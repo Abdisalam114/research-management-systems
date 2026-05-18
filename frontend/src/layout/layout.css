@@ -1,0 +1,253 @@
+@import "../styles/design-tokens.css";
+
+.appShell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  background: var(--rms-bg-primary);
+  color: var(--rms-text-primary);
+  font-family: var(--rms-font);
+}
+
+.appSidebar {
+  border-right: 1px solid var(--rms-border);
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--rms-bg-secondary);
+  align-items: center;
+}
+
+.appContent {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--rms-border);
+  background: var(--rms-bg-secondary);
+}
+
+.topBarLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topBarLogo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.topBarBrand {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--rms-text-secondary);
+}
+
+.topBarPage {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--rms-text-primary);
+}
+
+.topBarActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topBarIconBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--rms-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.topBarIconBtn:hover {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.35);
+}
+
+.topBarBell {
+  position: relative;
+}
+
+.topBarDot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rms-danger);
+}
+
+.topBarAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--rms-accent), #6366f1);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  text-decoration: none;
+  color: white;
+}
+
+.brandTitle {
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  font-size: 18px;
+}
+.brandSub {
+  opacity: 0.8;
+  font-size: 12px;
+}
+
+.userCard {
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.userName {
+  font-weight: 700;
+}
+.userMeta {
+  margin-top: 4px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.navItem {
+  padding: 10px 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  border: 1px solid transparent;
+}
+.navItem:hover {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+.navItem.active {
+  background: rgba(14, 165, 233, 0.18);
+  border-color: rgba(14, 165, 233, 0.45);
+  color: var(--rms-accent);
+}
+
+.sidebarFooter {
+  margin-top: auto;
+}
+
+.appMain {
+  padding: 22px;
+  background: var(--rms-bg-primary);
+  flex: 1;
+}
+
+.brandCompact {
+  display: none;
+}
+
+.navItem {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+}
+
+.navLabel {
+  display: none;
+}
+
+.btn {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: inherit;
+  padding: 10px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+.btn.primary {
+  background: rgba(14, 165, 233, 0.15);
+  border-color: rgba(14, 165, 233, 0.45);
+  color: var(--rms-text-primary);
+}
+.btn.primary:hover {
+  background: rgba(14, 165, 233, 0.25);
+}
+.btn.secondary {
+  width: 100%;
+}
+
+.card {
+  border: 1px solid var(--rms-border);
+  border-radius: 14px;
+  background: var(--rms-bg-card);
+  padding: 16px;
+  box-shadow: var(--rms-shadow);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.field label {
+  font-size: 12px;
+  opacity: 0.85;
+}
+.field input,
+.field select {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  outline: none;
+}
+.field input:focus,
+.field select:focus {
+  border-color: rgba(45, 212, 191, 0.45);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.muted {
+  opacity: 0.85;
+  font-size: 13px;
+}
+

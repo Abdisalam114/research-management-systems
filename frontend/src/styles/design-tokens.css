@@ -1,0 +1,14 @@
+:root {
+  --rms-bg-primary: #020617;
+  --rms-bg-secondary: #0f172a;
+  --rms-bg-card: #1e293b;
+  --rms-accent: #0ea5e9;
+  --rms-success: #10b981;
+  --rms-warning: #f59e0b;
+  --rms-danger: #ef4444;
+  --rms-text-primary: #f8fafc;
+  --rms-text-secondary: #94a3b8;
+  --rms-border: rgba(255, 255, 255, 0.08);
+  --rms-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  --rms-font: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+}
