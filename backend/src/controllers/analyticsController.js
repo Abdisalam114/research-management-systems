@@ -1,11 +1,13 @@
 const { Proposal, PROPOSAL_STATUSES } = require("../models/Proposal");
 const { Project, PROJECT_STATUSES } = require("../models/Project");
 const { Grant, GRANT_STATUSES } = require("../models/Grant");
+// GRANT_STATUSES used in finance report
 const { Budget, BUDGET_ITEM_STATUSES } = require("../models/Budget");
 const { Publication, PUBLICATION_STATUSES, PUBLICATION_TYPES } = require("../models/Publication");
 const { RepositoryItem } = require("../models/RepositoryItem");
 const { ResearchGroup } = require("../models/ResearchGroup");
 const { User, USER_STATUSES, ROLES } = require("../models/User");
+const PDFDocument = require("pdfkit");
 
 function sum(nums) {
   return (nums || []).reduce((acc, n) => acc + (typeof n === "number" ? n : 0), 0);
@@ -91,7 +93,7 @@ function buildMonthlyGrantTrends(grants) {
   return buckets.map(({ month, amount }) => ({ month, amount }));
 }
 
-async function getInstitutionalAnalytics(req, res) {
+async function buildInstitutionalAnalytics() {
   const [
     proposalCount,
     projectCount,
@@ -120,7 +122,7 @@ async function getInstitutionalAnalytics(req, res) {
     Project.find({}).sort({ updatedAt: -1 }).limit(10).populate("researcherId", "fullName department"),
     Grant.find({}).select("amountAwarded status createdAt decidedAt"),
     Budget.find({}).select("items totalAllocated"),
-    Publication.find({}).select("title type year status citationCount doi createdAt"),
+    Publication.find({}).select("title type year status citationCount doi createdAt researcherId"),
     Proposal.find({ status: { $in: [PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW, PROPOSAL_STATUSES.APPROVED] } })
       .sort({ updatedAt: -1 })
       .limit(8)
@@ -140,6 +142,7 @@ async function getInstitutionalAnalytics(req, res) {
   const pubsByType = {
     journal: publications.filter((p) => p.type === PUBLICATION_TYPES.JOURNAL).length,
     conference: publications.filter((p) => p.type === PUBLICATION_TYPES.CONFERENCE).length,
+    book: publications.filter((p) => p.type === PUBLICATION_TYPES.BOOK).length,
     patent: publications.filter((p) => p.type === PUBLICATION_TYPES.PATENT).length,
   };
   const citationTotal = publications.reduce((a, p) => a + (p.citationCount || 0), 0);
@@ -174,7 +177,63 @@ async function getInstitutionalAnalytics(req, res) {
     };
   });
 
-  res.json({
+  const grantDecided = grants.filter((g) => ["approved", "rejected", "active", "closed"].includes(g.status)).length;
+  const grantWon = grants.filter((g) => ["approved", "active", "closed"].includes(g.status)).length;
+  const grantSuccessRate = grantDecided ? Math.round((grantWon / grantDecided) * 100) : 0;
+
+  const activeUsers = await User.find({ status: USER_STATUSES.ACTIVE }).select("department role fullName");
+  const facultyMap = {};
+  activeUsers.forEach((u) => {
+    const dept = u.department || "Unknown";
+    if (!facultyMap[dept]) {
+      facultyMap[dept] = { department: dept, researchers: 0, publications: 0, citations: 0, proposals: 0, projects: 0 };
+    }
+    if (u.role === ROLES.RESEARCHER) facultyMap[dept].researchers += 1;
+  });
+
+  publications.forEach((pub) => {
+    const u = activeUsers.find((x) => String(x._id) === String(pub.researcherId));
+    const dept = u?.department || "Unknown";
+    if (!facultyMap[dept]) facultyMap[dept] = { department: dept, researchers: 0, publications: 0, citations: 0, proposals: 0, projects: 0 };
+    facultyMap[dept].publications += 1;
+    facultyMap[dept].citations += pub.citationCount || 0;
+  });
+
+  const allProposals = await Proposal.find({}).select("department status");
+  allProposals.forEach((p) => {
+    const dept = p.department || "Unknown";
+    if (!facultyMap[dept]) facultyMap[dept] = { department: dept, researchers: 0, publications: 0, citations: 0, proposals: 0, projects: 0 };
+    facultyMap[dept].proposals += 1;
+  });
+
+  projects.forEach((p) => {
+    const dept = p.researcherId?.department || "Unknown";
+    if (!facultyMap[dept]) facultyMap[dept] = { department: dept, researchers: 0, publications: 0, citations: 0, proposals: 0, projects: 0 };
+    facultyMap[dept].projects += 1;
+  });
+
+  const facultyAnalytics = Object.values(facultyMap).sort((a, b) => b.publications - a.publications);
+
+  const annualReport = {
+    year: new Date().getFullYear(),
+    overview: {
+      proposals: proposalCount,
+      projects: projectCount,
+      grants: grantCount,
+      publications: publicationCount,
+      fundingSecured: awardedTotal,
+    },
+    grantSuccessRate,
+    facultyCount: facultyAnalytics.length,
+    topFacultyByPublications: facultyAnalytics.slice(0, 5),
+    budgetUtilization: {
+      pending: allBudgetItems.filter((i) => i.status === BUDGET_ITEM_STATUSES.PENDING).length,
+      approved: allBudgetItems.filter((i) => i.status === BUDGET_ITEM_STATUSES.APPROVED).length,
+      paid: allBudgetItems.filter((i) => i.status === BUDGET_ITEM_STATUSES.PAID).length,
+    },
+  };
+
+  return {
     generatedAt: new Date().toISOString(),
     overview: {
       proposals: proposalCount,
@@ -230,8 +289,114 @@ async function getInstitutionalAnalytics(req, res) {
       itemsApproved: allBudgetItems.filter((i) => i.status === BUDGET_ITEM_STATUSES.APPROVED).length,
       itemsPaid: allBudgetItems.filter((i) => i.status === BUDGET_ITEM_STATUSES.PAID).length,
     },
+    grantSuccessRate,
+    facultyAnalytics,
+    annualReport,
+  };
+}
+
+async function getInstitutionalAnalytics(req, res) {
+  const data = await buildInstitutionalAnalytics();
+  res.json(data);
+}
+
+async function exportAnnualReportPdf(req, res) {
+  const data = await buildInstitutionalAnalytics();
+  const ar = data.annualReport;
+  const year = ar.year || new Date().getFullYear();
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="JUST-RMS-Annual-Report-${year}.pdf"`);
+
+  const doc = new PDFDocument({ size: "A4", margin: 54 });
+  doc.pipe(res);
+
+  doc.fontSize(20).text(`Jamhuriya University — Annual Research Report ${year}`, { align: "center" });
+  doc.moveDown(0.5);
+  doc.fontSize(11).fillColor("#444").text(`Generated: ${new Date(data.generatedAt).toLocaleString()}`, { align: "center" });
+  doc.fillColor("#000");
+  doc.moveDown(1.2);
+
+  doc.fontSize(14).text("Institutional overview", { underline: true });
+  doc.moveDown(0.4);
+  doc.fontSize(12);
+  doc.text(`Proposals: ${ar.overview.proposals}`);
+  doc.text(`Projects: ${ar.overview.projects}`);
+  doc.text(`Grants: ${ar.overview.grants}`);
+  doc.text(`Publications: ${ar.overview.publications}`);
+  doc.text(`Funding secured: $${ar.overview.fundingSecured.toLocaleString()}`);
+  doc.text(`Grant success rate: ${data.grantSuccessRate}%`);
+  doc.moveDown(0.8);
+
+  doc.fontSize(14).text("Research output", { underline: true });
+  doc.moveDown(0.4);
+  doc.text(`Total citations: ${data.researchOutput.citations}`);
+  doc.text(`Active projects: ${data.projectStatus.active} / ${data.projectStatus.total}`);
+  doc.moveDown(0.8);
+
+  doc.fontSize(14).text("Publications per faculty (top 5)", { underline: true });
+  doc.moveDown(0.4);
+  (ar.topFacultyByPublications || []).forEach((f) => {
+    doc.text(
+      `${f.department}: ${f.publications} publications, ${f.citations} citations, ${f.researchers} researchers`
+    );
+  });
+  doc.moveDown(0.8);
+
+  doc.fontSize(14).text("Budget utilization", { underline: true });
+  doc.moveDown(0.4);
+  doc.text(`Pending: ${ar.budgetUtilization.pending}`);
+  doc.text(`Approved: ${ar.budgetUtilization.approved}`);
+  doc.text(`Paid: ${ar.budgetUtilization.paid}`);
+
+  doc.end();
+}
+
+async function getFinanceReport(req, res) {
+  const [budgets, grants] = await Promise.all([
+    Budget.find({}).select("title totalAllocated items grantId projectId"),
+    Grant.find({}).select("title amountAwarded amountRequested status fundingSource"),
+  ]);
+
+  const allItems = budgets.flatMap((b) =>
+    (b.items || []).map((i) => ({
+      budgetTitle: b.title,
+      description: i.description,
+      amount: i.amount,
+      status: i.status,
+      type: i.type,
+    }))
+  );
+
+  const totalAllocated = budgets.reduce((a, b) => a + (b.totalAllocated || 0), 0);
+  const totalExpenses = allItems.filter((i) => i.status === BUDGET_ITEM_STATUSES.PAID).reduce((a, i) => a + (i.amount || 0), 0);
+
+  res.json({
+    generatedAt: new Date().toISOString(),
+    summary: {
+      budgets: budgets.length,
+      totalAllocated,
+      totalPaid: totalExpenses,
+      utilizationPercent: totalAllocated ? Math.round((totalExpenses / totalAllocated) * 100) : 0,
+      activeGrants: grants.filter((g) => g.status === GRANT_STATUSES.ACTIVE).length,
+      awardedTotal: grants.filter((g) => g.status === GRANT_STATUSES.ACTIVE).reduce((a, g) => a + (g.amountAwarded || 0), 0),
+    },
+    grantSummary: grants.map((g) => ({
+      title: g.title,
+      fundingSource: g.fundingSource,
+      status: g.status,
+      amountRequested: g.amountRequested,
+      amountAwarded: g.amountAwarded,
+    })),
+    budgetItems: allItems.slice(0, 100),
   });
 }
 
-module.exports = { getDashboardMetrics, getInstitutionalAnalytics };
+module.exports = {
+  getDashboardMetrics,
+  buildInstitutionalAnalytics,
+  getInstitutionalAnalytics,
+  exportAnnualReportPdf,
+  getFinanceReport,
+};
 

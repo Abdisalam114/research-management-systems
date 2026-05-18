@@ -52,5 +52,21 @@ router.post(
   asyncHandler(proposalController.directorDecision)
 );
 
+router.post(
+  "/:id/ethics-decision",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("research_director", "faculty_coordinator"),
+  asyncHandler(proposalController.ethicsDecision)
+);
+
+router.post(
+  "/:id/assign-reviewers",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("research_director"),
+  asyncHandler(proposalController.assignReviewers)
+);
+
 module.exports = { proposalRoutes: router };
 

@@ -7,6 +7,14 @@ const { authenticateUser, requireActiveUser, authorizeRoles } = require("../midd
 const router = express.Router();
 
 // Research Director only (institutional admin)
+router.post(
+  "/",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("research_director"),
+  asyncHandler(userController.createUserByDirector)
+);
+
 router.get(
   "/pending",
   authenticateUser,

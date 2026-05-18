@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const PUBLICATION_TYPES = Object.freeze({
   JOURNAL: "journal_article",
   CONFERENCE: "conference_paper",
+  BOOK: "book_chapter",
   PATENT: "patent",
   THESIS: "thesis",
   OTHER: "other",
@@ -26,6 +27,7 @@ const publicationSchema = new mongoose.Schema(
     url: { type: String, default: "", trim: true },
     authors: [{ type: String, trim: true }],
     citationCount: { type: Number, min: 0, default: 0 },
+    communityImpact: { type: String, default: "", trim: true },
     status: { type: String, enum: Object.values(PUBLICATION_STATUSES), default: PUBLICATION_STATUSES.DRAFT, index: true },
 
     researcherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },

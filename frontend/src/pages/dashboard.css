@@ -76,6 +76,132 @@
   color: var(--rms-text-primary);
 }
 
+.dashChartCard {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dashChartBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.dashChartPlot {
+  width: 100%;
+  height: 168px;
+  flex-shrink: 0;
+}
+
+.dashChartPlotBars {
+  height: 176px;
+}
+
+.dashPieSummary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  padding: 4px 0;
+}
+
+.dashPiePercent {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--rms-accent);
+}
+
+.dashPiePercentLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rms-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dashChartLegend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 14px;
+}
+
+.dashLegendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--rms-text-secondary);
+}
+
+.dashLegendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dashLegendValue {
+  color: var(--rms-text-primary);
+  font-weight: 700;
+}
+
+.dashChartMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--rms-border);
+}
+
+.dashChartMetaLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--rms-text-secondary);
+}
+
+.dashChartMetaValue {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--rms-text-primary);
+  line-height: 1.2;
+}
+
+.dashStatRowSplit {
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.dashStatRowSplit > span {
+  flex: 1 1 auto;
+  min-width: 72px;
+}
+
+.dashProgressCell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 108px;
+}
+
+.dashProgressPercent {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--rms-accent);
+  text-align: right;
+  line-height: 1;
+}
+
 .dashTable {
   width: 100%;
   border-collapse: collapse;
@@ -135,9 +261,27 @@
 
 .overviewGrid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.dashAnalyticsSection {
+  margin-top: 28px;
+  padding-top: 8px;
+  scroll-margin-top: 80px;
+}
+
+.dashSectionTitle {
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0 0 6px;
+  color: var(--rms-text-primary);
+}
+
+.dashSectionSub {
+  margin: 0;
+  font-size: 13px;
 }
 
 .overviewTile {
@@ -164,6 +308,12 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+@media (max-width: 1200px) {
+  .overviewGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 @media (max-width: 1100px) {

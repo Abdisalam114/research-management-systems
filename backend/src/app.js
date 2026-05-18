@@ -17,6 +17,7 @@ const { notificationRoutes } = require("./routes/notificationRoutes");
 const { conversationRoutes } = require("./routes/conversationRoutes");
 const { departmentRoutes } = require("./routes/departmentRoutes");
 const { analyticsRoutes } = require("./routes/analyticsRoutes");
+const { policyRoutes } = require("./routes/policyRoutes");
 
 function createApp() {
   const app = express();
@@ -52,6 +53,7 @@ function createApp() {
   app.use("/api/conversations", conversationRoutes);
   app.use("/api/departments", departmentRoutes);
   app.use("/api/analytics", analyticsRoutes);
+  app.use("/api/policies", policyRoutes);
 
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 

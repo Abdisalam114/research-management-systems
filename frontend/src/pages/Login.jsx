@@ -61,9 +61,9 @@ export function LoginPage() {
             {busy ? "Signing in..." : "Sign In"}
           </button>
 
-          <div className="authFooter muted">
-            Don’t have an account? <Link to="/register">Request access</Link>
-          </div>
+          <p className="authFooter muted" style={{ marginTop: 14, marginBottom: 0 }}>
+            Need an account? Contact the Research Director — only they can create users.
+          </p>
         </div>
       </div>
     </div>

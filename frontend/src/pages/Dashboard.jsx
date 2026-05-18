@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { DirectorDashboard } from "../components/DirectorDashboard";
+import { CoordinatorDashboardPage } from "./CoordinatorDashboard";
 import * as analyticsApi from "../services/analyticsApi";
 import "./dashboard.css";
 
@@ -122,6 +123,10 @@ export function DashboardPage() {
 
   if (user?.role === "research_director") {
     return <DirectorDashboard />;
+  }
+
+  if (user?.role === "faculty_coordinator") {
+    return <CoordinatorDashboardPage />;
   }
 
   return <RoleDashboard role={user?.role} user={user} />;

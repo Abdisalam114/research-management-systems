@@ -3,7 +3,7 @@
 .appShell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 72px 1fr;
+  grid-template-columns: 220px 1fr;
   background: var(--rms-bg-primary);
   color: var(--rms-text-primary);
   font-family: var(--rms-font);
@@ -11,12 +11,12 @@
 
 .appSidebar {
   border-right: 1px solid var(--rms-border);
-  padding: 14px 10px;
+  padding: 14px 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   background: var(--rms-bg-secondary);
-  align-items: center;
+  align-items: stretch;
 }
 
 .appContent {
@@ -158,8 +158,48 @@
   color: var(--rms-accent);
 }
 
-.sidebarFooter {
-  margin-top: auto;
+.sidebarBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 10px;
+  border-bottom: 1px solid var(--rms-border);
+  margin-bottom: 4px;
+}
+
+.sidebarLogo {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.sidebarBrandText {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--rms-text-primary);
+}
+
+.navItemLogout {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rms-border);
+  border-left: 1px solid transparent;
+  border-right: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.navItemLogout:hover {
+  border-top-color: var(--rms-border);
+  border-left-color: rgba(255, 255, 255, 0.08);
+  border-right-color: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .appMain {
@@ -173,16 +213,30 @@
 }
 
 .navItem {
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  display: grid;
-  place-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+}
+
+.navItem > span:first-child {
+  flex-shrink: 0;
+  width: 22px;
+  text-align: center;
   font-size: 18px;
 }
 
 .navLabel {
-  display: none;
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .btn {

@@ -42,6 +42,7 @@ export function PublicationsPage() {
                 <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
                   <option value="journal_article">Journal article</option>
                   <option value="conference_paper">Conference paper</option>
+                  <option value="book_chapter">Book / chapter</option>
                   <option value="patent">Patent</option>
                   <option value="thesis">Thesis</option>
                   <option value="other">Other</option>
@@ -95,7 +96,7 @@ export function PublicationsPage() {
                   {p.doi ? <div className="muted">DOI: {p.doi}</div> : null}
                   {p.orcid ? <div className="muted">ORCID: {p.orcid}</div> : null}
                 </div>
-                <motionTitle style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {canCreate && p.status === "draft" ? (
                     <button
                       className="btn"
@@ -154,7 +155,7 @@ export function PublicationsPage() {
                       </button>
                     </>
                   ) : null}
-                </motionTitle>
+                </div>
               </div>
             </div>
           ))}

@@ -21,6 +21,9 @@ import { RepositoryPage } from "./pages/Repository";
 import { GroupsPage } from "./pages/Groups";
 import { NotificationsPage } from "./pages/Notifications";
 import { MessagesPage } from "./pages/Messages";
+import { ResearchPoliciesPage } from "./pages/ResearchPolicies";
+import { CoordinatorDashboardPage } from "./pages/CoordinatorDashboard";
+import { FinanceReportsPage } from "./pages/FinanceReports";
 
 export default function App() {
   return (
@@ -41,6 +44,15 @@ export default function App() {
 
           <Route element={<ProtectedRoute roles={["research_director"]} />}>
             <Route path="/pending-users" element={<PendingUsersPage />} />
+            <Route path="/policies" element={<ResearchPoliciesPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute roles={["faculty_coordinator"]} />}>
+            <Route path="/faculty-dashboard" element={<CoordinatorDashboardPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute roles={["research_director", "finance_officer"]} />}>
+            <Route path="/finance-reports" element={<FinanceReportsPage />} />
           </Route>
 
           <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director"]} />}>
@@ -54,7 +66,7 @@ export default function App() {
             </Route>
           </Route>
 
-          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director"]} />}>
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "finance_officer"]} />}>
             <Route path="/projects" element={<ProjectsListPage />} />
             <Route path="/projects/:id" element={<ProjectDetailsPage />} />
             <Route element={<ProtectedRoute roles={["researcher"]} />}>

@@ -24,19 +24,19 @@ export function GroupsPage() {
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
   return (
-    <motionTitle>
+    <div>
       <h2 style={{ marginTop: 0 }}>Collaboration Groups</h2>
       {loading ? <p className="muted">Loading groups…</p> : null}
       {error ? (
-        <motionTitle className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>
+        <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>
           {error}
-        </motionTitle>
+        </div>
       ) : null}
 
       {canCreate ? (
-        <motionTitle className="card" style={{ marginTop: 12 }}>
-          <motionTitle style={{ fontWeight: 800 }}>Create Group</motionTitle>
-          <motionTitle style={{ display: "flex", gap: 10, marginTop: 10 }}>
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800 }}>Create Group</div>
+          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
             <input style={{ flex: 1 }} value={name} onChange={(e) => setName(e.target.value)} placeholder="Group name" />
             <button
               className="btn primary"
@@ -53,23 +53,23 @@ export function GroupsPage() {
             >
               Create
             </button>
-          </motionTitle>
-        </motionTitle>
+          </div>
+        </div>
       ) : null}
 
-      <motionTitle className="card" style={{ marginTop: 12 }}>
-        <motionTitle style={{ fontWeight: 800 }}>Groups</motionTitle>
-        <motionTitle style={{ display: "grid", gap: 10, marginTop: 10 }}>
+      <div className="card" style={{ marginTop: 12 }}>
+        <div style={{ fontWeight: 800 }}>Groups</div>
+        <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
           {groups.map((g) => {
             const member = isMember(g, user?.id);
             return (
-              <motionTitle key={g.id} className="card">
-                <motionTitle style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-                  <motionTitle>
-                    <motionTitle style={{ fontWeight: 800 }}>{g.name}</motionTitle>
-                    <motionTitle className="muted">Members: {g.members?.length || 0}</motionTitle>
-                  </motionTitle>
-                  <motionTitle style={{ display: "flex", gap: 8 }}>
+              <div key={g.id} className="card">
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontWeight: 800 }}>{g.name}</div>
+                    <div className="muted">Members: {g.members?.length || 0}</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
                     {!member ? (
                       <button
                         className="btn"
@@ -101,14 +101,14 @@ export function GroupsPage() {
                         Leave
                       </button>
                     )}
-                  </motionTitle>
-                </motionTitle>
-              </motionTitle>
+                  </div>
+                </div>
+              </div>
             );
           })}
-          {groups.length === 0 ? <motionTitle className="muted">No groups yet.</motionTitle> : null}
-        </motionTitle>
-      </motionTitle>
-    </motionTitle>
+          {groups.length === 0 ? <div className="muted">No groups yet.</div> : null}
+        </div>
+      </div>
+    </div>
   );
 }

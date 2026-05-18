@@ -14,6 +14,13 @@ export async function getProject(accessToken, id) {
   return data;
 }
 
+export async function updateProject(accessToken, id, body) {
+  const { data } = await api.put(`/api/projects/${id}`, body, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
 export async function addProgress(accessToken, id, note, progressPercent) {
   const { data } = await api.post(
     `/api/projects/${id}/progress`,

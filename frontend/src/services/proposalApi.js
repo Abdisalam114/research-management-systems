@@ -67,3 +67,29 @@ export async function directorDecision(accessToken, id, decision, comment) {
   return data;
 }
 
+export async function listProposalsAll(accessToken) {
+  const { data } = await api.get("/api/proposals", {
+    params: { scope: "all" },
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
+export async function ethicsDecision(accessToken, id, decision, comment) {
+  const { data } = await api.post(
+    `/api/proposals/${id}/ethics-decision`,
+    { decision, comment },
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return data;
+}
+
+export async function assignReviewers(accessToken, id, reviewerIds) {
+  const { data } = await api.post(
+    `/api/proposals/${id}/assign-reviewers`,
+    { reviewerIds },
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return data;
+}
+

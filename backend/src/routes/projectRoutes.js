@@ -9,6 +9,14 @@ const router = express.Router();
 router.get("/", authenticateUser, requireActiveUser, asyncHandler(projectController.listProjects));
 router.get("/:id", authenticateUser, requireActiveUser, asyncHandler(projectController.getProject));
 
+router.put(
+  "/:id",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("researcher", "research_director"),
+  asyncHandler(projectController.updateProject)
+);
+
 router.post(
   "/:id/progress",
   authenticateUser,

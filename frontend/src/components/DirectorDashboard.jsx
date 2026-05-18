@@ -15,6 +15,8 @@ import {
 } from "recharts";
 import { useAuth } from "../hooks/useAuth";
 import * as analyticsApi from "../services/analyticsApi";
+import { InstitutionalAnalyticsSections } from "./InstitutionalAnalyticsSections";
+import { FacultyAnalyticsSection } from "./FacultyAnalyticsSection";
 import "../pages/dashboard.css";
 
 const PIE_COLORS = ["#0ea5e9", "#334155"];
@@ -29,6 +31,29 @@ export function DirectorDashboard() {
   const { accessToken } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  async function handleDownloadAnnualReport() {
+    try {
+      setDownloadingPdf(true);
+      const blob = await analyticsApi.downloadAnnualReportPdf(accessToken);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `JUST-RMS-Annual-Report-${data?.annualReport?.year ?? new Date().getFullYear()}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to download annual report PDF");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!data || window.location.hash !== "#institutional-analytics") return;
+    document.getElementById("institutional-analytics")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [data]);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +109,7 @@ export function DirectorDashboard() {
         {[
           ["Proposals", data.overview.proposals, "/proposals"],
           ["Projects", data.overview.projects, "/projects"],
+          ["Grants", data.overview.grants, "/grants"],
           ["Publications", data.overview.publications, "/publications"],
           ["Budgets", data.overview.budgets, "/budgets"],
           ["Repository", data.overview.repository, "/repository"],
@@ -97,87 +123,109 @@ export function DirectorDashboard() {
       </div>
 
       <div className="dashChartsRow">
-        <div className="dashCard">
+        <div className="dashCard dashChartCard">
           <div className="dashCardTitle">Project Status</div>
-          <div style={{ height: 200, position: "relative" }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={pieData} innerRadius={55} outerRadius={80} dataKey="value" paddingAngle={2}>
-                  {pieData.map((_, i) => (
-                    <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "grid",
-                placeItems: "center",
-                fontWeight: 800,
-                fontSize: 22,
-                color: "var(--rms-accent)",
-              }}
-            >
-              {data.projectStatus.activePercent}% Active
+          <div className="dashChartBlock">
+            <div className="dashChartPlot">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={pieData} innerRadius={48} outerRadius={72} dataKey="value" paddingAngle={2}>
+                    {pieData.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="dashPieSummary">
+              <span className="dashPiePercent">{data.projectStatus.activePercent}%</span>
+              <span className="dashPiePercentLabel">Active projects</span>
+            </div>
+            <div className="dashChartLegend">
+              {pieData.map((entry, i) => (
+                <span key={entry.name} className="dashLegendItem">
+                  <span className="dashLegendDot" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                  <span className="dashLegendName">{entry.name}</span>
+                  <strong className="dashLegendValue">{entry.value}</strong>
+                </span>
+              ))}
+            </div>
+            <div className="dashStatRow dashStatRowSplit">
+              <span>
+                Total <strong>{data.projectStatus.total}</strong>
+              </span>
+              <span>
+                Active <strong>{data.projectStatus.active}</strong>
+              </span>
+              <span>
+                Done <strong>{data.projectStatus.completed}</strong>
+              </span>
             </div>
           </div>
-          <div className="dashStatRow">
-            <span>
-              Total <strong>{data.projectStatus.total}</strong>
-            </span>
-            <span>
-              Active <strong>{data.projectStatus.active}</strong>
-            </span>
-            <span>
-              Done <strong>{data.projectStatus.completed}</strong>
-            </span>
+        </div>
+
+        <div className="dashCard dashChartCard">
+          <div className="dashCardTitle">Grant Funding Trends</div>
+          <div className="dashChartBlock">
+            <div className="dashChartMeta">
+              <span className="dashChartMetaLabel">Active funds</span>
+              <span className="dashChartMetaValue">{formatMoney(data.grantFunding.activeFunds)}</span>
+            </div>
+            <div className="dashChartPlot">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data.grantFunding.trends} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                  <XAxis dataKey="month" tick={{ fill: "#94a3b8", fontSize: 10 }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} width={44} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#0f172a",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 10,
+                    }}
+                  />
+                  <Line type="monotone" dataKey="amount" stroke="#0ea5e9" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
-        <div className="dashCard">
-          <div className="dashCardTitleRow">
-            <div className="dashCardTitle">Grant Funding Trends</div>
-            <span className="muted" style={{ fontWeight: 600 }}>
-              ACTIVE FUNDS: {formatMoney(data.grantFunding.activeFunds)}
-            </span>
-          </div>
-          <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={data.grantFunding.trends}>
-              <XAxis dataKey="month" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-              <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} />
-              <Tooltip
-                contentStyle={{
-                  background: "#0f172a",
-                  border: "1px solid rgba(255,255,255,0.1)",
-                  borderRadius: 10,
-                }}
-              />
-              <Line type="monotone" dataKey="amount" stroke="#0ea5e9" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        <div className="dashCard">
+        <div className="dashCard dashChartCard">
           <div className="dashCardTitle">Research Output</div>
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart layout="vertical" data={outputBars} margin={{ top: 4, right: 8, left: 4, bottom: 4 }}>
-              <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 10 }} />
-              <YAxis type="category" dataKey="name" width={72} tick={{ fill: "#94a3b8", fontSize: 10 }} />
-              <Bar dataKey="value" fill="#0ea5e9" radius={[0, 6, 6, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-          <div className="dashStatRow">
-            <span>
-              Pubs <strong>{data.researchOutput.publications}</strong>
-            </span>
-            <span>
-              Citations <strong>{data.researchOutput.citations}</strong>
-            </span>
-            <span>
-              Patents <strong>{data.researchOutput.patents}</strong>
-            </span>
+          <div className="dashChartBlock">
+            <div className="dashChartPlot dashChartPlotBars">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart layout="vertical" data={outputBars} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
+                  <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 10 }} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={84}
+                    tick={{ fill: "#94a3b8", fontSize: 11 }}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#0f172a",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: 10,
+                    }}
+                  />
+                  <Bar dataKey="value" fill="#0ea5e9" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="dashStatRow dashStatRowSplit">
+              <span>
+                Pubs <strong>{data.researchOutput.publications}</strong>
+              </span>
+              <span>
+                Citations <strong>{data.researchOutput.citations}</strong>
+              </span>
+              <span>
+                Patents <strong>{data.researchOutput.patents}</strong>
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -201,13 +249,13 @@ export function DirectorDashboard() {
                   <td>{p.id}</td>
                   <td>{p.title}</td>
                   <td>{p.principalInvestigator}</td>
-                  <td style={{ minWidth: 120 }}>
-                    <div className="progressBar">
-                      <span style={{ width: `${p.progressPercent}%` }} />
+                                    <td>
+                    <div className="dashProgressCell">
+                      <div className="progressBar">
+                        <span style={{ width: `${p.progressPercent}%` }} />
+                      </div>
+                      <span className="dashProgressPercent">{p.progressPercent}%</span>
                     </div>
-                    <span className="muted" style={{ fontSize: 11 }}>
-                      {p.progressPercent}%
-                    </span>
                   </td>
                   <td>{p.status}</td>
                 </tr>
@@ -252,11 +300,12 @@ export function DirectorDashboard() {
         </div>
       </div>
 
-      <div style={{ marginTop: 12, textAlign: "right" }}>
-        <Link className="btn primary" to="/analytics">
-          View full analytics →
-        </Link>
-      </div>
+      <FacultyAnalyticsSection
+        data={data}
+        downloading={downloadingPdf}
+        onDownloadReport={handleDownloadAnnualReport}
+      />
+      <InstitutionalAnalyticsSections data={data} />
     </div>
   );
 }

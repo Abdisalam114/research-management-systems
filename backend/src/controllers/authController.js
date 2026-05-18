@@ -1,4 +1,4 @@
-const { User, USER_STATUSES } = require("../models/User");
+const { User, USER_STATUSES, normalizeResearchInterests } = require("../models/User");
 const { AppError } = require("../utils/AppError");
 const {
   signAccessToken,
@@ -29,35 +29,18 @@ function sanitizeUser(userDoc) {
     role: userDoc.role,
     department: userDoc.department,
     rank: userDoc.rank,
+    researchInterests: normalizeResearchInterests(userDoc.researchInterests),
     status: userDoc.status,
     createdAt: userDoc.createdAt,
     updatedAt: userDoc.updatedAt,
   };
 }
 
-async function register(req, res) {
-  const { fullName, email, password, role, department, rank } = req.body;
-  if (!fullName || !email || !password || !role || !department || !rank) {
-    throw new AppError("All fields are required", 400);
-  }
-
-  const exists = await User.findOne({ email: email.toLowerCase() });
-  if (exists) throw new AppError("Email already in use", 409);
-
-  const user = await User.create({
-    fullName,
-    email,
-    password,
-    role,
-    department,
-    rank,
-    status: USER_STATUSES.PENDING,
-  });
-
-  res.status(201).json({
-    message: "Registered successfully. Your account is pending approval.",
-    user: sanitizeUser(user),
-  });
+async function register(_req, _res) {
+  throw new AppError(
+    "Public registration is disabled. Contact the Research Director to create your account.",
+    403
+  );
 }
 
 async function login(req, res) {

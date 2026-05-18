@@ -27,6 +27,48 @@ async function listPendingUsers(req, res) {
   res.json({ users: users.map(sanitizeUser) });
 }
 
+async function createUserByDirector(req, res) {
+  const { fullName, email, password, role, department, rank, status } = req.body || {};
+
+  if (!fullName || !email || !password || !role || !department || !rank) {
+    throw new AppError("All fields are required", 400);
+  }
+
+  if (password.length < 6) {
+    throw new AppError("Password must be at least 6 characters", 400);
+  }
+
+  if (!Object.values(ROLES).includes(role)) {
+    throw new AppError("Invalid role", 400);
+  }
+
+  if (role === ROLES.RESEARCH_DIRECTOR) {
+    throw new AppError("Research Director accounts cannot be created here", 400);
+  }
+
+  const nextStatus =
+    status && Object.values(USER_STATUSES).includes(status) ? status : USER_STATUSES.ACTIVE;
+
+  const exists = await User.findOne({ email: String(email).toLowerCase().trim() });
+  if (exists) throw new AppError("Email already in use", 409);
+
+  const user = await User.create({
+    fullName: String(fullName).trim(),
+    email: String(email).toLowerCase().trim(),
+    password,
+    role,
+    department: String(department).trim(),
+    rank: String(rank).trim(),
+    status: nextStatus,
+    isProtected: false,
+  });
+
+  res.status(201).json({
+    message: nextStatus === USER_STATUSES.ACTIVE ? "User created and activated" : "User created (pending)",
+    user: sanitizeUser(user),
+  });
+}
+
 async function listUsers(req, res) {
   const { status, role, q } = req.query || {};
   const filter = {};
@@ -123,16 +165,18 @@ async function updateMyProfile(req, res) {
   const user = req.currentUser;
   if (!user) throw new AppError("Unauthorized", 401);
 
-  const { fullName, department, rank } = req.body;
+  const { fullName, department, rank, researchInterests } = req.body;
   if (fullName) user.fullName = fullName;
   if (department) user.department = department;
   if (rank) user.rank = rank;
+  if (researchInterests !== undefined) user.researchInterests = String(researchInterests).trim();
 
   await user.save();
   res.json({ message: "Profile updated", user: sanitizeUser(user) });
 }
 
 module.exports = {
+  createUserByDirector,
   listPendingUsers,
   listUsers,
   approveUser,

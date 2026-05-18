@@ -14,3 +14,18 @@ export async function institutionalAnalytics(accessToken) {
   return res.data;
 }
 
+export async function financeReport(accessToken) {
+  const res = await api.get("/api/analytics/finance-report", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
+
+export async function downloadAnnualReportPdf(accessToken) {
+  const res = await api.get("/api/analytics/annual-report.pdf", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    responseType: "blob",
+  });
+  return res.data;
+}
+

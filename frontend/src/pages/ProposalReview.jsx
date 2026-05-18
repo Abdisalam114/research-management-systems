@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as proposalApi from "../services/proposalApi";
+import * as userApi from "../services/userApi";
 import { apiOrigin } from "../config/apiBase";
 
 export function ProposalReviewPage() {
@@ -11,6 +12,9 @@ export function ProposalReviewPage() {
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [ethicsDecision, setEthicsDecision] = useState("approved");
+  const [reviewerIds, setReviewerIds] = useState("");
+  const [staffUsers, setStaffUsers] = useState([]);
 
   const isCoordinator = user?.role === "faculty_coordinator";
   const isDirector = user?.role === "research_director";
@@ -42,6 +46,12 @@ export function ProposalReviewPage() {
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load proposal"));
+    if (user?.role === "research_director") {
+      userApi
+        .listUsers(accessToken, { status: "active" })
+        .then((r) => setStaffUsers((r.users || []).filter((u) => u.role !== "research_director")))
+        .catch(() => {});
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -66,7 +76,71 @@ export function ProposalReviewPage() {
         <div style={{ fontWeight: 800 }}>{proposal.title}</div>
         <div className="muted" style={{ marginTop: 6 }}>
           Status: {proposal.status} • v{proposal.version}
+          {proposal.requiresEthics ? ` • Ethics: ${proposal.ethicsStatus}` : ""}
         </div>
+
+        {(isCoordinator || isDirector) && proposal.requiresEthics ? (
+          <div className="card" style={{ marginTop: 12 }}>
+            <div style={{ fontWeight: 700 }}>Ethics approval</div>
+            <div className="field">
+              <label>Ethics decision</label>
+              <select value={ethicsDecision} onChange={(e) => setEthicsDecision(e.target.value)}>
+                <option value="approved">Approve ethics</option>
+                <option value="revision_requested">Request ethics revision</option>
+                <option value="rejected">Reject ethics</option>
+              </select>
+            </div>
+            <button
+              className="btn"
+              type="button"
+              disabled={busy || !comment.trim()}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await proposalApi.ethicsDecision(accessToken, id, ethicsDecision, comment.trim());
+                  await load();
+                } catch (e) {
+                  setError(e?.response?.data?.message || "Ethics action failed");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Save ethics decision
+            </button>
+          </div>
+        ) : null}
+
+        {isDirector ? (
+          <div className="card" style={{ marginTop: 12 }}>
+            <div style={{ fontWeight: 700 }}>Assign reviewers</div>
+            <div className="field">
+              <label>Reviewer user IDs (comma-separated)</label>
+              <input value={reviewerIds} onChange={(e) => setReviewerIds(e.target.value)} />
+            </div>
+            <button
+              className="btn"
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                const ids = reviewerIds.split(",").map((x) => x.trim()).filter(Boolean);
+                if (!ids.length) return;
+                setBusy(true);
+                try {
+                  await proposalApi.assignReviewers(accessToken, id, ids);
+                  await load();
+                } catch (e) {
+                  setError(e?.response?.data?.message || "Assign failed");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Assign reviewers
+            </button>
+          </div>
+        ) : null}
+
 
         <div style={{ marginTop: 12 }}>
           <div className="muted" style={{ marginBottom: 6 }}>

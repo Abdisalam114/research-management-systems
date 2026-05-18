@@ -54,6 +54,14 @@ All users are defined in **`backend/src/scripts/seedData.js`** only.
 | `npm run seed` | **Single seed** — all users + sample data |
 | `npm run db:audit` | Count documents per collection (backend) |
 
+## Specification vs MVP (gap analysis)
+
+Your full university RMS specification (8 modules, 4 roles) is mapped to what this repo **implements today** vs what is **still missing**:
+
+→ **[docs/SPEC_GAP_ANALYSIS.md](docs/SPEC_GAP_ANALYSIS.md)**
+
+Use that document when planning Phase 2; it is kept in sync with the codebase (routes, roles, partial features).
+
 ## License
 
 Private / institutional use.

@@ -5,9 +5,11 @@ import logo from "../assets/jamhuriya-logo.png";
 const MENU = [
   { to: "/dashboard", label: "Dashboard", icon: "🏠", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
   { to: "/analytics", label: "Analytics", icon: "📊", roles: ["research_director"] },
-  { to: "/pending-users", label: "Director", icon: "🎓", roles: ["research_director"] },
+  { to: "/pending-users", label: "Users", icon: "👥", roles: ["research_director"] },
+  { to: "/policies", label: "Policies", icon: "📋", roles: ["research_director"] },
+  { to: "/finance-reports", label: "Finance", icon: "📑", roles: ["research_director", "finance_officer"] },
   { to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher"] },
-  { to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
   { to: "/grants", label: "Grants", icon: "💰", roles: ["research_director", "finance_officer", "faculty_coordinator", "researcher"] },
   { to: "/budgets", label: "Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher"] },
   { to: "/publications", label: "Publications", icon: "📚", roles: ["research_director", "faculty_coordinator", "researcher"] },
@@ -26,7 +28,10 @@ export function Sidebar() {
 
   return (
     <aside className="appSidebar">
-      <img src={logo} alt="JUST" style={{ width: 40, height: 40, borderRadius: 10, marginBottom: 8 }} title="Jamhuriya RMS" />
+      <div className="sidebarBrand" title="Jamhuriya RMS">
+        <img src={logo} alt="JUST" className="sidebarLogo" />
+        <span className="sidebarBrandText">JUST RMS</span>
+      </div>
 
       <nav className="nav">
         {items.map((item) => (
@@ -40,11 +45,8 @@ export function Sidebar() {
             <span className="navLabel">{item.label}</span>
           </NavLink>
         ))}
-      </nav>
-
-      <div className="sidebarFooter">
         <button
-          className="navItem"
+          className="navItem navItemLogout"
           type="button"
           title="Logout"
           onClick={async () => {
@@ -52,9 +54,10 @@ export function Sidebar() {
             navigate("/login", { replace: true });
           }}
         >
-          🚪
+          <span aria-hidden="true">🚪</span>
+          <span className="navLabel">Logout</span>
         </button>
-      </div>
+      </nav>
     </aside>
   );
 }

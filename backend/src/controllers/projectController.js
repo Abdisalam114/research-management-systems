@@ -1,6 +1,18 @@
-const { Project } = require("../models/Project");
+const { Project, PROJECT_STATUSES } = require("../models/Project");
 const { Proposal, PROPOSAL_STATUSES } = require("../models/Proposal");
 const { AppError } = require("../utils/AppError");
+
+function normalizeTeamMembers(team) {
+  if (!Array.isArray(team)) return [];
+  return team.map((m) => {
+    if (typeof m === "string") return { name: m, userId: null, role: "member" };
+    return {
+      name: m.name || "Member",
+      userId: m.userId || null,
+      role: m.role || "member",
+    };
+  });
+}
 
 function sanitizeProject(p) {
   return {
@@ -8,8 +20,8 @@ function sanitizeProject(p) {
     proposalId: p.proposalId,
     title: p.title,
     researcherId: p.researcherId,
-    teamMembers: p.teamMembers,
-    milestones: p.milestones,
+    teamMembers: normalizeTeamMembers(p.teamMembers),
+    milestones: p.milestones || [],
     startDate: p.startDate,
     endDate: p.endDate,
     status: p.status,
@@ -21,28 +33,72 @@ function sanitizeProject(p) {
 
 async function listProjects(req, res) {
   const { role } = req.user;
-
-  if (role === "researcher") {
-    const projects = await Project.find({ researcherId: req.user.id }).sort({ createdAt: -1 });
-    res.json({ projects: projects.map(sanitizeProject) });
-    return;
-  }
-
-  // Research Director / Faculty Coordinator: view all projects (MVP)
-  const projects = await Project.find({}).sort({ createdAt: -1 });
+  const filter = role === "researcher" ? { researcherId: req.user.id } : {};
+  const projects = await Project.find(filter).sort({ createdAt: -1 });
   res.json({ projects: projects.map(sanitizeProject) });
 }
 
 async function getProject(req, res) {
   const { id } = req.params;
+  const project = await Project.findById(id).populate("researcherId", "fullName email department");
+  if (!project) throw new AppError("Project not found", 404);
+
+  const isOwner = String(project.researcherId?._id || project.researcherId) === String(req.user.id);
+  const isStaff = ["faculty_coordinator", "research_director", "finance_officer"].includes(req.user.role);
+  if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+
+  const out = sanitizeProject(project);
+  if (project.researcherId && typeof project.researcherId === "object") {
+    out.principalInvestigator = {
+      id: project.researcherId._id,
+      fullName: project.researcherId.fullName,
+      email: project.researcherId.email,
+      department: project.researcherId.department,
+    };
+  }
+  res.json({ project: out });
+}
+
+async function updateProject(req, res) {
+  const { id } = req.params;
   const project = await Project.findById(id);
   if (!project) throw new AppError("Project not found", 404);
 
   const isOwner = String(project.researcherId) === String(req.user.id);
-  const isStaff = ["faculty_coordinator", "research_director"].includes(req.user.role);
-  if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+  const isDirector = req.user.role === "research_director";
+  if (!isOwner && !isDirector) throw new AppError("Forbidden", 403);
 
-  res.json({ project: sanitizeProject(project) });
+  const { milestones, teamMembers, startDate, endDate, status } = req.body;
+
+  if (milestones !== undefined) {
+    if (!Array.isArray(milestones)) throw new AppError("milestones must be an array", 400);
+    project.milestones = milestones.map((m) => ({
+      title: m.title,
+      dueDate: m.dueDate ? new Date(m.dueDate) : null,
+      completed: Boolean(m.completed),
+    }));
+  }
+
+  if (teamMembers !== undefined) {
+    if (!Array.isArray(teamMembers)) throw new AppError("teamMembers must be an array", 400);
+    project.teamMembers = teamMembers.map((m) => ({
+      name: String(m.name || "").trim() || "Member",
+      userId: m.userId || null,
+      role: m.role || "member",
+    }));
+  }
+
+  if (startDate !== undefined) project.startDate = startDate ? new Date(startDate) : project.startDate;
+  if (endDate !== undefined) project.endDate = endDate ? new Date(endDate) : null;
+
+  if (status !== undefined) {
+    if (!Object.values(PROJECT_STATUSES).includes(status)) throw new AppError("Invalid status", 400);
+    if (!isDirector && status !== project.status) throw new AppError("Only director can change project status", 403);
+    project.status = status;
+  }
+
+  await project.save();
+  res.json({ message: "Project updated", project: sanitizeProject(project) });
 }
 
 async function addProgressReport(req, res) {
@@ -67,7 +123,6 @@ async function addProgressReport(req, res) {
 }
 
 async function backfillProjectFromApprovedProposal(req, res) {
-  // MVP helper: if a proposal is already approved but project missing, create it.
   const { proposalId } = req.params;
 
   const proposal = await Proposal.findById(proposalId);
@@ -90,5 +145,4 @@ async function backfillProjectFromApprovedProposal(req, res) {
   res.status(201).json({ message: "Project created", project: sanitizeProject(project) });
 }
 
-module.exports = { listProjects, getProject, addProgressReport, backfillProjectFromApprovedProposal };
-
+module.exports = { listProjects, getProject, updateProject, addProgressReport, backfillProjectFromApprovedProposal };
