@@ -6,8 +6,8 @@ import logo from "../assets/jamhuriya-logo.png";
 
 export function LoginPage() {
   const { signIn } = useAuth();
-  const [email, setEmail] = useState("admin@rms.edu");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("director@rms.edu");
+  const [password, setPassword] = useState("Director2024!");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
@@ -35,7 +35,7 @@ export function LoginPage() {
         <div className="authForm">
           <div className="field">
             <label>Email Address</label>
-            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@rms.edu" autoComplete="email" />
+            <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="director@rms.edu" autoComplete="email" />
           </div>
           <div className="field">
             <label>Password</label>

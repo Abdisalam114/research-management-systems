@@ -20,9 +20,7 @@ MERN stack research management system for Jamhuriya University: proposals, proje
 cd backend
 cp .env.example .env
 npm install
-npm run seed:admin
-npm run seed:demo
-npm run seed:modules
+npm run seed
 npm run dev
 ```
 
@@ -38,21 +36,23 @@ npm run dev
 
 App: `http://localhost:5173` (Vite proxies `/api` to the backend in dev)
 
-### Default logins (after seed)
+### Default logins (after `npm run seed`)
+
+All users are defined in **`backend/src/scripts/seedData.js`** only.
 
 | Role | Email | Password |
 |------|-------|----------|
-| Research Director | `admin@rms.edu` | `admin123` |
-| Researcher | `asha@just.edu` | `Passw0rd!` |
-| Finance Officer | `finance@just.edu` | `Finance123!` |
-| Faculty Coordinator | `coordinator@just.edu` | `Coordinator123!` |
+| Research Director | `director@rms.edu` | `Director2024!` |
+| Faculty Coordinator | `coordinator@rms.edu` | `Coordinator2024!` |
+| Finance Officer | `finance@rms.edu` | `Finance2024!` |
+| Researcher | `asha@rms.edu` / `mahad@rms.edu` | `Researcher2024!` |
 
 ## Scripts
 
 | Command | Description |
 |---------|-------------|
+| `npm run seed` | **Single seed** — all users + sample data |
 | `npm run db:audit` | Count documents per collection (backend) |
-| `npm run seed:modules` | Sample grants, budgets, publications, etc. |
 
 ## License
 

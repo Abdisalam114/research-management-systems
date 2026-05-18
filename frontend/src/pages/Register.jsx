@@ -66,10 +66,9 @@ export function RegisterPage() {
           <div className="field">
             <label>Role</label>
             <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-              <option value="research_director">Research Director</option>
-              <option value="faculty_coordinator">Faculty Research Coordinator</option>
-              <option value="finance_officer">Finance Officer</option>
               <option value="researcher">Researcher</option>
+              <option value="faculty_coordinator">Faculty Coordinator</option>
+              <option value="finance_officer">Finance Officer</option>
             </select>
           </div>
           <div className="field">

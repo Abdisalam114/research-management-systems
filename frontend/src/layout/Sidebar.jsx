@@ -5,7 +5,7 @@ import logo from "../assets/jamhuriya-logo.png";
 const MENU = [
   { to: "/dashboard", label: "Dashboard", icon: "🏠", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
   { to: "/analytics", label: "Analytics", icon: "📊", roles: ["research_director"] },
-  { to: "/pending-users", label: "Users", icon: "👥", roles: ["research_director"] },
+  { to: "/pending-users", label: "Director", icon: "🎓", roles: ["research_director"] },
   { to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/grants", label: "Grants", icon: "💰", roles: ["research_director", "finance_officer", "faculty_coordinator", "researcher"] },

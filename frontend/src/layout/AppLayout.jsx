@@ -6,7 +6,7 @@ import "./layout.css";
 const PAGE_TITLES = {
   "/dashboard": "Dashboard",
   "/analytics": "Analytics & Reporting",
-  "/pending-users": "Pending Users",
+  "/pending-users": "Director — User Approvals",
   "/proposals": "Proposals",
   "/projects": "Projects",
   "/grants": "Grants & Funding",

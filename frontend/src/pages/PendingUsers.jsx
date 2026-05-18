@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { api } from "../services/api";
+import { formatRole } from "../utils/roleLabels";
 
 export function PendingUsersPage() {
   const { accessToken } = useAuth();
@@ -23,7 +24,10 @@ export function PendingUsersPage() {
 
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Pending Users</h2>
+      <h2 style={{ marginTop: 0 }}>Director — User Approvals</h2>
+      <p className="muted" style={{ marginTop: 6 }}>
+        Approve or reject new registrations (Research Director only).
+      </p>
       {error ? <div className="card" style={{ borderColor: "rgba(255, 99, 132, 0.55)" }}>{error}</div> : null}
 
       <div className="card" style={{ marginTop: 12 }}>
@@ -35,7 +39,7 @@ export function PendingUsersPage() {
               <div key={u.id} className="card">
                 <div style={{ fontWeight: 700 }}>{u.fullName}</div>
                 <div className="muted">
-                  {u.email} • {u.role} • {u.department}
+                  {u.email} • {formatRole(u.role)} • {u.department}
                 </div>
                 <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
                   <button
