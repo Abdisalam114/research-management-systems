@@ -1,7 +1,16 @@
 const { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES } = require("../models/Proposal");
 const { Project } = require("../models/Project");
 const { User } = require("../models/User");
+const { EthicsApplication } = require("../models/EthicsApplication");
 const { AppError } = require("../utils/AppError");
+const { notifyUsersByRole } = require("../utils/notify");
+const {
+  getEthicsForProposal,
+  assertEthicsReadyForProposalSubmit,
+  assertEthicsApprovedForDirectorApproval,
+  isEthicsFormComplete,
+  submitLinkedEthics,
+} = require("../utils/proposalEthicsLink");
 
 function sanitizeProposal(p) {
   return {
@@ -18,6 +27,7 @@ function sanitizeProposal(p) {
     requiresEthics: p.requiresEthics !== false,
     ethicsStatus: p.ethicsStatus,
     ethicsComments: p.ethicsComments || [],
+    ethicsApplicationId: p.ethicsApplicationId,
     assignedReviewers: p.assignedReviewers || [],
     reviewerComments: p.reviewerComments,
     submittedAt: p.submittedAt,
@@ -38,7 +48,47 @@ function pushVersionHistory(proposal, note = "") {
 
 function ethicsBlocksSubmission(proposal) {
   if (!proposal.requiresEthics) return false;
-  return ![ETHICS_STATUSES.APPROVED, ETHICS_STATUSES.NOT_REQUIRED].includes(proposal.ethicsStatus);
+  return proposal.ethicsStatus !== ETHICS_STATUSES.APPROVED;
+}
+
+async function attachEthicsSummary(proposal) {
+  const base = sanitizeProposal(proposal);
+  const ethics = await getEthicsForProposal(proposal._id);
+  if (!ethics) {
+    return {
+      ...base,
+      ethicsApplication: null,
+      ethicsFormComplete: false,
+    };
+  }
+  return {
+    ...base,
+    ethicsApplication: {
+      id: ethics._id,
+      status: ethics.status,
+      projectTitle: ethics.projectTitle,
+      formComplete: isEthicsFormComplete(ethics),
+    },
+    ethicsFormComplete: isEthicsFormComplete(ethics),
+  };
+}
+
+async function createLinkedEthicsApplication(proposal, user) {
+  const ethics = await EthicsApplication.create({
+    proposalId: proposal._id,
+    researcherId: proposal.researcherId,
+    projectTitle: proposal.title,
+    status: "draft",
+    principal: {
+      firstName: (user.fullName || "").split(" ")[0] || "",
+      lastName: (user.fullName || "").split(" ").slice(1).join(" ") || "",
+      email: user.email || "",
+      department: user.department || proposal.department || "",
+    },
+  });
+  proposal.ethicsApplicationId = ethics._id;
+  await proposal.save();
+  return ethics;
 }
 
 async function createProposal(req, res) {
@@ -63,7 +113,12 @@ async function createProposal(req, res) {
     ethicsStatus: needsEthics ? ETHICS_STATUSES.PENDING : ETHICS_STATUSES.NOT_REQUIRED,
   });
 
-  res.status(201).json({ proposal: sanitizeProposal(proposal) });
+  if (needsEthics) {
+    const user = await User.findById(req.user.id);
+    await createLinkedEthicsApplication(proposal, user || { email: "", fullName: "", department });
+  }
+
+  res.status(201).json({ proposal: await attachEthicsSummary(proposal) });
 }
 
 async function updateProposal(req, res) {
@@ -81,6 +136,13 @@ async function updateProposal(req, res) {
   if (abstract) proposal.abstract = abstract;
   if (department) proposal.department = department;
   if (researchArea) proposal.researchArea = researchArea;
+
+  if (title && proposal.ethicsApplicationId) {
+    await EthicsApplication.updateOne(
+      { _id: proposal.ethicsApplicationId },
+      { $set: { projectTitle: title } }
+    );
+  }
   if (requiresEthics !== undefined) {
     proposal.requiresEthics = requiresEthics !== "false" && requiresEthics !== false;
     if (!proposal.requiresEthics) proposal.ethicsStatus = ETHICS_STATUSES.NOT_REQUIRED;
@@ -95,7 +157,65 @@ async function updateProposal(req, res) {
   }
 
   await proposal.save();
-  res.json({ proposal: sanitizeProposal(proposal) });
+  res.json({ proposal: await attachEthicsSummary(proposal) });
+}
+
+async function getProposalEthicsApplication(req, res) {
+  const proposal = await Proposal.findById(req.params.id);
+  if (!proposal) throw new AppError("Proposal not found", 404);
+
+  const isOwner = String(proposal.researcherId) === String(req.user.id);
+  const isStaff = ["faculty_coordinator", "research_director"].includes(req.user.role);
+  if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+
+  let ethics = await getEthicsForProposal(proposal._id);
+  if (!ethics && isOwner && proposal.requiresEthics) {
+    const user = await User.findById(req.user.id);
+    ethics = await createLinkedEthicsApplication(proposal, user || {});
+  }
+
+  if (!ethics) {
+    return res.json({ application: null });
+  }
+
+  res.json({
+    application: {
+      id: ethics._id,
+      status: ethics.status,
+      projectTitle: ethics.projectTitle,
+      principal: ethics.principal,
+      coResearcher: ethics.coResearcher,
+      otherInvestigators: ethics.otherInvestigators,
+      projectLevel: ethics.projectLevel,
+      startDate: ethics.startDate,
+      endDate: ethics.endDate,
+      backgroundLiterature: ethics.backgroundLiterature,
+      aimsObjectives: ethics.aimsObjectives,
+      rationale: ethics.rationale,
+      design: ethics.design,
+      subjectTypes: ethics.subjectTypes,
+      subjectTypesSpecify: ethics.subjectTypesSpecify,
+      inclusionCriteria: ethics.inclusionCriteria,
+      exclusionCriteria: ethics.exclusionCriteria,
+      risk: ethics.risk,
+      riskPrecautions: ethics.riskPrecautions,
+      settings: ethics.settings,
+      instruments: ethics.instruments,
+      instrumentsOther: ethics.instrumentsOther,
+      dataCollectionDate: ethics.dataCollectionDate,
+      sampleSize: ethics.sampleSize,
+      dataHandling: ethics.dataHandling,
+      fundingSource: ethics.fundingSource,
+      consent: ethics.consent,
+      dataSafety: ethics.dataSafety,
+      privacy: ethics.privacy,
+      conflictOfInterest: ethics.conflictOfInterest,
+      applicantSignature: ethics.applicantSignature,
+      approval: ethics.approval,
+      proposalId: ethics.proposalId,
+      formComplete: isEthicsFormComplete(ethics),
+    },
+  });
 }
 
 async function submitProposal(req, res) {
@@ -108,8 +228,13 @@ async function submitProposal(req, res) {
     throw new AppError("Proposal cannot be submitted in its current status", 400);
   }
 
-  if (ethicsBlocksSubmission(proposal)) {
-    throw new AppError("Ethics approval is required before submission", 400);
+  if (proposal.requiresEthics) {
+    try {
+      const ethics = await assertEthicsReadyForProposalSubmit(proposal);
+      await submitLinkedEthics(ethics);
+    } catch (e) {
+      throw new AppError(e.message, 400);
+    }
   }
 
   if (proposal.status === PROPOSAL_STATUSES.REVISION_REQUESTED) {
@@ -121,7 +246,25 @@ async function submitProposal(req, res) {
   proposal.submittedAt = new Date();
   await proposal.save();
 
-  res.json({ message: "Proposal submitted", proposal: sanitizeProposal(proposal) });
+  try {
+    await notifyUsersByRole("research_director", {
+      type: "proposal",
+      title: proposal.requiresEthics
+        ? "Proposal + ethics form submitted for review"
+        : "Proposal submitted for director review",
+      body: proposal.title,
+      link: `/proposals/${proposal._id}/review`,
+    });
+  } catch {
+    /* notifications best-effort */
+  }
+
+  res.json({
+    message: proposal.requiresEthics
+      ? "Proposal and ethics form submitted to Director"
+      : "Proposal submitted to Director",
+    proposal: await attachEthicsSummary(proposal),
+  });
 }
 
 async function listProposals(req, res) {
@@ -156,7 +299,7 @@ async function getProposal(req, res) {
   const isStaff = ["faculty_coordinator", "research_director"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
-  res.json({ proposal: sanitizeProposal(proposal) });
+  res.json({ proposal: await attachEthicsSummary(proposal) });
 }
 
 async function coordinatorReview(req, res) {
@@ -194,7 +337,13 @@ async function directorDecision(req, res) {
     throw new AppError("Proposal is not decision-ready in its current status", 400);
   }
 
-  if (ethicsBlocksSubmission(proposal)) {
+  if (decision === PROPOSAL_STATUSES.APPROVED && proposal.requiresEthics) {
+    try {
+      await assertEthicsApprovedForDirectorApproval(proposal);
+    } catch (e) {
+      throw new AppError(e.message, 400);
+    }
+  } else if (decision === PROPOSAL_STATUSES.APPROVED && ethicsBlocksSubmission(proposal)) {
     throw new AppError("Ethics must be approved before final proposal decision", 400);
   }
 
@@ -272,6 +421,7 @@ module.exports = {
   submitProposal,
   listProposals,
   getProposal,
+  getProposalEthicsApplication,
   coordinatorReview,
   directorDecision,
   ethicsDecision,

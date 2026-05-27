@@ -14,6 +14,13 @@ export async function getProposal(accessToken, id) {
   return data;
 }
 
+export async function getProposalEthicsApplication(accessToken, proposalId) {
+  const { data } = await api.get(`/api/proposals/${proposalId}/ethics-application`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
 export async function createProposal(accessToken, payload) {
   const form = new FormData();
   Object.entries(payload).forEach(([k, v]) => {

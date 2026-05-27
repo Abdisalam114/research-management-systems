@@ -34,6 +34,12 @@ const proposalSchema = new mongoose.Schema(
       },
     ],
     researcherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    ethicsApplicationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "EthicsApplication",
+      default: null,
+      index: true,
+    },
     status: {
       type: String,
       enum: Object.values(PROPOSAL_STATUSES),

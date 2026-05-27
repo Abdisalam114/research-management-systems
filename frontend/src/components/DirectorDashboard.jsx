@@ -17,6 +17,7 @@ import { useAuth } from "../hooks/useAuth";
 import * as analyticsApi from "../services/analyticsApi";
 import { InstitutionalAnalyticsSections } from "./InstitutionalAnalyticsSections";
 import { FacultyAnalyticsSection } from "./FacultyAnalyticsSection";
+import { SystemModulesGrid } from "./SystemModulesGrid";
 import "../pages/dashboard.css";
 
 const PIE_COLORS = ["#0ea5e9", "#334155"];
@@ -110,22 +111,11 @@ export function DirectorDashboard() {
 
   return (
     <div>
-      <div className="overviewGrid">
-        {[
-          ["Proposals", data.overview.proposals, "/proposals"],
-          ["Projects", data.overview.projects, "/projects"],
-          ["Grants", data.overview.grants, "/grants"],
-          ["Publications", data.overview.publications, "/publications"],
-          ["Budgets", data.overview.budgets, "/budgets"],
-          ["Repository", data.overview.repository, "/repository"],
-          ["Groups", data.overview.groups, "/groups"],
-        ].map(([label, value, to]) => (
-          <Link key={label} to={to} className="overviewTile" style={{ textDecoration: "none" }}>
-            <div className="label">{label}</div>
-            <div className="value">{value}</div>
-          </Link>
-        ))}
-      </div>
+      <SystemModulesGrid
+        role="research_director"
+        overview={data.overview}
+        title="Jamhuriya RMS — dhammaan qaybaha system-ka"
+      />
 
       <div
         className="card"

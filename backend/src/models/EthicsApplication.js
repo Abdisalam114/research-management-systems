@@ -37,6 +37,14 @@ const personSchema = new mongoose.Schema(
 
 const ethicsSchema = new mongoose.Schema(
   {
+    proposalId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Proposal",
+      default: null,
+      index: true,
+      unique: true,
+      sparse: true,
+    },
     researcherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     status: {
       type: String,

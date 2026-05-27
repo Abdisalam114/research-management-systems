@@ -3,12 +3,14 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { EthicsApplication, ETHICS_STATUSES } = require("../models/EthicsApplication");
+const { Proposal, ETHICS_STATUSES: PROPOSAL_ETHICS_STATUSES } = require("../models/Proposal");
 const { AppError } = require("../utils/AppError");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
 
 function sanitize(a) {
   return {
     id: a._id,
+    proposalId: a.proposalId,
     researcherId: a.researcherId,
     status: a.status,
     principal: a.principal,
@@ -130,6 +132,13 @@ async function submitEthicsApplication(req, res) {
   if (!a.projectTitle || !a.principal?.firstName) {
     throw new AppError("Project title and principal investigator's first name are required", 400);
   }
+  const { isEthicsFormComplete } = require("../utils/proposalEthicsLink");
+  if (a.proposalId && !isEthicsFormComplete(a)) {
+    throw new AppError(
+      "Complete all required ethics fields (principal, level, aims, design, signature) before submitting.",
+      400
+    );
+  }
   a.status = ETHICS_STATUSES.SUBMITTED;
   if (!a.applicantSignature?.signedAt) {
     a.applicantSignature = {
@@ -142,9 +151,9 @@ async function submitEthicsApplication(req, res) {
   try {
     await notifyUsersByRole("research_director", {
       type: "ethics",
-      title: "New ethics application submitted",
+      title: a.proposalId ? "Ethics form submitted with proposal" : "New ethics application submitted",
       body: a.projectTitle,
-      link: "/ethics",
+      link: a.proposalId ? `/proposals/${a.proposalId}/review` : "/ethics",
     });
   } catch {
     /* notifications best-effort */
@@ -190,6 +199,9 @@ async function directorDecision(req, res) {
       year: year ? String(year).trim() : String(new Date().getFullYear()),
       rejectionReason: "",
     };
+    if (a.proposalId) {
+      await Proposal.updateOne({ _id: a.proposalId }, { ethicsStatus: PROPOSAL_ETHICS_STATUSES.APPROVED });
+    }
   } else {
     a.status = ETHICS_STATUSES.REJECTED;
     a.approval = {

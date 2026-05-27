@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as proposalApi from "../services/proposalApi";
+import { ProposalEthicsWorkflow, canSubmitToDirector } from "../components/ProposalEthicsWorkflow";
 import { apiOrigin } from "../config/apiBase";
 
 export function ProposalDetailsPage() {
@@ -9,22 +10,42 @@ export function ProposalDetailsPage() {
   const navigate = useNavigate();
   const { accessToken, user } = useAuth();
   const [proposal, setProposal] = useState(null);
+  const [ethics, setEthics] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const isOwner = proposal && String(proposal.researcherId) === String(user?.id);
-  const canSubmit = isOwner && ["draft", "revision_requested"].includes(proposal?.status);
+  const canSubmit = isOwner && canSubmitToDirector(proposal, ethics);
 
   async function load() {
     setError("");
     const res = await proposalApi.getProposal(accessToken, id);
     setProposal(res.proposal);
+    if (res.proposal?.requiresEthics) {
+      const eth = await proposalApi.getProposalEthicsApplication(accessToken, id);
+      setEthics(eth.application);
+    } else {
+      setEthics(null);
+    }
   }
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load proposal"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  async function submitCombined() {
+    setBusy(true);
+    setError("");
+    try {
+      await proposalApi.submitProposal(accessToken, id);
+      await load();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Submit failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   if (!proposal) return <div style={{ padding: 8 }}>{error ? error : "Loading..."}</div>;
 
@@ -73,7 +94,7 @@ export function ProposalDetailsPage() {
           )}
         </div>
 
-        <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+        <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
           {isOwner ? (
             <Link className="btn" to="/proposals/new">
               New draft
@@ -81,23 +102,8 @@ export function ProposalDetailsPage() {
           ) : null}
 
           {canSubmit ? (
-            <button
-              className="btn primary"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                setError("");
-                try {
-                  await proposalApi.submitProposal(accessToken, id);
-                  await load();
-                } catch (e) {
-                  setError(e?.response?.data?.message || "Submit failed");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              {busy ? "Submitting..." : "Submit proposal"}
+            <button className="btn primary" disabled={busy} onClick={submitCombined}>
+              {busy ? "Submitting…" : "Submit to Director (Proposal + Ethics)"}
             </button>
           ) : null}
 
@@ -108,6 +114,14 @@ export function ProposalDetailsPage() {
           ) : null}
         </div>
       </div>
+
+      <ProposalEthicsWorkflow
+        accessToken={accessToken}
+        proposal={proposal}
+        onRefresh={load}
+        onSubmitCombined={canSubmit ? submitCombined : undefined}
+        submitBusy={busy}
+      />
 
       {(proposal.versionHistory || []).length > 0 ? (
         <div className="card" style={{ marginTop: 12 }}>
@@ -161,4 +175,3 @@ export function ProposalDetailsPage() {
     </div>
   );
 }
-

@@ -8,6 +8,12 @@ const { upload } = require("../middleware/upload");
 const router = express.Router();
 
 router.get("/", authenticateUser, requireActiveUser, asyncHandler(proposalController.listProposals));
+router.get(
+  "/:id/ethics-application",
+  authenticateUser,
+  requireActiveUser,
+  asyncHandler(proposalController.getProposalEthicsApplication)
+);
 router.get("/:id", authenticateUser, requireActiveUser, asyncHandler(proposalController.getProposal));
 
 router.post(

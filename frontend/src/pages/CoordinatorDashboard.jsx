@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as analyticsApi from "../services/analyticsApi";
 import * as proposalApi from "../services/proposalApi";
+import { SystemModulesGrid } from "../components/SystemModulesGrid";
 
 export function CoordinatorDashboardPage() {
   const { accessToken, user } = useAuth();
@@ -54,24 +55,19 @@ export function CoordinatorDashboardPage() {
       {error ? <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>{error}</div> : null}
 
       {metrics ? (
-        <div className="overviewGrid" style={{ marginTop: 12 }}>
-          <div className="overviewTile">
-            <div className="label">Proposals (queue)</div>
-            <div className="value">{queue.length}</div>
+        <>
+          <SystemModulesGrid
+            role="faculty_coordinator"
+            metrics={metrics}
+            title="Jamhuriya RMS — dhammaan qaybaha system-ka"
+          />
+          <div className="overviewGrid" style={{ marginTop: 12 }}>
+            <div className="overviewTile">
+              <div className="label">Proposals (queue)</div>
+              <div className="value">{queue.length}</div>
+            </div>
           </div>
-          <div className="overviewTile">
-            <div className="label">All proposals</div>
-            <div className="value">{metrics.proposals?.total ?? 0}</div>
-          </div>
-          <div className="overviewTile">
-            <div className="label">Projects</div>
-            <div className="value">{metrics.projects?.total ?? 0}</div>
-          </div>
-          <div className="overviewTile">
-            <div className="label">Publications</div>
-            <div className="value">{metrics.publications?.total ?? 0}</div>
-          </div>
-        </div>
+        </>
       ) : null}
 
       <div className="card" style={{ marginTop: 16 }}>

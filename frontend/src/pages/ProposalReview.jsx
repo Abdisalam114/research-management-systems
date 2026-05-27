@@ -2,19 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as proposalApi from "../services/proposalApi";
-import * as userApi from "../services/userApi";
+import * as ethicsApi from "../services/ethicsApi";
+import { ProposalEthicsReviewPanel } from "../components/ProposalEthicsReviewPanel";
 import { apiOrigin } from "../config/apiBase";
 
 export function ProposalReviewPage() {
   const { id } = useParams();
   const { accessToken, user } = useAuth();
   const [proposal, setProposal] = useState(null);
+  const [ethics, setEthics] = useState(null);
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [ethicsDecision, setEthicsDecision] = useState("approved");
-  const [reviewerIds, setReviewerIds] = useState("");
-  const [staffUsers, setStaffUsers] = useState([]);
 
   const isCoordinator = user?.role === "faculty_coordinator";
   const isDirector = user?.role === "research_director";
@@ -28,7 +27,7 @@ export function ProposalReviewPage() {
     }
     if (isDirector) {
       return [
-        { id: "approved", label: "Approve" },
+        { id: "approved", label: "Approve proposal (creates project)" },
         { id: "revision_requested", label: "Request Revision" },
         { id: "rejected", label: "Reject" },
       ];
@@ -42,16 +41,16 @@ export function ProposalReviewPage() {
     setError("");
     const res = await proposalApi.getProposal(accessToken, id);
     setProposal(res.proposal);
+    if (res.proposal?.requiresEthics) {
+      const eth = await proposalApi.getProposalEthicsApplication(accessToken, id);
+      setEthics(eth.application);
+    } else {
+      setEthics(null);
+    }
   }
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load proposal"));
-    if (user?.role === "research_director") {
-      userApi
-        .listUsers(accessToken, { status: "active" })
-        .then((r) => setStaffUsers((r.users || []).filter((u) => u.role !== "research_director")))
-        .catch(() => {});
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -59,12 +58,53 @@ export function ProposalReviewPage() {
     setSelected((prev) => prev || actions[0]?.id || "");
   }, [actions]);
 
+  async function approveEthics() {
+    if (!ethics?.id) return;
+    const y = new Date().getFullYear();
+    const defaultAcademic = `${y}/${y + 1}`;
+    const academicYear = window.prompt("Academic year (certificate):", defaultAcademic) || defaultAcademic;
+    const year = window.prompt("Year (certificate):", String(y)) || String(y);
+    const serialNumber = window.prompt("Serial number (optional):") || undefined;
+    setBusy(true);
+    setError("");
+    try {
+      await ethicsApi.directorDecision(accessToken, ethics.id, {
+        decision: "approve",
+        academicYear,
+        year,
+        serialNumber,
+      });
+      await load();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Ethics approval failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function rejectEthics() {
+    if (!ethics?.id) return;
+    const rejectionReason = window.prompt("Rejection reason for ethics?") || "Rejected";
+    setBusy(true);
+    setError("");
+    try {
+      await ethicsApi.directorDecision(accessToken, ethics.id, { decision: "reject", rejectionReason });
+      await load();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Ethics rejection failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!proposal) return <div style={{ padding: 8 }}>{error ? error : "Loading..."}</div>;
+
+  const ethicsApproved = !proposal.requiresEthics || proposal.ethicsStatus === "approved" || ethics?.status === "approved";
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <h2 style={{ marginTop: 0 }}>Proposal Review</h2>
+        <h2 style={{ marginTop: 0 }}>Director review — Proposal + Ethics</h2>
         <Link className="btn" to={`/proposals/${id}`}>
           Back to details
         </Link>
@@ -72,135 +112,114 @@ export function ProposalReviewPage() {
 
       {error ? <div className="card" style={{ borderColor: "rgba(255, 99, 132, 0.55)" }}>{error}</div> : null}
 
-      <div className="card" style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800 }}>{proposal.title}</div>
+      <div className="card" style={{ marginTop: 12, borderColor: "rgba(14,165,233,0.25)" }}>
+        <div style={{ fontWeight: 800, fontSize: 18 }}>{proposal.title}</div>
         <div className="muted" style={{ marginTop: 6 }}>
-          Status: {proposal.status} • v{proposal.version}
-          {proposal.requiresEthics ? ` • Ethics: ${proposal.ethicsStatus}` : ""}
+          Proposal status: <strong>{proposal.status}</strong> • v{proposal.version}
+          {proposal.requiresEthics ? (
+            <>
+              {" "}
+              • Ethics: <strong>{ethics?.status || proposal.ethicsStatus || "—"}</strong>
+            </>
+          ) : null}
         </div>
 
-        {(isCoordinator || isDirector) && proposal.requiresEthics ? (
-          <div className="card" style={{ marginTop: 12 }}>
-            <div style={{ fontWeight: 700 }}>Ethics approval</div>
-            <div className="field">
-              <label>Ethics decision</label>
-              <select value={ethicsDecision} onChange={(e) => setEthicsDecision(e.target.value)}>
-                <option value="approved">Approve ethics</option>
-                <option value="revision_requested">Request ethics revision</option>
-                <option value="rejected">Reject ethics</option>
-              </select>
-            </div>
-            <button
-              className="btn"
-              type="button"
-              disabled={busy || !comment.trim()}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  await proposalApi.ethicsDecision(accessToken, id, ethicsDecision, comment.trim());
-                  await load();
-                } catch (e) {
-                  setError(e?.response?.data?.message || "Ethics action failed");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              Save ethics decision
-            </button>
+        <div style={{ marginTop: 12, display: "grid", gap: 8 }}>
+          <div>
+            <span className="muted">Department:</span> {proposal.department}
           </div>
-        ) : null}
-
-        {isDirector ? (
-          <div className="card" style={{ marginTop: 12 }}>
-            <div style={{ fontWeight: 700 }}>Assign reviewers</div>
-            <div className="field">
-              <label>Reviewer user IDs (comma-separated)</label>
-              <input value={reviewerIds} onChange={(e) => setReviewerIds(e.target.value)} />
-            </div>
-            <button
-              className="btn"
-              type="button"
-              disabled={busy}
-              onClick={async () => {
-                const ids = reviewerIds.split(",").map((x) => x.trim()).filter(Boolean);
-                if (!ids.length) return;
-                setBusy(true);
-                try {
-                  await proposalApi.assignReviewers(accessToken, id, ids);
-                  await load();
-                } catch (e) {
-                  setError(e?.response?.data?.message || "Assign failed");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              Assign reviewers
-            </button>
+          <div>
+            <span className="muted">Research area:</span> {proposal.researchArea}
           </div>
-        ) : null}
-
-
-        <div style={{ marginTop: 12 }}>
-          <div className="muted" style={{ marginBottom: 6 }}>
-            Uploaded document
+          <div>
+            <span className="muted">Abstract:</span>
+            <div style={{ marginTop: 4 }}>{proposal.abstract}</div>
           </div>
-          {proposal.document ? (
-            <a
-              className="btn"
-              href={`${apiOrigin()}${proposal.document}`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              View document
-            </a>
-          ) : (
-            <div className="muted">No document uploaded.</div>
-          )}
+          <div>
+            <span className="muted">Document:</span>{" "}
+            {proposal.document ? (
+              <a href={`${apiOrigin()}${proposal.document}`} target="_blank" rel="noreferrer">
+                View proposal document
+              </a>
+            ) : (
+              "—"
+            )}
+          </div>
         </div>
-
-        <div className="field" style={{ marginTop: 12 }}>
-          <label>Action</label>
-          <select value={selected} onChange={(e) => setSelected(e.target.value)}>
-            {actions.map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="field">
-          <label>Comment</label>
-          <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Write review notes..." />
-        </div>
-
-        <button
-          className="btn primary"
-          disabled={busy || !selected || !comment.trim()}
-          onClick={async () => {
-            setBusy(true);
-            setError("");
-            try {
-              if (isCoordinator) {
-                await proposalApi.coordinatorReview(accessToken, id, selected, comment.trim());
-              } else if (isDirector) {
-                await proposalApi.directorDecision(accessToken, id, selected, comment.trim());
-              }
-              setComment("");
-              await load();
-            } catch (e) {
-              setError(e?.response?.data?.message || "Action failed");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          {busy ? "Saving..." : "Submit review"}
-        </button>
       </div>
+
+      {proposal.requiresEthics ? (
+        <ProposalEthicsReviewPanel
+          ethics={ethics}
+          isDirector={isDirector}
+          onApproveEthics={approveEthics}
+          onRejectEthics={rejectEthics}
+          busy={busy}
+        />
+      ) : null}
+
+      {(isCoordinator || isDirector) && ["submitted", "under_review", "revision_requested"].includes(proposal.status) ? (
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>
+            {isDirector ? "Proposal decision" : "Coordinator recommendation"}
+          </div>
+          {isDirector && proposal.requiresEthics && !ethicsApproved ? (
+            <div className="muted" style={{ marginBottom: 10, fontSize: 13 }}>
+              Approve the ethics application above first, then approve the proposal to create the project.
+            </div>
+          ) : null}
+
+          <div className="field">
+            <label>Action</label>
+            <select value={selected} onChange={(e) => setSelected(e.target.value)}>
+              {actions.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field">
+            <label>Comment</label>
+            <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Write review notes..." />
+          </div>
+
+          <button
+            className="btn primary"
+            disabled={
+              busy ||
+              !selected ||
+              !comment.trim() ||
+              (isDirector && selected === "approved" && proposal.requiresEthics && !ethicsApproved)
+            }
+            title={
+              isDirector && selected === "approved" && !ethicsApproved
+                ? "Approve ethics first"
+                : undefined
+            }
+            onClick={async () => {
+              setBusy(true);
+              setError("");
+              try {
+                if (isCoordinator) {
+                  await proposalApi.coordinatorReview(accessToken, id, selected, comment.trim());
+                } else if (isDirector) {
+                  await proposalApi.directorDecision(accessToken, id, selected, comment.trim());
+                }
+                setComment("");
+                await load();
+              } catch (e) {
+                setError(e?.response?.data?.message || "Action failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {busy ? "Saving..." : "Submit decision"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
-

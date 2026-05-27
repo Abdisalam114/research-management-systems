@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { DirectorDashboard } from "../components/DirectorDashboard";
 import { FinanceDashboard } from "../components/FinanceDashboard";
 import { CoordinatorDashboardPage } from "./CoordinatorDashboard";
+import { SystemModulesGrid } from "../components/SystemModulesGrid";
 import * as analyticsApi from "../services/analyticsApi";
 import "./dashboard.css";
 
@@ -48,48 +49,7 @@ function RoleDashboard({ role, user }) {
         {error ? <div className="card" style={{ marginTop: 12, borderColor: "rgba(239,68,68,0.5)" }}>{error}</div> : null}
 
         {metrics ? (
-          <div className="overviewGrid" style={{ marginTop: 12 }}>
-            <div className="overviewTile">
-              <div className="label">Proposals</div>
-              <div className="value">{metrics.proposals.total}</div>
-            </div>
-            <div className="overviewTile">
-              <div className="label">Projects</div>
-              <div className="value">{metrics.projects.total}</div>
-            </div>
-            {role === "finance_officer" ? (
-              <>
-                <div className="overviewTile">
-                  <div>
-                    <div className="label">Budgets</div>
-                    <div className="value">{metrics.budgets.total}</div>
-                  </div>
-                </div>
-                <div className="overviewTile">
-                  <div className="label">Pending items</div>
-                  <div className="value">{metrics.budgets.itemsPending}</div>
-                </div>
-              </>
-            ) : null}
-            {role === "faculty_coordinator" ? (
-              <div className="overviewTile">
-                <div className="label">Publications</div>
-                <div className="value">{metrics.publications.total}</div>
-              </div>
-            ) : null}
-            {role === "researcher" ? (
-              <>
-                <div className="overviewTile">
-                  <div className="label">Grants</div>
-                  <div className="value">{metrics.grants.total}</div>
-                </div>
-                <div className="overviewTile">
-                  <div className="label">Publications</div>
-                  <div className="value">{metrics.publications.total}</div>
-                </div>
-              </>
-            ) : null}
-          </div>
+          <SystemModulesGrid role={role} metrics={metrics} title="Jamhuriya RMS — dhammaan qaybaha system-ka" />
         ) : (
           <div className="muted" style={{ marginTop: 12 }}>
             Loading…

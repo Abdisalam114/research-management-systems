@@ -24,6 +24,9 @@ export function ProposalFormPage() {
   return (
     <div>
       <h2 style={{ marginTop: 0 }}>{heading}</h2>
+      <p className="muted" style={{ marginTop: 0 }}>
+        After saving, complete the ethics form, then use one button to submit proposal + ethics to the Director.
+      </p>
       {error ? <div className="card" style={{ borderColor: "rgba(255, 99, 132, 0.55)" }}>{error}</div> : null}
 
       <div className="card" style={{ marginTop: 12 }}>

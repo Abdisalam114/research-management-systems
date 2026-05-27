@@ -5,9 +5,13 @@ const { Grant, GRANT_STATUSES } = require("../models/Grant");
 const { Budget, BUDGET_ITEM_STATUSES } = require("../models/Budget");
 const { Publication, PUBLICATION_STATUSES, PUBLICATION_TYPES } = require("../models/Publication");
 const { RepositoryItem } = require("../models/RepositoryItem");
-const { ResearchGroup } = require("../models/ResearchGroup");
+const { ResearchGroup, GROUP_KINDS } = require("../models/ResearchGroup");
 const { User, USER_STATUSES, ROLES } = require("../models/User");
 const { Department } = require("../models/Department");
+const { EthicsApplication } = require("../models/EthicsApplication");
+const { ThesisGroup } = require("../models/ThesisGroup");
+const { ResearchPolicy } = require("../models/ResearchPolicy");
+const { Notification } = require("../models/Notification");
 const { FACULTIES, matchFacultyByName } = require("../utils/facultyMatcher");
 const PDFDocument = require("pdfkit");
 
@@ -40,17 +44,38 @@ async function getDashboardMetrics(req, res) {
   const budgetFilter =
     role === "researcher" ? { ownerResearcherId: userId } : role === "finance_officer" ? {} : isStaffAll ? {} : {};
 
-  const [proposalCount, projectCount, grants, budgets, pubs, repoCount, groupCount] = await Promise.all([
-    Proposal.countDocuments(proposalFilter),
-    Project.countDocuments(projectFilter),
-    Grant.find(grantFilter).select("amountAwarded status"),
-    Budget.find(budgetFilter).select("items"),
-    Publication.find(pubFilter).select("status citationCount"),
-    RepositoryItem.countDocuments(repoFilter),
-    role === "researcher"
-      ? ResearchGroup.countDocuments({ "members.userId": userId })
-      : ResearchGroup.countDocuments({}),
-  ]);
+  const [proposalCount, projectCount, grants, budgets, pubs, repoCount, collabGroupCount, ethicsCount, thesisCount, notifUnread] =
+    await Promise.all([
+      Proposal.countDocuments(proposalFilter),
+      Project.countDocuments(projectFilter),
+      Grant.find(grantFilter).select("amountAwarded status"),
+      Budget.find(budgetFilter).select("items"),
+      Publication.find(pubFilter).select("status citationCount"),
+      RepositoryItem.countDocuments(repoFilter),
+      ResearchGroup.countDocuments(
+        role === "researcher"
+          ? { "members.userId": userId, $or: [{ kind: GROUP_KINDS.COLLABORATION }, { kind: { $exists: false } }] }
+          : { $or: [{ kind: GROUP_KINDS.COLLABORATION }, { kind: { $exists: false } }] }
+      ),
+      EthicsApplication.countDocuments(role === "researcher" ? { researcherId: userId } : {}),
+      ThesisGroup.countDocuments(
+        role === "researcher"
+          ? { $or: [{ supervisorId: userId }, { createdBy: userId }, { coordinatorId: userId }] }
+          : {}
+      ),
+      Notification.countDocuments({ userId, readAt: null }),
+    ]);
+
+  let usersCount = 0;
+  let departmentsCount = 0;
+  let policiesCount = 0;
+  if (role === "research_director") {
+    [usersCount, departmentsCount, policiesCount] = await Promise.all([
+      User.countDocuments({ status: USER_STATUSES.ACTIVE }),
+      Department.countDocuments({}),
+      ResearchPolicy.countDocuments({}),
+    ]);
+  }
 
   base.proposals.total = proposalCount;
   base.projects.total = projectCount;
@@ -69,7 +94,43 @@ async function getDashboardMetrics(req, res) {
   base.publications.citationTotal = sum(pubs.map((p) => p.citationCount || 0));
 
   base.repository.total = repoCount;
-  base.groups.total = groupCount;
+  base.groups.total = collabGroupCount;
+  base.ethics = { total: ethicsCount };
+  base.thesis = { total: thesisCount };
+  base.notifications = { unread: notifUnread };
+  base.modules = {
+    users: usersCount,
+    departments: departmentsCount,
+    policies: policiesCount,
+    ethics: ethicsCount,
+    proposals: proposalCount,
+    projects: projectCount,
+    grants: grants.length,
+    budgets: budgets.length,
+    publications: pubs.length,
+    repository: repoCount,
+    groups: collabGroupCount,
+    thesis: thesisCount,
+    messages: "—",
+    notificationsUnread: notifUnread,
+  };
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const logLine = `${JSON.stringify({
+      sessionId: "6113cc",
+      location: "analyticsController.js:getDashboardMetrics",
+      message: "dashboard metrics modules",
+      data: { role, moduleKeys: Object.keys(base.modules), modules: base.modules },
+      timestamp: Date.now(),
+      hypothesisId: "A",
+      runId: "post-fix",
+    })}\n`;
+    fs.appendFileSync(path.join(__dirname, "../../../debug-6113cc.log"), logLine);
+  } catch (_) {}
+  // #endregion
 
   res.json({ metrics: base, generatedAt: new Date().toISOString() });
 }
@@ -104,6 +165,12 @@ async function buildInstitutionalAnalytics() {
     publicationCount,
     repositoryCount,
     groupCount,
+    ethicsCount,
+    thesisCount,
+    usersCount,
+    departmentsCount,
+    policiesCount,
+    collabGroupCount,
     researcherCount,
     projects,
     grants,
@@ -120,6 +187,12 @@ async function buildInstitutionalAnalytics() {
     Publication.countDocuments({}),
     RepositoryItem.countDocuments({}),
     ResearchGroup.countDocuments({}),
+    EthicsApplication.countDocuments({}),
+    ThesisGroup.countDocuments({}),
+    User.countDocuments({ status: USER_STATUSES.ACTIVE }),
+    Department.countDocuments({}),
+    ResearchPolicy.countDocuments({}),
+    ResearchGroup.countDocuments({ $or: [{ kind: GROUP_KINDS.COLLABORATION }, { kind: { $exists: false } }] }),
     User.countDocuments({ role: ROLES.RESEARCHER, status: USER_STATUSES.ACTIVE }),
     Project.find({}).sort({ updatedAt: -1 }).limit(5).populate("researcherId", "fullName department"),
     Grant.find({}).select("amountAwarded status createdAt decidedAt"),
@@ -267,7 +340,28 @@ async function buildInstitutionalAnalytics() {
       budgets: budgetCount,
       publications: publicationCount,
       repository: repositoryCount,
-      groups: groupCount,
+      groups: collabGroupCount,
+      ethics: ethicsCount,
+      thesis: thesisCount,
+      users: usersCount,
+      departments: departmentsCount,
+      policies: policiesCount,
+      modules: {
+        users: usersCount,
+        departments: departmentsCount,
+        policies: policiesCount,
+        ethics: ethicsCount,
+        proposals: proposalCount,
+        projects: projectCount,
+        grants: grantCount,
+        budgets: budgetCount,
+        publications: publicationCount,
+        repository: repositoryCount,
+        groups: collabGroupCount,
+        thesis: thesisCount,
+        messages: "—",
+        notificationsUnread: 0,
+      },
     },
     projectStatus: {
       total: totalProjects,

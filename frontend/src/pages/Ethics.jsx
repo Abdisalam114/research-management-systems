@@ -1,7 +1,9 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as ethicsApi from "../services/ethicsApi";
+import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
 import { EthicsBrandingHeader } from "../components/EthicsBrandingHeader";
 
@@ -115,6 +117,8 @@ function toForm(a) {
 
 export function EthicsPage() {
   const { accessToken, user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const proposalIdFromUrl = searchParams.get("proposalId");
   const isResearcher = user?.role === "researcher";
   const isDirector = user?.role === "research_director";
 
@@ -126,6 +130,20 @@ export function EthicsPage() {
   }, [accessToken]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
+
+  useEffect(() => {
+    if (!accessToken || !proposalIdFromUrl || editing) return;
+    (async () => {
+      try {
+        const res = await proposalApi.getProposalEthicsApplication(accessToken, proposalIdFromUrl);
+        if (res.application) {
+          setEditing({ id: res.application.id, form: toForm(res.application), approval: res.application.approval, status: res.application.status });
+        }
+      } catch (_) {
+        /* proposal ethics may not exist yet */
+      }
+    })();
+  }, [accessToken, proposalIdFromUrl, editing]);
 
   const stats = useMemo(() => {
     const by = (s) => applications.filter((a) => a.status === s).length;
@@ -209,7 +227,11 @@ export function EthicsPage() {
     <div>
       <PageHeader
         title="Research Ethical Clearance"
-        subtitle="Researcher applies → Director (REC chair) reviews & signs the ethics certificate."
+        subtitle={
+          proposalIdFromUrl
+            ? "Complete this ethics form for your proposal — then submit to the Director before submitting the proposal."
+            : "Researcher applies → Director (REC chair) reviews & signs the ethics certificate."
+        }
         stats={stats}
         actions={
           isResearcher ? (

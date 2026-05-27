@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { useAuth } from "../hooks/useAuth";
 import * as analyticsApi from "../services/analyticsApi";
+import { SystemModulesGrid } from "./SystemModulesGrid";
 import "../pages/dashboard.css";
 
 const PIE_COLORS = ["#0ea5e9", "#38bdf8", "#1d4ed8"];
@@ -27,6 +28,7 @@ function formatMoney(n) {
 export function FinanceDashboard() {
   const { accessToken, user } = useAuth();
   const [report, setReport] = useState(null);
+  const [metrics, setMetrics] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -34,8 +36,14 @@ export function FinanceDashboard() {
     async function load() {
       try {
         setError("");
-        const res = await analyticsApi.financeReport(accessToken);
-        if (!cancelled) setReport(res);
+        const [res, m] = await Promise.all([
+          analyticsApi.financeReport(accessToken),
+          analyticsApi.dashboardMetrics(accessToken).catch(() => null),
+        ]);
+        if (!cancelled) {
+          setReport(res);
+          if (m?.metrics) setMetrics(m.metrics);
+        }
       } catch (e) {
         if (!cancelled) setError(e?.response?.data?.message || "Failed to load finance report");
       }
@@ -88,6 +96,10 @@ export function FinanceDashboard() {
           Welcome {user?.fullName} — manage budgets, payments, procurement, and grant funding.
         </div>
       </div>
+
+      {metrics ? (
+        <SystemModulesGrid role="finance_officer" metrics={metrics} title="Jamhuriya RMS — dhammaan qaybaha system-ka" />
+      ) : null}
 
       <div className="overviewGrid" style={{ marginTop: 12 }}>
         <Link to="/budgets" className="overviewTile" style={{ textDecoration: "none" }}>

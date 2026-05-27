@@ -43,7 +43,7 @@ export function ProposalsListPage() {
     <div>
       <PageHeader
         title={title}
-        subtitle="Manage proposals through draft → submitted → reviewed lifecycle."
+        subtitle="Complete ethics form, then submit proposal + ethics together to the Director."
         stats={stats}
         actions={
           <>
