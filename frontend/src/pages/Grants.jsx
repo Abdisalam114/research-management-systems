@@ -1,12 +1,15 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as grantApi from "../services/grantApi";
+import { PageHeader } from "../components/PageHeader";
 
 export function GrantsPage() {
   const { accessToken, user } = useAuth();
   const [grants, setGrants] = useState([]);
-  const [form, setForm] = useState({ title: "", fundingSource: "", amountRequested: 0, currency: "USD" });
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ title: "", fundingSource: "", donorRef: "", amountRequested: 0, currency: "USD" });
+  const [donorFilter, setDonorFilter] = useState(false);
 
   const canCreate = user?.role === "researcher";
   const isDirector = user?.role === "research_director";
@@ -18,16 +21,46 @@ export function GrantsPage() {
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
+  const stats = useMemo(() => {
+    const by = (s) => grants.filter((g) => g.status === s).length;
+    const totalAwarded = grants.reduce((acc, g) => acc + Number(g.amountAwarded || 0), 0);
+    return [
+      { label: "Total", value: grants.length },
+      { label: "Submitted", value: by("submitted") },
+      { label: "Approved", value: by("approved"), accent: "#1d4ed8" },
+      { label: "Awarded $", value: totalAwarded.toLocaleString(), accent: "#38bdf8" },
+    ];
+  }, [grants]);
+
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Grants & Funding</h2>
+      <PageHeader
+        title="Grants & Funding"
+        subtitle="Track grant submissions, donor funding, and director approval."
+        stats={stats}
+        actions={
+          <>
+            {canCreate ? (
+              <button type="button" className="btn primary" onClick={() => setShowForm((v) => !v)}>
+                {showForm ? "Close form" : "+ New grant"}
+              </button>
+            ) : null}
+            {isDirector ? (
+              <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                <input type="checkbox" checked={donorFilter} onChange={(e) => setDonorFilter(e.target.checked)} />
+                Donor-funded only
+              </label>
+            ) : null}
+          </>
+        }
+      />
       {error ? (
         <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>
           {error}
         </div>
       ) : null}
 
-      {canCreate ? (
+      {canCreate && showForm ? (
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ fontWeight: 800 }}>New Grant</div>
           <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
@@ -45,6 +78,14 @@ export function GrantsPage() {
               </div>
             </div>
             <div className="row">
+              <div className="field">
+                <label>Donor reference (external donor)</label>
+                <input
+                  value={form.donorRef}
+                  onChange={(e) => setForm((f) => ({ ...f, donorRef: e.target.value }))}
+                  placeholder="e.g. UNESCO-12345"
+                />
+              </div>
               <div className="field">
                 <label>Amount requested</label>
                 <input
@@ -64,7 +105,8 @@ export function GrantsPage() {
                 try {
                   setError("");
                   await grantApi.createGrant(accessToken, form);
-                  setForm({ title: "", fundingSource: "", amountRequested: 0, currency: "USD" });
+                  setForm({ title: "", fundingSource: "", donorRef: "", amountRequested: 0, currency: "USD" });
+                  setShowForm(false);
                   await reload();
                 } catch (e) {
                   setError(e?.response?.data?.message || "Failed to create grant");
@@ -80,13 +122,16 @@ export function GrantsPage() {
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800 }}>Grants</div>
         <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-          {grants.map((g) => (
+          {grants
+            .filter((g) => !donorFilter || (g.donorRef && g.donorRef.trim()))
+            .map((g) => (
             <div key={g.id} className="card">
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
                 <div>
                   <div style={{ fontWeight: 800 }}>{g.title}</div>
                   <div className="muted">
                     {g.fundingSource} • {g.status} • {g.amountRequested} {g.currency}
+                    {g.donorRef ? ` • donor: ${g.donorRef}` : ""}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -153,4 +198,6 @@ export function GrantsPage() {
     </div>
   );
 }
+
+
 

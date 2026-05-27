@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as conversationApi from "../services/conversationApi";
 
 export function MessagesPage() {
   const { accessToken, user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState([]);
-  const [activeId, setActiveId] = useState("");
+  const [activeId, setActiveId] = useState(searchParams.get("conversationId") || "");
   const [active, setActive] = useState(null);
   const [error, setError] = useState("");
   const [newParticipantId, setNewParticipantId] = useState("");
@@ -42,6 +44,13 @@ export function MessagesPage() {
 
   useEffect(() => {
     loadActive(activeId).catch((e) => setError(e?.response?.data?.message || "Failed to load conversation"));
+    if (activeId && searchParams.get("conversationId") !== activeId) {
+      setSearchParams({ conversationId: activeId }, { replace: true });
+    }
+    if (!activeId && searchParams.get("conversationId")) {
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, accessToken]);
 
   return (
@@ -93,7 +102,7 @@ export function MessagesPage() {
                 className={activeId === c.id ? "btn primary" : "btn"}
                 onClick={() => setActiveId(c.id)}
               >
-                Chat ({c.participants?.length || 0})
+                {c.groupId ? `# ${c.title || "Group chat"}` : `Chat (${c.participants?.length || 0})`}
               </button>
             ))}
             {conversations.length === 0 ? <div className="muted">No conversations yet.</div> : null}

@@ -16,7 +16,7 @@ export function InstitutionalAnalyticsSections({ data }) {
         Budget workflow, research groups, publications, and repository — same data as the analytics report.
       </p>
 
-      <div className="dashGrid" style={{ marginTop: 16 }}>
+      <div className="dashGrid" style={{ marginTop: 12 }}>
         <div className="dashCard dashSpan6">
           <div className="dashCardTitle">Budget workflow</div>
           <div className="dashChartPlot">

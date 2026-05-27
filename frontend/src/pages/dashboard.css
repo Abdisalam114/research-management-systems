@@ -2,6 +2,8 @@
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(12, 1fr);
+  margin-top: 16px;
+  align-items: start;
 }
 
 /* Charts only: three cards side-by-side (vertical bar/line style), not full-width stack */
@@ -9,7 +11,8 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
-  margin-bottom: 16px;
+  margin-top: 16px;
+  margin-bottom: 0;
 }
 
 @media (max-width: 1100px) {
@@ -22,7 +25,7 @@
   background: var(--rms-bg-card);
   border: 1px solid var(--rms-border);
   border-radius: 16px;
-  padding: 18px;
+  padding: 16px;
   box-shadow: var(--rms-shadow);
   transition: border-color 0.2s ease, transform 0.2s ease;
 }
@@ -35,7 +38,7 @@
   font-weight: 800;
   font-size: 14px;
   color: var(--rms-text-primary);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .dashCardTitleRow {
@@ -67,7 +70,7 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 12px;
+  margin-top: 10px;
   font-size: 13px;
   color: var(--rms-text-secondary);
 }
@@ -239,13 +242,13 @@
 .activityItem {
   display: flex;
   gap: 10px;
-  padding: 10px 0;
+  padding: 8px 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .metricList {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .metricRow {
@@ -253,7 +256,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px;
+  padding: 10px 12px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--rms-border);
@@ -263,12 +266,13 @@
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 12px;
+  margin-top: 0;
   margin-bottom: 16px;
 }
 
 .dashAnalyticsSection {
-  margin-top: 28px;
-  padding-top: 8px;
+  margin-top: 16px;
+  padding-top: 0;
   scroll-margin-top: 80px;
 }
 
@@ -285,7 +289,7 @@
 }
 
 .overviewTile {
-  padding: 14px;
+  padding: 16px;
   border-radius: 14px;
   background: var(--rms-bg-card);
   border: 1px solid var(--rms-border);
@@ -307,7 +311,7 @@
 .dashSideCol {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 @media (max-width: 1200px) {

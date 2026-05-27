@@ -4,10 +4,14 @@ dotenv.config();
 const { createApp } = require("./app");
 const { connectDB } = require("./config/db");
 const { migrateLegacyResearchInterests } = require("./scripts/migrateResearchInterests");
+const { migrateLegacyPublicationTypes } = require("./scripts/migratePublicationTypes");
+const { migrateDepartmentFaculties } = require("./scripts/migrateDepartmentFaculties");
 
 async function start() {
   await connectDB(process.env.MONGO_URI);
   await migrateLegacyResearchInterests();
+  await migrateLegacyPublicationTypes();
+  await migrateDepartmentFaculties();
 
   const app = createApp();
   const port = process.env.PORT || 5000;

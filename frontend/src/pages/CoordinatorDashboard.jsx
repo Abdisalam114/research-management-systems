@@ -7,17 +7,21 @@ import * as proposalApi from "../services/proposalApi";
 export function CoordinatorDashboardPage() {
   const { accessToken, user } = useAuth();
   const [metrics, setMetrics] = useState(null);
+  const [facultyReport, setFacultyReport] = useState(null);
   const [queue, setQueue] = useState([]);
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     (async () => {
       try {
-        const [m, p] = await Promise.all([
+        const [m, p, fr] = await Promise.all([
           analyticsApi.dashboardMetrics(accessToken),
           proposalApi.listProposals(accessToken),
+          analyticsApi.facultyReport(accessToken).catch(() => null),
         ]);
         setMetrics(m.metrics);
+        setFacultyReport(fr);
         const dept = user?.department;
         setQueue((p.proposals || []).filter((x) => !dept || x.department === dept));
       } catch (e) {
@@ -25,6 +29,23 @@ export function CoordinatorDashboardPage() {
       }
     })();
   }, [accessToken, user?.department]);
+
+  async function downloadFacultyPdf() {
+    try {
+      setDownloading(true);
+      const blob = await analyticsApi.downloadFacultyReportPdf(accessToken);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Faculty-Report-${(user?.department || "all").replace(/\s+/g, "-")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to download faculty report");
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   return (
     <div>
@@ -70,6 +91,24 @@ export function CoordinatorDashboardPage() {
           </div>
         )}
       </div>
+
+      {facultyReport ? (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ fontWeight: 800 }}>Faculty research report — {facultyReport.department}</div>
+            <button type="button" className="btn primary" onClick={downloadFacultyPdf} disabled={downloading}>
+              {downloading ? "Generating PDF…" : "Download PDF"}
+            </button>
+          </div>
+          <div className="muted" style={{ marginTop: 4 }}>
+            Researchers: <strong>{facultyReport.counts.researchers}</strong> • Proposals:{" "}
+            <strong>{facultyReport.counts.proposals}</strong> • Projects:{" "}
+            <strong>{facultyReport.counts.projects}</strong> • Publications:{" "}
+            <strong>{facultyReport.counts.publications}</strong> • Citations:{" "}
+            <strong>{facultyReport.counts.citations}</strong>
+          </div>
+        </div>
+      ) : null}
 
       <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
         <Link className="btn primary" to="/proposals">

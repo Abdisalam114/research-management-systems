@@ -109,6 +109,38 @@ export function ProposalDetailsPage() {
         </div>
       </div>
 
+      {(proposal.versionHistory || []).length > 0 ? (
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Version history</div>
+          <table className="dashTable">
+            <thead>
+              <tr>
+                <th>Version</th>
+                <th>Saved</th>
+                <th>Note</th>
+                <th>Document</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...(proposal.versionHistory || [])].reverse().map((v, idx) => (
+                <tr key={idx}>
+                  <td>v{v.version}</td>
+                  <td>{v.savedAt ? new Date(v.savedAt).toLocaleString() : "—"}</td>
+                  <td>{v.note || "—"}</td>
+                  <td>
+                    {v.document ? (
+                      <a href={`${apiOrigin()}${v.document}`} target="_blank" rel="noreferrer">Download</a>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800, marginBottom: 8 }}>Reviewer Comments</div>
         {(proposal.reviewerComments || []).length === 0 ? (

@@ -23,6 +23,13 @@ export async function createConversation(accessToken, participantIds) {
   return res.data;
 }
 
+export async function openGroupChat(accessToken, groupId) {
+  const res = await api.get(`/api/conversations/group/${groupId}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
+
 export async function sendMessage(accessToken, conversationId, body) {
   const res = await api.post(
     `/api/conversations/${conversationId}/messages`,

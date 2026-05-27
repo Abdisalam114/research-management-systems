@@ -1,12 +1,34 @@
 const mongoose = require("mongoose");
 
 const PUBLICATION_TYPES = Object.freeze({
+  PAPER: "paper",
   JOURNAL: "journal_article",
-  CONFERENCE: "conference_paper",
-  BOOK: "book_chapter",
+  CONFERENCE: "conference",
+  BOOK: "book",
+  BOOK_CHAPTER: "book_chapter",
   PATENT: "patent",
   THESIS: "thesis",
-  OTHER: "other",
+  REVIEW: "review",
+  CASE_STUDY: "case_study",
+  LETTER_TO_EDITOR: "letter_to_editor",
+});
+
+const PUBLICATION_TYPE_LABELS = Object.freeze({
+  paper: "Paper",
+  journal_article: "Journal article",
+  conference: "Conference paper",
+  book: "Book",
+  book_chapter: "Book chapter",
+  patent: "Patent",
+  thesis: "Thesis",
+  review: "Review",
+  case_study: "Case study",
+  letter_to_editor: "Letter to editor",
+});
+
+const LEGACY_PUBLICATION_TYPE_MAP = Object.freeze({
+  conference_paper: "conference",
+  other: "letter_to_editor",
 });
 
 const PUBLICATION_STATUSES = Object.freeze({
@@ -19,7 +41,13 @@ const PUBLICATION_STATUSES = Object.freeze({
 const publicationSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
-    type: { type: String, enum: Object.values(PUBLICATION_TYPES), default: PUBLICATION_TYPES.JOURNAL, index: true },
+    type: {
+      type: String,
+      enum: Object.values(PUBLICATION_TYPES),
+      default: PUBLICATION_TYPES.PAPER,
+      index: true,
+      set: (v) => (v && LEGACY_PUBLICATION_TYPE_MAP[v]) || v,
+    },
     year: { type: Number, min: 1900, max: 3000, default: new Date().getFullYear(), index: true },
     venue: { type: String, default: "", trim: true },
     doi: { type: String, default: "", trim: true, index: true },
@@ -40,5 +68,11 @@ const publicationSchema = new mongoose.Schema(
 
 const Publication = mongoose.model("Publication", publicationSchema);
 
-module.exports = { Publication, PUBLICATION_TYPES, PUBLICATION_STATUSES };
+module.exports = {
+  Publication,
+  PUBLICATION_TYPES,
+  PUBLICATION_TYPE_LABELS,
+  PUBLICATION_STATUSES,
+  LEGACY_PUBLICATION_TYPE_MAP,
+};
 

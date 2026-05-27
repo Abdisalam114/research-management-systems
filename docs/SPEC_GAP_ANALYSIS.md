@@ -20,11 +20,14 @@ Recent additions mapping to your 8 modules / 4 roles:
 |------|--------|
 | Proposals | Ethics workflow (`ethicsStatus`, ethics decision API), version history on document change, assign reviewers (director) |
 | Projects | Timeline dates, milestones UI, research team UI, `PUT /api/projects/:id` |
-| Director | Strategic policies (`/policies`), faculty analytics table, grant success %, annual report JSON |
-| Coordinator | Faculty dashboard on `/dashboard` (proposal queue by department) |
-| Finance | `/finance-reports` — utilization + grant summary |
-| Publications | Book/chapter type, `communityImpact` field (schema) |
+| Director | Strategic policies (`/policies`), faculty analytics table, grant success %, annual report JSON + PDF |
+| Coordinator | Faculty dashboard on `/dashboard`, faculty research report JSON + PDF |
+| Finance | `/finance-reports`, payments module (`/payments`), procurement / PO module (`/procurement`) |
+| Publications | Book/chapter type, `communityImpact` field, director can also validate, CrossRef DOI citation refresh |
 | Profile | Research interests + publication list |
+| Repository | OAI-PMH style export endpoint (`/api/repository/oai/export`) |
+| Collaboration | Group chat (one conversation per research group via `GET /api/conversations/group/:groupId`) |
+| Departments | Director CRUD page at `/departments` |
 
 Re-run `npm run seed` after pulling. Existing DB documents get new fields on next save.
 
@@ -51,9 +54,9 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | Proposal status tracking | ✅ | `draft` → `submitted` → `under_review` → `approved` / `rejected` / `revision_requested` |
 | Director approve / reject / revision | ✅ | `POST /api/proposals/:id/director-decision` |
 | Auto project on approval | ✅ | `proposalController.directorDecision` creates `Project` |
-| Ethics approval workflow | ❌ | No ethics model, states, or committee UI (seed text only on milestones) |
-| Version control (history, compare, prior files) | ⚠️ | `version` number increments on resubmit; **no** revision history store or compare UI |
-| Assign named reviewers | ❌ | Coordinator review only; no reviewer assignment table |
+| Ethics approval workflow | ✅ | `ethicsStatus`, `POST /api/proposals/:id/ethics-decision`; submit gated on ethics approval |
+| Version control (history, compare, prior files) | ✅ | `versionHistory` array with snapshots; new revision on document replace |
+| Assign named reviewers | ✅ | `POST /api/proposals/:id/assign-reviewers`; director-only |
 
 ---
 
@@ -62,11 +65,11 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | Requirement | Status | Notes / location |
 |-------------|--------|------------------|
 | Approved project registry | ✅ | `GET /api/projects`; `ProjectsList.jsx`, `ProjectDetails.jsx` |
-| Project timeline tracking | ❌ | `startDate` / `endDate` on model; no timeline/Gantt UI |
-| Milestones monitoring | ⚠️ | `Project.milestones` in schema + seed; **no** API/UI to add or complete |
-| Research team management | ⚠️ | `teamMembers` strings in schema + seed; **no** API/UI to assign users |
+| Project timeline tracking | ✅ | `startDate`/`endDate` editable on `ProjectDetails.jsx` |
+| Milestones monitoring | ✅ | Milestones add/complete in `ProjectDetails.jsx` and `PUT /api/projects/:id` |
+| Research team management | ✅ | `teamMembers` subdocs (`name`, `userId`, `role`) editable in UI |
 | Progress reports | ✅ | `POST /api/projects/:id/progress`; `ProjectProgressUpdate.jsx` |
-| Project status / dates update (UI) | ⚠️ | Status enum exists; no general update endpoint in UI |
+| Project status / dates update (UI) | ✅ | `PUT /api/projects/:id` for status + timeline (researcher + director) |
 
 ---
 
@@ -79,6 +82,7 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | Funding source tracking | ⚠️ | Free-text `fundingSource`, `donorRef` on `Grant` |
 | Grant compliance | ⚠️ | `complianceNotes` field only |
 | Director approve / reject grants | ✅ | `POST /api/grants/:id/director-decision` |
+| Donor-funded grants tracker | ✅ | `donorRef` field + filter toggle on Grants page (director) |
 | Finance officer grant approval | ❌ | Director only on `grantRoutes.js` |
 
 ---
@@ -91,11 +95,11 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | Conference papers | ✅ | Type `conference_paper` |
 | Patents | ✅ | Type `patent` |
 | Theses | ✅ | Type `thesis` |
-| Books / book chapters | ❌ | Closest: `other`; no dedicated book type |
-| Community research impact | ❌ | No impact / altmetrics module |
+| Books / book chapters | ✅ | Type `book_chapter` |
+| Community research impact | ✅ | `communityImpact` field |
 | Submit outputs | ✅ | Researcher submit flow |
-| Coordinator validation | ✅ | `POST /api/publications/:id/validate` — **faculty_coordinator only** |
-| Citation metrics (external) | ⚠️ | Manual `citationCount`; DOI/ORCID fields; no API integration |
+| Coordinator + director validation | ✅ | `POST /api/publications/:id/validate` — both roles |
+| Citation metrics (external) | ✅ | `POST /api/publications/:id/citations/refresh` — CrossRef DOI lookup |
 
 ---
 
@@ -107,7 +111,7 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | Store publications / theses / documents | ✅ | Upload + list + access levels |
 | Store proposals in repository | ⚠️ | Proposals use `Proposal.document`; not a repository item type |
 | Access control (private / group / institution) | ✅ | `repositoryController.listItems` |
-| Institutional repository integration | ❌ | No DSpace/OAI-PMH/SSO/harvest |
+| Institutional repository integration | ✅ | `GET /api/repository/oai/export` — OAI-PMH/Dublin Core XML |
 
 ---
 
@@ -118,9 +122,9 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | Research budget allocation | ⚠️ | `totalAllocated` on budget; researcher creates budget |
 | Expense tracking | ✅ | Budget line items type `expense` |
 | Budget approval workflow | ✅ | Finance `PATCH` item status; `Budgets.jsx` queue |
-| Procurement for research | ⚠️ | Item type `procurement`; no PO/vendor workflow |
-| Financial reports (export / formal) | ❌ | Dashboard counts only; no PDF/CSV reports |
-| Payment processing (RA, travel, equipment) | ❌ | No dedicated payment modules |
+| Procurement for research | ✅ | `PurchaseOrder` model + `/api/procurement` + `Procurement.jsx` (vendor, items, PO statuses) |
+| Financial reports (export / formal) | ✅ | `FinanceReports.jsx` + `GET /api/analytics/finance-report` |
+| Payment processing (RA, travel, equipment) | ✅ | `Payment` model + `/api/payments` + `Payments.jsx` (categories: research_assistant, equipment, travel, publication_fee, other) |
 
 ---
 
@@ -132,11 +136,12 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | Charts (projects, grants, output) | ✅ | Recharts on director dashboard |
 | Institutional section on dashboard | ✅ | `InstitutionalAnalyticsSections.jsx` (`#institutional-analytics`) |
 | Role dashboard metrics (non-director) | ✅ | `GET /api/analytics/dashboard`; `Dashboard.jsx` |
-| Publications per faculty | ❌ | No faculty breakdown API/charts |
-| Research productivity (per researcher/faculty) | ⚠️ | Aggregate counts only |
-| Citation metrics (automated) | ❌ | Manual field on publications |
-| Grant success rate | ❌ | No submitted vs approved ratio |
-| Annual research reports | ❌ | No report builder or export |
+| Publications per faculty | ✅ | `facultyAnalytics` on institutional endpoint + `FacultyAnalyticsSection.jsx` |
+| Research productivity (per researcher/faculty) | ✅ | `GET /api/analytics/faculty-report` (coordinator) + table |
+| Citation metrics (automated) | ✅ | CrossRef refresh button on Publications page |
+| Grant success rate | ✅ | `grantSuccessRate` on institutional analytics |
+| Annual research reports | ✅ | `GET /api/analytics/annual-report.pdf` + dashboard button |
+| Faculty PDF report | ✅ | `GET /api/analytics/faculty-report.pdf` + dashboard button |
 
 `/analytics` for director redirects to dashboard analytics section.
 
@@ -149,9 +154,9 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | Research groups | ✅ | `Groups.jsx`, `researchGroupRoutes.js` |
 | Notifications | ✅ | `Notifications.jsx`, hooks in grant/budget/publication flows |
 | Messaging system | ✅ | `Messages.jsx`, `conversationRoutes.js` |
-| Inter-faculty collaboration (beyond groups) | ⚠️ | Groups only; no faculty-wide collaboration hub |
-| Group chat | ❌ | Messages are not tied to `ResearchGroup` |
-| Real-time push (WebSocket) | ❌ | Polling / refresh only |
+| Inter-faculty collaboration (beyond groups) | ✅ | Groups span departments; coordinator/director can see all |
+| Group chat | ✅ | `GET /api/conversations/group/:groupId` opens shared chat tied to group members |
+| Real-time push (WebSocket) | ❌ | Polling / refresh only (deferred) |
 
 ---
 
@@ -161,15 +166,15 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 
 | Feature (from spec) | Status | MVP |
 |---------------------|--------|-----|
-| Strategic research management (policies, themes, programs) | ❌ | Not in scope of MVP |
+| Strategic research management (policies, themes, programs) | ✅ | `ResearchPolicy` model + `/policies` page (themes, priorities, programs) |
 | Proposal approval system | ✅ | Director decision + review page |
-| Assign reviewers | ❌ | — |
+| Assign reviewers | ✅ | `POST /api/proposals/:id/assign-reviewers` |
 | Research performance dashboard | ✅ | `DirectorDashboard.jsx` |
-| Grant & funding oversight | ✅ | Grant director decision; analytics funding |
-| Institutional research reports | ⚠️ | Dashboard analytics; no annual PDF report |
-| Research compliance / ethics monitoring | ❌ | — |
+| Grant & funding oversight | ✅ | Grant director decision; donor filter; analytics funding |
+| Institutional research reports | ✅ | Annual report JSON + PDF download |
+| Research compliance / ethics monitoring | ✅ | Ethics decision API + status badge on proposals |
 | Create / manage users | ✅ | `PendingUsers.jsx`, `POST /api/users` |
-| Departments (CRUD) | ⚠️ | API `departmentRoutes.js`; **no** frontend page |
+| Departments (CRUD) | ✅ | `/departments` page with create/update/delete |
 
 **Routes:** `/dashboard`, `/analytics` (redirect), `/pending-users`, full module access per sidebar.
 
@@ -179,11 +184,11 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 
 | Feature (from spec) | Status | MVP |
 |---------------------|--------|-----|
-| Faculty research monitoring | ⚠️ | Can view proposals/projects/publications; no faculty dashboard |
+| Faculty research monitoring | ✅ | `CoordinatorDashboard.jsx` (queue + counts + report) |
 | Proposal pre-review | ✅ | `coordinatorReview` |
-| Research collaboration (groups) | ✅ | Groups module |
-| Faculty research reporting | ❌ | No faculty report generator |
-| Publication verification | ✅ | **Only** coordinator can validate (API) |
+| Research collaboration (groups + chat) | ✅ | Groups module + per-group chat |
+| Faculty research reporting | ✅ | JSON + PDF endpoints + dashboard download |
+| Publication verification | ✅ | Coordinator + director can validate |
 
 **No access:** budgets (sidebar), `/pending-users`, institutional analytics.
 
@@ -194,9 +199,10 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | Feature (from spec) | Status | MVP |
 |---------------------|--------|-----|
 | Research budget management | ✅ | View all budgets; approve/pay/reject items |
-| Grant financial tracking | ⚠️ | View grants; cannot approve grants |
-| Payment processing | ❌ | — |
-| Financial reporting | ❌ | — |
+| Grant financial tracking | ⚠️ | View grants; director still approves; finance can see donor-funded |
+| Payment processing | ✅ | `/payments` page (RA, equipment, travel, publication fee, other) — request, approve, mark paid |
+| Procurement / Purchase Orders | ✅ | `/procurement` page (vendor, items, PO lifecycle: submitted → approved → ordered → received → closed) |
+| Financial reporting | ✅ | `/finance-reports` page + finance-report API |
 
 **No access:** proposals, projects (not in `App.jsx` or sidebar).
 
@@ -207,11 +213,11 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | Feature (from spec) | Status | MVP |
 |---------------------|--------|-----|
 | Research proposal submission | ✅ | Create, edit, submit, upload |
-| Project management (timeline, team) | ⚠️ | Progress updates only |
-| Publication submission | ✅ | Full CRUD + submit |
-| Grant applications | ✅ | Create/submit grants |
-| Budget proposal (items) | ✅ | Own budgets |
-| Research profile | ⚠️ | `Profile.jsx` basic fields; no rich publication portfolio |
+| Project management (timeline, team, milestones) | ✅ | `ProjectDetails.jsx` editing |
+| Publication submission + CrossRef citations | ✅ | Full CRUD + submit + DOI refresh |
+| Grant applications + donor reference | ✅ | Create/submit grants |
+| Budget + payment + procurement requests | ✅ | Own budgets + payment requests + PO requests |
+| Research profile | ✅ | `Profile.jsx` with research interests + publication portfolio |
 
 ---
 
@@ -222,9 +228,14 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | `/dashboard` | All |
 | `/analytics` | Director (→ dashboard section) |
 | `/pending-users` | Director |
+| `/departments` | Director (CRUD) |
+| `/policies` | Director |
 | `/proposals`, `/proposals/new`, `/proposals/:id`, `/proposals/:id/review` | Researcher + coordinator + director (review: coordinator + director) |
-| `/projects`, `/projects/:id`, `/projects/:id/progress` | Researcher + coordinator + director (progress: researcher) |
+| `/projects`, `/projects/:id`, `/projects/:id/progress` | Researcher + coordinator + director + finance officer (progress: researcher) |
 | `/grants`, `/budgets`, `/publications`, `/repository`, `/groups` | See `App.jsx` |
+| `/payments`, `/procurement` | Researcher, finance officer, director |
+| `/finance-reports` | Finance officer, director |
+| `/faculty-dashboard` | Coordinator |
 | `/notifications`, `/messages`, `/profile` | All authenticated |
 
 ---

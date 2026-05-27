@@ -1,14 +1,22 @@
 :root {
-  --rms-bg-primary: #020617;
-  --rms-bg-secondary: #0f172a;
-  --rms-bg-card: #1e293b;
-  --rms-accent: #0ea5e9;
-  --rms-success: #10b981;
-  --rms-warning: #f59e0b;
-  --rms-danger: #ef4444;
+  /* Dark blue surfaces */
+  --rms-bg-primary: #020617;     /* deepest navy */
+  --rms-bg-secondary: #0f172a;   /* dark slate-blue */
+  --rms-bg-card: #1e293b;        /* slate-blue card */
+
+  /* Light blue accents */
+  --rms-accent: #0ea5e9;         /* sky-500 (light blue) */
+  --rms-accent-soft: #38bdf8;    /* sky-400 (lighter blue) */
+  --rms-accent-strong: #1d4ed8;  /* blue-700 (deep blue) */
+
+  /* Semantic tokens — restricted to the blue family */
+  --rms-success: #38bdf8;        /* light blue (positive) */
+  --rms-warning: #7dd3fc;        /* very light blue (attention) */
+  --rms-danger:  #1d4ed8;        /* dark blue (negative) */
+
   --rms-text-primary: #f8fafc;
   --rms-text-secondary: #94a3b8;
-  --rms-border: rgba(255, 255, 255, 0.08);
-  --rms-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  --rms-border: rgba(148, 197, 255, 0.10);
+  --rms-shadow: 0 24px 80px rgba(2, 6, 23, 0.55);
   --rms-font: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
 }

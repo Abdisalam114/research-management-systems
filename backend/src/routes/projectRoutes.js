@@ -13,7 +13,7 @@ router.put(
   "/:id",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("researcher", "research_director"),
+  authorizeRoles("researcher", "research_director", "faculty_coordinator"),
   asyncHandler(projectController.updateProject)
 );
 

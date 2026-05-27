@@ -17,7 +17,7 @@ export function FacultyAnalyticsSection({ data, onDownloadReport, downloading })
         Grant success rate: <strong>{data.grantSuccessRate ?? 0}%</strong> — annual report year{" "}
         {data.annualReport?.year ?? new Date().getFullYear()}
       </p>
-      <div className="card" style={{ marginTop: 12, overflowX: "auto" }}>
+      <div className="card" style={{ marginTop: 10, padding: 14, overflowX: "auto" }}>
         <table className="dashTable">
           <thead>
             <tr>

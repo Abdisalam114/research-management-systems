@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { DirectorDashboard } from "../components/DirectorDashboard";
+import { FinanceDashboard } from "../components/FinanceDashboard";
 import { CoordinatorDashboardPage } from "./CoordinatorDashboard";
 import * as analyticsApi from "../services/analyticsApi";
 import "./dashboard.css";
@@ -127,6 +128,10 @@ export function DashboardPage() {
 
   if (user?.role === "faculty_coordinator") {
     return <CoordinatorDashboardPage />;
+  }
+
+  if (user?.role === "finance_officer") {
+    return <FinanceDashboard />;
   }
 
   return <RoleDashboard role={user?.role} user={user} />;

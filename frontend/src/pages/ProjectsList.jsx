@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as projectApi from "../services/projectApi";
+import { PageHeader } from "../components/PageHeader";
 
 export function ProjectsListPage() {
   const { accessToken, user } = useAuth();
@@ -21,9 +22,30 @@ export function ProjectsListPage() {
 
   const title = user?.role === "researcher" ? "My Projects" : "Projects";
 
+  const stats = useMemo(() => {
+    const by = (s) => projects.filter((p) => p.status === s).length;
+    return [
+      { label: "Total", value: projects.length },
+      { label: "Active", value: by("active"), accent: "#38bdf8" },
+      { label: "Completed", value: by("completed"), accent: "#1d4ed8" },
+      { label: "On hold", value: by("on_hold") },
+    ];
+  }, [projects]);
+
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>{title}</h2>
+      <PageHeader
+        title={title}
+        subtitle="Track project progress, milestones, and outputs."
+        stats={stats}
+        actions={
+          <>
+            <Link className="btn primary" to="/proposals">+ Start from Proposal</Link>
+            <Link className="btn" to="/budgets">Budgets</Link>
+            <Link className="btn" to="/publications">Publications</Link>
+          </>
+        }
+      />
       {error ? <div className="card" style={{ borderColor: "rgba(255, 99, 132, 0.55)" }}>{error}</div> : null}
 
       <div className="card" style={{ marginTop: 12 }}>

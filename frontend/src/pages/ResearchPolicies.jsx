@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import * as policyApi from "../services/policyApi";
+import { PageHeader } from "../components/PageHeader";
 
 const TYPES = [
   { value: "policy", label: "Policy" },
@@ -14,6 +15,7 @@ export function ResearchPoliciesPage() {
   const [policies, setPolicies] = useState([]);
   const [form, setForm] = useState({ type: "policy", title: "", description: "", status: "active" });
   const [error, setError] = useState("");
+  const [showForm, setShowForm] = useState(false);
 
   async function load() {
     const res = await policyApi.listPolicies(accessToken);
@@ -25,12 +27,32 @@ export function ResearchPoliciesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const stats = useMemo(() => {
+    const by = (k, v) => policies.filter((p) => p[k] === v).length;
+    return [
+      { label: "Total", value: policies.length },
+      { label: "Policies", value: by("type", "policy"), accent: "#1d4ed8" },
+      { label: "Themes", value: by("type", "theme") },
+      { label: "Priorities", value: by("type", "priority"), accent: "#38bdf8" },
+      { label: "Programs", value: by("type", "program") },
+    ];
+  }, [policies]);
+
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Strategic research management</h2>
-      <p className="muted">Policies, themes, priorities, and programs (Research Director).</p>
+      <PageHeader
+        title="Strategic research management"
+        subtitle="Policies, themes, priorities, and programs (Research Director)."
+        stats={stats}
+        actions={
+          <button type="button" className="btn primary" onClick={() => setShowForm((v) => !v)}>
+            {showForm ? "Close form" : "+ New entry"}
+          </button>
+        }
+      />
       {error ? <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)", marginTop: 12 }}>{error}</div> : null}
 
+      {showForm ? (
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ fontWeight: 800, marginBottom: 10 }}>Create entry</div>
         <div className="row">
@@ -67,6 +89,7 @@ export function ResearchPoliciesPage() {
             try {
               await policyApi.createPolicy(accessToken, form);
               setForm({ type: "policy", title: "", description: "", status: "active" });
+              setShowForm(false);
               await load();
             } catch (e) {
               setError(e?.response?.data?.message || "Create failed");
@@ -76,6 +99,7 @@ export function ResearchPoliciesPage() {
           Save
         </button>
       </div>
+      ) : null}
 
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ fontWeight: 800, marginBottom: 8 }}>Active registry</div>

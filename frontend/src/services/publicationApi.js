@@ -25,3 +25,12 @@ export async function validatePublication(accessToken, id, payload) {
   });
   return res.data;
 }
+
+export async function refreshCitations(accessToken, id) {
+  const res = await api.post(
+    `/api/publications/${id}/citations/refresh`,
+    null,
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return res.data;
+}

@@ -8,6 +8,7 @@ const router = express.Router();
 
 router.get("/", authenticateUser, requireActiveUser, asyncHandler(conversationController.listMyConversations));
 router.post("/", authenticateUser, requireActiveUser, asyncHandler(conversationController.createConversation));
+router.get("/group/:groupId", authenticateUser, requireActiveUser, asyncHandler(conversationController.openGroupChat));
 router.get("/:id", authenticateUser, requireActiveUser, asyncHandler(conversationController.getConversation));
 router.post("/:id/messages", authenticateUser, requireActiveUser, asyncHandler(conversationController.sendMessage));
 

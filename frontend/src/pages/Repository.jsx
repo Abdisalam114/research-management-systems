@@ -1,12 +1,14 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as repositoryApi from "../services/repositoryApi";
 import { apiOrigin } from "../config/apiBase";
+import { PageHeader } from "../components/PageHeader";
 
 export function RepositoryPage() {
   const { accessToken } = useAuth();
   const [items, setItems] = useState([]);
+  const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ type: "dataset", title: "", description: "", access: "private", groupId: "" });
   const [file, setFile] = useState(null);
 
@@ -17,9 +19,34 @@ export function RepositoryPage() {
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
+  const stats = useMemo(() => {
+    const by = (s) => items.filter((i) => i.type === s).length;
+    return [
+      { label: "Total items", value: items.length },
+      { label: "Datasets", value: by("dataset"), accent: "#38bdf8" },
+      { label: "Publications", value: by("publication"), accent: "#1d4ed8" },
+      { label: "Theses", value: by("thesis") },
+      { label: "Documents", value: by("document") },
+    ];
+  }, [items]);
+
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Research Repository</h2>
+      <PageHeader
+        title="Research Repository"
+        subtitle="Datasets, publications, theses, and other research artifacts."
+        stats={stats}
+        actions={
+          <>
+            <button type="button" className="btn primary" onClick={() => setShowForm((v) => !v)}>
+              {showForm ? "Close upload" : "+ Upload item"}
+            </button>
+            <a className="btn" href={`${apiOrigin()}/api/repository/oai/export`} target="_blank" rel="noreferrer">
+              📤 OAI export
+            </a>
+          </>
+        }
+      />
       {loading ? <p className="muted">Loading repository…</p> : null}
       {error ? (
         <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>
@@ -27,6 +54,7 @@ export function RepositoryPage() {
         </div>
       ) : null}
 
+      {showForm ? (
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800 }}>Upload Item</div>
         <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
@@ -84,6 +112,7 @@ export function RepositoryPage() {
                 await repositoryApi.uploadRepositoryItem(accessToken, fd);
                 setForm({ type: "dataset", title: "", description: "", access: "private", groupId: "" });
                 setFile(null);
+                setShowForm(false);
                 await reload();
               } catch (e) {
                 setError(e?.response?.data?.message || e.message || "Upload failed");
@@ -94,6 +123,7 @@ export function RepositoryPage() {
           </button>
         </div>
       </div>
+      ) : null}
 
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800 }}>Items</div>

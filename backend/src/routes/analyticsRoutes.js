@@ -32,5 +32,21 @@ router.get(
   asyncHandler(analyticsController.getFinanceReport)
 );
 
+router.get(
+  "/faculty-report",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("faculty_coordinator", "research_director"),
+  asyncHandler(analyticsController.getFacultyReport)
+);
+
+router.get(
+  "/faculty-report.pdf",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("faculty_coordinator", "research_director"),
+  asyncHandler(analyticsController.exportFacultyReportPdf)
+);
+
 module.exports = { analyticsRoutes: router };
 

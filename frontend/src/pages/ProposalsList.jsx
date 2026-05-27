@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as proposalApi from "../services/proposalApi";
+import { PageHeader } from "../components/PageHeader";
 
 export function ProposalsListPage() {
   const { accessToken, user } = useAuth();
@@ -16,6 +17,17 @@ export function ProposalsListPage() {
     return "Proposals (Review Queue)";
   }, [user?.role]);
 
+  const stats = useMemo(() => {
+    const by = (s) => proposals.filter((p) => p.status === s).length;
+    return [
+      { label: "Total", value: proposals.length },
+      { label: "Draft", value: by("draft") },
+      { label: "Submitted", value: by("submitted"), accent: "#38bdf8" },
+      { label: "Approved", value: by("approved"), accent: "#1d4ed8" },
+      { label: "Rejected", value: by("rejected") },
+    ];
+  }, [proposals]);
+
   async function load() {
     setError("");
     const res = await proposalApi.listProposals(accessToken);
@@ -29,14 +41,19 @@ export function ProposalsListPage() {
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <h2 style={{ marginTop: 0 }}>{title}</h2>
-        {canCreate ? (
-          <Link className="btn primary" to="/proposals/new">
-            New Proposal
-          </Link>
-        ) : null}
-      </div>
+      <PageHeader
+        title={title}
+        subtitle="Manage proposals through draft → submitted → reviewed lifecycle."
+        stats={stats}
+        actions={
+          <>
+            {canCreate ? (
+              <Link className="btn primary" to="/proposals/new">+ New Proposal</Link>
+            ) : null}
+            <Link className="btn" to="/projects">Go to Projects</Link>
+          </>
+        }
+      />
 
       {error ? <div className="card" style={{ borderColor: "rgba(255, 99, 132, 0.55)" }}>{error}</div> : null}
 

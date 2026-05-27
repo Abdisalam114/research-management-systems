@@ -1,26 +1,44 @@
 /**
- * Single institutional seed entry point.
- * All users are defined in seedData.js only.
- *
+ * Institutional seed — users in seedData.js; sample data tops up each module to 10 rows.
  * Usage: npm run seed
  */
 const dotenv = require("dotenv");
 dotenv.config();
 
+const fs = require("fs");
 const path = require("path");
 const mongoose = require("mongoose");
 const { connectDB } = require("../config/db");
 const { User } = require("../models/User");
 const { Proposal, PROPOSAL_STATUSES } = require("../models/Proposal");
-const { Project } = require("../models/Project");
+const { Project, PROJECT_STATUSES } = require("../models/Project");
 const { Grant, GRANT_STATUSES } = require("../models/Grant");
 const { Budget, BUDGET_ITEM_STATUSES, BUDGET_ITEM_TYPES } = require("../models/Budget");
 const { Publication, PUBLICATION_STATUSES } = require("../models/Publication");
-const { ResearchGroup, GROUP_MEMBER_ROLES } = require("../models/ResearchGroup");
+const { ResearchGroup, GROUP_MEMBER_ROLES, GROUP_KINDS } = require("../models/ResearchGroup");
+const { ThesisGroup, THESIS_STATUSES } = require("../models/ThesisGroup");
 const { RepositoryItem, REPOSITORY_ACCESS } = require("../models/RepositoryItem");
-const { Notification } = require("../models/Notification");
+const { Notification, NOTIFICATION_TYPES } = require("../models/Notification");
+const { Department } = require("../models/Department");
+const { ResearchPolicy } = require("../models/ResearchPolicy");
+const { EthicsApplication, ETHICS_STATUSES } = require("../models/EthicsApplication");
+const { Payment, PAYMENT_CATEGORIES, PAYMENT_STATUSES } = require("../models/Payment");
 const { writeSimplePdf } = require("../utils/pdf");
 const { INSTITUTIONAL_USERS } = require("./seedData");
+const {
+  TARGET,
+  SAMPLE_PROPOSALS,
+  SAMPLE_GRANTS,
+  SAMPLE_PUBLICATIONS,
+  SAMPLE_COLLAB_GROUPS,
+  SAMPLE_THESIS,
+  SAMPLE_DEPARTMENTS,
+  SAMPLE_POLICIES,
+  SAMPLE_ETHICS,
+  SAMPLE_REPOSITORY,
+  SAMPLE_NOTIFICATIONS,
+  LEGACY_TITLE_FIXES,
+} = require("./seedSamples");
 
 async function upsertUser(spec) {
   const email = String(spec.email).toLowerCase().trim();
@@ -55,7 +73,6 @@ async function seedUsers() {
     users[spec.email.toLowerCase()] = u;
   }
 
-  // Legacy demo accounts → rename to Director (no more "Seed Admin")
   const legacyAdmin = await User.findOne({ email: "admin@rms.edu" }).select("+password");
   if (legacyAdmin) {
     legacyAdmin.fullName = "Research Director";
@@ -69,205 +86,453 @@ async function seedUsers() {
   return users;
 }
 
-async function seedProposalsAndProjects(director, r1, r2) {
-  const seedTitles = [
-    "AI-assisted Early Disease Screening in Low-Resource Clinics",
-    "Renewable Microgrid Optimization for Campus Resilience",
-    "Community Water Quality Monitoring Using Low-Cost Sensors",
-  ];
-
-  const old = await Proposal.find({
-    $or: [{ title: { $in: seedTitles } }, { title: { $regex: /^DEMO:|^SEED:/ } }],
-  }).select("_id");
-  const oldIds = old.map((p) => p._id);
-  if (oldIds.length) {
-    await Project.deleteMany({ $or: [{ proposalId: { $in: oldIds } }, { title: { $regex: /^DEMO:|^SEED:/ } }] });
-    await Proposal.deleteMany({ _id: { $in: oldIds } });
+async function normalizeLegacySeedLabels() {
+  for (const [from, to] of LEGACY_TITLE_FIXES.Publication) {
+    await Publication.updateMany({ title: from }, { $set: { title: to } });
+  }
+  for (const [from, to] of LEGACY_TITLE_FIXES.Grant) {
+    await Grant.updateMany({ title: from }, { $set: { title: to } });
+  }
+  for (const [from, to] of LEGACY_TITLE_FIXES.ResearchGroup) {
+    await ResearchGroup.updateMany({ name: from }, { $set: { name: to } });
+  }
+  for (const [from, to] of LEGACY_TITLE_FIXES.RepositoryItem) {
+    await RepositoryItem.updateMany({ title: from }, { $set: { title: to } });
   }
 
-  const seededProposals = await Proposal.insertMany([
-    {
-      title: seedTitles[0],
-      abstract:
-        "A pilot study on lightweight machine learning screening tools suitable for low-resource clinical workflows at partner clinics.",
-      department: r1.department,
-      researchArea: "Artificial Intelligence",
-      document: null,
-      version: 1,
-      researcherId: r1._id,
-      status: PROPOSAL_STATUSES.SUBMITTED,
-      submittedAt: new Date(),
-      reviewerComments: [],
-    },
-    {
-      title: seedTitles[1],
-      abstract:
-        "Optimization of hybrid solar-diesel microgrids to improve reliability, reduce operating costs, and support critical facilities on campus.",
-      department: r2.department,
-      researchArea: "Energy Systems",
-      document: null,
-      version: 1,
-      researcherId: r2._id,
-      status: PROPOSAL_STATUSES.UNDER_REVIEW,
-      submittedAt: new Date(Date.now() - 86400000),
-      reviewerComments: [
-        { role: "faculty_coordinator", comment: "Promising scope; please clarify data sources and evaluation metrics." },
-      ],
-    },
-    {
-      title: seedTitles[2],
-      abstract:
-        "A community-driven monitoring framework using low-cost sensors and open reporting to improve water safety and public health outcomes.",
-      department: "Environmental Science",
-      researchArea: "Public Health",
-      document: null,
-      version: 1,
-      researcherId: r1._id,
-      status: PROPOSAL_STATUSES.APPROVED,
-      submittedAt: new Date(Date.now() - 172800000),
-      reviewerComments: [{ role: "research_director", comment: "Approved for pilot implementation." }],
-    },
-  ]);
-
-  const uploadsDir = path.join(process.cwd(), "uploads");
-  const pdf1 = `seeded-paper-${Date.now()}-screening.pdf`;
-  const pdf2 = `seeded-paper-${Date.now()}-microgrid.pdf`;
-  const pdf3 = `seeded-paper-${Date.now()}-water.pdf`;
-
-  await writeSimplePdf({
-    filePath: path.join(uploadsDir, pdf1),
-    title: seedTitles[0],
-    author: r1.fullName,
-    bodyLines: ["Institutional seed proposal document for Jamhuriya RMS."],
-  });
-  await writeSimplePdf({
-    filePath: path.join(uploadsDir, pdf2),
-    title: seedTitles[1],
-    author: r2.fullName,
-    bodyLines: ["Institutional seed proposal document for Jamhuriya RMS."],
-  });
-  await writeSimplePdf({
-    filePath: path.join(uploadsDir, pdf3),
-    title: seedTitles[2],
-    author: r1.fullName,
-    bodyLines: ["Institutional seed proposal document for Jamhuriya RMS."],
-  });
-
-  const [p1, p2, p3] = seededProposals;
-  await Proposal.updateOne({ _id: p1._id }, { $set: { document: `/uploads/${pdf1}` } });
-  await Proposal.updateOne({ _id: p2._id }, { $set: { document: `/uploads/${pdf2}` } });
-  await Proposal.updateOne({ _id: p3._id }, { $set: { document: `/uploads/${pdf3}` } });
-
-  const approved = seededProposals.find((p) => p.status === PROPOSAL_STATUSES.APPROVED);
-  if (approved) {
-    await Project.create({
-      proposalId: approved._id,
-      title: approved.title,
-      researcherId: approved.researcherId,
-      teamMembers: ["Co-Researcher 1", "Co-Researcher 2"],
-      milestones: [
-        { title: "Ethics clearance", dueDate: new Date(Date.now() + 1209600000), completed: false },
-        { title: "Pilot data collection", dueDate: new Date(Date.now() + 3888000000), completed: false },
-      ],
-      status: "active",
-      progressReports: [
-        { note: "Project initialized from approved proposal.", progressPercent: 5, createdBy: director._id },
-      ],
+  const budgets = await Budget.find({ "items.description": /^SEED:/ });
+  for (const b of budgets) {
+    let changed = false;
+    b.items.forEach((item) => {
+      if (item.description?.startsWith("SEED:")) {
+        item.description = item.description.replace(/^SEED:\s*/, "");
+        changed = true;
+      }
     });
+    if (changed) await b.save();
   }
 }
 
-async function seedModules(director, researcher) {
-  const oldGrantIds = await Grant.find({ title: { $regex: /^SEED:/ } }).distinct("_id");
-  await Grant.deleteMany({ title: { $regex: /^SEED:/ } });
-  await Publication.deleteMany({ title: { $regex: /^SEED:/ } });
-  await Budget.deleteMany({
-    $or: [
-      { financeNotes: { $in: ["INSTITUTIONAL_SEED", "SEED_MODULE"] } },
-      ...(oldGrantIds.length ? [{ grantId: { $in: oldGrantIds } }] : []),
-    ],
-  });
-  await ResearchGroup.deleteMany({ name: { $regex: /^SEED:/ } });
-  await RepositoryItem.deleteMany({ title: { $regex: /^SEED:/ } });
+async function insertUniqueByTitle(Model, titleField, samples, buildDoc) {
+  let inserted = 0;
+  const count = await Model.countDocuments();
+  const need = Math.max(0, TARGET - count);
+  if (!need) return 0;
 
-  const grant = await Grant.create({
-    title: "SEED: Campus Innovation Grant",
-    fundingSource: "Jamhuriya Research Fund",
-    amountRequested: 25000,
+  for (const sample of samples) {
+    if (inserted >= need) break;
+    const title = sample[titleField] || sample.title || sample.name;
+    const exists = await Model.exists({ [titleField]: title });
+    if (exists) continue;
+    await Model.create(buildDoc(sample, inserted));
+    inserted += 1;
+  }
+  return inserted;
+}
+
+async function seedProposals(director, researchers) {
+  const [r1, r2] = researchers;
+  let inserted = 0;
+  const count = await Proposal.countDocuments();
+  const need = Math.max(0, TARGET - count);
+  if (!need) return 0;
+
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+  for (let i = 0; inserted < need && i < SAMPLE_PROPOSALS.length * 2; i += 1) {
+    const sample = SAMPLE_PROPOSALS[i % SAMPLE_PROPOSALS.length];
+    const exists = await Proposal.exists({ title: sample.title });
+    if (exists) continue;
+
+    const researcher = i % 2 === 0 ? r1 : r2;
+    const status = Object.values(PROPOSAL_STATUSES).includes(sample.status)
+      ? sample.status
+      : PROPOSAL_STATUSES.DRAFT;
+
+    const pdfName = `proposal-${Date.now()}-${inserted}.pdf`;
+    await writeSimplePdf({
+      filePath: path.join(uploadsDir, pdfName),
+      title: sample.title,
+      author: researcher.fullName,
+      bodyLines: [sample.abstract, "", "Jamhuriya University — Research Management System sample document."],
+    });
+
+    await Proposal.create({
+      title: sample.title,
+      abstract: sample.abstract,
+      department: sample.department || researcher.department,
+      researchArea: sample.researchArea,
+      document: `/uploads/${pdfName}`,
+      version: 1,
+      researcherId: researcher._id,
+      status,
+      submittedAt: status !== PROPOSAL_STATUSES.DRAFT ? new Date(Date.now() - inserted * 86400000) : null,
+      reviewerComments:
+        status === PROPOSAL_STATUSES.UNDER_REVIEW
+          ? [{ role: "faculty_coordinator", comment: "Please clarify methodology and timeline.", at: new Date() }]
+          : status === PROPOSAL_STATUSES.APPROVED
+            ? [{ role: "research_director", comment: "Approved for implementation.", at: new Date() }]
+            : [],
+    });
+    inserted += 1;
+  }
+  return inserted;
+}
+
+async function seedProjects(director, researchers) {
+  let projectCount = await Project.countDocuments();
+  const need = Math.max(0, TARGET - projectCount);
+  if (!need) return 0;
+
+  let created = 0;
+  const approved = await Proposal.find({ status: PROPOSAL_STATUSES.APPROVED }).sort({ createdAt: -1 });
+
+  for (const prop of approved) {
+    if (created >= need) break;
+    const exists = await Project.exists({ proposalId: prop._id });
+    if (exists) continue;
+
+    await Project.create({
+      proposalId: prop._id,
+      title: prop.title,
+      researcherId: prop.researcherId,
+      teamMembers: [
+        { name: "Research Assistant", role: "member" },
+        { name: "Field Coordinator", role: "member" },
+      ],
+      milestones: [
+        { title: "Ethics clearance & instruments", dueDate: new Date(Date.now() + 1209600000), completed: false },
+        { title: "Data collection complete", dueDate: new Date(Date.now() + 3888000000), completed: false },
+        { title: "Final report & dissemination", dueDate: new Date(Date.now() + 6220800000), completed: false },
+      ],
+      status: PROJECT_STATUSES.ACTIVE,
+      progressReports: [
+        {
+          note: "Project initiated from approved proposal. Ethics application in progress.",
+          progressPercent: 10 + created * 5,
+          createdBy: director._id,
+        },
+      ],
+    });
+    created += 1;
+    projectCount += 1;
+  }
+
+  return created;
+}
+
+async function seedGrantsAndBudgets(researchers, financeOfficer) {
+  const [r1] = researchers;
+  const grantsAdded = await insertUniqueByTitle(Grant, "title", SAMPLE_GRANTS, (s) => ({
+    title: s.title,
+    fundingSource: s.fundingSource,
+    amountRequested: s.amountRequested,
     currency: "USD",
-    researcherId: researcher._id,
-    status: GRANT_STATUSES.SUBMITTED,
-    submittedAt: new Date(),
+    researcherId: r1._id,
+    status: Object.values(GRANT_STATUSES).includes(s.status) ? s.status : GRANT_STATUSES.DRAFT,
+    submittedAt: s.status !== GRANT_STATUSES.DRAFT ? new Date() : null,
+  }));
+
+  const budgetCount = await Budget.countDocuments();
+  const budgetNeed = Math.max(0, TARGET - budgetCount);
+  if (budgetNeed > 0) {
+    const grants = await Grant.find().sort({ createdAt: -1 }).limit(TARGET);
+    let added = 0;
+    for (const grant of grants) {
+      if (added >= budgetNeed) break;
+      const has = await Budget.exists({ grantId: grant._id });
+      if (has) continue;
+      await Budget.create({
+        grantId: grant._id,
+        ownerResearcherId: grant.researcherId,
+        totalAllocated: grant.amountRequested,
+        currency: "USD",
+        financeNotes: "",
+        items: [
+          {
+            type: BUDGET_ITEM_TYPES.EXPENSE,
+            description: "Laboratory consumables and field supplies",
+            amount: Math.round(grant.amountRequested * 0.15),
+            status: BUDGET_ITEM_STATUSES.PENDING,
+            createdBy: grant.researcherId,
+          },
+          {
+            type: BUDGET_ITEM_TYPES.EXPENSE,
+            description: "Research assistant stipend (3 months)",
+            amount: Math.round(grant.amountRequested * 0.2),
+            status: BUDGET_ITEM_STATUSES.APPROVED,
+            createdBy: grant.researcherId,
+            approvedBy: financeOfficer?._id || grant.researcherId,
+          },
+        ],
+      });
+      added += 1;
+    }
+  }
+
+  return grantsAdded;
+}
+
+async function seedPublications(researchers) {
+  const [r1, r2] = researchers;
+  return insertUniqueByTitle(Publication, "title", SAMPLE_PUBLICATIONS, (s, idx) => ({
+    title: s.title,
+    type: s.type,
+    year: s.year,
+    researcherId: (idx || 0) % 2 === 0 ? r1._id : r2._id,
+    status: Object.values(PUBLICATION_STATUSES).includes(s.status) ? s.status : PUBLICATION_STATUSES.DRAFT,
+  }));
+}
+
+async function seedCollaborationGroups(researchers) {
+  const [r1] = researchers;
+  const count = await ResearchGroup.countDocuments({ kind: GROUP_KINDS.COLLABORATION });
+  const need = Math.max(0, TARGET - count);
+  if (!need) return 0;
+
+  let inserted = 0;
+  for (const sample of SAMPLE_COLLAB_GROUPS) {
+    if (inserted >= need) break;
+    const exists = await ResearchGroup.exists({ name: sample.name });
+    if (exists) continue;
+    await ResearchGroup.create({
+      name: sample.name,
+      description: sample.description,
+      kind: GROUP_KINDS.COLLABORATION,
+      createdBy: r1._id,
+      members: [{ userId: r1._id, role: GROUP_MEMBER_ROLES.LEAD }],
+    });
+    inserted += 1;
+  }
+  return inserted;
+}
+
+async function createThesisRecord({ sample, coordinator, supervisor, createdBy }) {
+  const exists = await ThesisGroup.exists({ title: sample.title });
+  if (exists) return false;
+
+  const leadId = supervisor?._id || createdBy._id;
+  const memberIds = new Set([String(leadId), String(createdBy._id)]);
+
+  const researchGroup = await ResearchGroup.create({
+    name: sample.title.length > 120 ? `${sample.title.slice(0, 117)}...` : sample.title,
+    description: "Thesis supervision group (sample data).",
+    kind: GROUP_KINDS.THESIS,
+    createdBy: createdBy._id,
+    members: Array.from(memberIds).map((id) => ({
+      userId: id,
+      role: String(id) === String(leadId) ? GROUP_MEMBER_ROLES.LEAD : GROUP_MEMBER_ROLES.MEMBER,
+    })),
   });
 
-  await Budget.create({
-    grantId: grant._id,
-    ownerResearcherId: researcher._id,
-    totalAllocated: 25000,
-    currency: "USD",
-    financeNotes: "INSTITUTIONAL_SEED",
-    items: [
-      {
-        type: BUDGET_ITEM_TYPES.EXPENSE,
-        description: "SEED: Lab consumables",
-        amount: 1200,
-        status: BUDGET_ITEM_STATUSES.PENDING,
-        createdBy: researcher._id,
+  const meetingDate = new Date(Date.now() - 7 * 86400000);
+  await ThesisGroup.create({
+    title: sample.title,
+    students: sample.students,
+    researchGroupId: researchGroup._id,
+    supervisorId: supervisor?._id || null,
+    coordinatorId: coordinator?._id || null,
+    department: sample.department,
+    faculty: sample.faculty,
+    facultyResearchArea: sample.facultyResearchArea,
+    meetingSchedule: sample.meetingSchedule,
+    status: Object.values(THESIS_STATUSES).includes(sample.status) ? sample.status : THESIS_STATUSES.PROPOSED,
+    meetings: supervisor
+      ? [
+          {
+            date: meetingDate,
+            location: sample.meetingSchedule.split("—").pop()?.trim() || "Campus",
+            agenda: "Progress review and next milestones",
+            notes: "Supervisor reviewed draft chapter outline.",
+            loggedBy: supervisor._id,
+          },
+        ]
+      : [],
+    createdBy: createdBy._id,
+  });
+  return true;
+}
+
+async function seedThesisGroups(coordinator, supervisor, director) {
+  const count = await ThesisGroup.countDocuments();
+  const need = Math.max(0, TARGET - count);
+  if (!need) return 0;
+
+  const createdBy = coordinator || director;
+  let inserted = 0;
+  for (const sample of SAMPLE_THESIS) {
+    if (inserted >= need) break;
+    const ok = await createThesisRecord({ sample, coordinator, supervisor, createdBy });
+    if (ok) inserted += 1;
+  }
+  return inserted;
+}
+
+async function seedDepartments(director) {
+  let inserted = 0;
+  const count = await Department.countDocuments();
+  const need = Math.max(0, TARGET - count);
+  if (!need) return 0;
+
+  for (const d of SAMPLE_DEPARTMENTS) {
+    if (inserted >= need) break;
+    const exists = await Department.exists({ $or: [{ name: d.name }, { code: d.code }] });
+    if (exists) continue;
+    await Department.create({
+      name: d.name,
+      code: d.code,
+      faculty: d.faculty,
+      createdBy: director._id,
+    });
+    inserted += 1;
+  }
+  return inserted;
+}
+
+async function seedPolicies(director) {
+  return insertUniqueByTitle(ResearchPolicy, "title", SAMPLE_POLICIES, (s) => ({
+    type: s.type,
+    title: s.title,
+    description: `${s.title} — institutional research guidance for Jamhuriya University.`,
+    status: s.status,
+    createdBy: director._id,
+  }));
+}
+
+async function seedEthics(researchers) {
+  const [r1, r2] = researchers;
+  const count = await EthicsApplication.countDocuments();
+  const need = Math.max(0, TARGET - count);
+  if (!need) return 0;
+
+  const statuses = [ETHICS_STATUSES.DRAFT, ETHICS_STATUSES.SUBMITTED, ETHICS_STATUSES.APPROVED];
+  let inserted = 0;
+  for (let i = 0; inserted < need && i < SAMPLE_ETHICS.length; i += 1) {
+    const projectTitle = SAMPLE_ETHICS[i];
+    const exists = await EthicsApplication.exists({ projectTitle });
+    if (exists) continue;
+    const researcher = i % 2 === 0 ? r1 : r2;
+    await EthicsApplication.create({
+      researcherId: researcher._id,
+      status: statuses[i % statuses.length],
+      projectTitle,
+      projectLevel: i % 2 === 0 ? "master" : "undergraduate",
+      principal: {
+        firstName: researcher.fullName.split(" ")[0],
+        lastName: researcher.fullName.split(" ").slice(1).join(" "),
+        email: researcher.email,
+        department: researcher.department,
+        faculty: "Computer & IT",
       },
-    ],
-  });
+      backgroundLiterature: "Prior studies indicate a clear need for ethical, community-engaged research in this topic area.",
+      aimsObjectives: "To collect and analyse data while protecting participant welfare and confidentiality.",
+      rationale: "Addresses a documented gap in local evidence for policy and practice.",
+      design: "Mixed-methods design with surveys and structured interviews.",
+      subjectTypes: ["human"],
+      risk: { level: "minimal", description: "Minimal risk; standard confidentiality safeguards apply." },
+    });
+    inserted += 1;
+  }
+  return inserted;
+}
 
-  await Publication.insertMany([
-    {
-      title: "SEED: ML Screening in Low-Resource Clinics",
-      type: "journal_article",
-      year: 2025,
-      researcherId: researcher._id,
-      status: PUBLICATION_STATUSES.SUBMITTED,
-    },
-    {
-      title: "SEED: Microgrid Optimization Review",
-      type: "conference_paper",
-      year: 2024,
-      researcherId: researcher._id,
-      status: PUBLICATION_STATUSES.VALIDATED,
-    },
-  ]);
+async function ensureRepositoryPlaceholder() {
+  const uploadsDir = path.join(process.cwd(), "uploads");
+  const filePath = path.join(uploadsDir, "repository-sample-placeholder.txt");
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+  if (!fs.existsSync(filePath)) {
+    fs.writeFileSync(filePath, "Jamhuriya RMS — sample repository file.\n", "utf8");
+  }
+  return "/uploads/repository-sample-placeholder.txt";
+}
 
-  await ResearchGroup.create({
-    name: "SEED: AI & Health Research Group",
-    description: "Institutional collaboration group",
-    createdBy: researcher._id,
-    members: [{ userId: researcher._id, role: GROUP_MEMBER_ROLES.LEAD }],
-  });
-
-  await RepositoryItem.create({
-    type: "document",
-    title: "SEED: Pilot Study Protocol",
-    description: "Institutional repository sample",
-    filePath: "/uploads/seed-placeholder.txt",
-    fileSize: 0,
+async function seedRepository(researchers) {
+  const [r1] = researchers;
+  const placeholder = await ensureRepositoryPlaceholder();
+  return insertUniqueByTitle(RepositoryItem, "title", SAMPLE_REPOSITORY, (s) => ({
+    type: s.type,
+    title: s.title,
+    description: s.description,
+    filePath: placeholder,
+    fileSize: 128,
     access: REPOSITORY_ACCESS.INSTITUTION,
-    uploadedBy: researcher._id,
-  });
+    uploadedBy: r1._id,
+  }));
+}
 
-  await Notification.create({
-    userId: director._id,
-    type: "grant",
-    title: "Grant submitted for director review",
-    body: grant.title,
-    link: "/grants",
-  });
+async function seedNotifications(director, coordinator) {
+  const count = await Notification.countDocuments({ userId: director._id });
+  const need = Math.max(0, TARGET - count);
+  if (!need) return 0;
+
+  let inserted = 0;
+  for (const n of SAMPLE_NOTIFICATIONS) {
+    if (inserted >= need) break;
+    const exists = await Notification.exists({ userId: director._id, title: n.title });
+    if (exists) continue;
+    await Notification.create({
+      userId: director._id,
+      type: Object.values(NOTIFICATION_TYPES).includes(n.type) ? n.type : NOTIFICATION_TYPES.SYSTEM,
+      title: n.title,
+      body: n.body,
+      link: n.link,
+    });
+    inserted += 1;
+  }
+
+  if (coordinator) {
+    await Notification.create({
+      userId: coordinator._id,
+      type: NOTIFICATION_TYPES.SYSTEM,
+      title: "Faculty coordinator dashboard ready",
+      body: "Review proposals, ethics applications, and thesis groups for your faculty.",
+      link: "/faculty-dashboard",
+    });
+  }
+
+  return inserted;
+}
+
+async function seedPayments(financeOfficer) {
+  const count = await Payment.countDocuments();
+  const need = Math.max(0, Math.min(TARGET, 5) - count);
+  if (!need || !financeOfficer) return 0;
+
+  const budgets = await Budget.find().populate("ownerResearcherId").limit(5);
+  let inserted = 0;
+  for (const budget of budgets) {
+    if (inserted >= need) break;
+    const exists = await Payment.exists({ budgetId: budget._id });
+    if (exists) continue;
+    const requesterId = budget.ownerResearcherId?._id || budget.ownerResearcherId;
+    if (!requesterId) continue;
+    await Payment.create({
+      category: PAYMENT_CATEGORIES.EQUIPMENT,
+      budgetId: budget._id,
+      payee: "Jamhuriya University Supplies",
+      purpose: "Laboratory equipment purchase (sample)",
+      amount: 850,
+      currency: "USD",
+      status: PAYMENT_STATUSES.REQUESTED,
+      requestedBy: requesterId,
+    });
+    inserted += 1;
+  }
+  return inserted;
 }
 
 async function run() {
   await connectDB(process.env.MONGO_URI);
 
   console.log("=== Jamhuriya RMS institutional seed ===\n");
-  console.log("1/3 Users (see seedData.js)...");
+
+  console.log("1/4 Users (seedData.js)...");
   const users = await seedUsers();
 
   const director = users["director@rms.edu"] || users["admin@rms.edu"];
+  const coordinator = users["coordinator@rms.edu"];
+  const finance = users["finance@rms.edu"];
   const r1 = users["asha@rms.edu"];
   const r2 = users["mahad@rms.edu"];
 
@@ -275,12 +540,46 @@ async function run() {
     throw new Error("Missing director or researcher accounts after user seed.");
   }
 
-  console.log("2/3 Proposals & projects...");
-  await seedProposalsAndProjects(director, r1, r2);
+  const researchers = [r1, r2];
 
-  console.log("3/3 Grants, budgets, publications, groups, repository...");
-  await seedModules(director, r1);
+  console.log("2/4 Normalizing legacy SEED labels...");
+  await normalizeLegacySeedLabels();
 
+  console.log("3/4 Proposals, projects, grants, publications...");
+  const p = await seedProposals(director, researchers);
+  const pr = await seedProjects(director, researchers);
+  const g = await seedGrantsAndBudgets(researchers, finance);
+  const pub = await seedPublications(researchers);
+  console.log(`     +${p} proposals, +${pr} projects, +${g} grants, +${pub} publications`);
+
+  console.log("4/4 Groups, thesis, departments, ethics, repository, notifications...");
+  const grp = await seedCollaborationGroups(researchers);
+  const th = await seedThesisGroups(coordinator, r1, director);
+  const dept = await seedDepartments(director);
+  const pol = await seedPolicies(director);
+  const eth = await seedEthics(researchers);
+  const repo = await seedRepository(researchers);
+  const notif = await seedNotifications(director, coordinator);
+  const pay = await seedPayments(finance);
+  console.log(
+    `     +${grp} collab groups, +${th} thesis, +${dept} departments, +${pol} policies, +${eth} ethics, +${repo} repository, +${notif} notifications, +${pay} payments`
+  );
+
+  const summary = {
+    proposals: await Proposal.countDocuments(),
+    projects: await Project.countDocuments(),
+    grants: await Grant.countDocuments(),
+    budgets: await Budget.countDocuments(),
+    publications: await Publication.countDocuments(),
+    collabGroups: await ResearchGroup.countDocuments({ kind: GROUP_KINDS.COLLABORATION }),
+    thesisGroups: await ThesisGroup.countDocuments(),
+    departments: await Department.countDocuments(),
+    policies: await ResearchPolicy.countDocuments(),
+    ethics: await EthicsApplication.countDocuments(),
+    repository: await RepositoryItem.countDocuments(),
+  };
+
+  console.log("\nCounts in database:", summary);
   console.log("\nDone. Director login:");
   console.log(`  Email: ${INSTITUTIONAL_USERS[0].email}`);
   console.log(`  Password: (see SEED_DIRECTOR_PASSWORD or seedData.js)`);

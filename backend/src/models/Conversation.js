@@ -14,6 +14,8 @@ const conversationSchema = new mongoose.Schema(
     participants: [{ type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true }],
     messages: [messageSchema],
     lastMessageAt: { type: Date, default: null, index: true },
+    groupId: { type: mongoose.Schema.Types.ObjectId, ref: "ResearchGroup", default: null, index: true },
+    title: { type: String, default: "", trim: true },
   },
   { timestamps: true }
 );

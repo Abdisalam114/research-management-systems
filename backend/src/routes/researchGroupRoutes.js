@@ -7,6 +7,7 @@ const { authenticateUser, requireActiveUser, authorizeRoles } = require("../midd
 const router = express.Router();
 
 router.get("/", authenticateUser, requireActiveUser, asyncHandler(researchGroupController.listGroups));
+router.get("/stats", authenticateUser, requireActiveUser, asyncHandler(researchGroupController.getGroupStats));
 router.get("/:id", authenticateUser, requireActiveUser, asyncHandler(researchGroupController.getGroup));
 
 router.post(

@@ -1,4 +1,5 @@
 const { Conversation } = require("../models/Conversation");
+const { ResearchGroup } = require("../models/ResearchGroup");
 const { AppError } = require("../utils/AppError");
 
 function sanitizeConversation(c) {
@@ -7,6 +8,8 @@ function sanitizeConversation(c) {
     participants: c.participants,
     lastMessageAt: c.lastMessageAt,
     messages: c.messages,
+    groupId: c.groupId,
+    title: c.title,
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
   };
@@ -15,6 +18,54 @@ function sanitizeConversation(c) {
 async function listMyConversations(req, res) {
   const conversations = await Conversation.find({ participants: req.user.id }).sort({ lastMessageAt: -1, updatedAt: -1 });
   res.json({ conversations: conversations.map(sanitizeConversation) });
+}
+
+async function openGroupChat(req, res) {
+  const { groupId } = req.params;
+  const group = await ResearchGroup.findById(groupId);
+  if (!group) throw new AppError("Group not found", 404);
+
+  const isMember = (group.members || []).some((m) => String(m.userId) === String(req.user.id));
+  const isCreator = String(group.createdBy) === String(req.user.id);
+  if (!isMember && !isCreator && req.user.role !== "research_director") {
+    throw new AppError("Forbidden", 403);
+  }
+
+  let conversation = await Conversation.findOne({ groupId });
+  if (!conversation) {
+    const participantIds = Array.from(
+      new Set([
+        String(group.createdBy),
+        ...(group.members || []).map((m) => String(m.userId)),
+      ])
+    );
+    conversation = await Conversation.create({
+      participants: participantIds,
+      groupId,
+      title: group.name,
+      messages: [],
+      lastMessageAt: null,
+    });
+  } else {
+    const participantSet = new Set((conversation.participants || []).map(String));
+    let changed = false;
+    (group.members || []).forEach((m) => {
+      const uid = String(m.userId);
+      if (!participantSet.has(uid)) {
+        conversation.participants.push(m.userId);
+        participantSet.add(uid);
+        changed = true;
+      }
+    });
+    const creatorId = String(group.createdBy);
+    if (!participantSet.has(creatorId)) {
+      conversation.participants.push(group.createdBy);
+      changed = true;
+    }
+    if (changed) await conversation.save();
+  }
+
+  res.json({ conversation: sanitizeConversation(conversation) });
 }
 
 async function createConversation(req, res) {
@@ -64,5 +115,5 @@ async function getConversation(req, res) {
   res.json({ conversation: sanitizeConversation(conversation) });
 }
 
-module.exports = { listMyConversations, createConversation, sendMessage, getConversation };
+module.exports = { listMyConversations, createConversation, sendMessage, getConversation, openGroupChat };
 

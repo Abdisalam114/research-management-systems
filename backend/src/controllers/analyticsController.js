@@ -7,6 +7,8 @@ const { Publication, PUBLICATION_STATUSES, PUBLICATION_TYPES } = require("../mod
 const { RepositoryItem } = require("../models/RepositoryItem");
 const { ResearchGroup } = require("../models/ResearchGroup");
 const { User, USER_STATUSES, ROLES } = require("../models/User");
+const { Department } = require("../models/Department");
+const { FACULTIES, matchFacultyByName } = require("../utils/facultyMatcher");
 const PDFDocument = require("pdfkit");
 
 function sum(nums) {
@@ -119,16 +121,16 @@ async function buildInstitutionalAnalytics() {
     RepositoryItem.countDocuments({}),
     ResearchGroup.countDocuments({}),
     User.countDocuments({ role: ROLES.RESEARCHER, status: USER_STATUSES.ACTIVE }),
-    Project.find({}).sort({ updatedAt: -1 }).limit(10).populate("researcherId", "fullName department"),
+    Project.find({}).sort({ updatedAt: -1 }).limit(5).populate("researcherId", "fullName department"),
     Grant.find({}).select("amountAwarded status createdAt decidedAt"),
     Budget.find({}).select("items totalAllocated"),
     Publication.find({}).select("title type year status citationCount doi createdAt researcherId"),
     Proposal.find({ status: { $in: [PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW, PROPOSAL_STATUSES.APPROVED] } })
       .sort({ updatedAt: -1 })
-      .limit(8)
+      .limit(5)
       .populate("researcherId", "fullName"),
-    RepositoryItem.find({}).sort({ createdAt: -1 }).limit(6).select("title type access createdAt"),
-    ResearchGroup.find({}).sort({ createdAt: -1 }).limit(6).select("name members createdAt"),
+    RepositoryItem.find({}).sort({ createdAt: -1 }).limit(5).select("title type access createdAt"),
+    ResearchGroup.find({}).sort({ createdAt: -1 }).limit(5).select("name members createdAt"),
   ]);
 
   const activeProjects = projects.filter((p) => p.status === PROJECT_STATUSES.ACTIVE).length;
@@ -140,10 +142,16 @@ async function buildInstitutionalAnalytics() {
   const awardedTotal = grants.filter((g) => g.status === GRANT_STATUSES.ACTIVE).reduce((a, g) => a + (g.amountAwarded || 0), 0);
 
   const pubsByType = {
-    journal: publications.filter((p) => p.type === PUBLICATION_TYPES.JOURNAL).length,
+    paper: publications.filter((p) => p.type === PUBLICATION_TYPES.PAPER).length,
+    journal_article: publications.filter((p) => p.type === PUBLICATION_TYPES.JOURNAL).length,
     conference: publications.filter((p) => p.type === PUBLICATION_TYPES.CONFERENCE).length,
     book: publications.filter((p) => p.type === PUBLICATION_TYPES.BOOK).length,
+    book_chapter: publications.filter((p) => p.type === PUBLICATION_TYPES.BOOK_CHAPTER).length,
     patent: publications.filter((p) => p.type === PUBLICATION_TYPES.PATENT).length,
+    thesis: publications.filter((p) => p.type === PUBLICATION_TYPES.THESIS).length,
+    review: publications.filter((p) => p.type === PUBLICATION_TYPES.REVIEW).length,
+    case_study: publications.filter((p) => p.type === PUBLICATION_TYPES.CASE_STUDY).length,
+    letter_to_editor: publications.filter((p) => p.type === PUBLICATION_TYPES.LETTER_TO_EDITOR).length,
   };
   const citationTotal = publications.reduce((a, p) => a + (p.citationCount || 0), 0);
 
@@ -162,7 +170,7 @@ async function buildInstitutionalAnalytics() {
     })),
   ]
     .sort((a, b) => new Date(b.at) - new Date(a.at))
-    .slice(0, 8);
+    .slice(0, 5);
 
   const activeProjectsTable = projects.map((p, idx) => {
     const latest = (p.progressReports || [])[0];
@@ -182,34 +190,51 @@ async function buildInstitutionalAnalytics() {
   const grantSuccessRate = grantDecided ? Math.round((grantWon / grantDecided) * 100) : 0;
 
   const activeUsers = await User.find({ status: USER_STATUSES.ACTIVE }).select("department role fullName");
+
+  // Build a Department.name -> faculty lookup using stored faculty when valid,
+  // otherwise inferring from the department name keywords.
+  const allDepts = await Department.find({}).select("name faculty");
+  const deptToFaculty = {};
+  allDepts.forEach((d) => {
+    const stored = (d.faculty || "").trim();
+    deptToFaculty[d.name] = stored && FACULTIES.includes(stored) ? stored : matchFacultyByName(d.name);
+  });
+
+  // Resolve any department string (from user/proposal/project) into one of the 6 faculties.
+  // No "Unknown" — the matcher's DEFAULT_FACULTY fallback guarantees a faculty.
+  function resolveFaculty(deptName) {
+    if (!deptName) return matchFacultyByName("");
+    if (deptToFaculty[deptName]) return deptToFaculty[deptName];
+    return matchFacultyByName(deptName);
+  }
+
+  // Pre-seed all 6 faculties so every faculty row appears (even with zero counts).
   const facultyMap = {};
+  FACULTIES.forEach((f) => {
+    facultyMap[f] = { department: f, researchers: 0, publications: 0, citations: 0, proposals: 0, projects: 0 };
+  });
+
   activeUsers.forEach((u) => {
-    const dept = u.department || "Unknown";
-    if (!facultyMap[dept]) {
-      facultyMap[dept] = { department: dept, researchers: 0, publications: 0, citations: 0, proposals: 0, projects: 0 };
-    }
-    if (u.role === ROLES.RESEARCHER) facultyMap[dept].researchers += 1;
+    const faculty = resolveFaculty(u.department);
+    if (u.role === ROLES.RESEARCHER) facultyMap[faculty].researchers += 1;
   });
 
   publications.forEach((pub) => {
     const u = activeUsers.find((x) => String(x._id) === String(pub.researcherId));
-    const dept = u?.department || "Unknown";
-    if (!facultyMap[dept]) facultyMap[dept] = { department: dept, researchers: 0, publications: 0, citations: 0, proposals: 0, projects: 0 };
-    facultyMap[dept].publications += 1;
-    facultyMap[dept].citations += pub.citationCount || 0;
+    const faculty = resolveFaculty(u?.department);
+    facultyMap[faculty].publications += 1;
+    facultyMap[faculty].citations += pub.citationCount || 0;
   });
 
   const allProposals = await Proposal.find({}).select("department status");
   allProposals.forEach((p) => {
-    const dept = p.department || "Unknown";
-    if (!facultyMap[dept]) facultyMap[dept] = { department: dept, researchers: 0, publications: 0, citations: 0, proposals: 0, projects: 0 };
-    facultyMap[dept].proposals += 1;
+    const faculty = resolveFaculty(p.department);
+    facultyMap[faculty].proposals += 1;
   });
 
   projects.forEach((p) => {
-    const dept = p.researcherId?.department || "Unknown";
-    if (!facultyMap[dept]) facultyMap[dept] = { department: dept, researchers: 0, publications: 0, citations: 0, proposals: 0, projects: 0 };
-    facultyMap[dept].projects += 1;
+    const faculty = resolveFaculty(p.researcherId?.department);
+    facultyMap[faculty].projects += 1;
   });
 
   const facultyAnalytics = Object.values(facultyMap).sort((a, b) => b.publications - a.publications);
@@ -257,7 +282,8 @@ async function buildInstitutionalAnalytics() {
     researchOutput: {
       publications: publicationCount,
       citations: citationTotal,
-      patents: pubsByType.patent,
+      papers: pubsByType.paper,
+      caseStudies: pubsByType.case_study,
       byType: pubsByType,
     },
     keyMetrics: {
@@ -268,7 +294,7 @@ async function buildInstitutionalAnalytics() {
     },
     activeProjects: activeProjectsTable,
     recentActivity,
-    publications: publications.slice(0, 8).map((p) => ({
+    publications: publications.slice(0, 5).map((p) => ({
       id: p._id,
       title: p.title,
       type: p.type,
@@ -298,6 +324,130 @@ async function buildInstitutionalAnalytics() {
 async function getInstitutionalAnalytics(req, res) {
   const data = await buildInstitutionalAnalytics();
   res.json(data);
+}
+
+async function getFacultyReport(req, res) {
+  const dept = (req.user.department || "").trim();
+  const filter = dept ? { department: dept } : {};
+
+  const [proposals, projects, publications, deptUsers] = await Promise.all([
+    Proposal.find(filter).select("title status department researcherId createdAt updatedAt").populate("researcherId", "fullName"),
+    Project.find({}).populate("researcherId", "fullName department"),
+    Publication.find({}).populate("researcherId", "fullName department"),
+    User.find({ department: dept, status: USER_STATUSES.ACTIVE }).select("fullName role"),
+  ]);
+
+  const facultyProjects = projects.filter(
+    (p) => p.researcherId && (p.researcherId.department === dept || !dept)
+  );
+  const facultyPublications = publications.filter(
+    (p) => p.researcherId && (p.researcherId.department === dept || !dept)
+  );
+
+  res.json({
+    department: dept || "All faculties",
+    generatedAt: new Date().toISOString(),
+    counts: {
+      researchers: deptUsers.filter((u) => u.role === ROLES.RESEARCHER).length,
+      proposals: proposals.length,
+      projects: facultyProjects.length,
+      publications: facultyPublications.length,
+      citations: facultyPublications.reduce((acc, p) => acc + (p.citationCount || 0), 0),
+    },
+    proposals: proposals.slice(0, 50).map((p) => ({
+      id: p._id,
+      title: p.title,
+      status: p.status,
+      author: p.researcherId?.fullName || "—",
+      updatedAt: p.updatedAt,
+    })),
+    projects: facultyProjects.slice(0, 50).map((p) => ({
+      id: p._id,
+      title: p.title,
+      status: p.status,
+      pi: p.researcherId?.fullName || "—",
+    })),
+    publications: facultyPublications.slice(0, 50).map((p) => ({
+      id: p._id,
+      title: p.title,
+      type: p.type,
+      year: p.year,
+      author: p.researcherId?.fullName || "—",
+      citations: p.citationCount || 0,
+      status: p.status,
+    })),
+  });
+}
+
+async function exportFacultyReportPdf(req, res) {
+  const dept = (req.user.department || "").trim();
+  const filter = dept ? { department: dept } : {};
+
+  const [proposals, projects, publications, deptUsers] = await Promise.all([
+    Proposal.find(filter).populate("researcherId", "fullName department"),
+    Project.find({}).populate("researcherId", "fullName department"),
+    Publication.find({}).populate("researcherId", "fullName department"),
+    User.find({ department: dept, status: USER_STATUSES.ACTIVE }).select("fullName role"),
+  ]);
+
+  const facultyProjects = projects.filter(
+    (p) => p.researcherId && (p.researcherId.department === dept || !dept)
+  );
+  const facultyPublications = publications.filter(
+    (p) => p.researcherId && (p.researcherId.department === dept || !dept)
+  );
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="JUST-RMS-Faculty-Report-${(dept || "all").replace(/\s+/g, "-")}.pdf"`
+  );
+
+  const doc = new PDFDocument({ size: "A4", margin: 54 });
+  doc.pipe(res);
+
+  doc.fontSize(20).text(`Faculty Research Report — ${dept || "All faculties"}`, { align: "center" });
+  doc.moveDown(0.5);
+  doc.fontSize(11).fillColor("#444").text(`Generated: ${new Date().toLocaleString()}`, { align: "center" });
+  doc.fillColor("#000");
+  doc.moveDown(1.2);
+
+  doc.fontSize(14).text("Faculty overview", { underline: true });
+  doc.moveDown(0.4);
+  doc.fontSize(12);
+  doc.text(`Researchers: ${deptUsers.filter((u) => u.role === ROLES.RESEARCHER).length}`);
+  doc.text(`Proposals: ${proposals.length}`);
+  doc.text(`Projects: ${facultyProjects.length}`);
+  doc.text(`Publications: ${facultyPublications.length}`);
+  doc.text(
+    `Citations: ${facultyPublications.reduce((acc, p) => acc + (p.citationCount || 0), 0)}`
+  );
+  doc.moveDown(0.8);
+
+  doc.fontSize(14).text("Recent proposals", { underline: true });
+  doc.moveDown(0.4);
+  doc.fontSize(11);
+  proposals.slice(0, 10).forEach((p) => {
+    doc.text(`• ${p.title} — ${p.status} (${p.researcherId?.fullName || "—"})`);
+  });
+  doc.moveDown(0.8);
+
+  doc.fontSize(14).text("Active projects", { underline: true });
+  doc.moveDown(0.4);
+  doc.fontSize(11);
+  facultyProjects.slice(0, 10).forEach((p) => {
+    doc.text(`• ${p.title} — ${p.status} (PI: ${p.researcherId?.fullName || "—"})`);
+  });
+  doc.moveDown(0.8);
+
+  doc.fontSize(14).text("Publications", { underline: true });
+  doc.moveDown(0.4);
+  doc.fontSize(11);
+  facultyPublications.slice(0, 15).forEach((p) => {
+    doc.text(`• ${p.title} — ${p.type} ${p.year || ""} — ${p.citationCount || 0} citations`);
+  });
+
+  doc.end();
 }
 
 async function exportAnnualReportPdf(req, res) {
@@ -398,5 +548,7 @@ module.exports = {
   getInstitutionalAnalytics,
   exportAnnualReportPdf,
   getFinanceReport,
+  getFacultyReport,
+  exportFacultyReportPdf,
 };
 

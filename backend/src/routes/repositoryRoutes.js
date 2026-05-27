@@ -8,6 +8,7 @@ const { upload } = require("../middleware/upload");
 const router = express.Router();
 
 router.get("/", authenticateUser, requireActiveUser, asyncHandler(repositoryController.listItems));
+router.get("/oai/export", asyncHandler(repositoryController.oaiExport));
 router.get("/:id", authenticateUser, requireActiveUser, asyncHandler(repositoryController.getItem));
 
 router.post(

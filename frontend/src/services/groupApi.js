@@ -1,7 +1,17 @@
 import { api } from "./api";
 
 export async function listGroups(accessToken) {
-  const res = await api.get("/api/groups", { headers: { Authorization: `Bearer ${accessToken}` } });
+  const res = await api.get("/api/groups", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: { kind: "collaboration" },
+  });
+  return res.data;
+}
+
+export async function groupStats(accessToken) {
+  const res = await api.get("/api/groups/stats", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
   return res.data;
 }
 

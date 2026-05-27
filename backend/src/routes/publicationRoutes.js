@@ -35,8 +35,16 @@ router.post(
   "/:id/validate",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("faculty_coordinator"),
+  authorizeRoles("faculty_coordinator", "research_director"),
   asyncHandler(publicationController.validatePublication)
+);
+
+router.post(
+  "/:id/citations/refresh",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("researcher", "faculty_coordinator", "research_director"),
+  asyncHandler(publicationController.refreshCitations)
 );
 
 module.exports = { publicationRoutes: router };

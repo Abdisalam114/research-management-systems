@@ -29,3 +29,18 @@ export async function downloadAnnualReportPdf(accessToken) {
   return res.data;
 }
 
+export async function facultyReport(accessToken) {
+  const res = await api.get("/api/analytics/faculty-report", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
+
+export async function downloadFacultyReportPdf(accessToken) {
+  const res = await api.get("/api/analytics/faculty-report.pdf", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    responseType: "blob",
+  });
+  return res.data;
+}
+

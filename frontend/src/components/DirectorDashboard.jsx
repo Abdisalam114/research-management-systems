@@ -55,6 +55,7 @@ export function DirectorDashboard() {
     document.getElementById("institutional-analytics")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [data]);
 
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -85,11 +86,13 @@ export function DirectorDashboard() {
 
   const outputBars = useMemo(() => {
     if (!data) return [];
-    const t = data.researchOutput.byType;
+    const t = data.researchOutput.byType || {};
     return [
-      { name: "Journal", value: t.journal },
-      { name: "Conference", value: t.conference },
-      { name: "Patents", value: t.patent },
+      { name: "Papers", value: t.paper || 0 },
+      { name: "Conference", value: t.conference || 0 },
+      { name: "Review", value: t.review || 0 },
+      { name: "Case studies", value: t.case_study || 0 },
+      { name: "Letter to editor", value: t.letter_to_editor || 0 },
     ];
   }, [data]);
 
@@ -102,6 +105,8 @@ export function DirectorDashboard() {
   }
 
   if (!data) return <div>Loading institutional dashboard…</div>;
+
+  const topFaculty = (data.facultyAnalytics || []).slice(0, 1)[0];
 
   return (
     <div>
@@ -120,6 +125,44 @@ export function DirectorDashboard() {
             <div className="value">{value}</div>
           </Link>
         ))}
+      </div>
+
+      <div
+        className="card"
+        style={{
+          marginTop: 12,
+          padding: 14,
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+          gap: 12,
+        }}
+      >
+        <div>
+          <div className="muted" style={{ fontSize: 12 }}>🏆 Grant success rate</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>{data.grantSuccessRate ?? 0}%</div>
+        </div>
+        <div>
+          <div className="muted" style={{ fontSize: 12 }}>💰 Funding secured</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>{formatMoney(data.keyMetrics.activeGrantsValue)}</div>
+        </div>
+        <div>
+          <div className="muted" style={{ fontSize: 12 }}>📚 Total citations</div>
+          <div style={{ fontSize: 22, fontWeight: 800 }}>{data.researchOutput.citations.toLocaleString()}</div>
+        </div>
+        <div>
+          <div className="muted" style={{ fontSize: 12 }}>🥇 Top faculty (pubs)</div>
+          <div style={{ fontSize: 16, fontWeight: 800 }}>{topFaculty ? `${topFaculty.department} (${topFaculty.publications})` : "—"}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            className="btn primary"
+            onClick={handleDownloadAnnualReport}
+            disabled={downloadingPdf}
+          >
+            {downloadingPdf ? "Generating PDF…" : "📄 Annual report (PDF)"}
+          </button>
+        </div>
       </div>
 
       <div className="dashChartsRow">
@@ -223,7 +266,7 @@ export function DirectorDashboard() {
                 Citations <strong>{data.researchOutput.citations}</strong>
               </span>
               <span>
-                Patents <strong>{data.researchOutput.patents}</strong>
+                Papers <strong>{data.researchOutput.papers ?? 0}</strong>
               </span>
             </div>
           </div>
@@ -286,6 +329,18 @@ export function DirectorDashboard() {
               <div className="metricRow">
                 <span>💰 Active Grants</span>
                 <strong>{formatMoney(data.keyMetrics.activeGrantsValue)}</strong>
+              </div>
+              <div className="metricRow">
+                <span>🏆 Grant success rate</span>
+                <strong>{data.grantSuccessRate ?? 0}%</strong>
+              </div>
+              <div className="metricRow">
+                <span>📚 Citations</span>
+                <strong>{data.researchOutput.citations.toLocaleString()}</strong>
+              </div>
+              <div className="metricRow">
+                <span>🏛️ Faculties tracked</span>
+                <strong>{data.facultyAnalytics?.length ?? 0}</strong>
               </div>
               <div className="metricRow">
                 <span>🔬 Ongoing Studies</span>

@@ -1,6 +1,17 @@
 const { RepositoryItem, REPOSITORY_ACCESS } = require("../models/RepositoryItem");
 const { ResearchGroup } = require("../models/ResearchGroup");
+const { Publication, PUBLICATION_STATUSES } = require("../models/Publication");
 const { AppError } = require("../utils/AppError");
+
+function xmlEscape(value) {
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
 
 function sanitizeItem(i) {
   return {
@@ -102,5 +113,83 @@ async function getItem(req, res) {
   throw new AppError("Forbidden", 403);
 }
 
-module.exports = { listItems, uploadItem, getItem };
+async function oaiExport(req, res) {
+  const baseUrl =
+    process.env.REPOSITORY_PUBLIC_URL ||
+    `${req.protocol}://${req.get("host")}`;
+
+  const [pubItems, validatedPublications] = await Promise.all([
+    RepositoryItem.find({ access: REPOSITORY_ACCESS.INSTITUTION }).sort({ createdAt: -1 }).limit(500),
+    Publication.find({ status: PUBLICATION_STATUSES.VALIDATED }).sort({ createdAt: -1 }).limit(500),
+  ]);
+
+  const records = [];
+
+  pubItems.forEach((it) => {
+    records.push({
+      identifier: `oai:just-rms:repo:${it._id}`,
+      datestamp: it.updatedAt || it.createdAt,
+      title: it.title,
+      type: it.type,
+      description: it.description,
+      tags: it.tags || [],
+      url: it.filePath ? `${baseUrl}${it.filePath}` : "",
+    });
+  });
+
+  validatedPublications.forEach((p) => {
+    records.push({
+      identifier: `oai:just-rms:publication:${p._id}`,
+      datestamp: p.updatedAt || p.createdAt,
+      title: p.title,
+      type: p.type,
+      description: p.communityImpact || p.venue || "",
+      tags: p.authors || [],
+      url: p.url || (p.doi ? `https://doi.org/${p.doi}` : ""),
+    });
+  });
+
+  const recordsXml = records
+    .map((r) => {
+      const subjects = (r.tags || [])
+        .map((t) => `<dc:subject>${xmlEscape(t)}</dc:subject>`)
+        .join("");
+      return `<record>
+    <header>
+      <identifier>${xmlEscape(r.identifier)}</identifier>
+      <datestamp>${new Date(r.datestamp).toISOString()}</datestamp>
+    </header>
+    <metadata>
+      <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
+                 xmlns:dc="http://purl.org/dc/elements/1.1/"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd">
+        <dc:title>${xmlEscape(r.title)}</dc:title>
+        <dc:type>${xmlEscape(r.type)}</dc:type>
+        <dc:description>${xmlEscape(r.description || "")}</dc:description>
+        ${subjects}
+        ${r.url ? `<dc:identifier>${xmlEscape(r.url)}</dc:identifier>` : ""}
+        <dc:publisher>Jamhuriya University RMS</dc:publisher>
+      </oai_dc:dc>
+    </metadata>
+  </record>`;
+    })
+    .join("\n");
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/ http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd">
+  <responseDate>${new Date().toISOString()}</responseDate>
+  <request verb="ListRecords" metadataPrefix="oai_dc">${xmlEscape(baseUrl)}</request>
+  <ListRecords>
+${recordsXml}
+  </ListRecords>
+</OAI-PMH>`;
+
+  res.setHeader("Content-Type", "application/xml; charset=utf-8");
+  res.send(xml);
+}
+
+module.exports = { listItems, uploadItem, getItem, oaiExport };
 

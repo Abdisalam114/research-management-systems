@@ -1,22 +1,89 @@
-const { ResearchGroup, GROUP_MEMBER_ROLES } = require("../models/ResearchGroup");
+const { ResearchGroup, GROUP_MEMBER_ROLES, GROUP_KINDS } = require("../models/ResearchGroup");
 const { AppError } = require("../utils/AppError");
+const { ThesisGroup } = require("../models/ThesisGroup");
+const fs = require("fs");
+const path = require("path");
 
-function sanitizeGroup(g) {
+function debugLog(location, data) {
+  // #region agent log
+  try {
+    const logPath = path.resolve(__dirname, "../../../debug-6113cc.log");
+    fs.appendFileSync(
+      logPath,
+      JSON.stringify({
+        sessionId: "6113cc",
+        runId: "pre-fix",
+        hypothesisId: "thesis-groups-interface",
+        location,
+        message: "groups(thesis) interface mapping",
+        data,
+        timestamp: Date.now(),
+      }) + "\n"
+    );
+  } catch (_) {}
+  // #endregion
+}
+
+function sanitizeGroup(g, thesis) {
   return {
     id: g._id,
     name: g.name,
     description: g.description,
+    kind: g.kind,
     departmentId: g.departmentId,
     createdBy: g.createdBy,
     members: g.members,
     createdAt: g.createdAt,
     updatedAt: g.updatedAt,
+    thesis: thesis
+      ? {
+          id: thesis._id,
+          title: thesis.title,
+          status: thesis.status,
+          faculty: thesis.faculty,
+          department: thesis.department,
+          supervisor: thesis.supervisorId
+            ? { id: thesis.supervisorId._id, fullName: thesis.supervisorId.fullName, department: thesis.supervisorId.department }
+            : null,
+          meetingsCount: (thesis.meetings || []).length,
+          lastMeetingAt:
+            (thesis.meetings || []).length > 0
+              ? (thesis.meetings || []).reduce((m, x) => (!m || new Date(x.date) > new Date(m) ? x.date : m), null)
+              : null,
+          meetingSchedule: thesis.meetingSchedule,
+          facultyResearchArea: thesis.facultyResearchArea,
+        }
+      : null,
   };
 }
 
 async function listGroups(req, res) {
-  const groups = await ResearchGroup.find({}).sort({ createdAt: -1 });
-  res.json({ groups: groups.map(sanitizeGroup) });
+  const { kind } = req.query || {};
+  const filter = {};
+  if (kind && Object.values(GROUP_KINDS).includes(kind)) filter.kind = kind;
+  const groups = await ResearchGroup.find(filter).sort({ createdAt: -1 });
+
+  if (filter.kind === GROUP_KINDS.THESIS) {
+    const ids = groups.map((g) => g._id);
+    const theses = await ThesisGroup.find({ researchGroupId: { $in: ids } })
+      .select("title status faculty department supervisorId meetings meetingSchedule facultyResearchArea researchGroupId")
+      .populate("supervisorId", "fullName department");
+    const map = new Map(theses.map((t) => [String(t.researchGroupId), t]));
+    debugLog("researchGroupController.js:listGroups(thesis)", { groups: groups.length, theses: theses.length });
+    return res.json({ groups: groups.map((g) => sanitizeGroup(g, map.get(String(g._id)))) });
+  }
+
+  res.json({ groups: groups.map((g) => sanitizeGroup(g, null)) });
+}
+
+async function getGroupStats(req, res) {
+  const total = await ResearchGroup.countDocuments();
+  const thesis = await ResearchGroup.countDocuments({ kind: GROUP_KINDS.THESIS });
+  const collaboration = total - thesis;
+
+  debugLog("researchGroupController.js:stats", { total, thesis, collaboration });
+
+  res.json({ stats: { total, thesis, collaboration } });
 }
 
 async function getGroup(req, res) {
@@ -84,5 +151,5 @@ async function deleteGroup(req, res) {
   res.json({ message: "Group deleted" });
 }
 
-module.exports = { listGroups, getGroup, createGroup, joinGroup, leaveGroup, deleteGroup };
+module.exports = { listGroups, getGroupStats, getGroup, createGroup, joinGroup, leaveGroup, deleteGroup };
 

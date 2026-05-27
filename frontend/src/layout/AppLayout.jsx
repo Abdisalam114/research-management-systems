@@ -1,27 +1,12 @@
 import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { getPageTitle } from "../utils/navigation";
 import "./layout.css";
-
-const PAGE_TITLES = {
-  "/dashboard": "Dashboard",
-  "/analytics": "Analytics & Reporting",
-  "/pending-users": "Director — Users",
-  "/proposals": "Proposals",
-  "/projects": "Projects",
-  "/grants": "Grants & Funding",
-  "/budgets": "Finance & Budget",
-  "/publications": "Publications",
-  "/repository": "Repository",
-  "/groups": "Collaboration Groups",
-  "/messages": "Messages",
-  "/notifications": "Notifications",
-  "/profile": "Profile",
-};
 
 export function AppLayout() {
   const location = useLocation();
-  const title = PAGE_TITLES[location.pathname] || "Dashboard";
+  const title = getPageTitle(location.pathname);
 
   return (
     <div className="appShell">
