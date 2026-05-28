@@ -280,6 +280,8 @@ async function seedPublications(researchers) {
     title: s.title,
     type: s.type,
     year: s.year,
+    communityImpact: s.communityImpact || "",
+    venue: s.venue || "",
     researcherId: (idx || 0) % 2 === 0 ? r1._id : r2._id,
     status: Object.values(PUBLICATION_STATUSES).includes(s.status) ? s.status : PUBLICATION_STATUSES.DRAFT,
   }));

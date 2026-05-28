@@ -129,13 +129,10 @@ async function submitEthicsApplication(req, res) {
   if (![ETHICS_STATUSES.DRAFT, ETHICS_STATUSES.REJECTED].includes(a.status)) {
     throw new AppError("Only draft / rejected applications can be submitted", 400);
   }
-  if (!a.projectTitle || !a.principal?.firstName) {
-    throw new AppError("Project title and principal investigator's first name are required", 400);
-  }
   const { isEthicsFormComplete } = require("../utils/proposalEthicsLink");
-  if (a.proposalId && !isEthicsFormComplete(a)) {
+  if (!isEthicsFormComplete(a)) {
     throw new AppError(
-      "Complete all required ethics fields (principal, level, aims, design, signature) before submitting.",
+      "Complete all required ethics fields (title, principal name, level, aims, design, signature) before submitting.",
       400
     );
   }
@@ -212,6 +209,9 @@ async function directorDecision(req, res) {
       signedAt: new Date(),
       rejectionReason: rejectionReason ? String(rejectionReason) : "Rejected by Research Director",
     };
+    if (a.proposalId) {
+      await Proposal.updateOne({ _id: a.proposalId }, { ethicsStatus: PROPOSAL_ETHICS_STATUSES.REJECTED });
+    }
   }
   await a.save();
 
@@ -308,7 +308,10 @@ async function downloadCertificate(req, res) {
 
   doc.font("Helvetica-Bold").text("Co-investigators:");
   doc.font("Helvetica");
-  const cos = [a.coResearcher?.firstName ? `${a.coResearcher.firstName} ${a.coResearcher.lastName}` : null, ...a.otherInvestigators].filter(Boolean);
+  const cos = [
+    a.coResearcher?.firstName ? `${a.coResearcher.firstName} ${a.coResearcher.lastName}`.trim() : null,
+    ...(a.otherInvestigators || []).map((n) => (typeof n === "string" ? n : `${n?.firstName || ""} ${n?.lastName || ""}`.trim())).filter(Boolean),
+  ].filter(Boolean);
   if (cos.length) cos.forEach((n, i) => doc.text(`${i + 1}. ${n}`));
   else doc.text("—");
   doc.moveDown(0.8);

@@ -225,6 +225,7 @@ async function buildInstitutionalAnalytics() {
     review: publications.filter((p) => p.type === PUBLICATION_TYPES.REVIEW).length,
     case_study: publications.filter((p) => p.type === PUBLICATION_TYPES.CASE_STUDY).length,
     letter_to_editor: publications.filter((p) => p.type === PUBLICATION_TYPES.LETTER_TO_EDITOR).length,
+    community_research_impact: publications.filter((p) => p.type === PUBLICATION_TYPES.COMMUNITY_IMPACT).length,
   };
   const citationTotal = publications.reduce((a, p) => a + (p.citationCount || 0), 0);
 

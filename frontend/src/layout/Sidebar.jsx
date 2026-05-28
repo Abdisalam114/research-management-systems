@@ -12,7 +12,7 @@ const MENU = [
   { to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/grants", label: "Grants", icon: "💰", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
   { to: "/budgets", label: "Finance & Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher"] },
-  { to: "/publications", label: "Publications", icon: "📚", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { to: "/publications", label: "Publications & Outputs", icon: "📚", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/repository", label: "Repository", icon: "🗄️", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/groups", label: "Groups", icon: "🤝", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/thesis", label: "Thesis", icon: "🎓", roles: ["research_director", "faculty_coordinator", "researcher"] },

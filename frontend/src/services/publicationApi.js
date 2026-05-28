@@ -34,3 +34,19 @@ export async function refreshCitations(accessToken, id) {
   );
   return res.data;
 }
+
+export async function getFacultyWorkflow(accessToken) {
+  const res = await api.get("/api/publications/faculty-workflow", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
+
+export async function updateWorkflowStage(accessToken, id, stage) {
+  const res = await api.patch(
+    `/api/publications/${id}/workflow-stage`,
+    { stage },
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return res.data;
+}

@@ -17,6 +17,7 @@ import { useAuth } from "../hooks/useAuth";
 import * as analyticsApi from "../services/analyticsApi";
 import { InstitutionalAnalyticsSections } from "./InstitutionalAnalyticsSections";
 import { FacultyAnalyticsSection } from "./FacultyAnalyticsSection";
+import { FacultyResearchWorkflowModule } from "./FacultyResearchWorkflowModule";
 import { SystemModulesGrid } from "./SystemModulesGrid";
 import "../pages/dashboard.css";
 
@@ -93,7 +94,11 @@ export function DirectorDashboard() {
       { name: "Conference", value: t.conference || 0 },
       { name: "Review", value: t.review || 0 },
       { name: "Case studies", value: t.case_study || 0 },
-      { name: "Letter to editor", value: t.letter_to_editor || 0 },
+      { name: "Letter", value: t.letter_to_editor || 0 },
+      { name: "Journal", value: t.journal_article || 0 },
+      { name: "Books", value: (t.book || 0) + (t.book_chapter || 0) },
+      { name: "Patents", value: t.patent || 0 },
+      { name: "Community", value: t.community_research_impact || 0 },
     ];
   }, [data]);
 
@@ -116,6 +121,10 @@ export function DirectorDashboard() {
         overview={data.overview}
         title="Jamhuriya RMS — dhammaan qaybaha system-ka"
       />
+
+      {accessToken ? (
+        <FacultyResearchWorkflowModule accessToken={accessToken} departmentLabel="All faculties" canManage />
+      ) : null}
 
       <div
         className="card"

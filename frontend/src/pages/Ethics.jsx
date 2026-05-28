@@ -1,11 +1,12 @@
-import { useCallback, useMemo, useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as ethicsApi from "../services/ethicsApi";
 import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
 import { EthicsBrandingHeader } from "../components/EthicsBrandingHeader";
+import { isEthicsFormComplete } from "../utils/ethicsForm";
 
 const SUBJECT_OPTS = [
   { value: "human", label: "Human" },
@@ -123,7 +124,8 @@ export function EthicsPage() {
   const isDirector = user?.role === "research_director";
 
   const [applications, setApplications] = useState([]);
-  const [editing, setEditing] = useState(null); // {id, form} or {form} for new
+  const [editing, setEditing] = useState(null); // {id, form, status, proposalId?}
+  const proposalLoadedRef = useRef(false);
   const load = useCallback(async () => {
     const res = await ethicsApi.listEthicsApplications(accessToken);
     setApplications(res.applications || []);
@@ -132,18 +134,29 @@ export function EthicsPage() {
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
   useEffect(() => {
-    if (!accessToken || !proposalIdFromUrl || editing) return;
+    proposalLoadedRef.current = false;
+  }, [proposalIdFromUrl]);
+
+  useEffect(() => {
+    if (!accessToken || !proposalIdFromUrl || proposalLoadedRef.current) return;
     (async () => {
       try {
         const res = await proposalApi.getProposalEthicsApplication(accessToken, proposalIdFromUrl);
+        proposalLoadedRef.current = true;
         if (res.application) {
-          setEditing({ id: res.application.id, form: toForm(res.application), approval: res.application.approval, status: res.application.status });
+          setEditing({
+            id: res.application.id,
+            form: toForm(res.application),
+            approval: res.application.approval,
+            status: res.application.status,
+            proposalId: res.application.proposalId || proposalIdFromUrl,
+          });
         }
       } catch (_) {
-        /* proposal ethics may not exist yet */
+        proposalLoadedRef.current = true;
       }
     })();
-  }, [accessToken, proposalIdFromUrl, editing]);
+  }, [accessToken, proposalIdFromUrl]);
 
   const stats = useMemo(() => {
     const by = (s) => applications.filter((a) => a.status === s).length;
@@ -159,10 +172,31 @@ export function EthicsPage() {
   const directorQueue = applications.filter((a) => a.status === "submitted");
 
   function openNew() {
-    setEditing({ form: emptyForm() });
+    const parts = (user?.fullName || "").trim().split(/\s+/);
+    const firstName = parts[0] || "";
+    const lastName = parts.slice(1).join(" ") || "";
+    setEditing({
+      form: {
+        ...emptyForm(),
+        principal: {
+          ...emptyForm().principal,
+          firstName,
+          lastName,
+          email: user?.email || "",
+          department: user?.department || "",
+        },
+        applicantSignature: { name: user?.fullName || "" },
+      },
+    });
   }
   function openEdit(a) {
-    setEditing({ id: a.id, form: toForm(a), approval: a.approval, status: a.status });
+    setEditing({
+      id: a.id,
+      form: toForm(a),
+      approval: a.approval,
+      status: a.status,
+      proposalId: a.proposalId,
+    });
   }
   function closeEditor() {
     setEditing(null);
@@ -171,6 +205,13 @@ export function EthicsPage() {
   async function save(submit = false) {
     try {
       setError("");
+      const linkedProposalId = editing.proposalId || proposalIdFromUrl;
+      if (submit && linkedProposalId) {
+        setError(
+          "Foomkan waxaa la gudbiyaa proposal-ka: tag Proposal Details oo riix «Submit to Director (Proposal + Ethics)»."
+        );
+        return;
+      }
       const payload = { ...editing.form };
       if (payload.startDate === "") payload.startDate = null;
       if (payload.endDate === "") payload.endDate = null;
@@ -183,8 +224,34 @@ export function EthicsPage() {
       if (submit) {
         await ethicsApi.submitEthicsApplication(accessToken, res.application.id);
       }
-      closeEditor();
+      const app = res.application;
+      if (linkedProposalId) {
+        setEditing({
+          id: app.id,
+          form: toForm(app),
+          approval: app.approval,
+          status: app.status,
+          proposalId: app.proposalId || linkedProposalId,
+        });
+      } else {
+        closeEditor();
+      }
       await reload();
+      // #region agent log
+      fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
+        body: JSON.stringify({
+          sessionId: "6113cc",
+          location: "Ethics.jsx:save",
+          message: "ethics saved",
+          data: { submit, linkedProposalId: !!linkedProposalId, status: app?.status },
+          timestamp: Date.now(),
+          hypothesisId: "ethics-fix",
+          runId: "post-fix",
+        }),
+      }).catch(() => {});
+      // #endregion
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to save");
     }
@@ -244,6 +311,18 @@ export function EthicsPage() {
 
       {loading ? <p className="muted">Loading…</p> : null}
       {error ? <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)", marginTop: 8 }}>{error}</div> : null}
+
+      {proposalIdFromUrl ? (
+        <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.35)" }}>
+          <div style={{ fontWeight: 700 }}>Ethics linked to proposal</div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+            Buuxi foomkan, kadib ku noqo proposal-ka si aad u gudbiso proposal + ethics hal mar.
+          </div>
+          <Link className="btn primary" style={{ marginTop: 10, display: "inline-block" }} to={`/proposals/${proposalIdFromUrl}`}>
+            ← Back to proposal
+          </Link>
+        </div>
+      ) : null}
 
       {isDirector && directorQueue.length ? (
         <div className="card" style={{ marginTop: 12 }}>
@@ -309,8 +388,10 @@ export function EthicsPage() {
           onSave={() => save(false)}
           onSubmit={() => save(true)}
           onClose={closeEditor}
-          readOnly={!!editing.id && applications.find((a) => a.id === editing.id)?.status === "approved"}
-          canSubmit={isResearcher}
+          readOnly={!isResearcher || editing.status === "approved" || editing.status === "submitted"}
+          canSubmit={isResearcher && !editing.proposalId && !proposalIdFromUrl}
+          linkedToProposal={Boolean(editing.proposalId || proposalIdFromUrl)}
+          formComplete={isEthicsFormComplete(editing.form)}
           approval={editing.approval}
           showCertificateMeta={editing.status === "approved"}
         />
@@ -319,7 +400,7 @@ export function EthicsPage() {
   );
 }
 
-function EthicsEditor({ editing, setEditing, onSave, onSubmit, onClose, readOnly, canSubmit, approval, showCertificateMeta }) {
+function EthicsEditor({ editing, setEditing, onSave, onSubmit, onClose, readOnly, canSubmit, linkedToProposal, formComplete, approval, showCertificateMeta }) {
   const { form } = editing;
   const set = (path, value) => {
     setEditing((s) => {
@@ -347,6 +428,16 @@ function EthicsEditor({ editing, setEditing, onSave, onSubmit, onClose, readOnly
       </div>
 
       <EthicsBrandingHeader approval={approval} showCertificateMeta={showCertificateMeta} />
+
+      {linkedToProposal ? (
+        <div className="muted" style={{ marginBottom: 12, fontSize: 13, padding: "8px 10px", background: "rgba(14,165,233,0.08)", borderRadius: 8 }}>
+          Foomkan waa la xiriiriyay proposal. Kaydi draft halkan; gudbinta Director-ka waxay ka dhacdaa bogga proposal (hal badhan).
+        </div>
+      ) : null}
+
+      <div style={{ marginBottom: 12, fontSize: 13 }}>
+        Required fields: <strong>{formComplete ? "Complete ✓" : "Incomplete — fill title, PI name, level, aims, design, signature"}</strong>
+      </div>
 
       <Section title="Section I — Applicant details">
         <PersonFields label="Principal Researcher" person={form.principal} onChange={(field, v) => set(`principal.${field}`, v)} readOnly={readOnly} />
@@ -602,11 +693,17 @@ function EthicsEditor({ editing, setEditing, onSave, onSubmit, onClose, readOnly
 
       {!readOnly ? (
         <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-          <button className="btn" onClick={onSave}>💾 Save draft</button>
+          <button type="button" className="btn" onClick={onSave}>💾 Save draft</button>
           {canSubmit ? (
-            <button className="btn primary" onClick={onSubmit}>📤 Submit to REC</button>
+            <button type="button" className="btn primary" onClick={onSubmit} disabled={!formComplete}>
+              📤 Submit to REC
+            </button>
           ) : null}
         </div>
+      ) : readOnly && editing.status === "submitted" ? (
+        <div className="muted" style={{ marginTop: 12 }}>⏳ Submitted — awaiting Director review.</div>
+      ) : readOnly && editing.status === "rejected" ? (
+        <div className="muted" style={{ marginTop: 12 }}>Rejected — update the form and resubmit when allowed.</div>
       ) : null}
     </div>
   );

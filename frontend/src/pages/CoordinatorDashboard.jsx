@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import * as analyticsApi from "../services/analyticsApi";
 import * as proposalApi from "../services/proposalApi";
 import { SystemModulesGrid } from "../components/SystemModulesGrid";
+import { FacultyResearchWorkflowModule } from "../components/FacultyResearchWorkflowModule";
 
 export function CoordinatorDashboardPage() {
   const { accessToken, user } = useAuth();
@@ -68,6 +69,14 @@ export function CoordinatorDashboardPage() {
             </div>
           </div>
         </>
+      ) : null}
+
+      {accessToken ? (
+        <FacultyResearchWorkflowModule
+          accessToken={accessToken}
+          departmentLabel={user?.department}
+          canManage
+        />
       ) : null}
 
       <div className="card" style={{ marginTop: 16 }}>

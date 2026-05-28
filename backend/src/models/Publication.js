@@ -11,6 +11,7 @@ const PUBLICATION_TYPES = Object.freeze({
   REVIEW: "review",
   CASE_STUDY: "case_study",
   LETTER_TO_EDITOR: "letter_to_editor",
+  COMMUNITY_IMPACT: "community_research_impact",
 });
 
 const PUBLICATION_TYPE_LABELS = Object.freeze({
@@ -24,6 +25,7 @@ const PUBLICATION_TYPE_LABELS = Object.freeze({
   review: "Review",
   case_study: "Case study",
   letter_to_editor: "Letter to editor",
+  community_research_impact: "Community research impact",
 });
 
 const LEGACY_PUBLICATION_TYPE_MAP = Object.freeze({
@@ -37,6 +39,22 @@ const PUBLICATION_STATUSES = Object.freeze({
   VALIDATED: "validated",
   REJECTED: "rejected",
 });
+
+/** Faculty (Kulliyad) research output pipeline — visible on coordinator dashboard. */
+const WORKFLOW_STAGES = Object.freeze({
+  SUBMITTED: "submitted",
+  IN_PROCESS: "in_process",
+  PIPELINE: "pipeline",
+  PUBLISHED: "published",
+});
+
+const WORKFLOW_STAGE_LABELS = Object.freeze({
+  submitted: "Submitted",
+  in_process: "In process",
+  pipeline: "Pipeline",
+  published: "Published",
+});
+
 
 const publicationSchema = new mongoose.Schema(
   {
@@ -57,6 +75,12 @@ const publicationSchema = new mongoose.Schema(
     citationCount: { type: Number, min: 0, default: 0 },
     communityImpact: { type: String, default: "", trim: true },
     status: { type: String, enum: Object.values(PUBLICATION_STATUSES), default: PUBLICATION_STATUSES.DRAFT, index: true },
+    workflowStage: {
+      type: String,
+      enum: Object.values(WORKFLOW_STAGES),
+      default: null,
+      index: true,
+    },
 
     researcherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     validatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
@@ -73,6 +97,8 @@ module.exports = {
   PUBLICATION_TYPES,
   PUBLICATION_TYPE_LABELS,
   PUBLICATION_STATUSES,
+  WORKFLOW_STAGES,
+  WORKFLOW_STAGE_LABELS,
   LEGACY_PUBLICATION_TYPE_MAP,
 };
 

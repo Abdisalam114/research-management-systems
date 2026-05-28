@@ -7,6 +7,13 @@ const { authenticateUser, requireActiveUser, authorizeRoles } = require("../midd
 const router = express.Router();
 
 router.get("/", authenticateUser, requireActiveUser, asyncHandler(publicationController.listPublications));
+router.get(
+  "/faculty-workflow",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("faculty_coordinator", "research_director"),
+  asyncHandler(publicationController.getFacultyWorkflow)
+);
 router.get("/:id", authenticateUser, requireActiveUser, asyncHandler(publicationController.getPublication));
 
 router.post(
@@ -45,6 +52,14 @@ router.post(
   requireActiveUser,
   authorizeRoles("researcher", "faculty_coordinator", "research_director"),
   asyncHandler(publicationController.refreshCitations)
+);
+
+router.patch(
+  "/:id/workflow-stage",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("faculty_coordinator", "research_director"),
+  asyncHandler(publicationController.updateWorkflowStage)
 );
 
 module.exports = { publicationRoutes: router };

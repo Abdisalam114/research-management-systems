@@ -111,6 +111,14 @@ const SAMPLE_PUBLICATIONS = [
   { title: "Patent: Portable Solar Desalination Unit", type: "patent", year: 2023, status: "validated" },
   { title: "MSc Thesis: Maternal Health in IDP Camps", type: "thesis", year: 2024, status: "validated" },
   { title: "Digital Agriculture Advisories — Field Evaluation", type: "paper", year: 2025, status: "submitted" },
+  {
+    title: "Community WASH Training — Benadir Districts",
+    type: "community_research_impact",
+    year: 2025,
+    status: "validated",
+    communityImpact: "3,200 households reached; district health office adopted monitoring checklist.",
+  },
+  { title: "Introductory Textbook on Somali Public Health Systems", type: "book", year: 2024, status: "validated" },
 ];
 
 const SAMPLE_COLLAB_GROUPS = [

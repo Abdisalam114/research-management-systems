@@ -8,7 +8,7 @@ export const SYSTEM_MODULES = [
   { key: "projects", to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "grants", to: "/grants", label: "Grants", icon: "💰", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
   { key: "budgets", to: "/budgets", label: "Finance & Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher"] },
-  { key: "publications", to: "/publications", label: "Publications", icon: "📚", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { key: "publications", to: "/publications", label: "Publications & Outputs", icon: "📚", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "repository", to: "/repository", label: "Repository", icon: "🗄️", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "groups", to: "/groups", label: "Groups", icon: "🤝", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "thesis", to: "/thesis", label: "Thesis", icon: "🎓", roles: ["research_director", "faculty_coordinator", "researcher"] },

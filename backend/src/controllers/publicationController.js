@@ -3,11 +3,19 @@ const {
   PUBLICATION_STATUSES,
   PUBLICATION_TYPES,
   LEGACY_PUBLICATION_TYPE_MAP,
+  WORKFLOW_STAGES,
 } = require("../models/Publication");
 const { AppError } = require("../utils/AppError");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
+const {
+  resolveWorkflowStage,
+  workflowStageLabel,
+  countByWorkflowStage,
+  STAGE_ORDER,
+} = require("../utils/publicationWorkflow");
 
 function sanitizePublication(p) {
+  const workflowStage = resolveWorkflowStage(p);
   return {
     id: p._id,
     title: p.title,
@@ -21,6 +29,8 @@ function sanitizePublication(p) {
     citationCount: p.citationCount,
     communityImpact: p.communityImpact || "",
     status: p.status,
+    workflowStage,
+    workflowStageLabel: workflowStageLabel(workflowStage),
     researcherId: p.researcherId,
     validatedBy: p.validatedBy,
     validatedAt: p.validatedAt,
@@ -35,10 +45,45 @@ async function listPublications(req, res) {
   const filter = {};
 
   if (role === "researcher") filter.researcherId = req.user.id;
-  // coordinator/director can view all, finance can view all (MVP: allow staff)
 
-  const pubs = await Publication.find(filter).sort({ createdAt: -1 });
+  const pubs = await Publication.find(filter).sort({ createdAt: -1 }).populate("researcherId", "fullName department");
   res.json({ publications: pubs.map(sanitizePublication) });
+}
+
+async function getFacultyWorkflow(req, res) {
+  const { role, department } = req.user;
+  if (!["faculty_coordinator", "research_director"].includes(role)) {
+    throw new AppError("Forbidden", 403);
+  }
+
+  const dept = (department || "").trim();
+  let pubs = await Publication.find({
+    status: { $ne: PUBLICATION_STATUSES.DRAFT },
+  })
+    .sort({ updatedAt: -1 })
+    .populate("researcherId", "fullName department");
+
+  if (role === "faculty_coordinator" && dept) {
+    pubs = pubs.filter((p) => p.researcherId && p.researcherId.department === dept);
+  }
+
+  const sanitized = pubs.map(sanitizePublication);
+  const byStage = {};
+  STAGE_ORDER.forEach((s) => {
+    byStage[s] = sanitized.filter((p) => p.workflowStage === s);
+  });
+
+  res.json({
+    department: role === "research_director" ? "All faculties" : dept || "Faculty",
+    generatedAt: new Date().toISOString(),
+    counts: countByWorkflowStage(pubs),
+    stages: STAGE_ORDER.map((id) => ({
+      id,
+      label: workflowStageLabel(id),
+      count: byStage[id]?.length || 0,
+      items: byStage[id] || [],
+    })),
+  });
 }
 
 async function getPublication(req, res) {
@@ -69,16 +114,22 @@ async function createPublication(req, res) {
   const { title, type, year, venue, doi, orcid, url, authors, communityImpact } = req.body || {};
   if (!title) throw new AppError("title is required", 400);
 
+  const normalizedType = normalizeType(type);
+  const impactText = communityImpact ? String(communityImpact).trim() : "";
+  if (normalizedType === PUBLICATION_TYPES.COMMUNITY_IMPACT && !impactText) {
+    throw new AppError("communityImpact description is required for community research impact outputs", 400);
+  }
+
   const pub = await Publication.create({
     title: String(title).trim(),
-    type: normalizeType(type),
+    type: normalizedType,
     year,
     venue: venue ? String(venue).trim() : "",
     doi: doi ? String(doi).trim() : "",
     orcid: orcid ? String(orcid).trim() : "",
     url: url ? String(url).trim() : "",
     authors: Array.isArray(authors) ? authors.map((a) => String(a).trim()).filter(Boolean) : [],
-    communityImpact: communityImpact ? String(communityImpact).trim() : "",
+    communityImpact: impactText,
     researcherId: req.user.id,
     status: PUBLICATION_STATUSES.DRAFT,
   });
@@ -122,6 +173,7 @@ async function submitPublication(req, res) {
   if (pub.status !== PUBLICATION_STATUSES.DRAFT) throw new AppError("Only draft publications can be submitted", 400);
 
   pub.status = PUBLICATION_STATUSES.SUBMITTED;
+  pub.workflowStage = WORKFLOW_STAGES.SUBMITTED;
   await pub.save();
 
   try {
@@ -152,6 +204,11 @@ async function validatePublication(req, res) {
   pub.validatedBy = req.user.id;
   pub.validatedAt = new Date();
   pub.validationComment = String(comment);
+  if (decision === "validated") {
+    pub.workflowStage = WORKFLOW_STAGES.IN_PROCESS;
+  } else {
+    pub.workflowStage = WORKFLOW_STAGES.SUBMITTED;
+  }
   await pub.save();
 
   try {
@@ -211,13 +268,74 @@ async function refreshCitations(req, res) {
   });
 }
 
+async function updateWorkflowStage(req, res) {
+  const { id } = req.params;
+  const { stage } = req.body || {};
+  if (!STAGE_ORDER.includes(stage)) {
+    throw new AppError(`stage must be one of: ${STAGE_ORDER.join(", ")}`, 400);
+  }
+
+  const pub = await Publication.findById(id).populate("researcherId", "fullName department");
+  if (!pub) throw new AppError("Publication not found", 404);
+  if (pub.status === PUBLICATION_STATUSES.DRAFT) {
+    throw new AppError("Submit the publication before updating faculty workflow stage", 400);
+  }
+
+  const isStaff = ["faculty_coordinator", "research_director"].includes(req.user.role);
+  if (!isStaff) throw new AppError("Forbidden", 403);
+
+  if (req.user.role === "faculty_coordinator") {
+    const dept = (req.user.department || "").trim();
+    if (dept && pub.researcherId?.department !== dept) {
+      throw new AppError("Publication is outside your faculty", 403);
+    }
+  }
+
+  const current = resolveWorkflowStage(pub);
+  if (current !== stage) {
+    const isDirector = req.user.role === "research_director";
+    const ci = STAGE_ORDER.indexOf(current);
+    const ni = STAGE_ORDER.indexOf(stage);
+    const ok = ni > ci && (isDirector ? true : ni === ci + 1);
+    if (!ok) {
+      throw new AppError(
+        `Cannot move from "${workflowStageLabel(current)}" to "${workflowStageLabel(stage)}". Advance one step at a time.`,
+        400
+      );
+    }
+  }
+
+  pub.workflowStage = stage;
+  if (stage === WORKFLOW_STAGES.PUBLISHED && pub.status === PUBLICATION_STATUSES.SUBMITTED) {
+    pub.status = PUBLICATION_STATUSES.VALIDATED;
+    pub.validatedAt = pub.validatedAt || new Date();
+  }
+  await pub.save();
+
+  try {
+    const researcherId = pub.researcherId?._id || pub.researcherId;
+    await notifyUser(researcherId, {
+      type: "publication",
+      title: `Research output: ${workflowStageLabel(stage)}`,
+      body: pub.title,
+      link: "/publications",
+    });
+  } catch {
+    /* best-effort */
+  }
+
+  res.json({ message: "Workflow stage updated", publication: sanitizePublication(pub) });
+}
+
 module.exports = {
   listPublications,
   getPublication,
+  getFacultyWorkflow,
   createPublication,
   updatePublication,
   submitPublication,
   validatePublication,
   refreshCitations,
+  updateWorkflowStage,
 };
 
