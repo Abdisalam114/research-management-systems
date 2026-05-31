@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as analyticsApi from "../services/analyticsApi";
 import * as proposalApi from "../services/proposalApi";
+import { ActiveProjectsPanel } from "../components/ActiveProjectsPanel";
 import { SystemModulesGrid } from "../components/SystemModulesGrid";
-import { FacultyResearchWorkflowModule } from "../components/FacultyResearchWorkflowModule";
+import "./dashboard.css";
 
 export function CoordinatorDashboardPage() {
   const { accessToken, user } = useAuth();
@@ -50,37 +51,33 @@ export function CoordinatorDashboardPage() {
   }
 
   return (
-    <div>
-      <h2 style={{ marginTop: 0 }}>Faculty research monitoring</h2>
-      <p className="muted">Faculty Coordinator — {user?.department || "your faculty"}</p>
+    <div className="dashboardPage">
+      <header className="dashPageHeader">
+        <h1 className="dashPageTitle">Faculty research monitoring</h1>
+        <p className="dashPageSub">Faculty Coordinator — {user?.department || "your faculty"}</p>
+      </header>
+
       {error ? <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>{error}</div> : null}
 
       {metrics ? (
         <>
-          <SystemModulesGrid
-            role="faculty_coordinator"
-            metrics={metrics}
-            title="Jamhuriya RMS — dhammaan qaybaha system-ka"
-          />
-          <div className="overviewGrid" style={{ marginTop: 12 }}>
-            <div className="overviewTile">
+          <section className="dashboardSection">
+            <SystemModulesGrid role="faculty_coordinator" metrics={metrics} title="System modules" />
+          </section>
+          <div className="overviewGrid">
+            <Link to="/proposals?filter=submitted" className="overviewTile" style={{ textDecoration: "none" }}>
               <div className="label">Proposals (queue)</div>
               <div className="value">{queue.length}</div>
-            </div>
+            </Link>
           </div>
         </>
-      ) : null}
+      ) : (
+        <div className="dashboardLoading">Loading dashboard…</div>
+      )}
 
-      {accessToken ? (
-        <FacultyResearchWorkflowModule
-          accessToken={accessToken}
-          departmentLabel={user?.department}
-          canManage
-        />
-      ) : null}
-
-      <div className="card" style={{ marginTop: 16 }}>
-        <div style={{ fontWeight: 800 }}>Proposal pre-review queue</div>
+      <section className="dashboardSection">
+        <div className="dashCard">
+          <div className="dashCardTitle">Proposal pre-review queue</div>
         {queue.length === 0 ? (
           <p className="muted">No proposals awaiting review in your faculty.</p>
         ) : (
@@ -95,27 +92,43 @@ export function CoordinatorDashboardPage() {
             ))}
           </div>
         )}
-      </div>
+        </div>
+      </section>
 
       {facultyReport ? (
-        <div className="card" style={{ marginTop: 16 }}>
+        <section className="dashboardSection">
+          <ActiveProjectsPanel
+            projects={(facultyReport.projects || []).map((p) => ({
+              ...p,
+              principalInvestigator: p.pi,
+            }))}
+            totalActive={facultyReport.counts?.activeProjects}
+            title="Active Projects (Faculty)"
+          />
+        </section>
+      ) : null}
+
+      {facultyReport ? (
+        <section className="dashboardSection">
+          <div className="dashCard">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
             <div style={{ fontWeight: 800 }}>Faculty research report — {facultyReport.department}</div>
             <button type="button" className="btn primary" onClick={downloadFacultyPdf} disabled={downloading}>
               {downloading ? "Generating PDF…" : "Download PDF"}
             </button>
           </div>
-          <div className="muted" style={{ marginTop: 4 }}>
+          <div className="muted" style={{ marginTop: 8 }}>
             Researchers: <strong>{facultyReport.counts.researchers}</strong> • Proposals:{" "}
             <strong>{facultyReport.counts.proposals}</strong> • Projects:{" "}
             <strong>{facultyReport.counts.projects}</strong> • Publications:{" "}
             <strong>{facultyReport.counts.publications}</strong> • Citations:{" "}
             <strong>{facultyReport.counts.citations}</strong>
           </div>
-        </div>
+          </div>
+        </section>
       ) : null}
 
-      <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <div className="dashboardQuickLinks">
         <Link className="btn primary" to="/proposals">
           Proposals
         </Link>

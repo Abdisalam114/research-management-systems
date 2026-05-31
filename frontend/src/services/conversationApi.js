@@ -7,6 +7,13 @@ export async function listConversations(accessToken) {
   return res.data;
 }
 
+export async function listMessageableUsers(accessToken) {
+  const res = await api.get("/api/conversations/users", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
+
 export async function getConversation(accessToken, id) {
   const res = await api.get(`/api/conversations/${id}`, {
     headers: { Authorization: `Bearer ${accessToken}` },

@@ -11,6 +11,7 @@ const {
   isEthicsFormComplete,
   submitLinkedEthics,
 } = require("../utils/proposalEthicsLink");
+const { applyEthicsPayload, parseEthicsJson } = require("../utils/ethicsFormMerge");
 
 function sanitizeProposal(p) {
   return {
@@ -91,6 +92,22 @@ async function createLinkedEthicsApplication(proposal, user) {
   return ethics;
 }
 
+async function persistProposalEthics(proposal, user, reqBody) {
+  if (!proposal.requiresEthics) return;
+  let ethics = await getEthicsForProposal(proposal._id);
+  if (!ethics) {
+    ethics = await createLinkedEthicsApplication(proposal, user || {});
+  }
+  const parsed = parseEthicsJson(reqBody);
+  if (parsed) {
+    applyEthicsPayload(ethics, parsed);
+  } else {
+    ethics.projectTitle = proposal.title;
+    if (proposal.department) ethics.principal = { ...(ethics.principal || {}), department: proposal.department };
+  }
+  await ethics.save();
+}
+
 async function createProposal(req, res) {
   const { title, abstract, department, researchArea, requiresEthics } = req.body;
   if (!title || !abstract || !department || !researchArea) {
@@ -115,7 +132,7 @@ async function createProposal(req, res) {
 
   if (needsEthics) {
     const user = await User.findById(req.user.id);
-    await createLinkedEthicsApplication(proposal, user || { email: "", fullName: "", department });
+    await persistProposalEthics(proposal, user || {}, req.body);
   }
 
   res.status(201).json({ proposal: await attachEthicsSummary(proposal) });
@@ -157,6 +174,10 @@ async function updateProposal(req, res) {
   }
 
   await proposal.save();
+
+  const user = await User.findById(req.user.id);
+  await persistProposalEthics(proposal, user || {}, req.body);
+
   res.json({ proposal: await attachEthicsSummary(proposal) });
 }
 

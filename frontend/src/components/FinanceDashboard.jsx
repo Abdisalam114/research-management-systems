@@ -80,55 +80,61 @@ export function FinanceDashboard() {
 
   if (error) {
     return (
-      <div className="card" style={{ borderColor: "rgba(239, 68, 68, 0.5)" }}>{error}</div>
+      <div className="dashboardPage">
+        <div className="card" style={{ borderColor: "rgba(239, 68, 68, 0.5)" }}>{error}</div>
+      </div>
     );
   }
 
-  if (!report) return <div>Loading finance dashboard…</div>;
+  if (!report) return <div className="dashboardLoading">Loading finance dashboard…</div>;
 
   const s = report.summary || {};
 
   return (
-    <div>
-      <div className="card">
-        <div style={{ fontWeight: 800, fontSize: 18 }}>💼 Finance Office</div>
-        <div className="muted" style={{ marginTop: 6 }}>
-          Welcome {user?.fullName} — manage budgets, payments, procurement, and grant funding.
+    <div className="dashboardPage">
+      <header className="dashPageHeader">
+        <div className="dashWelcomeCard">
+          <h1 className="dashWelcomeTitle">💼 Finance Office</h1>
+          <p className="dashWelcomeSub">
+            Welcome {user?.fullName} — manage budgets, payments, procurement, and grant funding.
+          </p>
         </div>
-      </div>
+      </header>
 
       {metrics ? (
-        <SystemModulesGrid role="finance_officer" metrics={metrics} title="Jamhuriya RMS — dhammaan qaybaha system-ka" />
+        <section className="dashboardSection">
+          <SystemModulesGrid role="finance_officer" metrics={metrics} title="System modules" />
+        </section>
       ) : null}
 
-      <div className="overviewGrid" style={{ marginTop: 12 }}>
+      <div className="overviewGrid">
         <Link to="/budgets" className="overviewTile" style={{ textDecoration: "none" }}>
           <div className="label">Budgets</div>
           <div className="value">{s.budgets ?? 0}</div>
         </Link>
-        <div className="overviewTile">
+        <Link to="/budgets" className="overviewTile" style={{ textDecoration: "none" }}>
           <div className="label">Total allocated</div>
           <div className="value">{formatMoney(s.totalAllocated)}</div>
-        </div>
-        <div className="overviewTile">
+        </Link>
+        <Link to="/budgets?filter=disbursed" className="overviewTile" style={{ textDecoration: "none" }}>
           <div className="label">Total paid</div>
           <div className="value">{formatMoney(s.totalPaid)}</div>
-        </div>
-        <div className="overviewTile">
+        </Link>
+        <Link to="/budgets" className="overviewTile" style={{ textDecoration: "none" }}>
           <div className="label">Utilization</div>
           <div className="value">{s.utilizationPercent ?? 0}%</div>
-        </div>
-        <div className="overviewTile">
+        </Link>
+        <Link to="/grants?filter=active" className="overviewTile" style={{ textDecoration: "none" }}>
           <div className="label">Active grants</div>
           <div className="value">{s.activeGrants ?? 0}</div>
-        </div>
-        <div className="overviewTile">
+        </Link>
+        <Link to="/grants?filter=awarded" className="overviewTile" style={{ textDecoration: "none" }}>
           <div className="label">Awarded total</div>
           <div className="value">{formatMoney(s.awardedTotal)}</div>
-        </div>
+        </Link>
       </div>
 
-      <div className="dashChartsRow">
+      <section className="dashChartsRow">
         <div className="dashCard dashChartCard">
           <div className="dashCardTitle">Budget item status</div>
           <div className="dashChartBlock">
@@ -203,9 +209,9 @@ export function FinanceDashboard() {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="dashGrid">
+      <section className="dashGrid">
         <div className="dashCard dashSpan8">
           <div className="dashCardTitle">Recent budget items</div>
           <table className="dashTable">
@@ -250,9 +256,9 @@ export function FinanceDashboard() {
             {(report.grantSummary || []).length === 0 ? <span className="muted">No grants yet.</span> : null}
           </div>
         </div>
-      </div>
+      </section>
 
-      <div style={{ marginTop: 12, display: "flex", gap: 10 }}>
+      <div className="dashboardQuickLinks">
         <Link className="btn primary" to="/budgets">Open Finance &amp; Budgets</Link>
       </div>
     </div>

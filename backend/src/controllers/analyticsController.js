@@ -10,13 +10,45 @@ const { User, USER_STATUSES, ROLES } = require("../models/User");
 const { Department } = require("../models/Department");
 const { EthicsApplication } = require("../models/EthicsApplication");
 const { ThesisGroup } = require("../models/ThesisGroup");
-const { ResearchPolicy } = require("../models/ResearchPolicy");
 const { Notification } = require("../models/Notification");
 const { FACULTIES, matchFacultyByName } = require("../utils/facultyMatcher");
+const {
+  COLLAB_GROUP_FILTER,
+  METRIC_DEFINITIONS,
+  isAwardedGrant,
+  sumAwardedAmount,
+  grantSuccessRate: computeGrantSuccessRate,
+} = require("../utils/metricsDefinitions");
+const { enrichProjectsResearcher } = require("../utils/projectPi");
+const { userDisplayName } = require("../utils/userDisplay");
 const PDFDocument = require("pdfkit");
 
 function sum(nums) {
   return (nums || []).reduce((acc, n) => acc + (typeof n === "number" ? n : 0), 0);
+}
+
+const DASHBOARD_ACTIVE_PROJECTS_LIMIT = 10;
+
+function mapProjectDashboardRow(p, piName) {
+  const reports = p.progressReports || [];
+  const latest = reports.length ? reports[reports.length - 1] : null;
+  const progressPercent =
+    latest?.progressPercent ??
+    (p.status === PROJECT_STATUSES.COMPLETED ? 100 : p.status === PROJECT_STATUSES.ACTIVE ? 50 : 0);
+  return {
+    id: String(p._id).slice(-4).padStart(4, "0"),
+    projectId: String(p._id),
+    title: p.title,
+    principalInvestigator: piName || userDisplayName(p.researcherId),
+    progressPercent,
+    endDate: p.endDate,
+    status: p.status,
+  };
+}
+
+async function mapProjectDashboardRows(projects) {
+  const enriched = await enrichProjectsResearcher(projects);
+  return enriched.map(({ doc, piName }) => mapProjectDashboardRow(doc, piName));
 }
 
 async function getDashboardMetrics(req, res) {
@@ -44,7 +76,7 @@ async function getDashboardMetrics(req, res) {
   const budgetFilter =
     role === "researcher" ? { ownerResearcherId: userId } : role === "finance_officer" ? {} : isStaffAll ? {} : {};
 
-  const [proposalCount, projectCount, grants, budgets, pubs, repoCount, collabGroupCount, ethicsCount, thesisCount, notifUnread] =
+  const [proposalCount, projectCount, grants, budgets, pubs, repoCount, collabGroupCount, ethicsCount, thesisCount, notifUnread, activeProjectCount, activeProjectDocs, workflowPubCount] =
     await Promise.all([
       Proposal.countDocuments(proposalFilter),
       Project.countDocuments(projectFilter),
@@ -54,8 +86,8 @@ async function getDashboardMetrics(req, res) {
       RepositoryItem.countDocuments(repoFilter),
       ResearchGroup.countDocuments(
         role === "researcher"
-          ? { "members.userId": userId, $or: [{ kind: GROUP_KINDS.COLLABORATION }, { kind: { $exists: false } }] }
-          : { $or: [{ kind: GROUP_KINDS.COLLABORATION }, { kind: { $exists: false } }] }
+          ? { "members.userId": userId, ...COLLAB_GROUP_FILTER }
+          : COLLAB_GROUP_FILTER
       ),
       EthicsApplication.countDocuments(role === "researcher" ? { researcherId: userId } : {}),
       ThesisGroup.countDocuments(
@@ -64,23 +96,31 @@ async function getDashboardMetrics(req, res) {
           : {}
       ),
       Notification.countDocuments({ userId, readAt: null }),
+      Project.countDocuments({ ...projectFilter, status: PROJECT_STATUSES.ACTIVE }),
+      Project.find({ ...projectFilter, status: PROJECT_STATUSES.ACTIVE })
+        .sort({ updatedAt: -1 })
+        .limit(DASHBOARD_ACTIVE_PROJECTS_LIMIT)
+        .populate("researcherId", "fullName name email")
+        .select("title status progressReports researcherId endDate"),
+      Publication.countDocuments({ ...pubFilter, status: { $ne: PUBLICATION_STATUSES.DRAFT } }),
     ]);
 
   let usersCount = 0;
   let departmentsCount = 0;
-  let policiesCount = 0;
   if (role === "research_director") {
-    [usersCount, departmentsCount, policiesCount] = await Promise.all([
+    [usersCount, departmentsCount] = await Promise.all([
       User.countDocuments({ status: USER_STATUSES.ACTIVE }),
       Department.countDocuments({}),
-      ResearchPolicy.countDocuments({}),
     ]);
   }
 
   base.proposals.total = proposalCount;
   base.projects.total = projectCount;
+  base.projects.active = activeProjectCount;
+  base.activeProjects = await mapProjectDashboardRows(activeProjectDocs);
   base.grants.total = grants.length;
-  base.grants.awardedTotal = sum(grants.map((g) => (g.status === "active" ? g.amountAwarded : 0)));
+  base.grants.awardedTotal = sumAwardedAmount(grants);
+  base.grants.awardedCount = grants.filter(isAwardedGrant).length;
 
   base.budgets.total = budgets.length;
   const allItems = budgets.flatMap((b) => b.items || []);
@@ -101,13 +141,13 @@ async function getDashboardMetrics(req, res) {
   base.modules = {
     users: usersCount,
     departments: departmentsCount,
-    policies: policiesCount,
     ethics: ethicsCount,
     proposals: proposalCount,
     projects: projectCount,
     grants: grants.length,
     budgets: budgets.length,
     publications: pubs.length,
+    workflow: workflowPubCount,
     repository: repoCount,
     groups: collabGroupCount,
     thesis: thesisCount,
@@ -122,11 +162,19 @@ async function getDashboardMetrics(req, res) {
     const logLine = `${JSON.stringify({
       sessionId: "6113cc",
       location: "analyticsController.js:getDashboardMetrics",
-      message: "dashboard metrics modules",
-      data: { role, moduleKeys: Object.keys(base.modules), modules: base.modules },
+      message: "dashboard metrics audit",
+      data: {
+        role,
+        activeProjectCount,
+        tableLength: base.activeProjects?.length ?? 0,
+        piWithNames: (base.activeProjects || []).filter((p) => p.principalInvestigator && p.principalInvestigator !== "—").length,
+        piSample: (base.activeProjects || []).slice(0, 3).map((p) => ({ title: p.title, pi: p.principalInvestigator })),
+        grants: { total: grants.length, awardedCount: base.grants.awardedCount, awardedSum: base.grants.awardedTotal },
+        workflow: workflowPubCount,
+      },
       timestamp: Date.now(),
-      hypothesisId: "A",
-      runId: "post-fix",
+      hypothesisId: "PI3",
+      runId: "project-pi",
     })}\n`;
     fs.appendFileSync(path.join(__dirname, "../../../debug-6113cc.log"), logLine);
   } catch (_) {}
@@ -150,7 +198,7 @@ function buildMonthlyGrantTrends(grants) {
     if (!dt) return;
     const d = new Date(dt);
     const idx = buckets.findIndex((b) => b.month === MONTHS[d.getMonth()] && b.year === d.getFullYear());
-    if (idx >= 0 && g.status === GRANT_STATUSES.ACTIVE) buckets[idx].amount += g.amountAwarded || 0;
+    if (idx >= 0 && isAwardedGrant(g)) buckets[idx].amount += g.amountAwarded || 0;
   });
 
   return buckets.map(({ month, amount }) => ({ month, amount }));
@@ -164,15 +212,18 @@ async function buildInstitutionalAnalytics() {
     budgetCount,
     publicationCount,
     repositoryCount,
-    groupCount,
     ethicsCount,
     thesisCount,
     usersCount,
     departmentsCount,
-    policiesCount,
     collabGroupCount,
     researcherCount,
-    projects,
+    activeProjectCount,
+    completedProjectCount,
+    onHoldProjectCount,
+    workflowPubCount,
+    dashboardActiveProjects,
+    allProjectsForFaculty,
     grants,
     budgets,
     publications,
@@ -186,33 +237,43 @@ async function buildInstitutionalAnalytics() {
     Budget.countDocuments({}),
     Publication.countDocuments({}),
     RepositoryItem.countDocuments({}),
-    ResearchGroup.countDocuments({}),
     EthicsApplication.countDocuments({}),
     ThesisGroup.countDocuments({}),
     User.countDocuments({ status: USER_STATUSES.ACTIVE }),
     Department.countDocuments({}),
-    ResearchPolicy.countDocuments({}),
-    ResearchGroup.countDocuments({ $or: [{ kind: GROUP_KINDS.COLLABORATION }, { kind: { $exists: false } }] }),
+    ResearchGroup.countDocuments(COLLAB_GROUP_FILTER),
     User.countDocuments({ role: ROLES.RESEARCHER, status: USER_STATUSES.ACTIVE }),
-    Project.find({}).sort({ updatedAt: -1 }).limit(5).populate("researcherId", "fullName department"),
+    Project.countDocuments({ status: PROJECT_STATUSES.ACTIVE }),
+    Project.countDocuments({ status: PROJECT_STATUSES.COMPLETED }),
+    Project.countDocuments({ status: PROJECT_STATUSES.ON_HOLD }),
+    Publication.countDocuments({ status: { $ne: PUBLICATION_STATUSES.DRAFT } }),
+    Project.find({ status: PROJECT_STATUSES.ACTIVE })
+      .sort({ updatedAt: -1 })
+      .limit(DASHBOARD_ACTIVE_PROJECTS_LIMIT)
+      .populate("researcherId", "fullName department")
+      .select("title status endDate progressReports researcherId updatedAt"),
+    Project.find({}).select("researcherId").populate("researcherId", "fullName department"),
     Grant.find({}).select("amountAwarded status createdAt decidedAt"),
     Budget.find({}).select("items totalAllocated"),
-    Publication.find({}).select("title type year status citationCount doi createdAt researcherId"),
+    Publication.find({}).select("title type year status citationCount doi createdAt updatedAt researcherId"),
     Proposal.find({ status: { $in: [PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW, PROPOSAL_STATUSES.APPROVED] } })
       .sort({ updatedAt: -1 })
       .limit(5)
       .populate("researcherId", "fullName"),
     RepositoryItem.find({}).sort({ createdAt: -1 }).limit(5).select("title type access createdAt"),
-    ResearchGroup.find({}).sort({ createdAt: -1 }).limit(5).select("name members createdAt"),
+    ResearchGroup.find(COLLAB_GROUP_FILTER).sort({ createdAt: -1 }).limit(5).select("name members createdAt kind"),
   ]);
 
-  const activeProjects = projects.filter((p) => p.status === PROJECT_STATUSES.ACTIVE).length;
-  const completedProjects = projects.filter((p) => p.status === PROJECT_STATUSES.COMPLETED).length;
+  const activeProjects = activeProjectCount;
+  const completedProjects = completedProjectCount;
+  const onHoldProjects = onHoldProjectCount;
   const totalProjects = projectCount || 0;
+  const trackedProjects = activeProjects + completedProjects + onHoldProjects;
   const activePercent = totalProjects ? Math.round((activeProjects / totalProjects) * 100) : 0;
 
   const allBudgetItems = budgets.flatMap((b) => b.items || []);
-  const awardedTotal = grants.filter((g) => g.status === GRANT_STATUSES.ACTIVE).reduce((a, g) => a + (g.amountAwarded || 0), 0);
+  const awardedTotal = sumAwardedAmount(grants);
+  const awardedGrantCount = grants.filter(isAwardedGrant).length;
 
   const pubsByType = {
     paper: publications.filter((p) => p.type === PUBLICATION_TYPES.PAPER).length,
@@ -246,22 +307,13 @@ async function buildInstitutionalAnalytics() {
     .sort((a, b) => new Date(b.at) - new Date(a.at))
     .slice(0, 5);
 
-  const activeProjectsTable = projects.map((p, idx) => {
-    const latest = (p.progressReports || [])[0];
-    const progressPercent = latest?.progressPercent ?? (p.status === PROJECT_STATUSES.COMPLETED ? 100 : p.status === PROJECT_STATUSES.ACTIVE ? 50 : 0);
-    return {
-      id: String(p._id).slice(-4).padStart(4, "0"),
-      title: p.title,
-      principalInvestigator: p.researcherId?.fullName || "—",
-      progressPercent,
-      endDate: p.endDate,
-      status: p.status,
-    };
-  });
+  const activeProjectsTable = await mapProjectDashboardRows(dashboardActiveProjects);
 
-  const grantDecided = grants.filter((g) => ["approved", "rejected", "active", "closed"].includes(g.status)).length;
-  const grantWon = grants.filter((g) => ["approved", "active", "closed"].includes(g.status)).length;
-  const grantSuccessRate = grantDecided ? Math.round((grantWon / grantDecided) * 100) : 0;
+  const grantSuccessRate = computeGrantSuccessRate(grants);
+
+  const recentPublications = [...publications]
+    .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+    .slice(0, 5);
 
   const activeUsers = await User.find({ status: USER_STATUSES.ACTIVE }).select("department role fullName");
 
@@ -306,7 +358,7 @@ async function buildInstitutionalAnalytics() {
     facultyMap[faculty].proposals += 1;
   });
 
-  projects.forEach((p) => {
+  allProjectsForFaculty.forEach((p) => {
     const faculty = resolveFaculty(p.researcherId?.department);
     facultyMap[faculty].projects += 1;
   });
@@ -332,7 +384,7 @@ async function buildInstitutionalAnalytics() {
     },
   };
 
-  return {
+  const result = {
     generatedAt: new Date().toISOString(),
     overview: {
       proposals: proposalCount,
@@ -346,17 +398,16 @@ async function buildInstitutionalAnalytics() {
       thesis: thesisCount,
       users: usersCount,
       departments: departmentsCount,
-      policies: policiesCount,
       modules: {
         users: usersCount,
         departments: departmentsCount,
-        policies: policiesCount,
         ethics: ethicsCount,
         proposals: proposalCount,
         projects: projectCount,
         grants: grantCount,
         budgets: budgetCount,
         publications: publicationCount,
+        workflow: workflowPubCount,
         repository: repositoryCount,
         groups: collabGroupCount,
         thesis: thesisCount,
@@ -368,10 +419,13 @@ async function buildInstitutionalAnalytics() {
       total: totalProjects,
       active: activeProjects,
       completed: completedProjects,
+      onHold: onHoldProjects,
+      tracked: trackedProjects,
       activePercent,
     },
     grantFunding: {
       activeFunds: awardedTotal,
+      awardedGrantCount,
       trends: buildMonthlyGrantTrends(grants),
     },
     researchOutput: {
@@ -389,7 +443,7 @@ async function buildInstitutionalAnalytics() {
     },
     activeProjects: activeProjectsTable,
     recentActivity,
-    publications: publications.slice(0, 5).map((p) => ({
+    publications: recentPublications.map((p) => ({
       id: p._id,
       title: p.title,
       type: p.type,
@@ -413,11 +467,53 @@ async function buildInstitutionalAnalytics() {
     grantSuccessRate,
     facultyAnalytics,
     annualReport,
+    samples: {
+      activeProjects: { shown: activeProjectsTable.length, total: activeProjectCount, limit: DASHBOARD_ACTIVE_PROJECTS_LIMIT },
+      recentActivity: { shown: recentActivity.length, limit: 5 },
+      groups: { shown: groups.length, total: collabGroupCount, limit: 5 },
+      publications: { shown: recentPublications.length, total: publicationCount, limit: 5 },
+      repository: { shown: repositoryItems.length, total: repositoryCount, limit: 5 },
+    },
+    metricDefinitions: METRIC_DEFINITIONS,
   };
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const logLine = `${JSON.stringify({
+      sessionId: "6113cc",
+      location: "analyticsController.js:buildInstitutionalAnalytics",
+      message: "institutional metrics audit",
+      data: {
+        projects: {
+          total: projectCount,
+          active: activeProjectCount,
+          completed: completedProjectCount,
+          onHold: onHoldProjectCount,
+          trackedSum: trackedProjects,
+          balanced: trackedProjects === totalProjects,
+        },
+        grants: { total: grantCount, awardedCount: awardedGrantCount, awardedSum: awardedTotal },
+        groups: { collabTotal: collabGroupCount, sampleShown: groups.length },
+        workflow: { nonDraft: workflowPubCount, publicationTotal: publicationCount },
+      },
+      timestamp: Date.now(),
+      hypothesisId: "M1",
+      runId: "metrics-audit",
+    })}\n`;
+    fs.appendFileSync(path.join(__dirname, "../../../debug-6113cc.log"), logLine);
+  } catch (_) {}
+  // #endregion
+
+  return result;
 }
 
 async function getInstitutionalAnalytics(req, res) {
+  const notificationsUnread = await Notification.countDocuments({ userId: req.user.id, readAt: null });
   const data = await buildInstitutionalAnalytics();
+  data.overview.modules.notificationsUnread = notificationsUnread;
+  data.keyMetrics.notificationsUnread = notificationsUnread;
   res.json(data);
 }
 
@@ -446,6 +542,7 @@ async function getFacultyReport(req, res) {
       researchers: deptUsers.filter((u) => u.role === ROLES.RESEARCHER).length,
       proposals: proposals.length,
       projects: facultyProjects.length,
+      activeProjects: facultyProjects.filter((p) => p.status === PROJECT_STATUSES.ACTIVE).length,
       publications: facultyPublications.length,
       citations: facultyPublications.reduce((acc, p) => acc + (p.citationCount || 0), 0),
     },
@@ -456,11 +553,18 @@ async function getFacultyReport(req, res) {
       author: p.researcherId?.fullName || "—",
       updatedAt: p.updatedAt,
     })),
-    projects: facultyProjects.slice(0, 50).map((p) => ({
-      id: p._id,
-      title: p.title,
-      status: p.status,
-      pi: p.researcherId?.fullName || "—",
+    projects: (await mapProjectDashboardRows(
+      facultyProjects
+        .filter((p) => p.status === PROJECT_STATUSES.ACTIVE)
+        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+        .slice(0, DASHBOARD_ACTIVE_PROJECTS_LIMIT)
+    )).map((row) => ({
+      id: row.id,
+      projectId: row.projectId,
+      title: row.title,
+      status: row.status,
+      pi: row.principalInvestigator,
+      progressPercent: row.progressPercent,
     })),
     publications: facultyPublications.slice(0, 50).map((p) => ({
       id: p._id,

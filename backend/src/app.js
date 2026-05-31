@@ -4,6 +4,7 @@ const cookieParser = require("cookie-parser");
 const morgan = require("morgan");
 const path = require("path");
 const { errorHandler } = require("./middleware/errorHandler");
+const repositoryController = require("./controllers/repositoryController");
 const { authRoutes } = require("./routes/authRoutes");
 const { userRoutes } = require("./routes/userRoutes");
 const { proposalRoutes } = require("./routes/proposalRoutes");
@@ -17,7 +18,6 @@ const { notificationRoutes } = require("./routes/notificationRoutes");
 const { conversationRoutes } = require("./routes/conversationRoutes");
 const { departmentRoutes } = require("./routes/departmentRoutes");
 const { analyticsRoutes } = require("./routes/analyticsRoutes");
-const { policyRoutes } = require("./routes/policyRoutes");
 const { paymentRoutes } = require("./routes/paymentRoutes");
 const { purchaseOrderRoutes } = require("./routes/purchaseOrderRoutes");
 const { ethicsRoutes } = require("./routes/ethicsRoutes");
@@ -25,6 +25,7 @@ const { thesisGroupRoutes } = require("./routes/thesisGroupRoutes");
 
 function createApp() {
   const app = express();
+  app.set("trust proxy", 1);
 
   app.use(express.json({ limit: "2mb" }));
   app.use(cookieParser());
@@ -44,6 +45,11 @@ function createApp() {
     res.json({ ok: true, service: "just-rms-backend" });
   });
 
+  const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+  // Public OAI-PMH — register before /api/repository router so ":id" never captures "oai"
+  app.get("/api/repository/oai", asyncHandler(repositoryController.oaiPmhh));
+  app.get("/api/repository/oai/export", asyncHandler(repositoryController.oaiExport));
+
   app.use("/api/auth", authRoutes);
   app.use("/api/users", userRoutes);
   app.use("/api/proposals", proposalRoutes);
@@ -57,7 +63,6 @@ function createApp() {
   app.use("/api/conversations", conversationRoutes);
   app.use("/api/departments", departmentRoutes);
   app.use("/api/analytics", analyticsRoutes);
-  app.use("/api/policies", policyRoutes);
   app.use("/api/payments", paymentRoutes);
   app.use("/api/procurement", purchaseOrderRoutes);
   app.use("/api/ethics", ethicsRoutes);

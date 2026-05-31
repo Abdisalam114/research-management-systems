@@ -1,11 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as budgetApi from "../services/budgetApi";
 import * as paymentApi from "../services/paymentApi";
 import * as procurementApi from "../services/procurementApi";
 import * as analyticsApi from "../services/analyticsApi";
 import { PageHeader } from "../components/PageHeader";
+import { statFilterLabel } from "../utils/pageHeaderFilters";
 
 const PAYMENT_CATEGORIES = [
   { value: "research_assistant", label: "Research assistant" },
@@ -60,6 +62,7 @@ export function BudgetsPage() {
   const [newBudget, setNewBudget] = useState({ grantId: "", projectId: "", totalAllocated: 0, currency: "USD" });
   const [showTopPayment, setShowTopPayment] = useState(false);
   const [showTopPO, setShowTopPO] = useState(false);
+  const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
 
   const isResearcher = user?.role === "researcher";
   const isDirector = user?.role === "research_director";
@@ -222,6 +225,28 @@ export function BudgetsPage() {
     }
   }
 
+  const filteredBudgets = useMemo(() => {
+    if (statusFilter === "all") return budgets;
+    if (statusFilter === "pending") {
+      return budgets.filter((b) => {
+        const pays = paymentsByBudget[String(b.id)] || [];
+        const poList = posByBudget[String(b.id)] || [];
+        return (
+          pays.some((p) => ["requested", "director_approved"].includes(p.status)) ||
+          poList.some((p) => ["requested", "director_approved"].includes(p.status))
+        );
+      });
+    }
+    if (statusFilter === "disbursed") {
+      return budgets.filter((b) => {
+        const pays = paymentsByBudget[String(b.id)] || [];
+        const poList = posByBudget[String(b.id)] || [];
+        return pays.some((p) => p.status === "paid") || poList.some((p) => p.status === "paid");
+      });
+    }
+    return budgets;
+  }, [budgets, statusFilter, paymentsByBudget, posByBudget]);
+
   const headerStats = [
     {
       label: isResearcher ? "My total budget" : "Institutional total budget",
@@ -230,12 +255,14 @@ export function BudgetsPage() {
         ? `${budgets.length} of your budget${budgets.length === 1 ? "" : "s"}`
         : "Across the whole university",
       accent: "#0ea5e9",
+      filterKey: "all",
     },
     {
       label: "Disbursed (paid)",
       value: formatMoney(totals.disbursed, totals.currency),
       sub: `Payments ${formatMoney(totals.disbursedPayments, totals.currency)} • POs ${formatMoney(totals.disbursedPOs, totals.currency)}`,
       accent: "#1d4ed8",
+      filterKey: "disbursed",
     },
     {
       label: "Utilization",
@@ -248,12 +275,14 @@ export function BudgetsPage() {
       value: totals.pending,
       sub: `${totals.pendingPayments} payments • ${totals.pendingPOs} POs`,
       accent: "#7dd3fc",
+      filterKey: "pending",
     },
     {
       label: "Total budgets",
       value: `${budgets.length} • ${formatMoney(totals.disbursed, totals.currency)} spent`,
       sub: isResearcher ? "Your budgets & disbursed total" : "All budgets & disbursed total",
       accent: "#38bdf8",
+      filterKey: "all",
     },
   ];
 
@@ -263,19 +292,27 @@ export function BudgetsPage() {
         title="Finance & Budget"
         subtitle="Researcher requests → Director approves → Finance pays (with payment method)."
         stats={headerStats}
+        activeFilter={statusFilter}
+        onFilterChange={setStatusFilter}
         actions={
           isResearcher ? (
             <>
-              <button className="btn primary" onClick={() => { setShowTopPayment((v) => !v); setShowTopPO(false); }}>
+              <button type="button" className="btn primary" onClick={() => { setShowTopPayment((v) => !v); setShowTopPO(false); }}>
                 💳 {showTopPayment ? "Cancel" : "Request payment"}
               </button>
-              <button className="btn primary" onClick={() => { setShowTopPO((v) => !v); setShowTopPayment(false); }}>
+              <button type="button" className="btn primary" onClick={() => { setShowTopPO((v) => !v); setShowTopPayment(false); }}>
                 🛒 {showTopPO ? "Cancel" : "Request purchase order"}
               </button>
             </>
           ) : null
         }
       />
+
+      {statusFilter !== "all" ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Showing: <strong>{statFilterLabel(headerStats, statusFilter)}</strong> ({filteredBudgets.length} budget)
+        </p>
+      ) : null}
 
       {loading ? <p className="muted">Loading budgets…</p> : null}
       {error ? <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)", marginTop: 8 }}>{error}</div> : null}
@@ -312,8 +349,8 @@ export function BudgetsPage() {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn primary" onClick={() => decideDirectorPayment(p.id, "approve")}>Approve</button>
-                  <button className="btn" onClick={() => decideDirectorPayment(p.id, "reject")}>Reject</button>
+                  <button type="button" className="btn primary" onClick={() => decideDirectorPayment(p.id, "approve")}>Approve</button>
+                  <button type="button" className="btn" onClick={() => decideDirectorPayment(p.id, "reject")}>Reject</button>
                 </div>
               </div>
             ))}
@@ -324,8 +361,8 @@ export function BudgetsPage() {
                   <div className="muted">{p.currency} {p.totalAmount} • {p.items?.length || 0} item(s)</div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn primary" onClick={() => decideDirectorPO(p.id, "approve")}>Approve</button>
-                  <button className="btn" onClick={() => decideDirectorPO(p.id, "reject")}>Reject</button>
+                  <button type="button" className="btn primary" onClick={() => decideDirectorPO(p.id, "approve")}>Approve</button>
+                  <button type="button" className="btn" onClick={() => decideDirectorPO(p.id, "reject")}>Reject</button>
                 </div>
               </div>
             ))}
@@ -346,8 +383,8 @@ export function BudgetsPage() {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn primary" onClick={() => payPayment(p)}>Pay (record method)</button>
-                  <button className="btn" onClick={() => rejectFinancePayment(p.id)}>Reject</button>
+                  <button type="button" className="btn primary" onClick={() => payPayment(p)}>Pay (record method)</button>
+                  <button type="button" className="btn" onClick={() => rejectFinancePayment(p.id)}>Reject</button>
                 </div>
               </div>
             ))}
@@ -358,8 +395,8 @@ export function BudgetsPage() {
                   <div className="muted">{p.currency} {p.totalAmount} • {p.items?.length || 0} item(s)</div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn primary" onClick={() => payPO(p)}>Pay (record method)</button>
-                  <button className="btn" onClick={() => rejectFinancePO(p.id)}>Reject</button>
+                  <button type="button" className="btn primary" onClick={() => payPO(p)}>Pay (record method)</button>
+                  <button type="button" className="btn" onClick={() => rejectFinancePO(p.id)}>Reject</button>
                 </div>
               </div>
             ))}
@@ -396,6 +433,7 @@ export function BudgetsPage() {
               </div>
             </div>
             <button
+              type="button"
               className="btn primary"
               onClick={async () => {
                 try {
@@ -495,7 +533,7 @@ export function BudgetsPage() {
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800 }}>Budgets & their requests</div>
         <div style={{ display: "grid", gap: 12, marginTop: 10 }}>
-          {budgets.map((b) => (
+          {filteredBudgets.map((b) => (
             <BudgetCard
               key={b.id}
               budget={b}
@@ -503,7 +541,9 @@ export function BudgetsPage() {
               pos={posByBudget[String(b.id)] || []}
             />
           ))}
-          {budgets.length === 0 ? <div className="muted">No budgets yet.</div> : null}
+          {filteredBudgets.length === 0 ? (
+            <div className="muted">{budgets.length === 0 ? "No budgets yet." : "No budgets match this filter."}</div>
+          ) : null}
         </div>
       </div>
     </div>
@@ -580,8 +620,8 @@ function TopPaymentForm({ budgets, accessToken, onClose, onChange, setError }) {
         <input value={form.notes} onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))} />
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <button className="btn primary" onClick={submit}>Submit for director approval</button>
-        <button className="btn" onClick={onClose}>Cancel</button>
+        <button type="button" className="btn primary" onClick={submit}>Submit for director approval</button>
+        <button type="button" className="btn" onClick={onClose}>Cancel</button>
       </div>
     </div>
   );
@@ -678,8 +718,8 @@ function TopPOForm({ budgets, accessToken, onClose, onChange, setError }) {
         <input value={form.notes} onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))} />
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <button className="btn primary" onClick={submit}>Submit PO for director approval</button>
-        <button className="btn" onClick={onClose}>Cancel</button>
+        <button type="button" className="btn primary" onClick={submit}>Submit PO for director approval</button>
+        <button type="button" className="btn" onClick={onClose}>Cancel</button>
       </div>
     </div>
   );

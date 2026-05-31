@@ -9,11 +9,15 @@ export function InstitutionalAnalyticsSections({ data }) {
     { name: "Paid", value: data.budgets.itemsPaid },
   ];
 
+  const groupSample = data.samples?.groups;
+  const pubSample = data.samples?.publications;
+  const repoSample = data.samples?.repository;
+
   return (
     <section id="institutional-analytics" className="dashAnalyticsSection">
       <h2 className="dashSectionTitle">Institutional analytics</h2>
       <p className="muted dashSectionSub">
-        Budget workflow, research groups, publications, and repository — same data as the analytics report.
+        Budget workflow, research groups, publications, and repository — counts from database; tables show latest samples.
       </p>
 
       <div className="dashGrid" style={{ marginTop: 12 }}>
@@ -38,7 +42,10 @@ export function InstitutionalAnalyticsSections({ data }) {
         </div>
 
         <div className="dashCard dashSpan6">
-          <div className="dashCardTitle">Research groups</div>
+          <div className="dashCardTitle">
+            Research groups
+            {groupSample ? ` (${groupSample.shown} of ${groupSample.total})` : ""}
+          </div>
           <div style={{ display: "grid", gap: 8 }}>
             {data.groups.map((g) => (
               <div key={g.id} className="metricRow">
@@ -51,7 +58,10 @@ export function InstitutionalAnalyticsSections({ data }) {
         </div>
 
         <div className="dashCard dashSpan6">
-          <div className="dashCardTitle">Recent publications</div>
+          <div className="dashCardTitle">
+            Recent publications
+            {pubSample ? ` (${pubSample.shown} of ${pubSample.total})` : ""}
+          </div>
           <table className="dashTable">
             <thead>
               <tr>
@@ -82,7 +92,10 @@ export function InstitutionalAnalyticsSections({ data }) {
         </div>
 
         <div className="dashCard dashSpan6">
-          <div className="dashCardTitle">Repository uploads</div>
+          <div className="dashCardTitle">
+            Repository uploads
+            {repoSample ? ` (${repoSample.shown} of ${repoSample.total})` : ""}
+          </div>
           <div style={{ display: "grid", gap: 8 }}>
             {data.repository.map((r) => (
               <div key={r._id} className="activityItem">

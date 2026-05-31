@@ -54,10 +54,27 @@ export function ProjectDetailsPage() {
 
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800, fontSize: 18 }}>{project.title}</div>
-        <div className="muted" style={{ marginTop: 6 }}>
-          Status: {project.status}
-          {project.principalInvestigator ? ` • PI: ${project.principalInvestigator.fullName}` : ""}
-        </div>
+        <div className="muted" style={{ marginTop: 6 }}>Status: {project.status}</div>
+        {project.principalInvestigator ? (
+          <div
+            style={{
+              marginTop: 12,
+              padding: "12px 14px",
+              borderRadius: 12,
+              border: "1px solid var(--rms-border)",
+              background: "rgba(255,255,255,0.02)",
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--rms-text-secondary)", marginBottom: 4 }}>
+              Principal Investigator
+            </div>
+            <div style={{ fontWeight: 800 }}>{project.principalInvestigator.fullName}</div>
+            <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+              {project.principalInvestigator.department || "—"}
+              {project.principalInvestigator.email ? ` • ${project.principalInvestigator.email}` : ""}
+            </div>
+          </div>
+        ) : null}
 
         {canEdit ? (
           <div className="row" style={{ marginTop: 14 }}>
@@ -77,7 +94,7 @@ export function ProjectDetailsPage() {
         )}
 
         {isOwner ? (
-          <button className="btn primary" style={{ marginTop: 12 }} onClick={() => navigate(`/projects/${id}/progress`)}>
+          <button type="button" className="btn primary" style={{ marginTop: 12 }} onClick={() => navigate(`/projects/${id}/progress`)}>
             Add progress report
           </button>
         ) : null}
@@ -173,6 +190,7 @@ export function ProjectDetailsPage() {
 
       {canEdit ? (
         <button
+          type="button"
           className="btn primary"
           style={{ marginTop: 12 }}
           disabled={saving}

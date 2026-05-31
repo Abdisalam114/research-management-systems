@@ -30,9 +30,13 @@ const progressReportSchema = new mongoose.Schema(
 
 const projectSchema = new mongoose.Schema(
   {
-    proposalId: { type: mongoose.Schema.Types.ObjectId, ref: "Proposal", required: true, unique: true, index: true },
+    proposalId: { type: mongoose.Schema.Types.ObjectId, ref: "Proposal", index: true },
+    /** @deprecated legacy field — use proposalId */
+    proposal: { type: mongoose.Schema.Types.ObjectId, ref: "Proposal", index: true },
     title: { type: String, required: true, trim: true },
-    researcherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    researcherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
+    /** @deprecated legacy field — use researcherId (Principal Investigator) */
+    leadResearcher: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
     teamMembers: [teamMemberSchema],
     milestones: [milestoneSchema],
     startDate: { type: Date, default: Date.now },

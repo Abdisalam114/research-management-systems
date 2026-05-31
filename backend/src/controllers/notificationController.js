@@ -30,5 +30,10 @@ async function markRead(req, res) {
   res.json({ notification: sanitizeNotification(n) });
 }
 
-module.exports = { listMyNotifications, markRead };
+async function unreadCount(req, res) {
+  const count = await Notification.countDocuments({ userId: req.user.id, readAt: null });
+  res.json({ unread: count });
+}
+
+module.exports = { listMyNotifications, markRead, unreadCount };
 

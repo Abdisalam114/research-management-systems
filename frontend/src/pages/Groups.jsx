@@ -5,6 +5,9 @@ import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as groupApi from "../services/groupApi";
 import * as conversationApi from "../services/conversationApi";
 import { PageHeader } from "../components/PageHeader";
+import { GroupsModuleNav } from "../components/GroupsModuleNav";
+import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
+import "./groups.css";
 
 const CREATE_ROLES = ["researcher", "faculty_coordinator", "research_director"];
 
@@ -19,6 +22,7 @@ export function GroupsPage() {
   const [stats, setStats] = useState({ total: 0, thesis: 0, collaboration: 0 });
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const canCreate = CREATE_ROLES.includes(user?.role);
 
   const load = useCallback(async () => {
@@ -37,12 +41,20 @@ export function GroupsPage() {
   const headerStats = useMemo(() => {
     const mine = groups.filter((g) => isMember(g, user?.id)).length;
     return [
-      { label: "Total groups", value: stats.total, accent: "#0ea5e9" },
-      { label: "Thesis groups", value: stats.thesis, accent: "#38bdf8" },
-      { label: "Research groups", value: stats.collaboration, accent: "#1d4ed8" },
-      { label: "My groups", value: mine, accent: "#7dd3fc" },
+      { label: "Research groups", value: stats.collaboration, filterKey: "all", accent: "#0ea5e9" },
+      { label: "My groups", value: mine, filterKey: "mine", accent: "#7dd3fc" },
     ];
   }, [groups, user?.id, stats]);
+
+  const filteredGroups = useMemo(
+    () =>
+      filterByStatKey(groups, statusFilter, {
+        customFilters: {
+          mine: (g) => isMember(g, user?.id),
+        },
+      }),
+    [groups, statusFilter, user?.id]
+  );
 
   async function openChat(groupId) {
     try {
@@ -54,11 +66,15 @@ export function GroupsPage() {
   }
 
   return (
-    <div>
+    <div className="groupsPage">
+      <GroupsModuleNav />
+
       <PageHeader
         title="Groups"
         subtitle="Research collaboration groups (join/leave + chat). Thesis supervision is in the Thesis module."
         stats={headerStats}
+        activeFilter={statusFilter}
+        onFilterChange={setStatusFilter}
         actions={
           <>
             {canCreate ? (
@@ -66,19 +82,26 @@ export function GroupsPage() {
                 {showForm ? "Close form" : "+ New group"}
               </button>
             ) : null}
-            <button type="button" className="btn" onClick={() => navigate("/thesis")}>🎓 Thesis module</button>
-            <button type="button" className="btn" onClick={() => navigate("/messages")}>💬 Messages</button>
+            <button type="button" className="btn" onClick={() => navigate("/messages")}>
+              💬 Messages
+            </button>
           </>
         }
       />
+
+      {statusFilter !== "all" ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+          Showing: <strong>{statFilterLabel(headerStats, statusFilter)}</strong> ({filteredGroups.length})
+        </p>
+      ) : null}
       {loading ? <p className="muted">Loading groups…</p> : null}
-      {error ? <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)", marginBottom: 10 }}>{error}</div> : null}
+      {error ? <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>{error}</div> : null}
 
       {canCreate && showForm ? (
-        <div className="card" style={{ marginBottom: 12 }}>
+        <div className="card groupsCreateForm">
           <div style={{ fontWeight: 800 }}>Create research group</div>
-          <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
-            <input style={{ flex: 1 }} value={name} onChange={(e) => setName(e.target.value)} placeholder="Group name" />
+          <div className="inlineFormRow">
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Group name" />
             <button
               type="button"
               className="btn primary"
@@ -102,19 +125,21 @@ export function GroupsPage() {
 
       <div className="card">
         <div style={{ fontWeight: 800 }}>Research groups</div>
-        <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-          {groups.map((g) => {
+        <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+          {filteredGroups.map((g) => {
             const member = isMember(g, user?.id);
             return (
               <div key={g.id} className="card" style={{ background: "rgba(14,165,233,0.05)" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                  <div>
+                <div className="groupsListItem">
+                  <div className="groupsListItemMain">
                     <div style={{ fontWeight: 800 }}>{g.name}</div>
                     <div className="muted">Members: {g.members?.length || 0}</div>
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div className="groupsListItemActions">
                     {member ? (
-                      <button type="button" className="btn" onClick={() => openChat(g.id)}>Open chat</button>
+                      <button type="button" className="btn" onClick={() => openChat(g.id)}>
+                        Open chat
+                      </button>
                     ) : (
                       <button
                         type="button"
@@ -154,7 +179,9 @@ export function GroupsPage() {
               </div>
             );
           })}
-          {groups.length === 0 ? <div className="muted">No research groups yet.</div> : null}
+          {filteredGroups.length === 0 ? (
+            <div className="muted">{groups.length === 0 ? "No research groups yet." : "No groups match this filter."}</div>
+          ) : null}
         </div>
       </div>
     </div>

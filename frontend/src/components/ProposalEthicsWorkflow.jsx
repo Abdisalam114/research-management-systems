@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import * as proposalApi from "../services/proposalApi";
+import { getEthicsMissingFields, getProposalMissingFields } from "../utils/proposalSubmitValidation";
+import { AppButton } from "./AppButton";
 
 const STEPS = [
-  { key: "form", label: "1. Buuxi foomka ethics" },
-  { key: "submit", label: "2. Hal mar u gudbi Director (Proposal + Ethics)" },
+  { key: "form", label: "1. Complete proposal + ethics on one page" },
+  { key: "submit", label: "2. Submit both to the Director with one button" },
 ];
 
 export function canSubmitToDirector(proposal, ethics) {
@@ -53,8 +55,8 @@ export function ProposalEthicsWorkflow({ accessToken, proposal, onRefresh, onSub
     <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.35)" }}>
       <div style={{ fontWeight: 800, marginBottom: 8 }}>Ethics clearance (required — submitted with proposal)</div>
       <div className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
-        Buuxi foomka ethics, kadib hal badhan ayaa proposal + ethics u gudbinaya Director. Project ma abuurmo ilaa
-        Director uu ansixiyo ethics iyo proposal.
+        The proposal and ethics form are on the same page. If anything is missing when you submit, you will see a list of
+        fields to complete. After submission, await the Director&apos;s response.
       </div>
 
       <div style={{ display: "grid", gap: 6, marginBottom: 12 }}>
@@ -80,18 +82,14 @@ export function ProposalEthicsWorkflow({ accessToken, proposal, onRefresh, onSub
       {error ? <div style={{ color: "#f87171", marginBottom: 8 }}>{error}</div> : null}
 
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => navigate(`/ethics?proposalId=${proposal.id}`)}
-        >
-          {formComplete ? "View / edit ethics form" : "Complete ethics form"}
-        </button>
+        <AppButton onClick={() => navigate(`/proposals/${proposal.id}/edit`)}>
+          {formComplete ? "Edit proposal + ethics" : "Complete proposal + ethics"}
+        </AppButton>
 
-        {canSubmit && onSubmitCombined ? (
-          <button type="button" className="btn primary" disabled={submitBusy} onClick={onSubmitCombined}>
-            {submitBusy ? "Submitting…" : "Submit to Director (Proposal + Ethics)"}
-          </button>
+        {onSubmitCombined ? (
+          <AppButton variant="primary" loading={submitBusy} onClick={onSubmitCombined}>
+            Submit to Director (Proposal + Ethics)
+          </AppButton>
         ) : null}
 
         {ethicsApproved ? (
@@ -99,9 +97,40 @@ export function ProposalEthicsWorkflow({ accessToken, proposal, onRefresh, onSub
         ) : ethicsSubmitted ? (
           <span className="muted">⏳ With Director — ethics + proposal under review</span>
         ) : !formComplete ? (
-          <span className="muted">Complete ethics form to enable submit</span>
+          <span className="muted">Complete the fields below before submitting</span>
         ) : null}
       </div>
+
+      {!formComplete && !ethicsSubmitted ? (
+        <MissingFieldsHint proposal={proposal} ethics={ethics} />
+      ) : null}
+    </div>
+  );
+}
+
+function MissingFieldsHint({ proposal, ethics }) {
+  const proposalMissing = getProposalMissingFields(proposal);
+  const ethicsMissing = getEthicsMissingFields(ethics || {});
+  const all = [...proposalMissing, ...ethicsMissing];
+  if (!all.length) return null;
+
+  return (
+    <div
+      style={{
+        marginTop: 12,
+        padding: "10px 12px",
+        borderRadius: 8,
+        background: "rgba(248, 113, 113, 0.08)",
+        border: "1px solid rgba(248, 113, 113, 0.35)",
+        fontSize: 13,
+      }}
+    >
+      <div style={{ fontWeight: 700, marginBottom: 6 }}>Fields still missing:</div>
+      <ul style={{ margin: 0, paddingLeft: 18 }}>
+        {all.map((item) => (
+          <li key={`${item.section}-${item.field}`}>{item.label}</li>
+        ))}
+      </ul>
     </div>
   );
 }

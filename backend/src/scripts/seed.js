@@ -20,7 +20,6 @@ const { ThesisGroup, THESIS_STATUSES } = require("../models/ThesisGroup");
 const { RepositoryItem, REPOSITORY_ACCESS } = require("../models/RepositoryItem");
 const { Notification, NOTIFICATION_TYPES } = require("../models/Notification");
 const { Department } = require("../models/Department");
-const { ResearchPolicy } = require("../models/ResearchPolicy");
 const { EthicsApplication, ETHICS_STATUSES } = require("../models/EthicsApplication");
 const { Payment, PAYMENT_CATEGORIES, PAYMENT_STATUSES } = require("../models/Payment");
 const { writeSimplePdf } = require("../utils/pdf");
@@ -33,7 +32,6 @@ const {
   SAMPLE_COLLAB_GROUPS,
   SAMPLE_THESIS,
   SAMPLE_DEPARTMENTS,
-  SAMPLE_POLICIES,
   SAMPLE_ETHICS,
   SAMPLE_REPOSITORY,
   SAMPLE_NOTIFICATIONS,
@@ -232,6 +230,8 @@ async function seedGrantsAndBudgets(researchers, financeOfficer) {
     researcherId: r1._id,
     status: Object.values(GRANT_STATUSES).includes(s.status) ? s.status : GRANT_STATUSES.DRAFT,
     submittedAt: s.status !== GRANT_STATUSES.DRAFT ? new Date() : null,
+    amountAwarded:
+      s.status === GRANT_STATUSES.ACTIVE || s.status === GRANT_STATUSES.APPROVED ? s.amountRequested : 0,
   }));
 
   const budgetCount = await Budget.countDocuments();
@@ -392,16 +392,6 @@ async function seedDepartments(director) {
   return inserted;
 }
 
-async function seedPolicies(director) {
-  return insertUniqueByTitle(ResearchPolicy, "title", SAMPLE_POLICIES, (s) => ({
-    type: s.type,
-    title: s.title,
-    description: `${s.title} — institutional research guidance for Jamhuriya University.`,
-    status: s.status,
-    createdBy: director._id,
-  }));
-}
-
 async function seedEthics(researchers) {
   const [r1, r2] = researchers;
   const count = await EthicsApplication.countDocuments();
@@ -558,13 +548,12 @@ async function run() {
   const grp = await seedCollaborationGroups(researchers);
   const th = await seedThesisGroups(coordinator, r1, director);
   const dept = await seedDepartments(director);
-  const pol = await seedPolicies(director);
   const eth = await seedEthics(researchers);
   const repo = await seedRepository(researchers);
   const notif = await seedNotifications(director, coordinator);
   const pay = await seedPayments(finance);
   console.log(
-    `     +${grp} collab groups, +${th} thesis, +${dept} departments, +${pol} policies, +${eth} ethics, +${repo} repository, +${notif} notifications, +${pay} payments`
+    `     +${grp} collab groups, +${th} thesis, +${dept} departments, +${eth} ethics, +${repo} repository, +${notif} notifications, +${pay} payments`
   );
 
   const summary = {
@@ -576,7 +565,6 @@ async function run() {
     collabGroups: await ResearchGroup.countDocuments({ kind: GROUP_KINDS.COLLABORATION }),
     thesisGroups: await ThesisGroup.countDocuments(),
     departments: await Department.countDocuments(),
-    policies: await ResearchPolicy.countDocuments(),
     ethics: await EthicsApplication.countDocuments(),
     repository: await RepositoryItem.countDocuments(),
   };

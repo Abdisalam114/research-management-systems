@@ -28,8 +28,8 @@ export function SystemModulesGrid({ role, metrics, overview, title = "System mod
   if (!items.length) return null;
 
   return (
-    <div style={{ marginTop: 12 }}>
-      <div style={{ fontWeight: 800, marginBottom: 10, fontSize: 15 }}>{title}</div>
+    <div style={{ marginTop: 0 }}>
+      <div className="dashboardSectionTitle">{title}</div>
       <div className="overviewGrid">
         {items.map((mod) => {
           const value = countForModule(mod.key, metrics, overview);
@@ -38,7 +38,7 @@ export function SystemModulesGrid({ role, metrics, overview, title = "System mod
               key={mod.key}
               to={mod.to}
               className="overviewTile"
-              style={{ textDecoration: "none", borderColor: "rgba(56,189,248,0.2)" }}
+              style={{ textDecoration: "none" }}
             >
               <div className="label">
                 {mod.icon} {mod.label}

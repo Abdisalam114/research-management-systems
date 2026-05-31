@@ -11,7 +11,7 @@ router.get(
   "/faculty-workflow",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("faculty_coordinator", "research_director"),
+  authorizeRoles("researcher", "faculty_coordinator", "research_director"),
   asyncHandler(publicationController.getFacultyWorkflow)
 );
 router.get("/:id", authenticateUser, requireActiveUser, asyncHandler(publicationController.getPublication));

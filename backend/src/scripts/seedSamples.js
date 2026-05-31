@@ -240,19 +240,6 @@ const SAMPLE_DEPARTMENTS = [
   { name: "Veterinary Medicine", code: "VET", faculty: "Veterinary & Agriculture Sciences" },
 ];
 
-const SAMPLE_POLICIES = [
-  { type: "policy", title: "Institutional Research Integrity Policy", status: "active" },
-  { type: "policy", title: "Data Management & Sharing Policy", status: "active" },
-  { type: "theme", title: "Digital Transformation in Higher Education", status: "active" },
-  { type: "theme", title: "Climate Resilience & Green Campus", status: "active" },
-  { type: "priority", title: "Community-Engaged Research Priority 2025", status: "active" },
-  { type: "priority", title: "Health Systems Strengthening", status: "active" },
-  { type: "program", title: "Faculty Seed Grant Program", status: "active" },
-  { type: "program", title: "Graduate Thesis Support Program", status: "active" },
-  { type: "policy", title: "Open Access Publication Policy", status: "draft" },
-  { type: "theme", title: "AI Ethics & Responsible Innovation", status: "draft" },
-];
-
 const SAMPLE_ETHICS = [
   "Community Health Survey in IDP Settlements",
   "Wearable Sensors for Maternal Heart Rate Monitoring",
@@ -313,7 +300,6 @@ module.exports = {
   SAMPLE_COLLAB_GROUPS,
   SAMPLE_THESIS,
   SAMPLE_DEPARTMENTS,
-  SAMPLE_POLICIES,
   SAMPLE_ETHICS,
   SAMPLE_REPOSITORY,
   SAMPLE_NOTIFICATIONS,

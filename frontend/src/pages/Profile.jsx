@@ -57,6 +57,7 @@ export function ProfilePage() {
         </div>
 
         <button
+          type="button"
           className="btn primary"
           disabled={busy}
           onClick={async () => {

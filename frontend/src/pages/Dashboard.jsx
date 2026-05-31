@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { DirectorDashboard } from "../components/DirectorDashboard";
 import { FinanceDashboard } from "../components/FinanceDashboard";
 import { CoordinatorDashboardPage } from "./CoordinatorDashboard";
+import { ActiveProjectsPanel } from "../components/ActiveProjectsPanel";
 import { SystemModulesGrid } from "../components/SystemModulesGrid";
 import * as analyticsApi from "../services/analyticsApi";
 import "./dashboard.css";
@@ -37,26 +38,38 @@ function RoleDashboard({ role, user }) {
   const hint = roleHints[role] || { title: role, focus: "" };
 
   return (
-    <>
-      <div>
-        <div className="card">
-          <div style={{ fontWeight: 800, fontSize: 18 }}>Welcome, {user?.fullName}</div>
-          <div className="muted" style={{ marginTop: 6 }}>
+    <div className="dashboardPage">
+      <header className="dashPageHeader">
+        <div className="dashWelcomeCard">
+          <h1 className="dashWelcomeTitle">Welcome, {user?.fullName}</h1>
+          <p className="dashWelcomeSub">
             {hint.title} — {hint.focus}
-          </div>
+          </p>
         </div>
+      </header>
 
-        {error ? <div className="card" style={{ marginTop: 12, borderColor: "rgba(239,68,68,0.5)" }}>{error}</div> : null}
+      {error ? <div className="card" style={{ borderColor: "rgba(239,68,68,0.5)" }}>{error}</div> : null}
 
-        {metrics ? (
-          <SystemModulesGrid role={role} metrics={metrics} title="Jamhuriya RMS — dhammaan qaybaha system-ka" />
-        ) : (
-          <div className="muted" style={{ marginTop: 12 }}>
-            Loading…
-          </div>
-        )}
+      {metrics ? (
+        <>
+          <section className="dashboardSection">
+            <SystemModulesGrid role={role} metrics={metrics} title="System modules" />
+          </section>
+          {metrics.activeProjects?.length || metrics.projects?.active ? (
+            <section className="dashboardSection">
+                <ActiveProjectsPanel
+                  projects={metrics.activeProjects || []}
+                  totalActive={metrics.projects?.active}
+                  title="My Active Projects"
+                />
+            </section>
+          ) : null}
+        </>
+      ) : (
+        <div className="dashboardLoading">Loading dashboard…</div>
+      )}
 
-        <div style={{ marginTop: 16, display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <div className="dashboardQuickLinks">
           <Link className="btn primary" to="/proposals">
             Proposals
           </Link>
@@ -74,8 +87,7 @@ function RoleDashboard({ role, user }) {
             </Link>
           ) : null}
         </div>
-      </div>
-    </>
+    </div>
   );
 }
 

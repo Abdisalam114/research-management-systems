@@ -27,8 +27,17 @@ async function assertEthicsReadyForProposalSubmit(proposal) {
     throw new Error("Ethics application is required for this proposal. Please complete the ethics form.");
   }
   if (!isEthicsFormComplete(ethics)) {
+    const parts = [];
+    if (!String(ethics.projectTitle || "").trim()) parts.push("project title");
+    if (!String(ethics.principal?.firstName || "").trim() || !String(ethics.principal?.lastName || "").trim()) {
+      parts.push("PI name");
+    }
+    if (!String(ethics.projectLevel || "").trim()) parts.push("project level");
+    if (!String(ethics.aimsObjectives || "").trim()) parts.push("aims & objectives");
+    if (!String(ethics.design || "").trim()) parts.push("design");
+    if (!String(ethics.applicantSignature?.name || "").trim()) parts.push("signature");
     throw new Error(
-      "Complete the ethics form (title, principal investigator, level, aims, design, and signature) before submitting."
+      `Ethics form is incomplete. Complete: ${parts.join(", ")}.`
     );
   }
   return ethics;

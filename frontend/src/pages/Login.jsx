@@ -43,6 +43,7 @@ export function LoginPage() {
           </div>
 
           <button
+            type="button"
             className="authBtn"
             disabled={busy}
             onClick={async () => {

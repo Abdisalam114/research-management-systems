@@ -19,4 +19,16 @@
   --rms-border: rgba(148, 197, 255, 0.10);
   --rms-shadow: 0 24px 80px rgba(2, 6, 23, 0.55);
   --rms-font: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+
+  /* Text & list selection — light blue */
+  --rms-selection-bg: rgba(56, 189, 248, 0.42);
+  --rms-selection-text: #f8fafc;
+  --rms-selection-bg-strong: rgba(14, 165, 233, 0.55);
+
+  /* Dropdown — yellow background (not white) */
+  --rms-dropdown-bg: #fef08a;
+  --rms-dropdown-bg-open: #fde047;
+  --rms-dropdown-text: #1c1917;
+  --rms-dropdown-selected-bg: #facc15;
+  --rms-dropdown-selected-text: #1c1917;
 }

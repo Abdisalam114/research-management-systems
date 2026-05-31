@@ -2,22 +2,33 @@ const express = require("express");
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 const repositoryController = require("../controllers/repositoryController");
+const { AppError } = require("../utils/AppError");
 const { authenticateUser, requireActiveUser } = require("../middleware/auth");
-const { upload } = require("../middleware/upload");
+const { repositoryUpload } = require("../middleware/repositoryUpload");
 
 const router = express.Router();
 
+const RESERVED_IDS = new Set(["oai", "upload", "export"]);
+
+function blockReservedRepoIds(req, res, next) {
+  if (RESERVED_IDS.has(req.params.id)) {
+    return next(new AppError("Not found", 404));
+  }
+  next();
+}
+
 router.get("/", authenticateUser, requireActiveUser, asyncHandler(repositoryController.listItems));
-router.get("/oai/export", asyncHandler(repositoryController.oaiExport));
-router.get("/:id", authenticateUser, requireActiveUser, asyncHandler(repositoryController.getItem));
+router.get("/export/csv", authenticateUser, requireActiveUser, asyncHandler(repositoryController.exportRepositoryCsv));
+router.get("/export/pdf", authenticateUser, requireActiveUser, asyncHandler(repositoryController.exportRepositoryPdf));
+router.get("/export/excel", authenticateUser, requireActiveUser, asyncHandler(repositoryController.exportRepositoryExcel));
+router.get("/:id", authenticateUser, requireActiveUser, blockReservedRepoIds, asyncHandler(repositoryController.getItem));
 
 router.post(
   "/upload",
   authenticateUser,
   requireActiveUser,
-  upload.single("file"),
+  repositoryUpload.single("file"),
   asyncHandler(repositoryController.uploadItem)
 );
 
 module.exports = { repositoryRoutes: router };
-

@@ -1,6 +1,28 @@
+const fs = require("fs");
+const path = require("path");
 const { Grant, GRANT_STATUSES } = require("../models/Grant");
 const { AppError } = require("../utils/AppError");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
+
+function agentLog(location, message, data, hypothesisId) {
+  // #region agent log
+  try {
+    fs.appendFileSync(
+      path.resolve(__dirname, "../../../debug-6113cc.log"),
+      `${JSON.stringify({
+        sessionId: "6113cc",
+        location,
+        message,
+        data,
+        hypothesisId,
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+}
 
 function sanitizeGrant(g) {
   return {
@@ -124,6 +146,12 @@ async function submitGrant(req, res) {
 async function directorDecision(req, res) {
   const { id } = req.params;
   const { decision, amountAwarded, complianceNotes } = req.body || {};
+  agentLog("grantController.js:directorDecision:entry", "director decision request", {
+    grantId: id,
+    decision,
+    amountAwarded,
+    amountAwardedType: typeof amountAwarded,
+  }, "C,D");
   if (![GRANT_STATUSES.APPROVED, GRANT_STATUSES.REJECTED].includes(decision)) {
     throw new AppError("Invalid decision", 400);
   }
@@ -135,13 +163,19 @@ async function directorDecision(req, res) {
   grant.status = decision;
   grant.decidedAt = new Date();
   if (decision === GRANT_STATUSES.APPROVED) {
-    if (typeof amountAwarded !== "number" || amountAwarded < 0) throw new AppError("amountAwarded required", 400);
-    grant.amountAwarded = amountAwarded;
+    const awarded = Number(amountAwarded);
+    if (!Number.isFinite(awarded) || awarded < 0) throw new AppError("amountAwarded required", 400);
+    grant.amountAwarded = awarded;
     grant.status = GRANT_STATUSES.ACTIVE;
   }
   if (complianceNotes !== undefined) grant.complianceNotes = String(complianceNotes);
 
   await grant.save();
+  agentLog("grantController.js:directorDecision:exit", "decision saved", {
+    grantId: id,
+    finalStatus: grant.status,
+    amountAwarded: grant.amountAwarded,
+  }, "A,C,D");
 
   try {
     await notifyUser(grant.researcherId, {

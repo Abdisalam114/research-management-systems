@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as thesisApi from "../services/thesisGroupApi";
 import * as userApi from "../services/userApi";
 import { PageHeader } from "../components/PageHeader";
+import { GroupsModuleNav } from "../components/GroupsModuleNav";
+import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 import { FACULTIES } from "../constants/faculties";
+import "./groups.css";
 
 const MANAGE_ROLES = ["faculty_coordinator", "research_director"];
 
@@ -31,7 +33,6 @@ const EMPTY_FORM = {
 const EMPTY_MEETING = { date: "", location: "", agenda: "", notes: "" };
 
 export function ThesisGroupsPage() {
-  const navigate = useNavigate();
   const { accessToken, user } = useAuth();
   const [groups, setGroups] = useState([]);
   const [researchers, setResearchers] = useState([]);
@@ -40,6 +41,7 @@ export function ThesisGroupsPage() {
   const [editingId, setEditingId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [meetingForm, setMeetingForm] = useState(EMPTY_MEETING);
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const canManage = MANAGE_ROLES.includes(user?.role);
 
@@ -67,12 +69,24 @@ export function ThesisGroupsPage() {
     const supervised = groups.filter((g) => g.supervisorId).length;
     const totalStudents = groups.reduce((acc, g) => acc + (g.students?.length || 0), 0);
     return [
-      { label: "Thesis groups", value: groups.length, accent: "#0ea5e9" },
-      { label: "With title", value: titled, accent: "#38bdf8" },
-      { label: "With supervisor", value: supervised, accent: "#1d4ed8" },
-      { label: "Total students", value: totalStudents, accent: "#7dd3fc" },
+      { label: "Thesis groups", value: groups.length, filterKey: "all", accent: "#0ea5e9" },
+      { label: "With title", value: titled, filterKey: "hasTitle", accent: "#38bdf8" },
+      { label: "With supervisor", value: supervised, filterKey: "hasSupervisor", accent: "#1d4ed8" },
+      { label: "Total students", value: totalStudents, filterKey: "hasStudents", accent: "#7dd3fc" },
     ];
   }, [groups]);
+
+  const filteredGroups = useMemo(
+    () =>
+      filterByStatKey(groups, statusFilter, {
+        customFilters: {
+          hasTitle: (g) => Boolean(g.title?.trim()),
+          hasSupervisor: (g) => Boolean(g.supervisorId),
+          hasStudents: (g) => (g.students?.length || 0) > 0,
+        },
+      }),
+    [groups, statusFilter]
+  );
 
   function resetForm() {
     setForm(EMPTY_FORM);
@@ -182,24 +196,29 @@ export function ThesisGroupsPage() {
   }
 
   return (
-    <div>
+    <div className="groupsPage">
+      <GroupsModuleNav />
+
       <PageHeader
         title="Thesis"
         subtitle="Thesis supervision: students, titles, supervisor assignment, faculty research area, and meeting logs (date, location, agenda)."
         stats={stats}
+        activeFilter={statusFilter}
+        onFilterChange={setStatusFilter}
         actions={
-          <>
-            {canManage ? (
-              <button type="button" className="btn primary" onClick={showForm ? resetForm : openCreate}>
-                {showForm ? "Close form" : "+ New thesis group"}
-              </button>
-            ) : null}
-            <button type="button" className="btn" onClick={() => navigate("/groups")}>
-              🤝 Groups overview
+          canManage ? (
+            <button type="button" className="btn primary" onClick={showForm ? resetForm : openCreate}>
+              {showForm ? "Close form" : "+ New thesis group"}
             </button>
-          </>
+          ) : null
         }
       />
+
+      {statusFilter !== "all" ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Showing: <strong>{statFilterLabel(stats, statusFilter)}</strong> ({filteredGroups.length})
+        </p>
+      ) : null}
       {loading ? <p className="muted">Loading thesis groups…</p> : null}
       {error ? (
         <div className="card" style={{ borderColor: "rgba(239,68,68,0.55)", marginBottom: 10 }}>{error}</div>
@@ -305,7 +324,7 @@ export function ThesisGroupsPage() {
       ) : null}
 
       <div style={{ display: "grid", gap: 10 }}>
-        {groups.map((g) => {
+        {filteredGroups.map((g) => {
           const open = expandedId === g.id;
           const supervisorIdValue = g.supervisorId?._id || g.supervisorId || null;
           const canLogMeeting =

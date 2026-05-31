@@ -5,12 +5,16 @@ import * as repositoryApi from "../services/repositoryApi";
 import { apiOrigin } from "../config/apiBase";
 import { PageHeader } from "../components/PageHeader";
 
+import { filterByStatKey, statFilterLabel, totalStatTile, typeStatTile } from "../utils/pageHeaderFilters";
+
 export function RepositoryPage() {
   const { accessToken } = useAuth();
   const [items, setItems] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ type: "dataset", title: "", description: "", access: "private", groupId: "" });
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [form, setForm] = useState({ title: "", description: "", access: "private", groupId: "" });
   const [file, setFile] = useState(null);
+  const [exporting, setExporting] = useState("");
 
   const load = useCallback(async () => {
     const res = await repositoryApi.listRepositoryItems(accessToken);
@@ -22,31 +26,61 @@ export function RepositoryPage() {
   const stats = useMemo(() => {
     const by = (s) => items.filter((i) => i.type === s).length;
     return [
-      { label: "Total items", value: items.length },
-      { label: "Datasets", value: by("dataset"), accent: "#38bdf8" },
-      { label: "Publications", value: by("publication"), accent: "#1d4ed8" },
-      { label: "Theses", value: by("thesis") },
-      { label: "Documents", value: by("document") },
+      totalStatTile("Total items", items.length),
+      typeStatTile("PDF", by("document"), "document", "#1d4ed8"),
+      typeStatTile("CSV / Excel", by("dataset"), "dataset", "#38bdf8"),
     ];
   }, [items]);
+
+  const filteredItems = useMemo(() => filterByStatKey(items, statusFilter), [items, statusFilter]);
+
+  async function handleExport(kind) {
+    try {
+      setExporting(kind);
+      setError("");
+      if (kind === "pdf") await repositoryApi.downloadRepositoryPdf(accessToken);
+      else if (kind === "excel") await repositoryApi.downloadRepositoryExcel(accessToken);
+      else await repositoryApi.downloadRepositoryCsv(accessToken);
+    } catch (e) {
+      setError(e?.response?.data?.message || e.message || "Export failed");
+    } finally {
+      setExporting("");
+    }
+  }
 
   return (
     <div>
       <PageHeader
         title="Research Repository"
-        subtitle="Datasets, publications, theses, and other research artifacts."
+        subtitle="PDF, CSV, and Excel files — upload and export your repository catalog."
         stats={stats}
+        activeFilter={statusFilter}
+        onFilterChange={setStatusFilter}
         actions={
           <>
             <button type="button" className="btn primary" onClick={() => setShowForm((v) => !v)}>
-              {showForm ? "Close upload" : "+ Upload item"}
+              {showForm ? "Close upload" : "+ Upload file"}
             </button>
-            <a className="btn" href={`${apiOrigin()}/api/repository/oai/export`} target="_blank" rel="noreferrer">
-              📤 OAI export
-            </a>
+            <div className="btnGroup" role="group" aria-label="Export formats">
+              <button type="button" className="btn" disabled={!!exporting} onClick={() => handleExport("pdf")}>
+                {exporting === "pdf" ? "Exporting…" : "📄 PDF"}
+              </button>
+              <button type="button" className="btn" disabled={!!exporting} onClick={() => handleExport("excel")}>
+                {exporting === "excel" ? "Exporting…" : "📊 Excel"}
+              </button>
+              <button type="button" className="btn" disabled={!!exporting} onClick={() => handleExport("csv")}>
+                {exporting === "csv" ? "Exporting…" : "📋 CSV"}
+              </button>
+            </div>
           </>
         }
       />
+
+      {statusFilter !== "all" ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Showing: <strong>{statFilterLabel(stats, statusFilter)}</strong> ({filteredItems.length})
+        </p>
+      ) : null}
       {loading ? <p className="muted">Loading repository…</p> : null}
       {error ? (
         <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>
@@ -55,80 +89,84 @@ export function RepositoryPage() {
       ) : null}
 
       {showForm ? (
-      <div className="card" style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800 }}>Upload Item</div>
-        <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-          <div className="row">
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800 }}>Upload file</div>
+          <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+            PDF, CSV, or Excel (.xlsx / .xls) only — other formats are not allowed.
+          </p>
+          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+            <div className="row">
+              <div className="field">
+                <label>Access</label>
+                <select value={form.access} onChange={(e) => setForm((f) => ({ ...f, access: e.target.value }))}>
+                  <option value="private">Private</option>
+                  <option value="institution">Institution</option>
+                  <option value="group">Group</option>
+                </select>
+              </div>
+            </div>
+            {form.access === "group" ? (
+              <div className="field">
+                <label>Group ID</label>
+                <input value={form.groupId} onChange={(e) => setForm((f) => ({ ...f, groupId: e.target.value }))} />
+              </div>
+            ) : null}
             <div className="field">
-              <label>Type</label>
-              <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
-                <option value="dataset">Dataset</option>
-                <option value="publication">Publication</option>
-                <option value="thesis">Thesis</option>
-                <option value="document">Document</option>
-              </select>
+              <label>Title</label>
+              <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
             </div>
             <div className="field">
-              <label>Access</label>
-              <select value={form.access} onChange={(e) => setForm((f) => ({ ...f, access: e.target.value }))}>
-                <option value="private">Private</option>
-                <option value="institution">Institution</option>
-                <option value="group">Group</option>
-              </select>
+              <label>Description</label>
+              <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             </div>
-          </div>
-          {form.access === "group" ? (
             <div className="field">
-              <label>Group ID</label>
-              <input value={form.groupId} onChange={(e) => setForm((f) => ({ ...f, groupId: e.target.value }))} />
+              <label>File (PDF / CSV / Excel)</label>
+              <input
+                type="file"
+                accept=".pdf,.csv,.xlsx,.xls,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+              />
             </div>
-          ) : null}
-          <div className="field">
-            <label>Title</label>
-            <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
-          </div>
-          <div className="field">
-            <label>Description</label>
-            <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
-          </div>
-          <div className="field">
-            <label>File</label>
-            <input type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
-          </div>
-          <button
-            className="btn primary"
-            onClick={async () => {
-              try {
-                setError("");
-                if (!file) throw new Error("Pick a file first");
-                const fd = new FormData();
-                fd.append("file", file);
-                fd.append("type", form.type);
-                fd.append("title", form.title);
-                fd.append("description", form.description);
-                fd.append("access", form.access);
-                if (form.access === "group") fd.append("groupId", form.groupId);
+            <div className="formActions">
+              <button
+                type="button"
+                className="btn primary"
+                onClick={async () => {
+                  try {
+                    setError("");
+                    if (!file) throw new Error("Pick a PDF, CSV, or Excel file");
+                    const ext = file.name.split(".").pop()?.toLowerCase();
+                    if (!["pdf", "csv", "xlsx", "xls"].includes(ext || "")) {
+                      throw new Error("Only PDF, CSV, and Excel files are allowed");
+                    }
+                    const fd = new FormData();
+                    fd.append("file", file);
+                    fd.append("title", form.title);
+                    fd.append("description", form.description);
+                    fd.append("access", form.access);
+                    if (form.access === "group") fd.append("groupId", form.groupId);
 
-                await repositoryApi.uploadRepositoryItem(accessToken, fd);
-                setForm({ type: "dataset", title: "", description: "", access: "private", groupId: "" });
-                setFile(null);
-                setShowForm(false);
-                await reload();
-              } catch (e) {
-                setError(e?.response?.data?.message || e.message || "Upload failed");
-              }
-            }}
-          >
-            Upload
-          </button>
+                    await repositoryApi.uploadRepositoryItem(accessToken, fd);
+                    setForm({ title: "", description: "", access: "private", groupId: "" });
+                    setFile(null);
+                    setShowForm(false);
+                    await reload();
+                  } catch (e) {
+                    setError(e?.response?.data?.message || e.message || "Upload failed");
+                  }
+                }}
+              >
+                Upload
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
       ) : null}
 
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800 }}>Items</div>
         <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-          {items.map((i) => (
+          {filteredItems.map((i) => (
             <div key={i.id} className="card">
               <div style={{ fontWeight: 800 }}>{i.title}</div>
               <div className="muted">
@@ -142,10 +180,11 @@ export function RepositoryPage() {
               </div>
             </div>
           ))}
-          {items.length === 0 ? <div className="muted">No repository items yet.</div> : null}
+          {filteredItems.length === 0 ? (
+            <div className="muted">{items.length === 0 ? "No repository items yet." : "No items match this filter."}</div>
+          ) : null}
         </div>
       </div>
     </div>
   );
 }
-

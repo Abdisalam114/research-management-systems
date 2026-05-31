@@ -21,12 +21,20 @@ export async function getProposalEthicsApplication(accessToken, proposalId) {
   return data;
 }
 
-export async function createProposal(accessToken, payload) {
-  const form = new FormData();
+function appendProposalFields(form, payload) {
   Object.entries(payload).forEach(([k, v]) => {
     if (v === undefined || v === null) return;
+    if (k === "ethics") {
+      form.append("ethics", JSON.stringify(v));
+      return;
+    }
     form.append(k, v);
   });
+}
+
+export async function createProposal(accessToken, payload) {
+  const form = new FormData();
+  appendProposalFields(form, payload);
 
   const { data } = await api.post("/api/proposals", form, {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -36,10 +44,7 @@ export async function createProposal(accessToken, payload) {
 
 export async function updateProposal(accessToken, id, payload) {
   const form = new FormData();
-  Object.entries(payload).forEach(([k, v]) => {
-    if (v === undefined || v === null) return;
-    form.append(k, v);
-  });
+  appendProposalFields(form, payload);
 
   const { data } = await api.put(`/api/proposals/${id}`, form, {
     headers: { Authorization: `Bearer ${accessToken}` },

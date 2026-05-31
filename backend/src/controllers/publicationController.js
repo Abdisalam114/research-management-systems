@@ -52,7 +52,7 @@ async function listPublications(req, res) {
 
 async function getFacultyWorkflow(req, res) {
   const { role, department } = req.user;
-  if (!["faculty_coordinator", "research_director"].includes(role)) {
+  if (!["faculty_coordinator", "research_director", "researcher"].includes(role)) {
     throw new AppError("Forbidden", 403);
   }
 
@@ -63,7 +63,9 @@ async function getFacultyWorkflow(req, res) {
     .sort({ updatedAt: -1 })
     .populate("researcherId", "fullName department");
 
-  if (role === "faculty_coordinator" && dept) {
+  if (role === "researcher") {
+    pubs = pubs.filter((p) => String(p.researcherId?._id || p.researcherId) === String(req.user.id));
+  } else if (role === "faculty_coordinator" && dept) {
     pubs = pubs.filter((p) => p.researcherId && p.researcherId.department === dept);
   }
 
@@ -73,8 +75,11 @@ async function getFacultyWorkflow(req, res) {
     byStage[s] = sanitized.filter((p) => p.workflowStage === s);
   });
 
+  const deptLabel =
+    role === "research_director" ? "All faculties" : role === "researcher" ? "My outputs" : dept || "Faculty";
+
   res.json({
-    department: role === "research_director" ? "All faculties" : dept || "Faculty",
+    department: deptLabel,
     generatedAt: new Date().toISOString(),
     counts: countByWorkflowStage(pubs),
     stages: STAGE_ORDER.map((id) => ({

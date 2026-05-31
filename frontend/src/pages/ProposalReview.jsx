@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import * as proposalApi from "../services/proposalApi";
 import * as ethicsApi from "../services/ethicsApi";
 import { ProposalEthicsReviewPanel } from "../components/ProposalEthicsReviewPanel";
+import { EthicsDirectorDecisionModal } from "../components/EthicsDirectorDecisionModal";
 import { apiOrigin } from "../config/apiBase";
 
 export function ProposalReviewPage() {
@@ -14,6 +15,7 @@ export function ProposalReviewPage() {
   const [comment, setComment] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [ethicsDecisionModal, setEthicsDecisionModal] = useState(null);
 
   const isCoordinator = user?.role === "faculty_coordinator";
   const isDirector = user?.role === "research_director";
@@ -58,40 +60,16 @@ export function ProposalReviewPage() {
     setSelected((prev) => prev || actions[0]?.id || "");
   }, [actions]);
 
-  async function approveEthics() {
+  async function confirmEthicsDecision(payload) {
     if (!ethics?.id) return;
-    const y = new Date().getFullYear();
-    const defaultAcademic = `${y}/${y + 1}`;
-    const academicYear = window.prompt("Academic year (certificate):", defaultAcademic) || defaultAcademic;
-    const year = window.prompt("Year (certificate):", String(y)) || String(y);
-    const serialNumber = window.prompt("Serial number (optional):") || undefined;
     setBusy(true);
     setError("");
     try {
-      await ethicsApi.directorDecision(accessToken, ethics.id, {
-        decision: "approve",
-        academicYear,
-        year,
-        serialNumber,
-      });
+      await ethicsApi.directorDecision(accessToken, ethics.id, payload);
+      setEthicsDecisionModal(null);
       await load();
     } catch (e) {
-      setError(e?.response?.data?.message || "Ethics approval failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function rejectEthics() {
-    if (!ethics?.id) return;
-    const rejectionReason = window.prompt("Rejection reason for ethics?") || "Rejected";
-    setBusy(true);
-    setError("");
-    try {
-      await ethicsApi.directorDecision(accessToken, ethics.id, { decision: "reject", rejectionReason });
-      await load();
-    } catch (e) {
-      setError(e?.response?.data?.message || "Ethics rejection failed");
+      setError(e?.response?.data?.message || "Ethics decision failed");
     } finally {
       setBusy(false);
     }
@@ -152,8 +130,8 @@ export function ProposalReviewPage() {
         <ProposalEthicsReviewPanel
           ethics={ethics}
           isDirector={isDirector}
-          onApproveEthics={approveEthics}
-          onRejectEthics={rejectEthics}
+          onApproveEthics={() => setEthicsDecisionModal("approve")}
+          onRejectEthics={() => setEthicsDecisionModal("reject")}
           busy={busy}
         />
       ) : null}
@@ -186,6 +164,7 @@ export function ProposalReviewPage() {
           </div>
 
           <button
+            type="button"
             className="btn primary"
             disabled={
               busy ||
@@ -220,6 +199,15 @@ export function ProposalReviewPage() {
           </button>
         </div>
       ) : null}
+
+      <EthicsDirectorDecisionModal
+        open={Boolean(ethicsDecisionModal)}
+        mode={ethicsDecisionModal}
+        applicationTitle={ethics?.projectTitle || proposal?.title}
+        busy={busy}
+        onClose={() => !busy && setEthicsDecisionModal(null)}
+        onConfirm={confirmEthicsDecision}
+      />
     </div>
   );
 }

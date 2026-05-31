@@ -1,8 +1,17 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as notificationApi from "../services/notificationApi";
+
+function formatWhen(at) {
+  if (!at) return "";
+  try {
+    return new Date(at).toLocaleString();
+  } catch {
+    return "";
+  }
+}
 
 export function NotificationsPage() {
   const { accessToken } = useAuth();
@@ -15,9 +24,20 @@ export function NotificationsPage() {
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      reload().catch(() => {});
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [reload]);
+
   return (
-    <div>
-      <h2 style={{ marginTop: 0 }}>Notifications</h2>
+    <div className="dashboardPage">
+      <header className="dashPageHeader">
+        <h1 className="dashPageTitle">Notifications</h1>
+        <p className="dashPageSub">Your personal notifications — messages, grants, ethics, and more.</p>
+      </header>
+
       {loading ? <p className="muted">Loading notifications…</p> : null}
       {error ? (
         <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>
@@ -28,15 +48,27 @@ export function NotificationsPage() {
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ display: "grid", gap: 10 }}>
           {notifications.map((n) => (
-            <div key={n.id} className="card" style={{ opacity: n.readAt ? 0.7 : 1 }}>
-              <div style={{ fontWeight: 800 }}>{n.title}</div>
+            <div
+              key={n.id}
+              className="card"
+              style={{
+                opacity: n.readAt ? 0.7 : 1,
+                borderColor: n.readAt ? undefined : "rgba(14, 165, 233, 0.35)",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                <div style={{ fontWeight: 800 }}>{n.title}</div>
+                <span className="muted" style={{ fontSize: 11, whiteSpace: "nowrap" }}>
+                  {formatWhen(n.createdAt)}
+                </span>
+              </div>
               <div className="muted" style={{ marginTop: 4 }}>
                 {n.body}
               </div>
               <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
                 {n.link ? (
                   <Link className="btn" to={n.link}>
-                    Open
+                    {n.type === "message" ? "Open chat" : "Open"}
                   </Link>
                 ) : null}
                 {!n.readAt ? (

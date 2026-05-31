@@ -40,6 +40,7 @@ export function ProjectProgressUpdatePage() {
         </div>
 
         <button
+          type="button"
           className="btn primary"
           disabled={busy || !note.trim()}
           onClick={async () => {

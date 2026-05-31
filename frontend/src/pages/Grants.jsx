@@ -1,8 +1,28 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as grantApi from "../services/grantApi";
 import { PageHeader } from "../components/PageHeader";
+import { GrantAwardModal } from "../components/GrantAwardModal";
+import { filterByStatKey, isAwardedItem, statFilterLabel } from "../utils/pageHeaderFilters";
+
+function logGrantDebug(location, message, data, hypothesisId) {
+  // #region agent log
+  fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
+    body: JSON.stringify({
+      sessionId: "6113cc",
+      location,
+      message,
+      data,
+      hypothesisId,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+}
 
 export function GrantsPage() {
   const { accessToken, user } = useAuth();
@@ -10,27 +30,92 @@ export function GrantsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: "", fundingSource: "", donorRef: "", amountRequested: 0, currency: "USD" });
   const [donorFilter, setDonorFilter] = useState(false);
+  const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
+  const [awardModalGrant, setAwardModalGrant] = useState(null);
+  const [awardBusy, setAwardBusy] = useState(false);
 
   const canCreate = user?.role === "researcher";
   const isDirector = user?.role === "research_director";
 
   const load = useCallback(async () => {
     const res = await grantApi.listGrants(accessToken);
-    setGrants(res.grants || []);
+    const list = res.grants || [];
+    setGrants(list);
+    const byStatus = list.reduce((acc, g) => {
+      acc[g.status] = (acc[g.status] || 0) + 1;
+      return acc;
+    }, {});
+    const totalAwarded = list.reduce((acc, g) => acc + Number(g.amountAwarded || 0), 0);
+    logGrantDebug(
+      "Grants.jsx:load",
+      "grants loaded",
+      {
+        count: list.length,
+        byStatus,
+        totalAwarded,
+        awardedCount: list.filter(isAwardedItem).length,
+        approvedFilterCount: list.filter((g) => g.status === "approved").length,
+        activeCount: list.filter((g) => g.status === "active").length,
+      },
+      "A,B,E"
+    );
   }, [accessToken]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
   const stats = useMemo(() => {
     const by = (s) => grants.filter((g) => g.status === s).length;
+    const awardedCount = grants.filter(isAwardedItem).length;
     const totalAwarded = grants.reduce((acc, g) => acc + Number(g.amountAwarded || 0), 0);
     return [
-      { label: "Total", value: grants.length },
-      { label: "Submitted", value: by("submitted") },
-      { label: "Approved", value: by("approved"), accent: "#1d4ed8" },
-      { label: "Awarded $", value: totalAwarded.toLocaleString(), accent: "#38bdf8" },
+      { label: "Total", value: grants.length, filterKey: "all" },
+      { label: "Draft", value: by("draft"), filterKey: "draft" },
+      { label: "Submitted", value: by("submitted"), filterKey: "submitted" },
+      { label: "Awarded", value: awardedCount, filterKey: "awarded", accent: "#1d4ed8" },
+      { label: "Active", value: by("active"), filterKey: "active", accent: "#6366f1" },
+      { label: "Awarded $", value: totalAwarded.toLocaleString(), filterKey: "awarded", accent: "#38bdf8" },
     ];
   }, [grants]);
+
+  const filteredGrants = useMemo(() => {
+    let list = filterByStatKey(grants, statusFilter);
+    if (donorFilter) list = list.filter((g) => g.donorRef && g.donorRef.trim());
+    return list;
+  }, [grants, statusFilter, donorFilter]);
+
+  useEffect(() => {
+    if (loading) return;
+    logGrantDebug(
+      "Grants.jsx:filter",
+      "filter applied",
+      { statusFilter, filteredCount: filteredGrants.length, totalCount: grants.length },
+      "A,B"
+    );
+  }, [statusFilter, filteredGrants.length, grants.length, loading]);
+
+  async function handleAwardConfirm(amountAwarded) {
+    if (!awardModalGrant) return;
+    logGrantDebug(
+      "Grants.jsx:awardConfirm",
+      "approve grant",
+      { grantId: awardModalGrant.id, amountAwarded },
+      "C"
+    );
+    try {
+      setAwardBusy(true);
+      setError("");
+      await grantApi.directorDecision(accessToken, awardModalGrant.id, {
+        decision: "approved",
+        amountAwarded,
+      });
+      setAwardModalGrant(null);
+      await reload();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to approve");
+    } finally {
+      setAwardBusy(false);
+    }
+  }
 
   return (
     <div>
@@ -38,6 +123,8 @@ export function GrantsPage() {
         title="Grants & Funding"
         subtitle="Track grant submissions, donor funding, and director approval."
         stats={stats}
+        activeFilter={statusFilter}
+        onFilterChange={setStatusFilter}
         actions={
           <>
             {canCreate ? (
@@ -54,6 +141,11 @@ export function GrantsPage() {
           </>
         }
       />
+      {statusFilter !== "all" ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Showing: <strong>{statFilterLabel(stats, statusFilter)}</strong> ({filteredGrants.length})
+        </p>
+      ) : null}
       {error ? (
         <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>
           {error}
@@ -100,6 +192,7 @@ export function GrantsPage() {
               </div>
             </div>
             <button
+              type="button"
               className="btn primary"
               onClick={async () => {
                 try {
@@ -122,21 +215,21 @@ export function GrantsPage() {
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800 }}>Grants</div>
         <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-          {grants
-            .filter((g) => !donorFilter || (g.donorRef && g.donorRef.trim()))
-            .map((g) => (
+          {filteredGrants.map((g) => (
             <div key={g.id} className="card">
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
                 <div>
                   <div style={{ fontWeight: 800 }}>{g.title}</div>
                   <div className="muted">
                     {g.fundingSource} • {g.status} • {g.amountRequested} {g.currency}
+                    {Number(g.amountAwarded || 0) > 0 ? ` • awarded: ${g.amountAwarded} ${g.currency}` : ""}
                     {g.donorRef ? ` • donor: ${g.donorRef}` : ""}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   {canCreate && g.status === "draft" ? (
                     <button
+                      type="button"
                       className="btn"
                       onClick={async () => {
                         try {
@@ -153,26 +246,11 @@ export function GrantsPage() {
                   ) : null}
                   {isDirector && g.status === "submitted" ? (
                     <>
-                      <button
-                        className="btn primary"
-                        onClick={async () => {
-                          const amountAwarded = Number(prompt("Amount awarded?", String(g.amountRequested || 0)));
-                          if (!Number.isFinite(amountAwarded)) return;
-                          try {
-                            setError("");
-                            await grantApi.directorDecision(accessToken, g.id, {
-                              decision: "approved",
-                              amountAwarded,
-                            });
-                            await reload();
-                          } catch (e) {
-                            setError(e?.response?.data?.message || "Failed to approve");
-                          }
-                        }}
-                      >
+                      <button type="button" className="btn primary" onClick={() => setAwardModalGrant(g)}>
                         Approve
                       </button>
                       <button
+                        type="button"
                         className="btn"
                         onClick={async () => {
                           try {
@@ -192,12 +270,21 @@ export function GrantsPage() {
               </div>
             </div>
           ))}
-          {grants.length === 0 ? <div className="muted">No grants yet.</div> : null}
+          {filteredGrants.length === 0 ? (
+            <div className="muted">{grants.length === 0 ? "No grants yet." : "No grants match this filter."}</div>
+          ) : null}
         </div>
       </div>
+
+      <GrantAwardModal
+        open={Boolean(awardModalGrant)}
+        grant={awardModalGrant}
+        busy={awardBusy}
+        onClose={() => {
+          if (!awardBusy) setAwardModalGrant(null);
+        }}
+        onConfirm={handleAwardConfirm}
+      />
     </div>
   );
 }
-
-
-

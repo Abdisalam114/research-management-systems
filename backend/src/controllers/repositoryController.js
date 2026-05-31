@@ -1,7 +1,35 @@
+const PDFDocument = require("pdfkit");
 const { RepositoryItem, REPOSITORY_ACCESS } = require("../models/RepositoryItem");
 const { ResearchGroup } = require("../models/ResearchGroup");
-const { Publication, PUBLICATION_STATUSES } = require("../models/Publication");
 const { AppError } = require("../utils/AppError");
+const {
+  fetchItemsForUser,
+  itemsToExportRows,
+  rowsToCsv,
+  rowsToExcelXml,
+  inferTypeFromFilename,
+} = require("../services/repositoryExportService");
+const {
+  OAI_DC_PREFIX,
+  OAI_REPOSITORY_NAME,
+  OAI_ADMIN_EMAIL,
+  getPublicBaseUrl,
+  getOaiEndpoint,
+  wrapOaiResponse,
+  oaiError,
+  encodeResumptionToken,
+  decodeResumptionToken,
+  recordXml,
+  paginateRecords,
+} = require("../utils/oaiPmh");
+const {
+  SET_REPO,
+  SET_PUBLICATIONS,
+  loadAllOaiRecords,
+  filterRecords,
+  findRecordByIdentifier,
+  earliestDatestamp,
+} = require("../services/oaiRecordService");
 
 function xmlEscape(value) {
   if (value == null) return "";
@@ -32,38 +60,16 @@ function sanitizeItem(i) {
 }
 
 async function listItems(req, res) {
-  const { role } = req.user;
-
-  if (["research_director", "faculty_coordinator"].includes(role)) {
-    const items = await RepositoryItem.find({}).sort({ createdAt: -1 });
-    return res.json({ items: items.map(sanitizeItem) });
-  }
-
-  if (role === "finance_officer") {
-    // Finance can see institution-wide items only (safest default)
-    const items = await RepositoryItem.find({ access: REPOSITORY_ACCESS.INSTITUTION }).sort({ createdAt: -1 });
-    return res.json({ items: items.map(sanitizeItem) });
-  }
-
-  // Researcher: can see own uploads + institution + groups they belong to
-  const groups = await ResearchGroup.find({ "members.userId": req.user.id }).select("_id");
-  const groupIds = groups.map((g) => g._id);
-
-  const items = await RepositoryItem.find({
-    $or: [
-      { uploadedBy: req.user.id },
-      { access: REPOSITORY_ACCESS.INSTITUTION },
-      { access: REPOSITORY_ACCESS.GROUP, groupId: { $in: groupIds } },
-    ],
-  }).sort({ createdAt: -1 });
-
+  const items = await fetchItemsForUser(req);
   return res.json({ items: items.map(sanitizeItem) });
 }
 
 async function uploadItem(req, res) {
-  const { type, title, description, tags, access, groupId, projectId } = req.body || {};
-  if (!type || !title) throw new AppError("type and title are required", 400);
+  const { title, description, tags, access, groupId, projectId } = req.body || {};
+  if (!title) throw new AppError("title is required", 400);
   if (!req.file) throw new AppError("file is required", 400);
+
+  const type = inferTypeFromFilename(req.file.originalname);
 
   const normalizedAccess = access && Object.values(REPOSITORY_ACCESS).includes(access) ? access : REPOSITORY_ACCESS.PRIVATE;
   const normalizedGroupId = normalizedAccess === REPOSITORY_ACCESS.GROUP ? groupId || null : null;
@@ -113,83 +119,300 @@ async function getItem(req, res) {
   throw new AppError("Forbidden", 403);
 }
 
-async function oaiExport(req, res) {
-  const baseUrl =
-    process.env.REPOSITORY_PUBLIC_URL ||
-    `${req.protocol}://${req.get("host")}`;
-
-  const [pubItems, validatedPublications] = await Promise.all([
-    RepositoryItem.find({ access: REPOSITORY_ACCESS.INSTITUTION }).sort({ createdAt: -1 }).limit(500),
-    Publication.find({ status: PUBLICATION_STATUSES.VALIDATED }).sort({ createdAt: -1 }).limit(500),
-  ]);
-
-  const records = [];
-
-  pubItems.forEach((it) => {
-    records.push({
-      identifier: `oai:just-rms:repo:${it._id}`,
-      datestamp: it.updatedAt || it.createdAt,
-      title: it.title,
-      type: it.type,
-      description: it.description,
-      tags: it.tags || [],
-      url: it.filePath ? `${baseUrl}${it.filePath}` : "",
-    });
-  });
-
-  validatedPublications.forEach((p) => {
-    records.push({
-      identifier: `oai:just-rms:publication:${p._id}`,
-      datestamp: p.updatedAt || p.createdAt,
-      title: p.title,
-      type: p.type,
-      description: p.communityImpact || p.venue || "",
-      tags: p.authors || [],
-      url: p.url || (p.doi ? `https://doi.org/${p.doi}` : ""),
-    });
-  });
-
-  const recordsXml = records
-    .map((r) => {
-      const subjects = (r.tags || [])
-        .map((t) => `<dc:subject>${xmlEscape(t)}</dc:subject>`)
-        .join("");
-      return `<record>
-    <header>
-      <identifier>${xmlEscape(r.identifier)}</identifier>
-      <datestamp>${new Date(r.datestamp).toISOString()}</datestamp>
-    </header>
-    <metadata>
-      <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/"
-                 xmlns:dc="http://purl.org/dc/elements/1.1/"
-                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/oai_dc/ http://www.openarchives.org/OAI/2.0/oai_dc.xsd">
-        <dc:title>${xmlEscape(r.title)}</dc:title>
-        <dc:type>${xmlEscape(r.type)}</dc:type>
-        <dc:description>${xmlEscape(r.description || "")}</dc:description>
-        ${subjects}
-        ${r.url ? `<dc:identifier>${xmlEscape(r.url)}</dc:identifier>` : ""}
-        <dc:publisher>Jamhuriya University RMS</dc:publisher>
-      </oai_dc:dc>
-    </metadata>
-  </record>`;
-    })
-    .join("\n");
-
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
-<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/ http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd">
-  <responseDate>${new Date().toISOString()}</responseDate>
-  <request verb="ListRecords" metadataPrefix="oai_dc">${xmlEscape(baseUrl)}</request>
-  <ListRecords>
-${recordsXml}
-  </ListRecords>
-</OAI-PMH>`;
-
-  res.setHeader("Content-Type", "application/xml; charset=utf-8");
-  res.send(xml);
+async function buildExportRows(req) {
+  const items = await fetchItemsForUser(req);
+  const baseUrl = getPublicBaseUrl(req);
+  return itemsToExportRows(items, baseUrl);
 }
 
-module.exports = { listItems, uploadItem, getItem, oaiExport };
+function logRepositoryExport(format, rowCount) {
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(__dirname, "../../../debug-6113cc.log"),
+      `${JSON.stringify({
+        sessionId: "6113cc",
+        location: "repositoryController.js:export",
+        message: "repository export",
+        data: { format, rowCount },
+        timestamp: Date.now(),
+        hypothesisId: "REPOEXP",
+        runId: "repo-formats",
+      })}\n`
+    );
+  } catch (_) {}
+  // #endregion
+}
+
+async function exportRepositoryCsv(req, res) {
+  const rows = await buildExportRows(req);
+  logRepositoryExport("csv", rows.length);
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader("Content-Disposition", 'attachment; filename="JUST-RMS-Repository.csv"');
+  res.send(rowsToCsv(rows));
+}
+
+async function exportRepositoryExcel(req, res) {
+  const rows = await buildExportRows(req);
+  logRepositoryExport("xlsx", rows.length);
+  res.setHeader("Content-Type", "application/vnd.ms-excel; charset=utf-8");
+  res.setHeader("Content-Disposition", 'attachment; filename="JUST-RMS-Repository.xls"');
+  res.send(rowsToExcelXml(rows));
+}
+
+async function exportRepositoryPdf(req, res) {
+  const rows = await buildExportRows(req);
+  logRepositoryExport("pdf", rows.length);
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", 'attachment; filename="JUST-RMS-Repository.pdf"');
+
+  const doc = new PDFDocument({ size: "A4", margin: 48, layout: "landscape" });
+  doc.pipe(res);
+  doc.fontSize(18).text("Jamhuriya University — Research Repository", { align: "center" });
+  doc.moveDown(0.4);
+  doc.fontSize(10).fillColor("#444").text(`Generated: ${new Date().toLocaleString()} • ${rows.length} items`, {
+    align: "center",
+  });
+  doc.fillColor("#000");
+  doc.moveDown(1);
+
+  doc.fontSize(9);
+  rows.forEach((row, idx) => {
+    if (doc.y > doc.page.height - 60) doc.addPage();
+    doc.font("Helvetica-Bold").text(`${idx + 1}. ${row.title}`);
+    doc.font("Helvetica").text(`${row.type} • ${row.access} • ${row.created.slice(0, 10)}`);
+    if (row.description) doc.text(row.description, { width: doc.page.width - 96 });
+    if (row.file) doc.fillColor("#0369a1").text(row.file, { link: row.file, underline: true });
+    doc.fillColor("#000");
+    doc.moveDown(0.6);
+  });
+
+  if (!rows.length) doc.text("No repository items to export.");
+  doc.end();
+}
+
+async function oaiPmhh(req, res, overrides = {}) {
+  const q = { ...req.query, ...overrides };
+  const verb = String(q.verb || "").trim();
+  const metadataPrefix = q.metadataPrefix ? String(q.metadataPrefix) : "";
+  const set = q.set ? String(q.set) : "";
+  const from = q.from ? String(q.from) : "";
+  const until = q.until ? String(q.until) : "";
+  const identifier = q.identifier ? String(q.identifier) : "";
+  const resumptionToken = q.resumptionToken ? String(q.resumptionToken) : "";
+
+  res.setHeader("Content-Type", "application/xml; charset=utf-8");
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(__dirname, "../../../debug-6113cc.log"),
+      `${JSON.stringify({
+        sessionId: "6113cc",
+        location: "repositoryController.js:oaiPmhh:entry",
+        message: "OAI request",
+        data: {
+          verb: verb || "(missing)",
+          host: req.get("host"),
+          forwardedHost: req.get("x-forwarded-host"),
+          oaiEndpoint: getOaiEndpoint(req),
+        },
+        timestamp: Date.now(),
+        hypothesisId: "OAI5173",
+        runId: "oai-5173-fix",
+      })}\n`
+    );
+  } catch (_) {}
+  // #endregion
+
+  if (!verb) {
+    return res.status(400).send(oaiError(req, "badVerb", "Missing verb argument", {}));
+  }
+
+  const fileBaseUrl = getPublicBaseUrl(req);
+
+  try {
+    if (verb === "Identify") {
+      const body = `<Identify>
+  <repositoryName>${xmlEscape(OAI_REPOSITORY_NAME)}</repositoryName>
+  <baseURL>${xmlEscape(getOaiEndpoint(req))}</baseURL>
+  <protocolVersion>2.0</protocolVersion>
+  <adminEmail>${xmlEscape(OAI_ADMIN_EMAIL)}</adminEmail>
+  <earliestDatestamp>${await earliestDatestamp()}</earliestDatestamp>
+  <deletedRecord>no</deletedRecord>
+  <granularity>YYYY-MM-DDThh:mm:ssZ</granularity>
+</Identify>`;
+      // #region agent log
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        fs.appendFileSync(
+          path.join(__dirname, "../../../debug-6113cc.log"),
+          `${JSON.stringify({
+            sessionId: "6113cc",
+            location: "repositoryController.js:oaiPmhh",
+            message: "OAI Identify",
+            data: { verb, endpoint: getOaiEndpoint(req) },
+            timestamp: Date.now(),
+            hypothesisId: "OAI1",
+            runId: "oai-fix",
+          })}\n`
+        );
+      } catch (_) {}
+      // #endregion
+      return res.send(wrapOaiResponse(req, body, { verb: "Identify" }));
+    }
+
+    if (verb === "ListMetadataFormats") {
+      const body = `<ListMetadataFormats>
+  <metadataFormat>
+    <metadataPrefix>${OAI_DC_PREFIX}</metadataPrefix>
+    <schema>http://www.openarchives.org/OAI/2.0/oai_dc.xsd</schema>
+    <metadataNamespace>http://www.openarchives.org/OAI/2.0/oai_dc/</metadataNamespace>
+  </metadataFormat>
+</ListMetadataFormats>`;
+      return res.send(wrapOaiResponse(req, body, { verb: "ListMetadataFormats" }));
+    }
+
+    if (verb === "ListSets") {
+      const body = `<ListSets>
+  <set>
+    <setSpec>${SET_REPO}</setSpec>
+    <setName>Institutional repository deposits</setName>
+  </set>
+  <set>
+    <setSpec>${SET_PUBLICATIONS}</setSpec>
+    <setName>Validated research publications</setName>
+  </set>
+</ListSets>`;
+      return res.send(wrapOaiResponse(req, body, { verb: "ListSets" }));
+    }
+
+    if (verb === "GetRecord") {
+      if (!identifier) {
+        return res.status(400).send(oaiError(req, "badArgument", "Missing identifier", { verb, metadataPrefix }));
+      }
+      if (metadataPrefix !== OAI_DC_PREFIX) {
+        return res
+          .status(400)
+          .send(oaiError(req, "cannotDisseminateFormat", "Unsupported metadataPrefix", { verb, metadataPrefix, identifier }));
+      }
+      const record = await findRecordByIdentifier(identifier);
+      if (!record) {
+        return res.status(404).send(oaiError(req, "idDoesNotExist", "Unknown identifier", { verb, metadataPrefix, identifier }));
+      }
+      const body = `<GetRecord>${recordXml(record, fileBaseUrl, true)}</GetRecord>`;
+      return res.send(wrapOaiResponse(req, body, { verb: "GetRecord", metadataPrefix, identifier }));
+    }
+
+    if (verb === "ListRecords" || verb === "ListIdentifiers") {
+      if (metadataPrefix !== OAI_DC_PREFIX) {
+        return res
+          .status(400)
+          .send(oaiError(req, "cannotDisseminateFormat", "Unsupported metadataPrefix", { verb, metadataPrefix }));
+      }
+
+      let offset = 0;
+      let activeSet = set;
+      let activeFrom = from;
+      let activeUntil = until;
+
+      if (resumptionToken) {
+        const decoded = decodeResumptionToken(resumptionToken);
+        if (!decoded || decoded.verb !== verb || decoded.metadataPrefix !== OAI_DC_PREFIX) {
+          return res.status(400).send(oaiError(req, "badResumptionToken", "Invalid resumptionToken", { verb, resumptionToken }));
+        }
+        offset = decoded.offset || 0;
+        activeSet = decoded.set || "";
+        activeFrom = decoded.from || "";
+        activeUntil = decoded.until || "";
+      } else if (set && set !== SET_REPO && set !== SET_PUBLICATIONS) {
+        return res.status(400).send(oaiError(req, "noRecordsMatch", "Unknown set", { verb, metadataPrefix, set }));
+      }
+
+      const allRecords = filterRecords(await loadAllOaiRecords(), {
+        set: activeSet,
+        from: activeFrom,
+        until: activeUntil,
+      });
+
+      const { slice, resumptionToken: nextOffset, completeListSize } = paginateRecords(allRecords, offset);
+      const includeMetadata = verb === "ListRecords";
+
+      if (!slice.length && !resumptionToken) {
+        return res
+          .status(404)
+          .send(oaiError(req, "noRecordsMatch", "No records match request", { verb, metadataPrefix, set: activeSet }));
+      }
+
+      const recordsBody = slice.map((r) => recordXml(r, fileBaseUrl, includeMetadata)).join("\n");
+      let listBody = `<${verb}>\n${recordsBody}`;
+      if (nextOffset != null) {
+        listBody += `\n  <resumptionToken completeListSize="${completeListSize}">${encodeResumptionToken({
+          verb,
+          metadataPrefix: OAI_DC_PREFIX,
+          set: activeSet,
+          from: activeFrom,
+          until: activeUntil,
+          offset: nextOffset,
+        })}</resumptionToken>`;
+      }
+      listBody += `\n</${verb}>`;
+
+      // #region agent log
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        fs.appendFileSync(
+          path.join(__dirname, "../../../debug-6113cc.log"),
+          `${JSON.stringify({
+            sessionId: "6113cc",
+            location: "repositoryController.js:oaiPmhh",
+            message: "OAI list response",
+            data: { verb, recordCount: slice.length, total: completeListSize, set: activeSet || "all" },
+            timestamp: Date.now(),
+            hypothesisId: "OAI2",
+            runId: "oai-fix",
+          })}\n`
+        );
+      } catch (_) {}
+      // #endregion
+
+      return res.send(
+        wrapOaiResponse(req, listBody, {
+          verb,
+          metadataPrefix,
+          ...(activeSet ? { set: activeSet } : {}),
+          ...(activeFrom ? { from: activeFrom } : {}),
+          ...(activeUntil ? { until: activeUntil } : {}),
+          ...(resumptionToken ? { resumptionToken } : {}),
+        })
+      );
+    }
+
+    return res.status(400).send(oaiError(req, "badVerb", `Unsupported verb: ${verb}`, { verb }));
+  } catch (err) {
+    return res.status(500).send(oaiError(req, "badArgument", err.message || "OAI handler failed", { verb }));
+  }
+}
+
+/** Backward-compatible alias: full ListRecords export */
+async function oaiExport(req, res) {
+  return oaiPmhh(req, res, { verb: "ListRecords", metadataPrefix: OAI_DC_PREFIX });
+}
+
+module.exports = {
+  listItems,
+  uploadItem,
+  getItem,
+  exportRepositoryCsv,
+  exportRepositoryExcel,
+  exportRepositoryPdf,
+  oaiPmhh,
+  oaiExport,
+};
 

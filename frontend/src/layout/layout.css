@@ -1,12 +1,24 @@
 @import "../styles/design-tokens.css";
 
+::selection {
+  background: var(--rms-selection-bg);
+  color: var(--rms-selection-text);
+}
+
+::-moz-selection {
+  background: var(--rms-selection-bg);
+  color: var(--rms-selection-text);
+}
+
 .appShell {
   min-height: 100vh;
+  height: 100vh;
   display: grid;
   grid-template-columns: 220px 1fr;
   background: var(--rms-bg-primary);
   color: var(--rms-text-primary);
   font-family: var(--rms-font);
+  overflow: hidden;
 }
 
 .appSidebar {
@@ -17,12 +29,16 @@
   gap: 12px;
   background: var(--rms-bg-secondary);
   align-items: stretch;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .appContent {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .topBar {
@@ -82,7 +98,9 @@
 .topBarActions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
 }
 
 .topBarIconBtn {
@@ -159,6 +177,9 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
 }
 .navItem {
   padding: 10px 12px;
@@ -222,7 +243,7 @@
 }
 
 .appMain {
-  padding: 20px 24px;
+  padding: 28px 36px 40px;
   background: var(--rms-bg-primary);
   flex: 1;
   max-width: 1600px;
@@ -233,7 +254,7 @@
 
 @media (max-width: 1024px) {
   .appMain {
-    padding: 16px;
+    padding: 20px 18px 28px;
   }
 }
 
@@ -272,12 +293,39 @@
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.06);
   color: inherit;
-  padding: 10px 12px;
+  margin: 0;
+  padding: 10px 16px;
   border-radius: 12px;
   cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  min-height: 40px;
+  box-sizing: border-box;
+  pointer-events: auto;
+  touch-action: manipulation;
+  position: relative;
+  z-index: 1;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+a.btn {
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
 }
 .btn:hover {
   background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 .btn.primary {
   background: rgba(14, 165, 233, 0.15);
@@ -313,14 +361,45 @@
 .field select {
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(0, 0, 0, 0.2);
-  color: inherit;
+  border: 1px solid rgba(250, 204, 21, 0.45);
   outline: none;
 }
+
+.field input {
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+}
+
+.field select {
+  background: var(--rms-dropdown-bg);
+  color: var(--rms-dropdown-text);
+  color-scheme: light;
+}
+
+select {
+  background: var(--rms-dropdown-bg);
+  color: var(--rms-dropdown-text);
+  color-scheme: light;
+}
+
+select option {
+  background: var(--rms-dropdown-bg-open);
+  color: var(--rms-dropdown-text);
+}
+
+.field select option:checked,
+.field select option:hover,
+select option:checked,
+select option:hover {
+  background: var(--rms-dropdown-selected-bg);
+  color: var(--rms-dropdown-selected-text);
+}
+
 .field input:focus,
-.field select:focus {
-  border-color: rgba(45, 212, 191, 0.45);
+.field select:focus,
+select:focus {
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
 }
 
 .row {
@@ -332,5 +411,44 @@
 .muted {
   opacity: 0.85;
   font-size: 13px;
+}
+
+.formActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rms-border);
+}
+
+.formActions .btn {
+  margin: 0;
+}
+
+.inlineFormRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.inlineFormRow input {
+  flex: 1 1 220px;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.2);
+  color: inherit;
+  outline: none;
+}
+
+.inlineFormRow .btn {
+  flex: 0 0 auto;
+  align-self: center;
 }
 

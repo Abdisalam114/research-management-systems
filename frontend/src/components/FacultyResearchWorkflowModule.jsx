@@ -1,14 +1,23 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import * as publicationApi from "../services/publicationApi";
+import { PageHeader } from "./PageHeader";
+import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
+import { statFilterLabel } from "../utils/pageHeaderFilters";
 import { FACULTY_WORKFLOW_STAGES, nextWorkflowStage, workflowStageMeta } from "../constants/facultyWorkflow";
 import { publicationTypeLabel } from "../constants/publicationTypes";
 
-export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, canManage }) {
+export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, canManage, standalone = false }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
-  const [stageFilter, setStageFilter] = useState(null);
+  const [internalStageFilter, setInternalStageFilter] = useState(null);
+  const [urlStageFilter, setUrlStageFilter] = useUrlStatFilter("all");
+
+  const stageFilter = standalone ? (urlStageFilter === "all" ? null : urlStageFilter) : internalStageFilter;
+  const setStageFilter = standalone
+    ? (key) => setUrlStageFilter(key || "all")
+    : setInternalStageFilter;
 
   const load = useCallback(async () => {
     const res = await publicationApi.getFacultyWorkflow(accessToken);
@@ -34,45 +43,70 @@ export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, ca
     }
   }
 
-  if (!data && !error) return <p className="muted">Loading Kulliyad workflow…</p>;
+  const stats = useMemo(() => {
+    const total = FACULTY_WORKFLOW_STAGES.reduce((acc, s) => acc + (data?.counts?.[s.id] ?? 0), 0);
+    return [
+      { label: "Total in workflow", value: total, filterKey: "all" },
+      ...FACULTY_WORKFLOW_STAGES.map((s) => ({
+        label: s.label,
+        value: data?.counts?.[s.id] ?? 0,
+        filterKey: s.id,
+        accent: s.accent,
+      })),
+    ];
+  }, [data]);
 
   const filteredStage = stageFilter ? data?.stages?.find((s) => s.id === stageFilter) : null;
 
-  return (
-    <div className="card" style={{ marginTop: 16, borderColor: "rgba(56,189,248,0.35)" }}>
-      <div style={{ fontWeight: 800, fontSize: 16 }}>Kulliyad research workflow status</div>
-      <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-        {departmentLabel || data?.department} — track outputs from submission to publication.
+  if (!data && !error) {
+    return standalone ? (
+      <div>
+        <PageHeader
+          title="Research Workflow Status"
+          subtitle="Track outputs from submission → in process → pipeline → published."
+          stats={stats}
+          activeFilter={urlStageFilter}
+          onFilterChange={setUrlStageFilter}
+        />
+        <p className="muted">Loading workflow…</p>
       </div>
+    ) : (
+      <p className="muted">Loading Kulliyad workflow…</p>
+    );
+  }
 
-      {error ? <div style={{ color: "#f87171", marginTop: 8 }}>{error}</div> : null}
+  const body = (
+    <>
+      {error ? <div style={{ color: "#f87171", marginTop: standalone ? 0 : 8 }}>{error}</div> : null}
 
-      <div className="overviewGrid pubCategoryGrid" style={{ marginTop: 12 }}>
-        {(data?.stages || FACULTY_WORKFLOW_STAGES).map((stage) => {
-          const meta = workflowStageMeta(stage.id);
-          const count = stage.count ?? data?.counts?.[stage.id] ?? 0;
-          return (
-            <button
-              key={stage.id}
-              type="button"
-              className="overviewTile"
-              style={{
-                textAlign: "left",
-                cursor: "pointer",
-                borderColor: stageFilter === stage.id ? meta.accent : undefined,
-              }}
-              onClick={() => setStageFilter((f) => (f === stage.id ? null : stage.id))}
-            >
-              <div className="label">
-                {meta.icon} {stage.label || meta.label}
-              </div>
-              <div className="value" style={{ color: meta.accent }}>
-                {count}
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      {!standalone ? (
+        <div className="overviewGrid pubCategoryGrid" style={{ marginTop: 12 }}>
+          {(data?.stages || FACULTY_WORKFLOW_STAGES).map((stage) => {
+            const meta = workflowStageMeta(stage.id);
+            const count = stage.count ?? data?.counts?.[stage.id] ?? 0;
+            return (
+              <button
+                key={stage.id}
+                type="button"
+                className="overviewTile"
+                style={{
+                  textAlign: "left",
+                  cursor: "pointer",
+                  borderColor: stageFilter === stage.id ? meta.accent : undefined,
+                }}
+                onClick={() => setStageFilter(stageFilter === stage.id ? null : stage.id)}
+              >
+                <div className="label">
+                  {meta.icon} {stage.label || meta.label}
+                </div>
+                <div className="value" style={{ color: meta.accent }}>
+                  {count}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {stageFilter && filteredStage ? (
         <div style={{ marginTop: 12 }}>
@@ -93,10 +127,10 @@ export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, ca
               <div key={stage.id}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>{stage.label}</div>
                 <div style={{ display: "grid", gap: 6 }}>
-                  {stage.items.slice(0, 4).map((p) => (
+                  {stage.items.slice(0, standalone ? 20 : 4).map((p) => (
                     <WorkflowRow key={p.id} pub={p} canManage={canManage} busyId={busyId} onAdvance={advance} />
                   ))}
-                  {stage.items.length > 4 ? (
+                  {!standalone && stage.items.length > 4 ? (
                     <button type="button" className="btn" onClick={() => setStageFilter(stage.id)}>
                       View all {stage.items.length} in {stage.label}
                     </button>
@@ -108,11 +142,56 @@ export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, ca
         </div>
       )}
 
-      <div style={{ marginTop: 12 }}>
-        <Link className="btn" to="/publications">
-          Open publications
-        </Link>
+      {!standalone ? (
+        <div style={{ marginTop: 12 }}>
+          <Link className="btn" to="/research-workflow">
+            Open research workflow
+          </Link>
+        </div>
+      ) : (
+        <div style={{ marginTop: 12 }}>
+          <Link className="btn" to="/publications">
+            Open publications
+          </Link>
+        </div>
+      )}
+    </>
+  );
+
+  if (standalone) {
+    return (
+      <div>
+        <PageHeader
+          title="Research Workflow Status"
+          subtitle={`${departmentLabel || data?.department || "Faculty"} — track outputs from submission to publication.`}
+          stats={stats}
+          activeFilter={urlStageFilter}
+          onFilterChange={setUrlStageFilter}
+          actions={
+            <Link className="btn" to="/publications">
+              Publications
+            </Link>
+          }
+        />
+        {urlStageFilter !== "all" ? (
+          <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+            Showing: <strong>{statFilterLabel(stats, urlStageFilter)}</strong>
+          </p>
+        ) : null}
+        <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.35)" }}>
+          {body}
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className="card" style={{ marginTop: 16, borderColor: "rgba(56,189,248,0.35)" }}>
+      <div style={{ fontWeight: 800, fontSize: 16 }}>Kulliyad research workflow status</div>
+      <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+        {departmentLabel || data?.department} — track outputs from submission to publication.
+      </div>
+      {body}
     </div>
   );
 }

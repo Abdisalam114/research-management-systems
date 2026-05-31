@@ -1,9 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as publicationApi from "../services/publicationApi";
 import { PageHeader } from "../components/PageHeader";
-import { FacultyResearchWorkflowModule } from "../components/FacultyResearchWorkflowModule";
+import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 import {
   OUTPUT_TRACKING_CATEGORIES,
   PUBLICATION_TYPE_OPTIONS,
@@ -30,10 +31,10 @@ export function PublicationsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [typeFilter, setTypeFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
 
   const canCreate = user?.role === "researcher";
   const canValidate = ["faculty_coordinator", "research_director"].includes(user?.role);
-  const canManageWorkflow = canValidate;
 
   const load = useCallback(async () => {
     const res = await publicationApi.listPublications(accessToken);
@@ -51,19 +52,19 @@ export function PublicationsPage() {
     [publications]
   );
 
-  const filtered = useMemo(
-    () => publications.filter((p) => matchesTrackingFilter(p, typeFilter)),
-    [publications, typeFilter]
-  );
+  const filtered = useMemo(() => {
+    let list = filterByStatKey(publications, statusFilter);
+    return list.filter((p) => matchesTrackingFilter(p, typeFilter));
+  }, [publications, statusFilter, typeFilter]);
 
   const stats = useMemo(() => {
     const by = (s) => publications.filter((p) => p.status === s).length;
     const totalCitations = publications.reduce((acc, p) => acc + Number(p.citationCount || 0), 0);
     return [
-      { label: "Total outputs", value: publications.length },
-      { label: "Draft", value: by("draft") },
-      { label: "Submitted", value: by("submitted"), accent: "#38bdf8" },
-      { label: "Validated", value: by("validated"), accent: "#1d4ed8" },
+      { label: "Total outputs", value: publications.length, filterKey: "all" },
+      { label: "Draft", value: by("draft"), filterKey: "draft" },
+      { label: "Submitted", value: by("submitted"), filterKey: "submitted", accent: "#38bdf8" },
+      { label: "Validated", value: by("validated"), filterKey: "validated", accent: "#1d4ed8" },
       { label: "Citations", value: totalCitations.toLocaleString(), accent: "#7dd3fc" },
     ];
   }, [publications]);
@@ -76,6 +77,8 @@ export function PublicationsPage() {
         title="Publication & Output Tracking"
         subtitle="Papers • Conference • Review • Case studies • Letter to editor — plus journal articles, books, patents, thesis, and community impact."
         stats={stats}
+        activeFilter={statusFilter}
+        onFilterChange={setStatusFilter}
         actions={
           canCreate ? (
             <button type="button" className="btn primary" onClick={() => setShowForm((v) => !v)}>
@@ -85,19 +88,18 @@ export function PublicationsPage() {
         }
       />
 
+      {statusFilter !== "all" ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Showing status: <strong>{statFilterLabel(stats, statusFilter)}</strong>
+          {typeFilter !== "all" ? ` • type: ${OUTPUT_TRACKING_CATEGORIES.find((c) => c.id === typeFilter)?.label}` : ""}
+        </p>
+      ) : null}
+
       {loading ? <p className="muted">Loading publications…</p> : null}
       {error ? (
         <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>
           {error}
         </div>
-      ) : null}
-
-      {canManageWorkflow && accessToken ? (
-        <FacultyResearchWorkflowModule
-          accessToken={accessToken}
-          departmentLabel={user?.role === "research_director" ? "All faculties" : user?.department}
-          canManage
-        />
       ) : null}
 
       <div className="overviewGrid pubCategoryGrid" style={{ marginTop: 12 }}>

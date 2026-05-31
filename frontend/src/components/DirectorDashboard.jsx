@@ -17,11 +17,12 @@ import { useAuth } from "../hooks/useAuth";
 import * as analyticsApi from "../services/analyticsApi";
 import { InstitutionalAnalyticsSections } from "./InstitutionalAnalyticsSections";
 import { FacultyAnalyticsSection } from "./FacultyAnalyticsSection";
-import { FacultyResearchWorkflowModule } from "./FacultyResearchWorkflowModule";
+import { ActiveProjectsPanel } from "./ActiveProjectsPanel";
+import { MetricProvenanceBar } from "./MetricProvenanceBar";
 import { SystemModulesGrid } from "./SystemModulesGrid";
 import "../pages/dashboard.css";
 
-const PIE_COLORS = ["#0ea5e9", "#334155"];
+const PIE_COLORS = ["#0ea5e9", "#334155", "#f59e0b"];
 
 function formatMoney(n) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
@@ -64,7 +65,28 @@ export function DirectorDashboard() {
       try {
         setError("");
         const res = await analyticsApi.institutionalAnalytics(accessToken);
-        if (!cancelled) setData(res);
+        if (!cancelled) {
+          setData(res);
+          // #region agent log
+          fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
+            body: JSON.stringify({
+              sessionId: "6113cc",
+              location: "DirectorDashboard.jsx:load",
+              message: "director active projects rendered",
+              data: {
+                totalActive: res?.projectStatus?.active,
+                tableLength: res?.activeProjects?.length ?? 0,
+                titles: (res?.activeProjects || []).map((p) => p.title),
+              },
+              timestamp: Date.now(),
+              hypothesisId: "C",
+              runId: "active-projects",
+            }),
+          }).catch(() => {});
+          // #endregion
+        }
       } catch (e) {
         if (!cancelled) setError(e?.response?.data?.message || "Failed to load institutional dashboard");
       }
@@ -79,11 +101,13 @@ export function DirectorDashboard() {
 
   const pieData = useMemo(() => {
     if (!data) return [];
-    const { active, completed } = data.projectStatus;
-    return [
+    const { active, completed, onHold } = data.projectStatus;
+    const slices = [
       { name: "Active", value: active },
       { name: "Completed", value: completed },
     ];
+    if (onHold > 0) slices.push({ name: "On hold", value: onHold });
+    return slices.filter((s) => s.value > 0);
   }, [data]);
 
   const outputBars = useMemo(() => {
@@ -98,61 +122,62 @@ export function DirectorDashboard() {
       { name: "Journal", value: t.journal_article || 0 },
       { name: "Books", value: (t.book || 0) + (t.book_chapter || 0) },
       { name: "Patents", value: t.patent || 0 },
+      { name: "Thesis", value: t.thesis || 0 },
       { name: "Community", value: t.community_research_impact || 0 },
     ];
   }, [data]);
 
   if (error) {
     return (
-      <div className="card" style={{ borderColor: "rgba(239, 68, 68, 0.5)" }}>
-        {error}
+      <div className="dashboardPage">
+        <div className="card" style={{ borderColor: "rgba(239, 68, 68, 0.5)" }}>
+          {error}
+        </div>
       </div>
     );
   }
 
-  if (!data) return <div>Loading institutional dashboard…</div>;
+  if (!data) return <div className="dashboardLoading">Loading institutional dashboard…</div>;
 
   const topFaculty = (data.facultyAnalytics || []).slice(0, 1)[0];
 
   return (
-    <div>
-      <SystemModulesGrid
-        role="research_director"
-        overview={data.overview}
-        title="Jamhuriya RMS — dhammaan qaybaha system-ka"
-      />
+    <div className="dashboardPage">
+      <header className="dashPageHeader">
+        <h1 className="dashPageTitle">Institutional Dashboard</h1>
+        <p className="dashPageSub">All Jamhuriya RMS modules — live, consistent counts across the system.</p>
+      </header>
 
-      {accessToken ? (
-        <FacultyResearchWorkflowModule accessToken={accessToken} departmentLabel="All faculties" canManage />
-      ) : null}
+      <section className="dashboardSection">
+        <SystemModulesGrid
+          role="research_director"
+          overview={data.overview}
+          title="System modules"
+        />
+      </section>
 
-      <div
-        className="card"
-        style={{
-          marginTop: 12,
-          padding: 14,
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
-          gap: 12,
-        }}
-      >
-        <div>
-          <div className="muted" style={{ fontSize: 12 }}>🏆 Grant success rate</div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>{data.grantSuccessRate ?? 0}%</div>
+      <MetricProvenanceBar data={data} />
+
+      <section className="dashboardKpiStrip">
+        <div className="dashboardKpiItem">
+          <div className="dashboardKpiLabel">🏆 Grant success rate</div>
+          <div className="dashboardKpiValue">{data.grantSuccessRate ?? 0}%</div>
         </div>
-        <div>
-          <div className="muted" style={{ fontSize: 12 }}>💰 Funding secured</div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>{formatMoney(data.keyMetrics.activeGrantsValue)}</div>
+        <div className="dashboardKpiItem">
+          <div className="dashboardKpiLabel">💰 Funding awarded</div>
+          <div className="dashboardKpiValue">{formatMoney(data.keyMetrics.activeGrantsValue)}</div>
         </div>
-        <div>
-          <div className="muted" style={{ fontSize: 12 }}>📚 Total citations</div>
-          <div style={{ fontSize: 22, fontWeight: 800 }}>{data.researchOutput.citations.toLocaleString()}</div>
+        <div className="dashboardKpiItem">
+          <div className="dashboardKpiLabel">📚 Total citations</div>
+          <div className="dashboardKpiValue">{data.researchOutput.citations.toLocaleString()}</div>
         </div>
-        <div>
-          <div className="muted" style={{ fontSize: 12 }}>🥇 Top faculty (pubs)</div>
-          <div style={{ fontSize: 16, fontWeight: 800 }}>{topFaculty ? `${topFaculty.department} (${topFaculty.publications})` : "—"}</div>
+        <div className="dashboardKpiItem">
+          <div className="dashboardKpiLabel">🥇 Top faculty (pubs)</div>
+          <div className="dashboardKpiValue dashboardKpiValueSm">
+            {topFaculty ? `${topFaculty.department} (${topFaculty.publications})` : "—"}
+          </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end" }}>
+        <div className="dashboardKpiAction">
           <button
             type="button"
             className="btn primary"
@@ -162,9 +187,9 @@ export function DirectorDashboard() {
             {downloadingPdf ? "Generating PDF…" : "📄 Annual report (PDF)"}
           </button>
         </div>
-      </div>
+      </section>
 
-      <div className="dashChartsRow">
+      <section className="dashChartsRow">
         <div className="dashCard dashChartCard">
           <div className="dashCardTitle">Project Status</div>
           <div className="dashChartBlock">
@@ -202,6 +227,11 @@ export function DirectorDashboard() {
               <span>
                 Done <strong>{data.projectStatus.completed}</strong>
               </span>
+              {data.projectStatus.onHold > 0 ? (
+                <span>
+                  On hold <strong>{data.projectStatus.onHold}</strong>
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -270,41 +300,14 @@ export function DirectorDashboard() {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="dashGrid">
-        <div className="dashCard dashSpan8">
-          <div className="dashCardTitle">Active Projects</div>
-          <table className="dashTable">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Title</th>
-                <th>Principal Investigator</th>
-                <th>Progress</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.activeProjects.map((p) => (
-                <tr key={p.id + p.title}>
-                  <td>{p.id}</td>
-                  <td>{p.title}</td>
-                  <td>{p.principalInvestigator}</td>
-                                    <td>
-                    <div className="dashProgressCell">
-                      <div className="progressBar">
-                        <span style={{ width: `${p.progressPercent}%` }} />
-                      </div>
-                      <span className="dashProgressPercent">{p.progressPercent}%</span>
-                    </div>
-                  </td>
-                  <td>{p.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <section className="dashGrid dashGridProjectsRow">
+        <ActiveProjectsPanel
+          projects={data.activeProjects}
+          totalActive={data.projectStatus.active}
+          sampleMeta={data.samples?.activeProjects}
+        />
 
         <div className="dashSpan4 dashSideCol">
           <div className="dashCard">
@@ -352,7 +355,7 @@ export function DirectorDashboard() {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       <FacultyAnalyticsSection
         data={data}

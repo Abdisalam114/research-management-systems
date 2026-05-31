@@ -13,3 +13,10 @@ export async function markNotificationRead(accessToken, id) {
   });
   return res.data;
 }
+
+export async function getUnreadCount(accessToken) {
+  const res = await api.get("/api/notifications/me/unread-count", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
