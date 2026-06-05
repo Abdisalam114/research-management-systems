@@ -12,6 +12,10 @@
     "seed:demo": "node src/scripts/seedDemo.js",
     "seed:modules": "node src/scripts/seedModules.js",
     "db:audit": "node src/scripts/dbAudit.js",
+    "docs:database-pdf": "node src/scripts/generateDatabaseDocsPdf.js",
+    "docs:system-pdf": "node src/scripts/generateSystemDocsPdf.js",
+    "docs:pdf": "node src/scripts/generateDatabaseDocsPdf.js && node src/scripts/generateSystemDocsPdf.js",
+    "verify:roles": "node ../scripts/verify-all-roles.cjs",
     "purge:seeded-papers": "node src/scripts/purgeSeededPapers.js",
     "purge:seeded-records": "node src/scripts/purgeSeededRecords.js",
     "test": "echo \"No tests yet\" && exit 0"

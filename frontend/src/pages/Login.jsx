@@ -15,6 +15,20 @@ export function LoginPage() {
 
   const redirectTo = useMemo(() => location.state?.from?.pathname || "/dashboard", [location.state]);
 
+  const demoAccounts = [
+    { label: "Director", email: "director@rms.edu", password: "Director2024!", hint: "Full institutional access" },
+    { label: "Coordinator", email: "coordinator@rms.edu", password: "Coordinator2024!", hint: "Faculty proposals & publications" },
+    { label: "Finance", email: "finance@rms.edu", password: "Finance2024!", hint: "Budgets, payments, procurement" },
+    { label: "Researcher (Asha)", email: "asha@rms.edu", password: "Researcher2024!", hint: "Proposals, projects, ethics" },
+    { label: "Researcher (Mahad)", email: "mahad@rms.edu", password: "Researcher2024!", hint: "Second researcher account" },
+  ];
+
+  function fillDemo(account) {
+    setEmail(account.email);
+    setPassword(account.password);
+    setError("");
+  }
+
   return (
     <div className="authBg">
       <div className="authCard">
@@ -61,6 +75,28 @@ export function LoginPage() {
           >
             {busy ? "Signing in..." : "Sign In"}
           </button>
+
+          <div style={{ marginTop: 16 }}>
+            <div className="muted" style={{ fontSize: 12, marginBottom: 8, fontWeight: 600 }}>
+              Demo accounts (click to fill)
+            </div>
+            <div style={{ display: "grid", gap: 6 }}>
+              {demoAccounts.map((a) => (
+                <button
+                  key={a.email}
+                  type="button"
+                  className="btn"
+                  style={{ textAlign: "left", fontSize: 13 }}
+                  onClick={() => fillDemo(a)}
+                >
+                  <strong>{a.label}</strong>
+                  <span className="muted" style={{ display: "block", fontSize: 11, marginTop: 2 }}>
+                    {a.email} — {a.hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
 
           <p className="authFooter muted" style={{ marginTop: 14, marginBottom: 0 }}>
             Need an account? Contact the Research Director — only they can create users.

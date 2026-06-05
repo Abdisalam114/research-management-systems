@@ -3,6 +3,7 @@ export const SYSTEM_MODULES = [
   { key: "ethics", to: "/ethics", label: "Ethics (REC)", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "proposals", to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "projects", to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { key: "grants", to: "/grants", label: "Grants", icon: "💰", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
   { key: "budgets", to: "/budgets", label: "Finance & Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher"] },
   { key: "publications", to: "/publications", label: "Publications & Outputs", icon: "📚", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "workflow", to: "/research-workflow", label: "Research Workflow", icon: "🔄", roles: ["research_director", "faculty_coordinator", "researcher"] },
@@ -24,6 +25,8 @@ export function countForModule(key, metrics = {}, overview = {}) {
       return m.proposals ?? o.proposals ?? metrics.proposals?.total ?? 0;
     case "projects":
       return m.projects ?? o.projects ?? metrics.projects?.total ?? 0;
+    case "grants":
+      return m.grants ?? o.grants ?? metrics.grants?.total ?? 0;
     case "budgets":
       return m.budgets ?? o.budgets ?? metrics.budgets?.total ?? 0;
     case "publications":
