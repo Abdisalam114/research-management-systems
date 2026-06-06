@@ -70,6 +70,20 @@ function createApp() {
 
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
+  const serveFrontend = process.env.SERVE_FRONTEND === "true" || process.env.SERVE_FRONTEND === "1";
+  if (serveFrontend) {
+    const frontendDist = path.resolve(__dirname, "../../frontend/dist");
+    app.use(express.static(frontendDist));
+    app.get("*", (req, res, next) => {
+      if (req.method !== "GET" || req.path.startsWith("/api") || req.path.startsWith("/uploads")) {
+        return next();
+      }
+      res.sendFile(path.join(frontendDist, "index.html"), (err) => {
+        if (err) next(err);
+      });
+    });
+  }
+
   app.use(errorHandler);
 
   return app;

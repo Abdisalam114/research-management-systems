@@ -1,0 +1,33 @@
+# Free deployment on Render.com (https://render.com)
+# 1) Create free MongoDB Atlas cluster → copy MONGO_URI
+# 2) Connect this GitHub repo on Render → New Blueprint
+# 3) Set MONGO_URI and CLIENT_ORIGIN (your Render URL, e.g. https://just-rms.onrender.com)
+# 4) After deploy: Render Shell → cd backend && npm run seed
+
+services:
+  - type: web
+    name: just-rms
+    runtime: node
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build && cd ../backend && npm install
+    startCommand: cd backend && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SERVE_FRONTEND
+        value: "true"
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRES_IN
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 7d
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: REFRESH_COOKIE_NAME
+        value: just_rms_refresh
