@@ -1,0 +1,266 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+} from "recharts";
+import { useAuth } from "../hooks/useAuth";
+import * as analyticsApi from "../services/analyticsApi";
+import { SystemModulesGrid } from "./SystemModulesGrid";
+import "../pages/dashboard.css";
+
+const PIE_COLORS = ["#0ea5e9", "#38bdf8", "#1d4ed8"];
+
+function formatMoney(n) {
+  if (!n && n !== 0) return "$0";
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
+  return `$${n}`;
+}
+
+export function FinanceDashboard() {
+  const { accessToken, user } = useAuth();
+  const [report, setReport] = useState(null);
+  const [metrics, setMetrics] = useState(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        setError("");
+        const [res, m] = await Promise.all([
+          analyticsApi.financeReport(accessToken),
+          analyticsApi.dashboardMetrics(accessToken).catch(() => null),
+        ]);
+        if (!cancelled) {
+          setReport(res);
+          if (m?.metrics) setMetrics(m.metrics);
+        }
+      } catch (e) {
+        if (!cancelled) setError(e?.response?.data?.message || "Failed to load finance report");
+      }
+    }
+    load();
+    const t = setInterval(load, 15000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [accessToken]);
+
+  const utilizationPie = useMemo(() => {
+    if (!report) return [];
+    const items = report.budgetItems || [];
+    const pending = items.filter((i) => i.status === "pending").length;
+    const approved = items.filter((i) => i.status === "approved").length;
+    const paid = items.filter((i) => i.status === "paid").length;
+    return [
+      { name: "Pending", value: pending },
+      { name: "Approved", value: approved },
+      { name: "Paid", value: paid },
+    ];
+  }, [report]);
+
+  const grantBars = useMemo(() => {
+    if (!report) return [];
+    const buckets = { active: 0, approved: 0, closed: 0, pending: 0, rejected: 0 };
+    (report.grantSummary || []).forEach((g) => {
+      if (buckets[g.status] !== undefined) buckets[g.status] += 1;
+    });
+    return Object.entries(buckets).map(([name, value]) => ({ name, value }));
+  }, [report]);
+
+  if (error) {
+    return (
+      <div className="dashboardPage">
+        <div className="card" style={{ borderColor: "rgba(239, 68, 68, 0.5)" }}>{error}</div>
+      </div>
+    );
+  }
+
+  if (!report) return <div className="dashboardLoading">Loading finance dashboard…</div>;
+
+  const s = report.summary || {};
+
+  return (
+    <div className="dashboardPage">
+      <header className="dashPageHeader">
+        <div className="dashWelcomeCard">
+          <h1 className="dashWelcomeTitle">💼 Finance Office</h1>
+          <p className="dashWelcomeSub">
+            Welcome {user?.fullName} — manage budgets, payments, procurement, and grant funding.
+          </p>
+        </div>
+      </header>
+
+      {metrics ? (
+        <section className="dashboardSection">
+          <SystemModulesGrid role="finance_officer" metrics={metrics} title="System modules" />
+        </section>
+      ) : null}
+
+      <div className="overviewGrid">
+        <Link to="/budgets" className="overviewTile" style={{ textDecoration: "none" }}>
+          <div className="label">Budgets</div>
+          <div className="value">{s.budgets ?? 0}</div>
+        </Link>
+        <Link to="/budgets" className="overviewTile" style={{ textDecoration: "none" }}>
+          <div className="label">Total allocated</div>
+          <div className="value">{formatMoney(s.totalAllocated)}</div>
+        </Link>
+        <Link to="/budgets?filter=disbursed" className="overviewTile" style={{ textDecoration: "none" }}>
+          <div className="label">Total paid</div>
+          <div className="value">{formatMoney(s.totalPaid)}</div>
+        </Link>
+        <Link to="/budgets" className="overviewTile" style={{ textDecoration: "none" }}>
+          <div className="label">Utilization</div>
+          <div className="value">{s.utilizationPercent ?? 0}%</div>
+        </Link>
+        <Link to="/grants?filter=active" className="overviewTile" style={{ textDecoration: "none" }}>
+          <div className="label">Active grants</div>
+          <div className="value">{s.activeGrants ?? 0}</div>
+        </Link>
+        <Link to="/grants?filter=awarded" className="overviewTile" style={{ textDecoration: "none" }}>
+          <div className="label">Awarded total</div>
+          <div className="value">{formatMoney(s.awardedTotal)}</div>
+        </Link>
+      </div>
+
+      <section className="dashChartsRow">
+        <div className="dashCard dashChartCard">
+          <div className="dashCardTitle">Budget item status</div>
+          <div className="dashChartBlock">
+            <div className="dashChartPlot">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={utilizationPie} innerRadius={48} outerRadius={72} dataKey="value" paddingAngle={2}>
+                    {utilizationPie.map((_, i) => (
+                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10 }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="dashChartLegend">
+              {utilizationPie.map((entry, i) => (
+                <span key={entry.name} className="dashLegendItem">
+                  <span className="dashLegendDot" style={{ background: PIE_COLORS[i % PIE_COLORS.length] }} />
+                  <span className="dashLegendName">{entry.name}</span>
+                  <strong className="dashLegendValue">{entry.value}</strong>
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="dashCard dashChartCard">
+          <div className="dashCardTitle">Grants by status</div>
+          <div className="dashChartBlock">
+            <div className="dashChartPlot dashChartPlotBars">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart layout="vertical" data={grantBars} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
+                  <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 10 }} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    width={72}
+                    tick={{ fill: "#94a3b8", fontSize: 11 }}
+                    tickLine={false}
+                  />
+                  <Tooltip
+                    contentStyle={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10 }}
+                  />
+                  <Bar dataKey="value" fill="#0ea5e9" radius={[0, 6, 6, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        <div className="dashCard dashChartCard">
+          <div className="dashCardTitle">Key finance metrics</div>
+          <div className="metricList">
+            <div className="metricRow">
+              <span>💰 Active grant funds</span>
+              <strong>{formatMoney(s.awardedTotal)}</strong>
+            </div>
+            <div className="metricRow">
+              <span>📊 Total budgets</span>
+              <strong>{s.budgets ?? 0}</strong>
+            </div>
+            <div className="metricRow">
+              <span>🧾 Allocated</span>
+              <strong>{formatMoney(s.totalAllocated)}</strong>
+            </div>
+            <div className="metricRow">
+              <span>✅ Paid out</span>
+              <strong>{formatMoney(s.totalPaid)}</strong>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="dashGrid">
+        <div className="dashCard dashSpan8">
+          <div className="dashCardTitle">Recent budget items</div>
+          <table className="dashTable">
+            <thead>
+              <tr>
+                <th>Budget</th>
+                <th>Description</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(report.budgetItems || []).slice(0, 8).map((i, idx) => (
+                <tr key={idx}>
+                  <td>{i.budgetTitle}</td>
+                  <td>{i.description || "—"}</td>
+                  <td>{i.type || "—"}</td>
+                  <td>{formatMoney(i.amount)}</td>
+                  <td>{i.status}</td>
+                </tr>
+              ))}
+              {(report.budgetItems || []).length === 0 ? (
+                <tr><td colSpan={5} className="muted">No budget items yet.</td></tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="dashCard dashSpan4">
+          <div className="dashCardTitle">Grants overview</div>
+          <div style={{ display: "grid", gap: 8 }}>
+            {(report.grantSummary || []).slice(0, 6).map((g, i) => (
+              <div key={i} className="metricRow">
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{g.title}</div>
+                  <div className="muted" style={{ fontSize: 11 }}>{g.fundingSource || "—"} • {g.status}</div>
+                </div>
+                <strong>{formatMoney(g.amountAwarded)}</strong>
+              </div>
+            ))}
+            {(report.grantSummary || []).length === 0 ? <span className="muted">No grants yet.</span> : null}
+          </div>
+        </div>
+      </section>
+
+      <div className="dashboardQuickLinks">
+        <Link className="btn primary" to="/budgets">Open Finance &amp; Budgets</Link>
+      </div>
+    </div>
+  );
+}

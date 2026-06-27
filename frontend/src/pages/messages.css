@@ -1,0 +1,178 @@
+.messagesPage {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.messagesError {
+  border-color: rgba(255, 99, 132, 0.55);
+}
+
+.messagesStartCard {
+  padding: 18px 20px;
+}
+
+.messagesStartRow {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr auto;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.messagesSearch,
+.messagesComposer input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--rms-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--rms-text-primary);
+}
+
+.messagesUserSelect {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(250, 204, 21, 0.45);
+  background: var(--rms-dropdown-bg);
+  color: var(--rms-dropdown-text);
+  color-scheme: light;
+}
+
+.messagesUserSelect option {
+  background: var(--rms-dropdown-bg-open);
+  color: var(--rms-dropdown-text);
+}
+
+.messagesUserSelect:focus,
+.messagesSearch:focus,
+.messagesComposer input:focus {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.55);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
+}
+
+.messagesUserSelect option:checked,
+.messagesUserSelect option:hover {
+  background: var(--rms-dropdown-selected-bg);
+  color: var(--rms-dropdown-selected-text);
+}
+
+.messagesLayout {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 16px;
+  min-height: 520px;
+}
+
+.messagesSidebar,
+.messagesThread {
+  display: flex;
+  flex-direction: column;
+  min-height: 520px;
+}
+
+.messagesConvList {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  overflow-y: auto;
+  max-height: 440px;
+}
+
+.messagesConvItem {
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--rms-border);
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  color: var(--rms-text-primary);
+}
+
+.messagesConvItem.active {
+  border-color: rgba(56, 189, 248, 0.55);
+  background: rgba(56, 189, 248, 0.14);
+}
+
+.messagesConvTitle {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--rms-text-primary);
+}
+
+.messagesConvPreview {
+  font-size: 12px;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--rms-text-secondary);
+}
+
+.messagesThreadHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rms-border);
+}
+
+.messagesBubbleList {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 0;
+  min-height: 0;
+}
+
+.messagesBubble {
+  max-width: 78%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--rms-border);
+  color: var(--rms-text-primary);
+}
+
+.messagesBubble.mine {
+  align-self: flex-end;
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(14, 165, 233, 0.25);
+}
+
+.messagesBubbleMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  margin-bottom: 6px;
+  color: var(--rms-text-secondary);
+}
+
+.messagesComposer {
+  display: flex;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--rms-border);
+}
+
+.messagesEmpty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 900px) {
+  .messagesLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .messagesStartRow {
+    grid-template-columns: 1fr;
+  }
+}

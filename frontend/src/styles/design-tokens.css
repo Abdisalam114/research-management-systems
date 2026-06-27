@@ -1,0 +1,34 @@
+:root {
+  /* Dark blue surfaces */
+  --rms-bg-primary: #020617;     /* deepest navy */
+  --rms-bg-secondary: #0f172a;   /* dark slate-blue */
+  --rms-bg-card: #1e293b;        /* slate-blue card */
+
+  /* Light blue accents */
+  --rms-accent: #0ea5e9;         /* sky-500 (light blue) */
+  --rms-accent-soft: #38bdf8;    /* sky-400 (lighter blue) */
+  --rms-accent-strong: #1d4ed8;  /* blue-700 (deep blue) */
+
+  /* Semantic tokens — restricted to the blue family */
+  --rms-success: #38bdf8;        /* light blue (positive) */
+  --rms-warning: #7dd3fc;        /* very light blue (attention) */
+  --rms-danger:  #1d4ed8;        /* dark blue (negative) */
+
+  --rms-text-primary: #f8fafc;
+  --rms-text-secondary: #94a3b8;
+  --rms-border: rgba(148, 197, 255, 0.10);
+  --rms-shadow: 0 24px 80px rgba(2, 6, 23, 0.55);
+  --rms-font: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
+
+  /* Text & list selection — light blue */
+  --rms-selection-bg: rgba(56, 189, 248, 0.42);
+  --rms-selection-text: #f8fafc;
+  --rms-selection-bg-strong: rgba(14, 165, 233, 0.55);
+
+  /* Dropdown — yellow background (not white) */
+  --rms-dropdown-bg: #fef08a;
+  --rms-dropdown-bg-open: #fde047;
+  --rms-dropdown-text: #1c1917;
+  --rms-dropdown-selected-bg: #facc15;
+  --rms-dropdown-selected-text: #1c1917;
+}

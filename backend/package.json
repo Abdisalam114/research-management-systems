@@ -1,0 +1,39 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "seed": "node src/scripts/seed.js",
+    "migrate:program-tier": "node src/scripts/migrateProgramTier.js",
+    "fix:grant-awards": "node src/scripts/fixGrantAwards.js",
+    "fix:grant-budgets": "node src/scripts/fixGrantBudgets.js",
+    "fix:grant-project-links": "node src/scripts/fixGrantProjectLinks.js",
+    "docs:database-pdf": "node src/scripts/generateDatabaseDocsPdf.js",
+    "docs:system-pdf": "node src/scripts/generateSystemDocsPdf.js",
+    "docs:pdf": "node src/scripts/generateDatabaseDocsPdf.js && node src/scripts/generateSystemDocsPdf.js",
+    "verify:roles": "node ../scripts/verify-all-roles.cjs",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.1",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.4.1",
+    "morgan": "^1.10.1",
+    "multer": "^2.1.1",
+    "pdfkit": "^0.18.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}

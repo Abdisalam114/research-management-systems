@@ -1,0 +1,171 @@
+const { Budget, BUDGET_ITEM_STATUSES, BUDGET_ITEM_TYPES } = require("../models/Budget");
+const { Grant } = require("../models/Grant");
+const { AppError } = require("../utils/AppError");
+const { notifyUser, notifyUsersByRole } = require("../utils/notify");
+
+function refId(ref) {
+  if (!ref) return null;
+  return ref._id ? String(ref._id) : String(ref);
+}
+
+function sanitizeBudget(b) {
+  const grantRef = b.grantId;
+  const projectRef = b.projectId;
+  const out = {
+    id: b._id,
+    grantId: refId(grantRef),
+    projectId: refId(projectRef),
+    ownerResearcherId: refId(b.ownerResearcherId),
+    totalAllocated: b.totalAllocated,
+    currency: b.currency,
+    financeNotes: b.financeNotes,
+    items: b.items,
+    createdAt: b.createdAt,
+    updatedAt: b.updatedAt,
+  };
+  if (grantRef && typeof grantRef === "object" && grantRef._id) {
+    out.grant = {
+      id: grantRef._id,
+      title: grantRef.title,
+      fundingSource: grantRef.fundingSource,
+      amountAwarded: grantRef.amountAwarded,
+      status: grantRef.status,
+    };
+  }
+  if (projectRef && typeof projectRef === "object" && projectRef._id) {
+    out.project = {
+      id: projectRef._id,
+      title: projectRef.title,
+      status: projectRef.status,
+    };
+  }
+  return out;
+}
+
+async function listBudgets(req, res) {
+  const { role } = req.user;
+  const filter = {};
+  if (role === "researcher") filter.ownerResearcherId = req.user.id;
+  // finance_officer / director can view all
+  const budgets = await Budget.find(req.tierWhere(filter))
+    .sort({ createdAt: -1 })
+    .populate({ path: "grantId", select: "title fundingSource amountAwarded status" })
+    .populate({ path: "projectId", select: "title status" });
+  res.json({ budgets: budgets.map(sanitizeBudget) });
+}
+
+async function getBudget(req, res) {
+  const { id } = req.params;
+  const budget = await Budget.findOne(req.tierWhere({ _id: id }));
+  if (!budget) throw new AppError("Budget not found", 404);
+
+  const isOwner = String(budget.ownerResearcherId) === String(req.user.id);
+  const isStaff = ["finance_officer", "research_director"].includes(req.user.role);
+  if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+
+  res.json({ budget: sanitizeBudget(budget) });
+}
+
+async function createBudget(req, res) {
+  const { grantId, projectId, totalAllocated, currency } = req.body || {};
+  if (!grantId && !projectId) throw new AppError("grantId or projectId is required", 400);
+
+  // If grantId provided, ensure it exists and belongs to owner (or staff creating on behalf—kept simple: researcher only).
+  if (grantId) {
+    const grant = await Grant.findOne(req.tierWhere({ _id: grantId }));
+    if (!grant) throw new AppError("Grant not found", 404);
+    if (String(grant.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
+  }
+
+  const budget = await Budget.create(req.tierAssign({
+    grantId: grantId || null,
+    projectId: projectId || null,
+    ownerResearcherId: req.user.id,
+    totalAllocated: typeof totalAllocated === "number" && totalAllocated >= 0 ? totalAllocated : 0,
+    currency: currency ? String(currency).trim().toUpperCase() : "USD",
+    items: [],
+  }));
+
+  res.status(201).json({ budget: sanitizeBudget(budget) });
+}
+
+async function addBudgetItem(req, res) {
+  const { id } = req.params;
+  const { type, description, amount } = req.body || {};
+  if (!type || !description) throw new AppError("type and description are required", 400);
+  if (!Object.values(BUDGET_ITEM_TYPES).includes(type)) throw new AppError("Invalid type", 400);
+  if (typeof amount !== "number" || amount < 0) throw new AppError("amount must be a non-negative number", 400);
+
+  const budget = await Budget.findOne(req.tierWhere({ _id: id }));
+  if (!budget) throw new AppError("Budget not found", 404);
+  if (String(budget.ownerResearcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
+
+  budget.items.unshift({
+    type,
+    description: String(description).trim(),
+    amount,
+    status: BUDGET_ITEM_STATUSES.PENDING,
+    createdBy: req.user.id,
+  });
+
+  await budget.save();
+
+  try {
+    await notifyUsersByRole("finance_officer", {
+      type: "budget",
+      title: "New budget item pending",
+      body: String(description).trim(),
+      link: "/budgets",
+    }, req.programTier);
+  } catch {
+    /* notifications are best-effort */
+  }
+
+  res.json({ message: "Item added", budget: sanitizeBudget(budget) });
+}
+
+async function financeUpdateItemStatus(req, res) {
+  const { id, itemId } = req.params;
+  const { status, rejectedReason } = req.body || {};
+  if (!Object.values(BUDGET_ITEM_STATUSES).includes(status)) throw new AppError("Invalid status", 400);
+
+  const budget = await Budget.findOne(req.tierWhere({ _id: id }));
+  if (!budget) throw new AppError("Budget not found", 404);
+
+  const item = budget.items.id(itemId);
+  if (!item) throw new AppError("Budget item not found", 404);
+
+  if (status === BUDGET_ITEM_STATUSES.APPROVED) {
+    item.status = status;
+    item.approvedBy = req.user.id;
+    item.rejectedReason = "";
+  } else if (status === BUDGET_ITEM_STATUSES.PAID) {
+    if (item.status !== BUDGET_ITEM_STATUSES.APPROVED) throw new AppError("Item must be approved before payment", 400);
+    item.status = status;
+    item.paidAt = new Date();
+  } else if (status === BUDGET_ITEM_STATUSES.REJECTED) {
+    item.status = status;
+    item.rejectedReason = rejectedReason ? String(rejectedReason) : "Rejected";
+  } else {
+    item.status = status;
+  }
+
+  await budget.save();
+
+  try {
+    await notifyUser(budget.ownerResearcherId, {
+      type: "budget",
+      title: `Budget item ${status}`,
+      body: item.description,
+      link: "/budgets",
+      programTier: req.programTier,
+    });
+  } catch {
+    /* notifications are best-effort */
+  }
+
+  res.json({ message: "Item updated", budget: sanitizeBudget(budget) });
+}
+
+module.exports = { listBudgets, getBudget, createBudget, addBudgetItem, financeUpdateItemStatus };
+

@@ -1,0 +1,144 @@
+.pageHeader {
+  margin-bottom: 20px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(14, 165, 233, 0.08), rgba(14, 165, 233, 0.02));
+  border: 1px solid rgba(56, 189, 248, 0.18);
+  box-shadow: 0 8px 28px rgba(2, 6, 23, 0.35);
+}
+
+.pageHeaderTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.pageHeaderTitleBox {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.pageHeaderTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--rms-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.pageHeaderSubtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--rms-text-secondary);
+}
+
+.pageHeaderActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+  padding: 2px 0 0;
+  flex: 1 1 260px;
+  max-width: 100%;
+}
+
+.btnGroup {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px;
+  margin: 0;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(56, 189, 248, 0.14);
+}
+
+.btnGroup .btn {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .pageHeaderActions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .btnGroup {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .btnGroup .btn {
+    flex: 1 1 auto;
+    min-width: 88px;
+  }
+}
+
+.pageHeaderStats {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.pageHeaderStat {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(56, 189, 248, 0.18);
+}
+
+.pageHeaderStatBtn {
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.pageHeaderStatBtn:hover {
+  background: rgba(14, 165, 233, 0.12);
+  border-color: rgba(56, 189, 248, 0.45);
+}
+
+.pageHeaderStatBtn:active {
+  transform: scale(0.98);
+}
+
+.pageHeaderStatActive {
+  background: rgba(14, 165, 233, 0.18) !important;
+  border-color: rgba(56, 189, 248, 0.65) !important;
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
+}
+
+.pageHeaderStatActive .pageHeaderStatValue {
+  color: #7dd3fc !important;
+}
+
+.pageHeaderStatLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #7dd3fc;
+}
+
+.pageHeaderStatValue {
+  margin-top: 4px;
+  font-size: 22px;
+  font-weight: 800;
+  color: #38bdf8;
+  line-height: 1.1;
+}
+
+.pageHeaderStatSub {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--rms-text-secondary);
+}
