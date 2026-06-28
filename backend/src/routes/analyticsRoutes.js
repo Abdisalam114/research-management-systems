@@ -48,5 +48,13 @@ router.get(
   asyncHandler(analyticsController.exportFacultyReportPdf)
 );
 
+router.get(
+  "/research-journey",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("researcher", "faculty_coordinator", "research_director"),
+  asyncHandler(analyticsController.getResearchJourney)
+);
+
 module.exports = { analyticsRoutes: router };
 

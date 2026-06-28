@@ -7,7 +7,7 @@ import { statFilterLabel } from "../utils/pageHeaderFilters";
 import { FACULTY_WORKFLOW_STAGES, nextWorkflowStage, workflowStageMeta } from "../constants/facultyWorkflow";
 import { publicationTypeLabel } from "../constants/publicationTypes";
 
-export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, canManage, standalone = false }) {
+export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, canManage, standalone = false, embedded = false }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
@@ -59,6 +59,14 @@ export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, ca
   const filteredStage = stageFilter ? data?.stages?.find((s) => s.id === stageFilter) : null;
 
   if (!data && !error) {
+    if (embedded) {
+      return (
+        <div className="card" style={{ marginTop: 16, borderColor: "rgba(56,189,248,0.35)" }}>
+          <div style={{ fontWeight: 800, fontSize: 16 }}>Publication workflow</div>
+          <p className="muted" style={{ marginTop: 8 }}>Loading publication workflow…</p>
+        </div>
+      );
+    }
     return standalone ? (
       <div>
         <PageHeader
@@ -75,11 +83,14 @@ export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, ca
     );
   }
 
+  const showStageTiles = !standalone || embedded;
+  const listLimit = standalone || embedded ? 20 : 4;
+
   const body = (
     <>
       {error ? <div style={{ color: "#f87171", marginTop: standalone ? 0 : 8 }}>{error}</div> : null}
 
-      {!standalone ? (
+      {showStageTiles ? (
         <div className="overviewGrid pubCategoryGrid" style={{ marginTop: 12 }}>
           {(data?.stages || FACULTY_WORKFLOW_STAGES).map((stage) => {
             const meta = workflowStageMeta(stage.id);
@@ -127,10 +138,10 @@ export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, ca
               <div key={stage.id}>
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>{stage.label}</div>
                 <div style={{ display: "grid", gap: 6 }}>
-                  {stage.items.slice(0, standalone ? 20 : 4).map((p) => (
+                  {stage.items.slice(0, listLimit).map((p) => (
                     <WorkflowRow key={p.id} pub={p} canManage={canManage} busyId={busyId} onAdvance={advance} />
                   ))}
-                  {!standalone && stage.items.length > 4 ? (
+                  {!showStageTiles && stage.items.length > listLimit ? (
                     <button type="button" className="btn" onClick={() => setStageFilter(stage.id)}>
                       View all {stage.items.length} in {stage.label}
                     </button>
@@ -142,19 +153,21 @@ export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, ca
         </div>
       )}
 
-      {!standalone ? (
-        <div style={{ marginTop: 12 }}>
-          <Link className="btn" to="/research-workflow">
-            Open research workflow
-          </Link>
-        </div>
-      ) : (
+      {standalone ? (
         <div style={{ marginTop: 12 }}>
           <Link className="btn" to="/publications">
             Open publications
           </Link>
         </div>
-      )}
+      ) : null}
+
+      {!standalone && !embedded ? (
+        <div style={{ marginTop: 12 }}>
+          <Link className="btn" to="/research-workflow">
+            Open research workflow
+          </Link>
+        </div>
+      ) : null}
     </>
   );
 
@@ -181,6 +194,18 @@ export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, ca
         <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.35)" }}>
           {body}
         </div>
+      </div>
+    );
+  }
+
+  if (embedded) {
+    return (
+      <div className="card" style={{ marginTop: 16, borderColor: "rgba(56,189,248,0.35)" }}>
+        <div style={{ fontWeight: 800, fontSize: 16 }}>Publication workflow</div>
+        <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+          {departmentLabel || data?.department} — submitted → in process → pipeline → published.
+        </div>
+        {body}
       </div>
     );
   }

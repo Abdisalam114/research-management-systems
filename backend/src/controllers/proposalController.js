@@ -1,3 +1,5 @@
+const fs = require("fs");
+const path = require("path");
 const { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES } = require("../models/Proposal");
 const { Project } = require("../models/Project");
 const { User } = require("../models/User");
@@ -77,18 +79,24 @@ async function attachEthicsSummary(proposal) {
 }
 
 async function createLinkedEthicsApplication(proposal, user) {
+  const parts = (user.fullName || "").trim().split(/\s+/);
+  const defaultLevel =
+    proposal.programTier === "undergraduate" ? "undergraduate" : "";
   const ethics = await EthicsApplication.create({
     proposalId: proposal._id,
     researcherId: proposal.researcherId,
     programTier: proposal.programTier,
     projectTitle: proposal.title,
+    projectLevel: defaultLevel,
+    aimsObjectives: proposal.abstract || "",
     status: "draft",
     principal: {
-      firstName: (user.fullName || "").split(" ")[0] || "",
-      lastName: (user.fullName || "").split(" ").slice(1).join(" ") || "",
+      firstName: parts[0] || "",
+      lastName: parts.slice(1).join(" ") || "",
       email: user.email || "",
       department: user.department || proposal.department || "",
     },
+    applicantSignature: { name: user.fullName || "" },
   });
   proposal.ethicsApplicationId = ethics._id;
   await proposal.save();
@@ -109,6 +117,35 @@ async function persistProposalEthics(proposal, user, reqBody) {
     if (proposal.department) ethics.principal = { ...(ethics.principal || {}), department: proposal.department };
   }
   await ethics.save();
+  // #region agent log
+  try {
+    const logPath = path.join(process.cwd(), "debug-15a9cf.log");
+    fs.appendFileSync(
+      logPath,
+      `${JSON.stringify({
+        sessionId: "15a9cf",
+        location: "proposalController.js:persistProposalEthics",
+        message: "ethics persisted",
+        data: {
+          proposalId: String(proposal._id),
+          hasProjectTitle: Boolean(String(ethics.projectTitle || "").trim()),
+          hasPiFirst: Boolean(String(ethics.principal?.firstName || "").trim()),
+          hasPiLast: Boolean(String(ethics.principal?.lastName || "").trim()),
+          hasProjectLevel: Boolean(String(ethics.projectLevel || "").trim()),
+          hasAims: Boolean(String(ethics.aimsObjectives || "").trim()),
+          hasDesign: Boolean(String(ethics.design || "").trim()),
+          hasSignature: Boolean(String(ethics.applicantSignature?.name || "").trim()),
+          formComplete: isEthicsFormComplete(ethics),
+        },
+        timestamp: Date.now(),
+        hypothesisId: "E",
+        runId: "pre-fix",
+      })}\n`
+    );
+  } catch {
+    /* ignore log errors */
+  }
+  // #endregion
 }
 
 async function createProposal(req, res) {

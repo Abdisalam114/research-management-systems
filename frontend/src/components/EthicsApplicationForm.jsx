@@ -1,5 +1,23 @@
+import { useEffect } from "react";
 import { SUBJECT_OPTS, INSTRUMENT_OPTS, CONSENT_ITEMS } from "../constants/ethicsFormOptions";
 import { getEthicsMissingFields } from "../utils/proposalSubmitValidation";
+
+const REQUIRED_FIELD_IDS = {
+  projectTitle: "ethics-req-projectTitle",
+  "principal.firstName": "ethics-req-pi-firstName",
+  "principal.lastName": "ethics-req-pi-lastName",
+  projectLevel: "ethics-req-projectLevel",
+  aimsObjectives: "ethics-req-aimsObjectives",
+  design: "ethics-req-design",
+  "applicantSignature.name": "ethics-req-signature",
+};
+
+function scrollToEthicsField(fieldKey) {
+  const id = REQUIRED_FIELD_IDS[fieldKey];
+  if (!id) return;
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  document.getElementById(id)?.focus?.();
+}
 
 function patchForm(prev, path, value) {
   const next = { ...prev };
@@ -25,6 +43,30 @@ export function EthicsApplicationForm({
   autoFillHint = false,
 }) {
   const set = (path, value) => setForm((prev) => patchForm(prev, path, value));
+  const missing = getEthicsMissingFields(form);
+
+  useEffect(() => {
+    // #region agent log
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15a9cf" },
+      body: JSON.stringify({
+        sessionId: "15a9cf",
+        location: "EthicsApplicationForm.jsx:mount",
+        message: "ethics form rendered",
+        data: {
+          missingCount: missing.length,
+          missingFields: missing.map((m) => m.field),
+          formComplete,
+          embeddedInProposal,
+        },
+        timestamp: Date.now(),
+        hypothesisId: "A",
+        runId: "pre-fix",
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [missing.length, formComplete, embeddedInProposal]);
 
   const toggleInArray = (path, value) => {
     const arr = path.split(".").reduce((acc, k) => acc?.[k], form) || [];
@@ -70,19 +112,102 @@ export function EthicsApplicationForm({
         <strong>{formComplete ? "Complete ✓" : "Incomplete"}</strong>
         {!formComplete ? (
           <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontWeight: 400 }}>
-            {getEthicsMissingFields(form).map((item) => (
-              <li key={item.field}>{item.label}</li>
+            {missing.map((item) => (
+              <li key={item.field}>
+                <button
+                  type="button"
+                  className="btn linkish"
+                  style={{ padding: 0, fontSize: "inherit", textAlign: "left" }}
+                  onClick={() => scrollToEthicsField(item.field)}
+                >
+                  {item.label}
+                </button>
+              </li>
             ))}
           </ul>
         ) : null}
       </div>
 
+      <Section title="Required fields — complete before submit" highlight>
+        <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+          Fill every field below. These are checked before you can submit to the Director.
+        </p>
+        <div className="field">
+          <label htmlFor="ethics-req-projectTitle">Project title (ethics form) *</label>
+          <input
+            id="ethics-req-projectTitle"
+            disabled={readOnly}
+            value={form.projectTitle}
+            onChange={(e) => set("projectTitle", e.target.value)}
+          />
+        </div>
+        <div className="row">
+          <div className="field">
+            <label htmlFor="ethics-req-pi-firstName">PI first name (Principal Investigator) *</label>
+            <input
+              id="ethics-req-pi-firstName"
+              disabled={readOnly}
+              value={form.principal?.firstName || ""}
+              onChange={(e) => set("principal.firstName", e.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="ethics-req-pi-lastName">PI last name *</label>
+            <input
+              id="ethics-req-pi-lastName"
+              disabled={readOnly}
+              value={form.principal?.lastName || ""}
+              onChange={(e) => set("principal.lastName", e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="field">
+          <label htmlFor="ethics-req-projectLevel">Project level (Undergraduate / PGD / Master) *</label>
+          <select
+            id="ethics-req-projectLevel"
+            disabled={readOnly}
+            value={form.projectLevel}
+            onChange={(e) => set("projectLevel", e.target.value)}
+          >
+            <option value="">— Select level —</option>
+            <option value="undergraduate">Undergraduate</option>
+            <option value="pgd">PGD</option>
+            <option value="master">Master</option>
+          </select>
+        </div>
+        <Textarea
+          id="ethics-req-aimsObjectives"
+          label="Aims & objectives *"
+          value={form.aimsObjectives}
+          onChange={(v) => set("aimsObjectives", v)}
+          readOnly={readOnly}
+        />
+        <Textarea
+          id="ethics-req-design"
+          label="Design (research methodology) *"
+          value={form.design}
+          onChange={(v) => set("design", v)}
+          readOnly={readOnly}
+        />
+        <div className="field">
+          <label htmlFor="ethics-req-signature">Signature (your full name) *</label>
+          <input
+            id="ethics-req-signature"
+            disabled={readOnly}
+            value={form.applicantSignature?.name || ""}
+            onChange={(e) => set("applicantSignature.name", e.target.value)}
+            placeholder="Enter your full name"
+          />
+        </div>
+      </Section>
+
       <Section title="Part I — Applicant information">
         <PersonFields
-          label="Principal Researcher"
+          label="Principal Investigator (PI) — additional details"
           person={form.principal}
           onChange={(field, v) => set(`principal.${field}`, v)}
           readOnly={readOnly}
+          hideNameFields={!readOnly}
         />
         <PersonFields
           label="Co-researcher / Supervisor"
@@ -102,20 +227,10 @@ export function EthicsApplicationForm({
       </Section>
 
       <Section title="Part II — Project details">
-        <div className="field">
-          <label>1. Project title</label>
-          <input disabled={readOnly} value={form.projectTitle} onChange={(e) => set("projectTitle", e.target.value)} />
-        </div>
+        <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+          Required title, level, aims, and design are entered in the section above. Complete the remaining REC fields below.
+        </p>
         <div className="row">
-          <div className="field">
-            <label>2. Project level</label>
-            <select disabled={readOnly} value={form.projectLevel} onChange={(e) => set("projectLevel", e.target.value)}>
-              <option value="">—</option>
-              <option value="undergraduate">Undergraduate</option>
-              <option value="pgd">PGD</option>
-              <option value="master">Master</option>
-            </select>
-          </div>
           <div className="field">
             <label>Start date</label>
             <input type="date" disabled={readOnly} value={form.startDate || ""} onChange={(e) => set("startDate", e.target.value)} />
@@ -131,14 +246,7 @@ export function EthicsApplicationForm({
           onChange={(v) => set("backgroundLiterature", v)}
           readOnly={readOnly}
         />
-        <Textarea
-          label="4.1 Aims & objectives (max 250 words)"
-          value={form.aimsObjectives}
-          onChange={(v) => set("aimsObjectives", v)}
-          readOnly={readOnly}
-        />
         <Textarea label="4.2 Rationale for the research" value={form.rationale} onChange={(v) => set("rationale", v)} readOnly={readOnly} />
-        <Textarea label="5. Design" value={form.design} onChange={(v) => set("design", v)} readOnly={readOnly} />
 
         <div className="field">
           <label>6.1 Type of participants</label>
@@ -363,43 +471,60 @@ export function EthicsApplicationForm({
           By submitting, you confirm that you have completed this form and that the research will follow the Belmont Report,
           Helsinki Declaration, and applicable ethical guidelines.
         </p>
-        <div className="field">
-          <label>Signature (your full name)</label>
-          <input
-            disabled={readOnly}
-            value={form.applicantSignature?.name || ""}
-            onChange={(e) => set("applicantSignature.name", e.target.value)}
-            placeholder="Enter your full name"
-          />
-        </div>
+        {readOnly && form.applicantSignature?.name ? (
+          <div className="field">
+            <label>Signature (your full name)</label>
+            <div>{form.applicantSignature.name}</div>
+          </div>
+        ) : (
+          <p className="muted" style={{ fontSize: 13 }}>
+            Your signature is entered in the Required fields section above.
+          </p>
+        )}
       </Section>
     </>
   );
 }
 
-function Section({ title, children }) {
+function Section({ title, children, highlight = false }) {
   return (
-    <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid rgba(56,189,248,0.18)" }}>
-      <div style={{ fontWeight: 800, color: "#7dd3fc", marginBottom: 10 }}>{title}</div>
+    <div
+      style={{
+        marginTop: 16,
+        paddingTop: 12,
+        borderTop: "1px solid rgba(56,189,248,0.18)",
+        ...(highlight
+          ? {
+              padding: "14px 14px 4px",
+              borderRadius: 10,
+              border: "1px solid rgba(34,197,94,0.35)",
+              background: "rgba(34,197,94,0.06)",
+            }
+          : {}),
+      }}
+    >
+      <div style={{ fontWeight: 800, color: highlight ? "#16a34a" : "#7dd3fc", marginBottom: 10 }}>{title}</div>
       {children}
     </div>
   );
 }
 
-function PersonFields({ label, person, onChange, readOnly }) {
+function PersonFields({ label, person, onChange, readOnly, hideNameFields = false }) {
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
-      <div className="row">
-        <div className="field">
-          <label>Last name</label>
-          <input disabled={readOnly} value={person.lastName} onChange={(e) => onChange("lastName", e.target.value)} />
+      {!hideNameFields ? (
+        <div className="row">
+          <div className="field">
+            <label>Last name</label>
+            <input disabled={readOnly} value={person.lastName} onChange={(e) => onChange("lastName", e.target.value)} />
+          </div>
+          <div className="field">
+            <label>First name</label>
+            <input disabled={readOnly} value={person.firstName} onChange={(e) => onChange("firstName", e.target.value)} />
+          </div>
         </div>
-        <div className="field">
-          <label>First name</label>
-          <input disabled={readOnly} value={person.firstName} onChange={(e) => onChange("firstName", e.target.value)} />
-        </div>
-      </div>
+      ) : null}
       <div className="row">
         <div className="field">
           <label>Title / position</label>
@@ -434,11 +559,11 @@ function PersonFields({ label, person, onChange, readOnly }) {
   );
 }
 
-function Textarea({ label, value, onChange, readOnly }) {
+function Textarea({ label, value, onChange, readOnly, id }) {
   return (
     <div className="field">
-      <label>{label}</label>
-      <textarea rows={3} disabled={readOnly} value={value} onChange={(e) => onChange(e.target.value)} />
+      <label htmlFor={id}>{label}</label>
+      <textarea id={id} rows={3} disabled={readOnly} value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }

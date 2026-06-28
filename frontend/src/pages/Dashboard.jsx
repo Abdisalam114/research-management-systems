@@ -70,6 +70,9 @@ function RoleDashboard({ role, user }) {
       )}
 
       <div className="dashboardQuickLinks">
+          <Link className="btn primary" to="/research-workflow">
+            Research Workflow Status
+          </Link>
           <Link className="btn primary" to="/proposals">
             Proposals
           </Link>

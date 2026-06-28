@@ -9,6 +9,10 @@ const { User, USER_STATUSES, ROLES } = require("../models/User");
 const { Department } = require("../models/Department");
 const { EthicsApplication } = require("../models/EthicsApplication");
 const { ThesisGroup } = require("../models/ThesisGroup");
+const {
+  buildResearchJourneyForResearcher,
+  listResearchersForJourney,
+} = require("../utils/researchJourney");
 const { Notification } = require("../models/Notification");
 const { FACULTIES, matchFacultyByName } = require("../utils/facultyMatcher");
 const {
@@ -19,6 +23,7 @@ const {
   grantSuccessRate: computeGrantSuccessRate,
 } = require("../utils/metricsDefinitions");
 const { enrichProjectsResearcher } = require("../utils/projectPi");
+const { AppError } = require("../utils/AppError");
 const { userDisplayName } = require("../utils/userDisplay");
 const PDFDocument = require("pdfkit");
 
@@ -749,6 +754,42 @@ async function getFinanceReport(req, res) {
   });
 }
 
+async function getResearchJourney(req, res) {
+  const { role, id: userId, department } = req.user;
+  const { researcherId: researcherIdQuery } = req.query || {};
+  const tierFilter = req.tierWhere({});
+
+  const isStaff = ["research_director", "faculty_coordinator"].includes(role);
+
+  if (!researcherIdQuery) {
+    if (role === "researcher") {
+      const journey = await buildResearchJourneyForResearcher(userId, tierFilter);
+      if (!journey) throw new AppError("Researcher not found", 404);
+      return res.json({ mode: "journey", ...journey });
+    }
+    if (!isStaff) throw new AppError("Forbidden", 403);
+    const dept = role === "faculty_coordinator" ? (department || "").trim() : "";
+    const researchers = await listResearchersForJourney(tierFilter, dept || undefined);
+    return res.json({ mode: "picker", researchers });
+  }
+
+  if (role === "researcher" && String(researcherIdQuery) !== String(userId)) {
+    throw new AppError("Forbidden", 403);
+  }
+
+  const journey = await buildResearchJourneyForResearcher(researcherIdQuery, tierFilter);
+  if (!journey) throw new AppError("Researcher not found", 404);
+
+  if (role === "faculty_coordinator") {
+    const dept = (department || "").trim();
+    if (dept && journey.researcher.department !== dept) {
+      throw new AppError("Researcher is outside your faculty", 403);
+    }
+  }
+
+  res.json({ mode: "journey", ...journey });
+}
+
 module.exports = {
   getDashboardMetrics,
   buildInstitutionalAnalytics,
@@ -757,5 +798,6 @@ module.exports = {
   getFinanceReport,
   getFacultyReport,
   exportFacultyReportPdf,
+  getResearchJourney,
 };
 

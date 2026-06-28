@@ -5,11 +5,11 @@ import logo from "../assets/jamhuriya-logo.png";
 
 const MENU = [
   { to: "/dashboard", label: "Dashboard & Analytics", icon: "🏠", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
+  { to: "/research-workflow", label: "Research Workflow Status", icon: "🔄", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/ethics", label: "Ethics", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/publications", label: "Publications & Outputs", icon: "📚", roles: ["research_director", "faculty_coordinator", "researcher"] },
-  { to: "/research-workflow", label: "Research Workflow", icon: "🔄", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/thesis", label: "Thesis", icon: "🎓", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/grants", label: "Grants", icon: "💰", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
   { to: "/budgets", label: "Finance & Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher"] },

@@ -1,5 +1,12 @@
 /** Shared ethics application form state (proposal + standalone ethics page). */
 
+import { PROGRAM_TIERS } from "../constants/programTier";
+
+export function defaultProjectLevelFromTier(programTier) {
+  if (programTier === PROGRAM_TIERS.UNDERGRADUATE) return "undergraduate";
+  return "";
+}
+
 export function emptyEthicsForm() {
   return {
     principal: { lastName: "", firstName: "", title: "", faculty: "", department: "", qualification: "", phone: "", email: "" },
@@ -37,30 +44,60 @@ export function emptyEthicsForm() {
 export function ethicsApplicationToForm(a) {
   if (!a) return emptyEthicsForm();
   const dt = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
-  return {
-    ...emptyEthicsForm(),
+  const empty = emptyEthicsForm();
+  const form = {
+    ...empty,
     ...a,
+    principal: { ...empty.principal, ...(a.principal || {}) },
+    coResearcher: { ...empty.coResearcher, ...(a.coResearcher || {}) },
     startDate: dt(a.startDate),
     endDate: dt(a.endDate),
-    risk: a.risk || { level: "", description: "" },
-    riskPrecautions: a.riskPrecautions || { has: false, description: "" },
-    consent: { ...emptyEthicsForm().consent, ...(a.consent || {}) },
-    dataSafety: { ...emptyEthicsForm().dataSafety, ...(a.dataSafety || {}) },
-    privacy: { ...emptyEthicsForm().privacy, ...(a.privacy || {}) },
-    conflictOfInterest: { ...emptyEthicsForm().conflictOfInterest, ...(a.conflictOfInterest || {}) },
-    applicantSignature: { name: a.applicantSignature?.name || "" },
+    risk: { ...empty.risk, ...(a.risk || {}) },
+    riskPrecautions: { ...empty.riskPrecautions, ...(a.riskPrecautions || {}) },
+    dataHandling: { ...empty.dataHandling, ...(a.dataHandling || {}) },
+    consent: { ...empty.consent, ...(a.consent || {}) },
+    dataSafety: { ...empty.dataSafety, ...(a.dataSafety || {}) },
+    privacy: { ...empty.privacy, ...(a.privacy || {}) },
+    conflictOfInterest: { ...empty.conflictOfInterest, ...(a.conflictOfInterest || {}) },
+    applicantSignature: { ...empty.applicantSignature, ...(a.applicantSignature || {}) },
     otherInvestigators: a.otherInvestigators || [],
   };
+  // #region agent log
+  fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15a9cf" },
+    body: JSON.stringify({
+      sessionId: "15a9cf",
+      location: "ethicsFormState.js:ethicsApplicationToForm",
+      message: "ethics API mapped to form",
+      data: {
+        hasProjectTitle: Boolean(String(form.projectTitle || "").trim()),
+        hasPiFirst: Boolean(String(form.principal?.firstName || "").trim()),
+        hasPiLast: Boolean(String(form.principal?.lastName || "").trim()),
+        hasProjectLevel: Boolean(String(form.projectLevel || "").trim()),
+        hasAims: Boolean(String(form.aimsObjectives || "").trim()),
+        hasDesign: Boolean(String(form.design || "").trim()),
+        hasSignature: Boolean(String(form.applicantSignature?.name || "").trim()),
+      },
+      timestamp: Date.now(),
+      hypothesisId: "B",
+      runId: "pre-fix",
+    }),
+  }).catch(() => {});
+  // #endregion
+  return form;
 }
 
 /** Pre-fill ethics from logged-in researcher + proposal fields. */
-export function buildEthicsFromProposalAndUser(proposal, user) {
+export function buildEthicsFromProposalAndUser(proposal, user, programTier) {
   const parts = (user?.fullName || "").trim().split(/\s+/);
   const firstName = parts[0] || "";
   const lastName = parts.slice(1).join(" ") || "";
+  const tier = programTier || proposal?.programTier;
   return {
     ...emptyEthicsForm(),
     projectTitle: proposal?.title || "",
+    projectLevel: defaultProjectLevelFromTier(tier),
     aimsObjectives: proposal?.abstract || "",
     principal: {
       ...emptyEthicsForm().principal,
@@ -74,12 +111,15 @@ export function buildEthicsFromProposalAndUser(proposal, user) {
 }
 
 /** Keep ethics in sync when proposal title / dept / abstract change. */
-export function syncEthicsFromProposal(ethics, proposal, user) {
+export function syncEthicsFromProposal(ethics, proposal, user, programTier) {
   const parts = (user?.fullName || "").trim().split(/\s+/);
+  const tier = programTier || proposal?.programTier;
+  const defaultLevel = defaultProjectLevelFromTier(tier);
   return {
     ...ethics,
     projectTitle: proposal.title || "",
-    aimsObjectives: proposal.abstract || ethics.aimsObjectives,
+    projectLevel: ethics.projectLevel || defaultLevel,
+    aimsObjectives: ethics.aimsObjectives || proposal.abstract || "",
     principal: {
       ...ethics.principal,
       department: proposal.department || user?.department || ethics.principal?.department || "",

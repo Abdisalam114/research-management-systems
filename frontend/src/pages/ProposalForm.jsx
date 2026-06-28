@@ -13,6 +13,7 @@ import {
   syncEthicsFromProposal,
 } from "../utils/ethicsFormState";
 import { isEthicsFormComplete } from "../utils/ethicsForm";
+import { useProgramTier } from "../hooks/useProgramTier";
 import {
   collectSubmitValidationIssues,
   SUBMIT_SUCCESS_MESSAGE,
@@ -23,6 +24,7 @@ export function ProposalFormPage() {
   const isEdit = Boolean(id);
   const navigate = useNavigate();
   const { accessToken, user } = useAuth();
+  const { programTier } = useProgramTier();
 
   const [proposal, setProposal] = useState({
     title: "",
@@ -32,7 +34,7 @@ export function ProposalFormPage() {
     document: null,
     requiresEthics: true,
   });
-  const [ethicsForm, setEthicsForm] = useState(() => buildEthicsFromProposalAndUser({}, user));
+  const [ethicsForm, setEthicsForm] = useState(() => buildEthicsFromProposalAndUser({}, user, programTier));
   const [loaded, setLoaded] = useState(!isEdit);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -70,7 +72,7 @@ export function ProposalFormPage() {
         setEthicsForm(
           ethicsRes.application
             ? ethicsApplicationToForm(ethicsRes.application)
-            : buildEthicsFromProposalAndUser(p, user)
+            : buildEthicsFromProposalAndUser(p, user, programTier)
         );
         setSavedId(p.id);
         setStatus(p.status);
@@ -82,11 +84,11 @@ export function ProposalFormPage() {
     return () => {
       cancelled = true;
     };
-  }, [isEdit, accessToken, id, user]);
+  }, [isEdit, accessToken, id, user, programTier]);
 
   const syncFromProposal = useCallback(() => {
-    setEthicsForm((prev) => syncEthicsFromProposal(prev, proposal, user));
-  }, [proposal, user]);
+    setEthicsForm((prev) => syncEthicsFromProposal(prev, proposal, user, programTier));
+  }, [proposal, user, programTier]);
 
   useEffect(() => {
     if (!loaded && isEdit) return;
@@ -128,21 +130,27 @@ export function ProposalFormPage() {
       setStatus(res.proposal.status);
       setDraftSaved(true);
       // #region agent log
-      fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15a9cf" },
         body: JSON.stringify({
-          sessionId: "6113cc",
+          sessionId: "15a9cf",
           location: "ProposalForm.jsx:saveDraft",
           message: "proposal+ethics saved",
           data: {
             proposalId: res.proposal.id,
-            hasEthics: Boolean(proposal.requiresEthics),
+            hasProjectTitle: Boolean(String(ethicsForm.projectTitle || "").trim()),
+            hasPiFirst: Boolean(String(ethicsForm.principal?.firstName || "").trim()),
+            hasPiLast: Boolean(String(ethicsForm.principal?.lastName || "").trim()),
+            hasProjectLevel: Boolean(String(ethicsForm.projectLevel || "").trim()),
+            hasAims: Boolean(String(ethicsForm.aimsObjectives || "").trim()),
+            hasDesign: Boolean(String(ethicsForm.design || "").trim()),
+            hasSignature: Boolean(String(ethicsForm.applicantSignature?.name || "").trim()),
             formComplete,
           },
           timestamp: Date.now(),
-          hypothesisId: "H-unified-save",
-          runId: "post-fix",
+          hypothesisId: "C",
+          runId: "pre-fix",
         }),
       }).catch(() => {});
       // #endregion
