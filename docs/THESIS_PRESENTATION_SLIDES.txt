@@ -1,0 +1,519 @@
+================================================================================
+JAMHURIYA RESEARCH MANAGEMENT SYSTEM (RMS)
+Thesis Presentation — PowerPoint-Ready Text
+Copy each [SLIDE] block into one PowerPoint slide.
+Speaker notes are under [NOTES] — paste into PowerPoint "Notes" area.
+================================================================================
+
+[SLIDE 1 — TITLE]
+Jamhuriya Research Management System (RMS)
+A Web-Based Platform for Managing the University Research Lifecycle
+
+[Your Full Name]
+[Supervisor Name]
+Jamhuriya University
+[Date — e.g. June 2026]
+
+[NOTES — Somali]
+Assalaamu caleykum. Magacaygu waa [magacaaga]. Maanta waxaan soo bandhigi doonaa thesis-kayga: Jamhuriya RMS — nidaam web ah oo maamula cilmi-baarista jaamacadda laga bilaabo proposal ilaa repository.
+
+
+================================================================================
+
+[SLIDE 2 — THE PROBLEM]
+The Problem
+
+• Research managed with paper, email, and spreadsheets
+• No single system from idea → funding → publication
+• Slow approvals and lost documents
+• Unclear financial tracking (grants vs budgets vs payments)
+• Difficult institutional reporting for leadership
+
+Impact: Delays research, reduces transparency, weakens accountability
+
+[NOTES — Somali]
+Cilmi-baarista waxaa lagu maamulaa warqado iyo Excel. Xogtu way lumaan, ansixintu way gaabisataa, maaliyaddu ma cadda, warbixintu way adag tahay.
+
+
+================================================================================
+
+[SLIDE 3 — AIM & OBJECTIVES]
+Aim & Objectives
+
+AIM
+Design and implement a digital Research Management System for Jamhuriya University
+
+OBJECTIVES
+1. Digitize proposal submission and review workflow
+2. Automate project creation after director approval
+3. Manage grants, budgets, payments, and procurement
+4. Track publications and institutional repository assets
+5. Provide role-based dashboards and PDF reports
+6. Support Undergraduate (UG) and Postgraduate (PG) portals
+
+[NOTES — Somali]
+Ujeeddo: nidaam digital ah. Lix ujeeddo: proposals online, auto project, grants+budgets, publications, dashboards, laba portal UG/PG.
+
+
+================================================================================
+
+[SLIDE 4 — SCOPE]
+Scope
+
+IN SCOPE
+• 8 core modules (university specification)
+• Extended modules: Ethics, Thesis Supervision, Research Workflow
+• 4 user roles with RBAC
+• MERN stack web application
+• MongoDB database (14+ collections)
+• Cloud deployment (Render + MongoDB Atlas)
+
+OUT OF SCOPE (Future Work)
+• Mobile native application
+• Email/SMS notifications
+• Multi-university tenancy
+
+[NOTES — Somali]
+8 module spec + modules dheeraad ah (Thesis Supervision, Ethics). Afar role, MERN stack.
+
+
+================================================================================
+
+[SLIDE 5 — METHODOLOGY]
+Methodology
+
+Approach: Agile / Iterative Development
+
+| Phase          | Activity                              |
+|----------------|---------------------------------------|
+| Requirements   | 8 modules, 4 roles (university spec)  |
+| Design         | Database models, REST API, UI         |
+| Implementation | MERN stack                            |
+| Testing        | Seed data, role testing, smoke scripts|
+| Deployment     | Render.com + MongoDB Atlas (free tier)|
+
+[NOTES — Somali]
+Agile approach: requirements → design → build → test → deploy. Free cloud hosting.
+
+
+================================================================================
+
+[SLIDE 6 — SYSTEM ARCHITECTURE]
+System Architecture
+
+Three-Tier Architecture
+
+  [ Browser — React + Vite Frontend ]
+              ↕  REST API / JSON
+  [ Server — Node.js + Express API ]
+              ↕  Mongoose ODM
+  [ Database — MongoDB (rms) ]
+
+Security: JWT auth • bcrypt passwords • Role-Based Access Control (RBAC)
+
+[NOTES — Somali]
+Saddex heer: Browser (React), Server (Express), Database (MongoDB). JWT iyo RBAC amniga.
+
+
+================================================================================
+
+[SLIDE 7 — USER ROLES]
+Four User Roles (RBAC)
+
+RESEARCH DIRECTOR
+Approve proposals, grants, ethics • Manage users & departments • Institutional analytics
+
+FACULTY COORDINATOR
+Pre-review proposals • Validate publications • Faculty reports
+
+FINANCE OFFICER
+Budget items • Payment requests • Purchase orders • Finance reports
+
+RESEARCHER
+Submit proposals • Manage projects • Apply for grants • Publish outputs
+
+Special: Director selects UG or PG portal at login — data separated by programTier
+
+[NOTES — Somali]
+Afar role: Director ansixiyaa, Coordinator pre-review, Finance maaliyadda, Researcher gudbiyaa. Director wuxuu dooranayaa UG ama PG.
+
+
+================================================================================
+
+[SLIDE 8 — MODULES (8 CORE + EXTENSIONS)]
+Modules: 8 Core (University Spec) + Extensions
+
+─── 8 CORE MODULES (official university specification) ───
+
+1. Proposal Management      — submission, review, version history
+2. Project Management       — timeline, milestones, team, progress
+3. Grant & Funding          — applications, director approval, donor tracking
+4. Publications & Outputs   — papers, patents, theses (as output type), validation
+5. Budget & Finance         — budgets, payments, purchase orders (PO)
+6. Institutional Repository — archive + OAI-PMH export
+7. Collaboration            — research groups + messaging
+8. Analytics & Reporting    — dashboards, charts, PDF exports
+
+─── EXTENDED MODULES (added in this implementation) ───
+
+• Ethics (REC)              — standalone ethics applications; gates proposal submit
+• Thesis Supervision (/thesis) — supervisor, students, meetings, status workflow
+  (PG/UG thesis groups — NOT the same as the 8 spec modules)
+• Research Workflow         — faculty research workflow tracking
+
+Where “thesis” appears in the 8 core modules:
+  • Publications → output type: thesis
+  • Repository   → archived thesis documents (type: thesis)
+  • Thesis Supervision → separate module for supervising students (ThesisGroup)
+
+[NOTES — Somali]
+8 module waa spec-ka jaamacadda — thesis document waxaa lagu qoraa Publications iyo Repository.
+Thesis Supervision (/thesis) waa module DHEERAAD ah — supervisor, ardayda, kulamo, status
+(proposed → in progress → submitted → defended → completed). Ma aha module #9 ee spec-ka,
+laakiin waa qayb muhiim ah gaar ahaan Postgraduate portal.
+
+
+================================================================================
+
+[SLIDE 8B — THESIS SUPERVISION MODULE (DETAIL)]
+Thesis Supervision Module (/thesis)
+
+Purpose: Manage thesis supervision separately from general research projects
+
+Who uses it: Director, Coordinator, Researcher (supervisor)
+
+Features:
+• Create thesis group — title, department, faculty, supervisor
+• Register students (name, student ID, email)
+• Track status: proposed → in progress → submitted → defended → completed
+• Schedule and log supervision meetings (date, location, agenda, notes)
+• Linked to ResearchGroup (optional collaboration group)
+
+Difference from other modules:
+  NOT the same as your graduation thesis (this presentation)
+  NOT a 9th university-spec module — it extends PG/UG thesis oversight
+  Thesis final document → also stored in Publications + Repository
+
+Demo tip: Show /thesis after Publications in live demo (PG portal)
+
+[NOTES — Somali]
+Thesis module: maamulka kormeerka thesis ardayda — supervisor, arday, kulamo.
+Thesis-ka aad berri u sharaxayso waa mashruucaaga, ma aha module gudaha system-ka.
+Document-ka thesis-ka ardayda waxaa lagu kaydiyaa Publications iyo Repository.
+
+
+================================================================================
+
+[SLIDE 9 — CORE WORKFLOW]
+Core Research Workflow
+
+Proposal submitted
+    → Coordinator pre-review
+    → Ethics approval
+    → Director approval
+    → ★ PROJECT auto-created
+    → Grant request (linked to project)
+    → Director award
+    → ★ BUDGET auto-created
+    → Payments / Purchase Orders (Finance)
+    → Publication → Validation
+    → Repository archive
+    → Analytics & Annual Report PDF
+
+★ = Automated by the system (no manual step)
+
+[NOTES — Somali]
+Socodka: proposal → ethics → director → AUTO project → grant → AUTO budget → finance → publication → repository. Laba automation: project iyo budget.
+
+
+================================================================================
+
+[SLIDE 10 — DATABASE / ERD]
+Database Design
+
+Engine: MongoDB (NoSQL, document-oriented)
+Database name: rms
+
+14 Collections:
+users • departments • proposals • projects • budgets • grants
+publications • repositoryitems • researchgroups • conversations
+notifications • payments • purchaseorders • researchpolicies
+(+ ethicsapplications, thesisgroups)
+
+Key relationships:
+  User → Proposal → Project (on approval)
+  Project → Grant → Budget (on award)
+  Budget → Payment / PurchaseOrder
+  Publication → RepositoryItem
+
+[NOTES — Somali]
+14 collection MongoDB. Xiriirka muhiimka ah: Proposal→Project, Grant→Budget, Budget→Payment.
+
+
+================================================================================
+
+[SLIDE 11 — KEY FEATURES]
+Key Features & Innovation
+
+✓ Thesis Supervision module (/thesis) — PG/UG student oversight
+✓ Dual portal (Undergraduate & Postgraduate)
+✓ Ethics workflow gates proposal submission
+✓ Document version history on proposals
+✓ Automatic project creation on approval
+✓ Automatic budget creation on grant award
+✓ CrossRef DOI citation refresh
+✓ OAI-PMH repository export
+✓ Group chat per research group
+✓ Annual & faculty PDF reports
+✓ Realistic seed data (200+ records for testing)
+
+[NOTES — Somali]
+Features gaar ah: labo portal, ethics, version history, auto project/budget, CrossRef, OAI-PMH, group chat, PDF reports.
+
+
+================================================================================
+
+[SLIDE 12 — TECHNOLOGY STACK]
+Technology Stack
+
+| Layer      | Technology                    |
+|------------|-------------------------------|
+| Frontend   | React 18, Vite, Recharts      |
+| Backend    | Node.js, Express 5            |
+| Database   | MongoDB, Mongoose             |
+| Auth       | JWT (access + refresh tokens) |
+| File upload| Multer                        |
+| PDF export | PDFKit                        |
+| Deployment | Render.com, MongoDB Atlas     |
+| Version control | Git, GitHub              |
+
+GitHub: github.com/Abdisalam114/research-management-systems
+
+[NOTES — Somali]
+MERN stack + JWT + Multer + PDFKit. GitHub repo waa la wadaagi karaa clone.
+
+
+================================================================================
+
+[SLIDE 13 — SCREENSHOTS / DEMO PREVIEW]
+System Screenshots
+
+[INSERT IMAGE: Login page]
+[INSERT IMAGE: Director dashboard with charts]
+[INSERT IMAGE: Proposal review / approval screen]
+[INSERT IMAGE: Project details with linked grants]
+[INSERT IMAGE: Budgets page]
+[INSERT IMAGE: Publications or Repository]
+[INSERT IMAGE: Thesis Supervision (/thesis) — optional, PG demo]
+
+Tip: Use live demo OR screenshots if internet is unavailable
+
+[NOTES — Somali]
+Geli screenshots 4-6 ah. Haddii internet jiro — live demo ka fiican.
+
+
+================================================================================
+
+[SLIDE 14 — TESTING]
+Testing & Validation
+
+Methods:
+• Database seed: 200+ realistic records (UG + PG portals)
+• Manual testing: 9 user accounts (all roles)
+• Automated smoke scripts (verify-all-roles, verify-e2e)
+• API health endpoint verification
+
+Test accounts (after npm run seed):
+  director@rms.edu        / Director2024!
+  coordinator@rms.edu     / Coordinator2024!
+  finance@rms.edu         / Finance2024!
+  asha@rms.edu            / Researcher2024!
+
+Result: All core workflows verified end-to-end ✓
+
+[NOTES — Somali]
+200+ records seed, 9 users, smoke scripts. Dhammaan workflows waa la test-gareeyay.
+
+
+================================================================================
+
+[SLIDE 15 — LIMITATIONS]
+Limitations
+
+• Finance officer cannot approve grants (director only)
+• Notifications are in-app only (no email/SMS)
+• Single-institution design (not multi-tenant)
+• Requires MongoDB running (local or Atlas)
+• Free Render tier sleeps after 15 min idle
+
+[NOTES — Somali]
+Xaddidaadaha: finance ma ansixiyo grants, email ma jiro, single university, Render free tier wuu seexdaa.
+
+
+================================================================================
+
+[SLIDE 16 — FUTURE WORK]
+Future Work
+
+• Email and SMS notification gateway
+• Mobile application (React Native)
+• Finance officer grant approval workflow
+• Multi-campus / multi-university support
+• AI-assisted research analytics and recommendations
+• Integration with external grant databases
+
+[NOTES — Somali]
+Mustaqbalka: email/SMS, mobile app, multi-campus, AI analytics.
+
+
+================================================================================
+
+[SLIDE 17 — CONCLUSION]
+Conclusion
+
+• Built a complete Research Management System for Jamhuriya University
+• Covers full lifecycle: proposal → project → grant → budget → publication → repository
+• Four roles; 8 core modules + extensions (Ethics, Thesis Supervision)
+• Two portals (UG/PG); thesis documents in Publications + Repository
+• Automated workflows reduce manual work and errors
+• Tested and ready for institutional pilot deployment
+• Open source on GitHub for collaboration and extension
+
+[NOTES — Somali]
+Gabagabo: 8 core module + Thesis Supervision extension, auto workflows, diyaar pilot.
+
+
+================================================================================
+
+[SLIDE 18 — LIVE DEMO]
+Live Demonstration
+
+Demo script (5 minutes):
+
+1. Login as Director → select UG portal
+2. Dashboard → show analytics charts
+3. Proposals → open submitted proposal → Approve
+   → Show: Project auto-created
+4. Grants → open submitted grant → Approve with amount
+   → Show: Budget auto-created in Budgets
+5. Login as Researcher → show project + budget visible
+6. (Optional PG) Thesis Supervision → show thesis group + meetings
+7. Q&A
+
+Thank you — Questions?
+
+[NOTES — Somali]
+Demo: director login → dashboard → approve proposal (project auto) → approve grant (budget auto) → researcher arko. Mahadsanidiin!
+
+
+================================================================================
+APPENDIX A — ABSTRACT (English, for thesis document)
+================================================================================
+
+Title: Design and Implementation of a Web-Based Research Management System
+       for Jamhuriya University
+
+Abstract:
+
+This thesis presents the design, development, and evaluation of the Jamhuriya
+Research Management System (RMS), a web-based platform built using the MERN
+stack (MongoDB, Express.js, React, and Node.js) to digitize the full research
+lifecycle at Jamhuriya University. The system addresses the limitations of
+manual, paper-based research administration by providing an integrated
+platform that connects four user roles — Research Director, Faculty Research
+Coordinator, Finance Officer, and Researcher — across separate Undergraduate
+and Postgraduate portals.
+
+The RMS implements eight functional modules: research proposal management
+(including ethics approval and document version control), project management,
+grant and funding management, publication tracking, budget and financial
+management, institutional repository (with OAI-PMH export), research
+collaboration, and institutional analytics with PDF report generation.
+
+Beyond the eight core modules, the implementation adds dedicated modules for
+ethics review (REC) and thesis supervision (ThesisGroup: supervisors, students,
+meetings, and status tracking). Final thesis documents are also recorded as
+publication outputs and repository items.
+
+Key automated workflows include automatic project creation upon proposal
+approval and automatic budget allocation upon grant award. Role-based access
+control and JWT authentication ensure data security. The system was tested
+using realistic seed data (200+ documents), manual role-based verification,
+and automated smoke test scripts. All core workflows operate correctly
+end-to-end. The system is deployable on free-tier cloud infrastructure.
+
+Keywords: Research Management System, MERN stack, MongoDB, RBAC, University
+Research Workflow, Institutional Repository, Jamhuriya University
+
+
+================================================================================
+APPENDIX B — SOMALI FULL SCRIPT (read aloud — all slides combined)
+================================================================================
+
+Assalaamu caleykum mudane gudoomiye iyo xubnaha guddiga.
+
+Magacaygu waa [magacaaga]. Thesis-kaygu wuxuu ku saabsan yahay Jamhuriya
+Research Management System — nidaam web ah oo maamula cilmi-baarista jaamacadda.
+
+Dhibaatada: cilmi-baarista waxaa lagu maamulaa warqado iyo Excel. Xogtu way
+lumaan, ansixintu way gaabisataa, maaliyaddu ma cadda.
+
+Ujeeddo: nidaam digital ah oo isku xira afar role — Director, Coordinator,
+Finance, iyo Researcher — labada portal UG iyo PG.
+
+Waxaan u isticmaalnay MERN stack: MongoDB, Express, React, Node.js.
+Architecture: three-tier — browser, API server, database. JWT iyo RBAC
+amniga.
+
+Siddeed module (spec): proposals, projects, grants, publications, budget, repository,
+collaboration, analytics.
+
+Modules dheeraad ah: Ethics, Thesis Supervision (/thesis) — kormeerka ardayda thesis-ka;
+document-ka thesis waxaa lagu kaydiyaa Publications iyo Repository.
+
+Socodka muhiimka ah: researcher gudbiyaa proposal → coordinator pre-review →
+ethics → director ansixiyaa → SYSTEM wuxuu AUTO abuuraa PROJECT → researcher
+codsadaa grant → director ansixiyaa → SYSTEM wuxuu AUTO abuuraa BUDGET →
+finance maamushaa payments → publication → repository → analytics PDF.
+
+Database: MongoDB, 14 collection. Features gaar ah: ethics workflow, version
+history, auto project/budget, CrossRef DOI, OAI-PMH export, group chat.
+
+Testing: 200+ seed records, 9 user accounts, smoke scripts. Dhammaan
+workflows waa la xaqiijiyay.
+
+Xaddidaadaha: email ma jiro, finance ma ansixiyo grants. Mustaqbalka: mobile
+app, email notifications, multi-campus.
+
+Hadda waxaan idin tusi doonaa live demo. Mahadsanidiin — su'aalo?
+
+
+================================================================================
+APPENDIX C — ERD (paste into draw.io or PowerPoint SmartArt)
+================================================================================
+
+USER ──────────► PROPOSAL ──[Director Approve]──► PROJECT
+    │                │
+    │                └──► ETHICS_APPLICATION
+    │
+    ├──► GRANT ──[Director Award]──► BUDGET ──► PAYMENT
+    │       │                          └──► PURCHASE_ORDER
+    │       └── linked to PROJECT
+    │
+    ├──► PUBLICATION ──► REPOSITORY_ITEM  (thesis = output type + archive type)
+    ├──► THESIS_GROUP  (Thesis Supervision module — /thesis)
+    │       └── supervisor, students, meetings, status workflow
+    ├──► RESEARCH_GROUP ──► CONVERSATION
+    └──► NOTIFICATION
+
+DEPARTMENT ──► PROPOSAL
+
+Legend:
+  ──►  = one-to-many relationship
+  [Action] = automated system trigger
+
+
+================================================================================
+END OF FILE — 19 slides (incl. 8B) + 3 appendices
+File: docs/THESIS_PRESENTATION_SLIDES.txt
+================================================================================
