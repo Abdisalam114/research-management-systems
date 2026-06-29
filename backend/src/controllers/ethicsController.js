@@ -1,11 +1,15 @@
 const PDFDocument = require("pdfkit");
-const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { EthicsApplication, ETHICS_STATUSES } = require("../models/EthicsApplication");
 const { Proposal, ETHICS_STATUSES: PROPOSAL_ETHICS_STATUSES } = require("../models/Proposal");
 const { AppError } = require("../utils/AppError");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
+const {
+  buildJurecApprovalMeta,
+  buildCertificateNotificationBody,
+  renderJurecCertificatePdf,
+} = require("../utils/jurecCertificate");
 
 function sanitize(a) {
   return {
@@ -43,6 +47,7 @@ function sanitize(a) {
     conflictOfInterest: a.conflictOfInterest,
     applicantSignature: a.applicantSignature,
     approval: a.approval,
+    submittedAt: a.submittedAt,
     createdAt: a.createdAt,
     updatedAt: a.updatedAt,
   };
@@ -137,6 +142,7 @@ async function submitEthicsApplication(req, res) {
     );
   }
   a.status = ETHICS_STATUSES.SUBMITTED;
+  a.submittedAt = new Date();
   if (!a.applicantSignature?.signedAt) {
     a.applicantSignature = {
       name: a.applicantSignature?.name || `${a.principal?.firstName || ""} ${a.principal?.lastName || ""}`.trim(),
@@ -151,6 +157,7 @@ async function submitEthicsApplication(req, res) {
       title: a.proposalId ? "Ethics form submitted with proposal" : "New ethics application submitted",
       body: a.projectTitle,
       link: a.proposalId ? `/proposals/${a.proposalId}/review` : "/ethics",
+      programTier: a.programTier,
     });
   } catch {
     /* notifications best-effort */
@@ -173,7 +180,7 @@ function defaultAcademicYear() {
 }
 
 async function directorDecision(req, res) {
-  const { decision, rejectionReason, serialNumber, academicYear, year } = req.body || {};
+  const { decision, rejectionReason, serialNumber, academicYear, year, reviewedAt } = req.body || {};
   if (!["approve", "reject"].includes(decision)) {
     throw new AppError("decision must be 'approve' or 'reject'", 400);
   }
@@ -184,21 +191,54 @@ async function directorDecision(req, res) {
   }
 
   if (decision === "approve") {
+    const issueDate = new Date();
+    const jurec = await buildJurecApprovalMeta(a, {
+      EthicsApplication,
+      tierFilter: req.tierWhere({}),
+      issueDate,
+      reviewedAt,
+    });
     a.status = ETHICS_STATUSES.APPROVED;
     a.approval = {
       decision: "approved",
       signedByUserId: req.user.id,
       signedByName: req.user.fullName || "Research Director",
-      signedAt: new Date(),
-      certificateId: `ETH-${crypto.randomBytes(4).toString("hex").toUpperCase()}`,
-      serialNumber: serialNumber ? String(serialNumber).trim() : `REC-${Date.now()}`,
+      signedAt: issueDate,
+      certificateId: jurec.certificateNumber,
+      serialNumber: serialNumber ? String(serialNumber).trim() : jurec.refNumber,
+      refNumber: jurec.refNumber,
+      certificateNumber: jurec.certificateNumber,
       academicYear: academicYear ? String(academicYear).trim() : defaultAcademicYear(),
-      year: year ? String(year).trim() : String(new Date().getFullYear()),
+      year: year ? String(year).trim() : String(issueDate.getFullYear()),
+      receivedAt: jurec.receivedAt,
+      reviewedAt: jurec.reviewedAt,
+      chairpersonLine: jurec.chairpersonLine,
       rejectionReason: "",
     };
     if (a.proposalId) {
       await Proposal.updateOne({ _id: a.proposalId }, { ethicsStatus: PROPOSAL_ETHICS_STATUSES.APPROVED });
     }
+
+    // #region agent log
+    try {
+      fs.appendFileSync(
+        path.join(__dirname, "../../../debug-15a9cf.log"),
+        `${JSON.stringify({
+          sessionId: "15a9cf",
+          location: "ethicsController.js:directorDecision",
+          message: "JUREC certificate issued",
+          data: {
+            applicationId: String(a._id),
+            refNumber: a.approval.refNumber,
+            certificateNumber: a.approval.certificateNumber,
+            hypothesisId: "H-JUREC",
+            runId: "jurec-cert",
+          },
+          timestamp: Date.now(),
+        })}\n`
+      );
+    } catch (_) {}
+    // #endregion
   } else {
     a.status = ETHICS_STATUSES.REJECTED;
     a.approval = {
@@ -216,21 +256,62 @@ async function directorDecision(req, res) {
   await a.save();
 
   try {
-    await notifyUser(a.researcherId, {
-      type: "ethics",
-      title: `Ethics application ${decision === "approve" ? "approved — certificate issued" : "rejected"}`,
-      body: a.projectTitle,
-      link: "/ethics",
-    });
-  } catch {
-    /* notifications best-effort */
+    if (decision === "approve") {
+      const certBody = buildCertificateNotificationBody(a, a.approval);
+      await notifyUser(a.researcherId, {
+        type: "ethics",
+        title: "JUREC Ethical Approval Certificate Issued",
+        body: certBody,
+        link: `/ethics?applicationId=${a._id}`,
+        programTier: a.programTier,
+      });
+      // #region agent log
+      try {
+        fs.appendFileSync(
+          path.join(__dirname, "../../../debug-15a9cf.log"),
+          `${JSON.stringify({
+            sessionId: "15a9cf",
+            location: "ethicsController.js:notifyResearcher",
+            message: "JUREC notification sent",
+            data: {
+              researcherId: String(a.researcherId),
+              bodyLength: certBody.length,
+              bodyPreview: certBody.slice(0, 120),
+              hypothesisId: "H-NOTIFY-ETHICS",
+              runId: "jurec-notify-fix",
+            },
+            timestamp: Date.now(),
+          })}\n`
+        );
+      } catch (_) {}
+      // #endregion
+    } else {
+      await notifyUser(a.researcherId, {
+        type: "ethics",
+        title: "Ethics application rejected",
+        body: a.projectTitle,
+        link: "/ethics",
+        programTier: a.programTier,
+      });
+    }
+  } catch (err) {
+    // #region agent log
+    try {
+      fs.appendFileSync(
+        path.join(__dirname, "../../../debug-15a9cf.log"),
+        `${JSON.stringify({
+          sessionId: "15a9cf",
+          location: "ethicsController.js:notifyResearcher",
+          message: "JUREC notification FAILED",
+          data: { error: err.message, hypothesisId: "H-NOTIFY-ETHICS", runId: "jurec-notify-fix" },
+          timestamp: Date.now(),
+        })}\n`
+      );
+    } catch (_) {}
+    // #endregion
   }
 
   res.json({ message: `Application ${decision}d`, application: sanitize(a) });
-}
-
-function writeLine(doc, label, value) {
-  doc.font("Helvetica-Bold").text(label, { continued: true }).font("Helvetica").text(` ${value || "—"}`);
 }
 
 async function downloadCertificate(req, res) {
@@ -245,87 +326,20 @@ async function downloadCertificate(req, res) {
 
   const margin = 60;
   const pageWidth = 595.28;
-  const contentWidth = pageWidth - margin * 2;
-  const academicYear = a.approval?.academicYear || defaultAcademicYear();
-  const certYear =
-    a.approval?.year ||
-    (a.approval?.signedAt ? String(new Date(a.approval.signedAt).getFullYear()) : String(new Date().getFullYear()));
-  const certificateId = a.approval?.certificateId || "—";
+  const fileRef = (a.approval?.refNumber || a.approval?.certificateNumber || a._id)
+    .replace(/[^\w.-]+/g, "-")
+    .slice(0, 80);
 
   const doc = new PDFDocument({ size: "A4", margin });
   res.setHeader("Content-Type", "application/pdf");
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename="ethics-certificate-${a.approval.certificateId || a._id}.pdf"`
-  );
+  res.setHeader("Content-Disposition", `attachment; filename="JUREC-certificate-${fileRef}.pdf"`);
   doc.pipe(res);
 
-  let y = margin;
-
-  // Top band — academic year, year, certificate ID (uppermost on certificate)
-  doc.font("Helvetica-Bold").fontSize(12).fillColor("#0f172a");
-  doc.text(`Academic Year: ${academicYear}`, margin, y, { width: contentWidth, align: "center" });
-  y += 18;
-  doc.fontSize(11).fillColor("#334155");
-  doc.text(`Year: ${certYear}`, margin, y, { width: contentWidth, align: "center" });
-  y += 16;
-  doc.text(`Serial Number: ${a.approval?.serialNumber || "—"}`, margin, y, { width: contentWidth, align: "center" });
-  y += 16;
-  doc.text(`Certificate ID: ${certificateId}`, margin, y, { width: contentWidth, align: "center" });
-  y += 22;
-
-  const logoPath = resolveJamhuriyaLogoPath();
-  if (logoPath) {
-    const logoW = 78;
-    doc.image(logoPath, (pageWidth - logoW) / 2, y, { width: logoW });
-    y += logoW + 14;
-  }
-
-  doc.font("Helvetica-Bold").fontSize(11).fillColor("#0f172a");
-  doc.text("Jamhuriya University of Science & Technology", margin, y, { width: contentWidth, align: "center" });
-  y += 14;
-  doc.font("Helvetica").fontSize(9).fillColor("#64748b");
-  doc.text("Research Ethical Committee (REC)", margin, y, { width: contentWidth, align: "center" });
-  y += 20;
-
-  doc.y = y;
-  doc.font("Helvetica-Bold").fontSize(20).fillColor("#0ea5e9").text("ETHICAL CLEARANCE CERTIFICATE", { align: "center" });
-  doc.moveDown(0.4);
-  doc.font("Helvetica").fontSize(10).fillColor("#64748b").text("Faculty of Applied Medical Sciences", { align: "center" });
-  doc.moveDown(1);
-
-  doc.strokeColor("#0ea5e9").lineWidth(1.2).moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).stroke();
-  doc.moveDown(1);
-
-  doc.fillColor("#0f172a").fontSize(11);
-  doc.text("I certify that this study titled:", { align: "left" });
-  doc.moveDown(0.3);
-  doc.font("Helvetica-Bold").fontSize(13).text(a.projectTitle || "—", { align: "center" });
-  doc.moveDown(0.5);
-  doc.font("Helvetica").fontSize(11);
-  writeLine(doc, "Proposed by the primary investigator:", `${a.principal?.firstName || ""} ${a.principal?.lastName || ""}`.trim() || "—");
-  doc.moveDown(0.4);
-
-  doc.font("Helvetica-Bold").text("Co-investigators:");
-  doc.font("Helvetica");
-  const cos = [
-    a.coResearcher?.firstName ? `${a.coResearcher.firstName} ${a.coResearcher.lastName}`.trim() : null,
-    ...(a.otherInvestigators || []).map((n) => (typeof n === "string" ? n : `${n?.firstName || ""} ${n?.lastName || ""}`.trim())).filter(Boolean),
-  ].filter(Boolean);
-  if (cos.length) cos.forEach((n, i) => doc.text(`${i + 1}. ${n}`));
-  else doc.text("—");
-  doc.moveDown(0.8);
-
-  doc.fontSize(11).text(
-    "The Research Ethical Clearance application form was reviewed and the protocol for scientific or scholarly merit was examined, as well as the protection of human / animal subjects was ensured. Investigators are hereby granted ethical clearance to conduct the research.",
-    { align: "justify" }
-  );
-
-  doc.moveDown(2);
-  doc.strokeColor("#94a3b8").lineWidth(0.5).moveTo(margin, doc.y).lineTo(margin + 220, doc.y).stroke();
-  doc.fontSize(10).fillColor("#0f172a").text("Signature of Chairman of REC", margin, doc.y + 4);
-  doc.text(`Name: ${a.approval?.signedByName || "—"}`, margin);
-  doc.text(`Date: ${a.approval?.signedAt ? new Date(a.approval.signedAt).toLocaleDateString() : "—"}`, margin);
+  renderJurecCertificatePdf(doc, a, {
+    margin,
+    pageWidth,
+    logoPath: resolveJamhuriyaLogoPath(),
+  });
 
   doc.end();
 }

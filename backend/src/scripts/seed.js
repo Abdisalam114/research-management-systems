@@ -289,7 +289,14 @@ async function seedGrantsAndBudgets(ctx) {
     if (await existsByTitle(Grant, title, programTier)) continue;
 
     const researcher = researchers[i % researchers.length];
-    const project = await Project.findOne({ programTier, researcherId: researcher._id }).sort({ createdAt: -1 });
+    const proposalDefs = proposalsForTier(programTier);
+    const proposalTpl = proposalDefs[i % proposalDefs.length];
+    const proposal = await Proposal.findOne({
+      programTier,
+      title: proposalTpl.title,
+      researcherId: researcher._id,
+    });
+    const project = proposal ? await Project.findOne({ proposalId: proposal._id }) : null;
     const awarded =
       tpl.status === GRANT_STATUSES.ACTIVE || tpl.status === GRANT_STATUSES.APPROVED
         ? Math.round(tpl.amountRequested * (tpl.awardRatio || 1))
@@ -356,6 +363,7 @@ async function seedGrantsAndBudgets(ctx) {
 async function seedPublications(ctx) {
   const { programTier, researchers, coordinator } = ctx;
   const templates = PUBLICATION_TEMPLATES.slice(0, RECORDS_PER_TIER);
+  const proposalDefs = proposalsForTier(programTier);
   let inserted = 0;
 
   for (let i = 0; i < templates.length; i += 1) {
@@ -363,9 +371,18 @@ async function seedPublications(ctx) {
     if (await existsByTitle(Publication, tpl.title, programTier)) continue;
 
     const researcher = researchers[i % researchers.length];
+    const proposalTpl = proposalDefs[i % proposalDefs.length];
+    const proposal = await Proposal.findOne({
+      programTier,
+      title: proposalTpl.title,
+      researcherId: researcher._id,
+    });
+    const project = proposal ? await Project.findOne({ proposalId: proposal._id }) : null;
+
     await Publication.create({
       ...tpl,
       researcherId: researcher._id,
+      projectId: project?._id || null,
       programTier,
       authors: [researcher.fullName],
       doi: tpl.status === PUBLICATION_STATUSES.VALIDATED ? `10.1000/rms.${programTier}.${i + 1}` : "",
@@ -444,6 +461,7 @@ async function ensureRepositoryFile(fileName, content) {
 
 async function seedRepository(ctx) {
   const { programTier, researchers } = ctx;
+  const proposalDefs = proposalsForTier(programTier);
   let inserted = 0;
 
   for (let i = 0; i < Math.min(REPOSITORY_ITEMS.length, RECORDS_PER_TIER); i += 1) {
@@ -451,6 +469,13 @@ async function seedRepository(ctx) {
     if (await existsByTitle(RepositoryItem, tpl.title, programTier)) continue;
 
     const researcher = researchers[i % researchers.length];
+    const proposalTpl = proposalDefs[i % proposalDefs.length];
+    const proposal = await Proposal.findOne({
+      programTier,
+      title: proposalTpl.title,
+      researcherId: researcher._id,
+    });
+    const project = proposal ? await Project.findOne({ proposalId: proposal._id }) : null;
     const fileName = `${programTier}-${i + 1}-${tpl.type}.txt`;
     const filePath = await ensureRepositoryFile(
       fileName,
@@ -466,6 +491,7 @@ async function seedRepository(ctx) {
       fileSize: Buffer.byteLength(tpl.description, "utf8") + 128,
       access: REPOSITORY_ACCESS.INSTITUTION,
       uploadedBy: researcher._id,
+      projectId: project?._id || null,
       programTier,
     });
     inserted += 1;

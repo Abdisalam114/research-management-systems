@@ -1,12 +1,89 @@
 const { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES } = require("../models/Proposal");
-const { Project } = require("../models/Project");
+const { Project, PROJECT_STATUSES } = require("../models/Project");
 const { Grant, GRANT_STATUSES } = require("../models/Grant");
 const { Budget } = require("../models/Budget");
 const { Publication, PUBLICATION_STATUSES } = require("../models/Publication");
 const { RepositoryItem } = require("../models/RepositoryItem");
 const { User } = require("../models/User");
+const {
+  indexByProjectId,
+  pickPublicationForProject,
+  pickRepositoryForProject,
+} = require("./projectScopedRecords");
 
 const AWARDED_GRANT = [GRANT_STATUSES.ACTIVE, GRANT_STATUSES.APPROVED, GRANT_STATUSES.CLOSED];
+
+function pickPrimaryGrant(grants) {
+  if (!grants?.length) return null;
+  const statusRank = {
+    [GRANT_STATUSES.ACTIVE]: 4,
+    [GRANT_STATUSES.APPROVED]: 3,
+    [GRANT_STATUSES.SUBMITTED]: 2,
+    [GRANT_STATUSES.DRAFT]: 1,
+    [GRANT_STATUSES.CLOSED]: 3,
+    [GRANT_STATUSES.REJECTED]: 0,
+  };
+  return [...grants].sort((a, b) => {
+    const rankDiff = (statusRank[b.status] || 0) - (statusRank[a.status] || 0);
+    if (rankDiff !== 0) return rankDiff;
+    return Number(b.amountAwarded || 0) - Number(a.amountAwarded || 0);
+  })[0];
+}
+
+/** Director always sees award amounts; others only after the project has a publication. */
+function canViewProjectAwards({ role, hasProjectPublication }) {
+  if (role === "research_director") return true;
+  return Boolean(hasProjectPublication);
+}
+
+function redactAwardStepDetails(steps, canViewAwards) {
+  if (canViewAwards) return steps;
+  return steps.map((s) => {
+    if (s.key !== "grant_award") return s;
+    const hasAmount = s.detail && /\d/.test(String(s.detail));
+    if (!hasAmount && s.status !== "completed") return s;
+    return {
+      ...s,
+      detail: "Award recorded — amount shown after publication (director authorized)",
+    };
+  });
+}
+
+const GRANT_AWARD_KEY = "grant_award";
+const GRANT_APPLY_KEY = "grant_apply";
+
+function isProjectCompleted(project) {
+  return project?.status === PROJECT_STATUSES.COMPLETED;
+}
+
+const GRANTS_LOCKED_DETAIL =
+  "Ma muuqdaan ilaa project-ku noqdo Completed · Hidden until project is Completed";
+
+/** Show grant steps in pipeline as pending until project is completed. */
+function maskGrantStepsUntilComplete(steps, project) {
+  if (isProjectCompleted(project)) return steps;
+  return steps.map((s) => {
+    if (s.key !== GRANT_APPLY_KEY && s.key !== GRANT_AWARD_KEY) return s;
+    return {
+      ...s,
+      status: "pending",
+      detail: GRANTS_LOCKED_DETAIL,
+      at: null,
+      link: null,
+    };
+  });
+}
+
+function sanitizeLinkedGrantsForViewer(grants, canViewAwards, project) {
+  if (!isProjectCompleted(project)) return [];
+  if (canViewAwards) return grants;
+  return grants.map((g) => ({
+    ...g,
+    amountRequested: null,
+    amountAwarded: null,
+    awardsHidden: true,
+  }));
+}
 
 function step(key, label, status, extra = {}) {
   return { key, label, status, ...extra };
@@ -16,7 +93,109 @@ function ts(value) {
   return value ? new Date(value).toISOString() : null;
 }
 
-function buildStepsForTrack({ proposal, project, grants, budget, publications, repositoryItems }) {
+function buildProjectSteps(project, approved) {
+  const link = project ? `/projects/${project._id}` : "/projects";
+  const progressLink = project ? `/projects/${project._id}/progress` : "/projects";
+
+  if (!project) {
+    const createdStatus = approved ? "current" : "pending";
+    return [
+      step("project_created", "Project created", createdStatus, {
+        link: "/projects",
+        detail: approved ? "Awaiting project record" : undefined,
+      }),
+      step("project_team", "Team & milestones setup", "pending", { link: "/projects" }),
+      step("project_progress", "Progress updates", "pending", { link: "/projects" }),
+    ];
+  }
+
+  const hasTeamOrMilestones =
+    (project.teamMembers?.length || 0) > 0 || (project.milestones?.length || 0) > 0;
+  const hasProgress = (project.progressReports?.length || 0) > 0;
+  const latestProgress = project.progressReports?.[0];
+  const isCompleted = project.status === PROJECT_STATUSES.COMPLETED;
+  const isOnHold = project.status === PROJECT_STATUSES.ON_HOLD;
+
+  const steps = [
+    step("project_created", "Project created", "completed", {
+      at: ts(project.createdAt),
+      link,
+      detail: project.title,
+    }),
+  ];
+
+  let teamStatus = "pending";
+  if (hasTeamOrMilestones) teamStatus = "completed";
+  else if (!hasProgress && !isCompleted) teamStatus = "current";
+
+  steps.push(
+    step("project_team", "Team & milestones setup", teamStatus, {
+      link,
+      detail: hasTeamOrMilestones
+        ? `${project.teamMembers?.length || 0} team • ${project.milestones?.length || 0} milestones`
+        : "Add research team and milestones",
+    })
+  );
+
+  let progressStatus = "pending";
+  if (isCompleted && hasProgress) progressStatus = "completed";
+  else if (hasProgress) progressStatus = "current";
+  else if (hasTeamOrMilestones) progressStatus = "current";
+
+  steps.push(
+    step("project_progress", "Progress updates", progressStatus, {
+      at: latestProgress ? ts(latestProgress.createdAt) : null,
+      link: progressLink,
+      detail: hasProgress
+        ? `${latestProgress.progressPercent || 0}% — ${String(latestProgress.note || "").slice(0, 55)}`
+        : "Submit progress on your project",
+    })
+  );
+
+  return steps;
+}
+
+function buildProjectCompletedStep(project) {
+  if (!project) {
+    return step("project_completed", "Project completed", "pending", { link: "/projects" });
+  }
+
+  const link = `/projects/${project._id}`;
+  const hasProgress = (project.progressReports?.length || 0) > 0;
+  const latestProgress = project.progressReports?.[0];
+  const isCompleted = project.status === PROJECT_STATUSES.COMPLETED;
+  const isOnHold = project.status === PROJECT_STATUSES.ON_HOLD;
+
+  let completeStatus = "pending";
+  if (isCompleted) completeStatus = "completed";
+  else if (isOnHold) completeStatus = "blocked";
+  else if (hasProgress && (latestProgress?.progressPercent || 0) >= 90) completeStatus = "current";
+
+  return step("project_completed", "Project completed", completeStatus, {
+    link,
+    detail: isOnHold ? "On hold" : project.status,
+  });
+}
+
+/** Later pipeline steps stay pending until the current stage is finished. */
+function enforceSequentialWorkflow(steps) {
+  const haltIdx = steps.findIndex((s) => s.status === "current" || s.status === "blocked");
+  if (haltIdx === -1) return steps;
+
+  const haltKey = steps[haltIdx]?.key;
+
+  return steps.map((s, i) => {
+    if (i <= haltIdx || s.status === "skipped") return s;
+    if (s.status !== "completed" && s.status !== "current") return s;
+    const downgraded = { ...s, status: "pending", at: null };
+    if (s.key === "project_completed") {
+      downgraded.detail = "Pending — finish progress and budget stages first";
+    }
+    return downgraded;
+  });
+}
+
+function buildStepsForTrack({ proposal, project, grants, budget, publication, repositoryItem }) {
   const steps = [];
   const rejected = proposal.status === PROPOSAL_STATUSES.REJECTED;
   const approved = proposal.status === PROPOSAL_STATUSES.APPROVED;
@@ -77,46 +256,10 @@ function buildStepsForTrack({ proposal, project, grants, budget, publications, r
     })
   );
 
-  if (project) {
-    const latestProgress = project.progressReports?.[0];
-    steps.push(
-      step("project", "Active research project", "completed", {
-        at: ts(project.createdAt),
-        link: `/projects/${project._id}`,
-        detail: `${project.status}${latestProgress ? ` • ${latestProgress.progressPercent || 0}% progress` : ""}`,
-      })
-    );
-  } else if (approved) {
-    steps.push(step("project", "Active research project", "current", { link: "/projects", detail: "Awaiting project record" }));
-  } else {
-    steps.push(step("project", "Active research project", "pending", { link: "/projects" }));
-  }
+  steps.push(...buildProjectSteps(project, approved));
 
-  const grant = grants[0] || null;
+  const grant = pickPrimaryGrant(grants);
   const grantAwarded = grant && AWARDED_GRANT.includes(grant.status) && Number(grant.amountAwarded || 0) > 0;
-
-  if (grant) {
-    steps.push(
-      step("grant_apply", "Grant / funding request", grant.status !== GRANT_STATUSES.DRAFT ? "completed" : "current", {
-        at: ts(grant.submittedAt || grant.createdAt),
-        link: `/grants/${grant._id}`,
-        detail: grant.status,
-      })
-    );
-    steps.push(
-      step("grant_award", "Grant awarded", grantAwarded ? "completed" : grant.status === GRANT_STATUSES.SUBMITTED ? "current" : "pending", {
-        at: ts(grant.decidedAt),
-        link: `/grants/${grant._id}`,
-        detail: grantAwarded ? `${grant.currency || "USD"} ${grant.amountAwarded}` : grant.status,
-      })
-    );
-  } else if (project) {
-    steps.push(step("grant_apply", "Grant / funding request", "current", { link: "/grants", detail: "Not started" }));
-    steps.push(step("grant_award", "Grant awarded", "pending", { link: "/grants" }));
-  } else {
-    steps.push(step("grant_apply", "Grant / funding request", "pending", { link: "/grants" }));
-    steps.push(step("grant_award", "Grant awarded", "pending", { link: "/grants" }));
-  }
 
   if (budget) {
     steps.push(
@@ -132,36 +275,71 @@ function buildStepsForTrack({ proposal, project, grants, budget, publications, r
     steps.push(step("budget", "Budget allocated", "pending", { link: "/budgets" }));
   }
 
-  const pub = publications[0] || null;
+  steps.push(buildProjectCompletedStep(project));
+
+  if (grant) {
+    const grantLink = project ? `/grants?projectId=${project._id}` : "/grants";
+    steps.push(
+      step("grant_apply", "Grant / funding request", grant.status !== GRANT_STATUSES.DRAFT ? "completed" : "current", {
+        at: ts(grant.submittedAt || grant.createdAt),
+        link: `/grants/${grant._id}`,
+        detail: grant.status,
+      })
+    );
+    steps.push(
+      step("grant_award", "Grant awarded", grantAwarded ? "completed" : grant.status === GRANT_STATUSES.SUBMITTED ? "current" : "pending", {
+        at: ts(grant.decidedAt),
+        link: `/grants/${grant._id}`,
+        detail: grantAwarded ? `${grant.currency || "USD"} ${grant.amountAwarded}` : grant.status,
+      })
+    );
+  } else if (project) {
+    const grantLink = `/grants?projectId=${project._id}`;
+    steps.push(step("grant_apply", "Grant / funding request", "pending", { link: grantLink, detail: "After project completion" }));
+    steps.push(step("grant_award", "Grant awarded", "pending", { link: grantLink }));
+  } else {
+    steps.push(step("grant_apply", "Grant / funding request", "pending", { link: "/grants" }));
+    steps.push(step("grant_award", "Grant awarded", "pending", { link: "/grants" }));
+  }
+
+  const pubLink = project ? `/publications?projectId=${project._id}` : "/publications";
+  const repoLink = project ? `/repository?projectId=${project._id}` : "/repository";
+  const pub = publication || null;
   const pubValidated = pub && pub.status === PUBLICATION_STATUSES.VALIDATED;
   if (pub) {
     steps.push(
       step("publication", "Research publication", pubValidated ? "completed" : "current", {
         at: ts(pub.updatedAt),
-        link: "/publications",
-        detail: pub.status + (pub.workflowStage ? ` • ${pub.workflowStage}` : ""),
+        link: pubLink,
+        detail: pub.title
+          ? `${String(pub.title).slice(0, 55)} • ${pub.status}${pub.workflowStage ? ` • ${pub.workflowStage}` : ""}`
+          : pub.status + (pub.workflowStage ? ` • ${pub.workflowStage}` : ""),
       })
     );
   } else if (project) {
-    steps.push(step("publication", "Research publication", "pending", { link: "/publications" }));
+    steps.push(step("publication", "Research publication", "pending", { link: pubLink }));
   } else {
-    steps.push(step("publication", "Research publication", "pending", { link: "/publications" }));
+    steps.push(step("publication", "Research publication", "pending", { link: pubLink }));
   }
 
-  const repo = repositoryItems[0] || null;
+  const repo = repositoryItem || null;
   steps.push(
     step("repository", "Archive in repository", repo ? "completed" : project ? "pending" : "pending", {
       at: repo ? ts(repo.createdAt) : null,
-      link: "/repository",
+      link: repoLink,
       detail: repo ? repo.title : "Not archived yet",
     })
   );
 
-  const current = steps.find((s) => s.status === "current") || steps.find((s) => s.status === "blocked") || steps.filter((s) => s.status === "completed").pop();
-  return { steps, currentStepKey: current?.key || null, currentStepLabel: current?.label || null };
+  const gatedSteps = enforceSequentialWorkflow(steps);
+  const current =
+    gatedSteps.find((s) => s.status === "current") ||
+    gatedSteps.find((s) => s.status === "blocked") ||
+    gatedSteps.filter((s) => s.status === "completed").pop();
+  return { steps: gatedSteps, currentStepKey: current?.key || null, currentStepLabel: current?.label || null };
 }
 
-function buildTimelineEvents({ proposals, projects, grants, publications, project }) {
+function buildTimelineEvents({ proposals, projects, grants, publications }) {
   const events = [];
   for (const p of proposals) {
     if (p.createdAt) events.push({ at: p.createdAt, label: `Proposal created: ${p.title}`, module: "proposals", link: `/proposals/${p._id}` });
@@ -170,20 +348,38 @@ function buildTimelineEvents({ proposals, projects, grants, publications, projec
       events.push({ at: p.updatedAt, label: `Proposal approved: ${p.title}`, module: "proposals", link: `/proposals/${p._id}` });
     }
   }
+  for (const proj of projects) {
+    if (proj.createdAt) {
+      events.push({
+        at: proj.createdAt,
+        label: `Project created: ${proj.title}`,
+        module: "projects",
+        link: `/projects/${proj._id}`,
+      });
+    }
+    if (proj.progressReports?.length) {
+      for (const r of proj.progressReports) {
+        events.push({
+          at: r.createdAt,
+          label: `Progress update (${proj.title}): ${r.progressPercent || 0}% — ${String(r.note || "").slice(0, 60)}`,
+          module: "projects",
+          link: `/projects/${proj._id}`,
+        });
+      }
+    }
+    if (proj.status === PROJECT_STATUSES.COMPLETED) {
+      events.push({
+        at: proj.updatedAt,
+        label: `Project completed: ${proj.title}`,
+        module: "projects",
+        link: `/projects/${proj._id}`,
+      });
+    }
+  }
   for (const g of grants) {
     if (g.submittedAt) events.push({ at: g.submittedAt, label: `Grant submitted: ${g.title}`, module: "grants", link: `/grants/${g._id}` });
     if (g.decidedAt && AWARDED_GRANT.includes(g.status)) {
       events.push({ at: g.decidedAt, label: `Grant awarded: ${g.title}`, module: "grants", link: `/grants/${g._id}` });
-    }
-  }
-  if (project?.progressReports?.length) {
-    for (const r of project.progressReports) {
-      events.push({
-        at: r.createdAt,
-        label: `Progress update: ${r.progressPercent || 0}% — ${String(r.note || "").slice(0, 60)}`,
-        module: "projects",
-        link: `/projects/${project._id}`,
-      });
     }
   }
   for (const pub of publications.slice(0, 5)) {
@@ -224,37 +420,105 @@ async function buildResearchJourneyForResearcher(researcherId, tierFilter) {
     if (b.grantId) budgetByGrant.set(String(b.grantId), b);
   }
 
-  const tracks = proposals.map((proposal) => {
-    const project = projectByProposal.get(String(proposal._id)) || null;
-    const trackGrants = project ? grantsByProject.get(String(project._id)) || [] : [];
-    const grant = trackGrants[0] || null;
-    const budget = grant ? budgetByGrant.get(String(grant._id)) || null : null;
+  const publicationsByProject = indexByProjectId(publications);
+  const repositoryByProject = indexByProjectId(repositoryItems);
+
+  function trackBundle(proposal, project, trackGrants, budget) {
+    const publication = project
+      ? pickPublicationForProject(publicationsByProject.get(String(project._id)) || [], project)
+      : null;
+    const repositoryItem = project
+      ? pickRepositoryForProject(repositoryByProject.get(String(project._id)) || [], project)
+      : null;
     const track = buildStepsForTrack({
       proposal,
       project,
       grants: trackGrants,
       budget,
-      publications,
-      repositoryItems,
+      publication,
+      repositoryItem,
     });
+    const latestProgress = project?.progressReports?.[0];
+    let progressPercent = null;
+    if (project) {
+      progressPercent =
+        latestProgress?.progressPercent ??
+        (project.status === PROJECT_STATUSES.COMPLETED ? 100 : 0);
+    }
     return {
-      proposalId: proposal._id,
-      title: proposal.title,
-      proposalStatus: proposal.status,
-      projectId: project?._id || null,
       currentStepKey: track.currentStepKey,
       currentStepLabel: track.currentStepLabel,
       steps: track.steps,
+      progressPercent,
+    };
+  }
+
+  function syntheticProposalForProject(project) {
+    return {
+      _id: project.proposalId || project.proposal || project._id,
+      title: project.title,
+      status: PROPOSAL_STATUSES.APPROVED,
+      requiresEthics: false,
+      ethicsStatus: ETHICS_STATUSES.NOT_REQUIRED,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
+      submittedAt: project.createdAt,
+    };
+  }
+
+  const projectsPipeline = projects.map((project) => {
+    const proposalId = String(project.proposalId || project.proposal || "");
+    const proposal =
+      proposals.find((p) => String(p._id) === proposalId) || syntheticProposalForProject(project);
+    const trackGrants = grantsByProject.get(String(project._id)) || [];
+    const primaryGrant = pickPrimaryGrant(trackGrants);
+    const budget = primaryGrant ? budgetByGrant.get(String(primaryGrant._id)) || null : null;
+    return {
+      projectId: project._id,
+      title: project.title,
+      projectStatus: project.status,
+      proposalId: proposal._id,
+      proposalStatus: proposal.status,
+      ...trackBundle(proposal, project, trackGrants, budget),
     };
   });
 
-  const primaryProject = projects[0] || null;
+  const pendingProposals = proposals
+    .filter((p) => !projectByProposal.has(String(p._id)))
+    .map((proposal) => ({
+      proposalId: proposal._id,
+      title: proposal.title,
+      proposalStatus: proposal.status,
+      projectId: null,
+      ...trackBundle(proposal, null, [], null),
+    }));
+
+  const tracks = [
+    ...projectsPipeline.map((p) => ({
+      proposalId: p.proposalId,
+      projectId: p.projectId,
+      title: p.title,
+      proposalStatus: p.proposalStatus,
+      currentStepKey: p.currentStepKey,
+      currentStepLabel: p.currentStepLabel,
+      steps: p.steps,
+    })),
+    ...pendingProposals.map((p) => ({
+      proposalId: p.proposalId,
+      projectId: null,
+      title: p.title,
+      proposalStatus: p.proposalStatus,
+      currentStepKey: p.currentStepKey,
+      currentStepLabel: p.currentStepLabel,
+      steps: p.steps,
+    })),
+  ];
+
   const timeline = buildTimelineEvents({
     proposals,
     projects,
     grants,
     publications,
-    project: primaryProject,
   });
 
   return {
@@ -271,6 +535,8 @@ async function buildResearchJourneyForResearcher(researcherId, tierFilter) {
       publications: publications.length,
       repositoryItems: repositoryItems.length,
     },
+    projects: projectsPipeline,
+    pendingProposals,
     tracks: tracks.length ? tracks : [],
     timeline,
   };
@@ -296,4 +562,178 @@ async function listResearchersForJourney(tierFilter, department) {
   return summaries;
 }
 
-module.exports = { buildResearchJourneyForResearcher, listResearchersForJourney };
+function syntheticProposalForProject(project) {
+  return {
+    _id: project.proposalId || project.proposal || project._id,
+    title: project.title,
+    status: PROPOSAL_STATUSES.APPROVED,
+    requiresEthics: false,
+    ethicsStatus: ETHICS_STATUSES.NOT_REQUIRED,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+    submittedAt: project.createdAt,
+  };
+}
+
+function buildTrackResult(proposal, project, trackGrants, budget, publications, repositoryItems, viewerRole) {
+  const publication = project ? pickPublicationForProject(publications, project) : null;
+  const repositoryItem = project ? pickRepositoryForProject(repositoryItems, project) : null;
+  const track = buildStepsForTrack({
+    proposal,
+    project,
+    grants: trackGrants,
+    budget,
+    publication,
+    repositoryItem,
+  });
+  const latestProgress = project?.progressReports?.[0];
+  let progressPercent = null;
+  if (project) {
+    progressPercent =
+      latestProgress?.progressPercent ??
+      (project.status === PROJECT_STATUSES.COMPLETED ? 100 : 0);
+  }
+  const canViewAwards = canViewProjectAwards({
+    role: viewerRole,
+    hasProjectPublication: Boolean(publication),
+  });
+  const grantsVisible = isProjectCompleted(project);
+  let steps = maskGrantStepsUntilComplete(track.steps, project);
+  steps = redactAwardStepDetails(steps, canViewAwards);
+  const current =
+    steps.find((s) => s.status === "current") ||
+    steps.find((s) => s.status === "blocked") ||
+    steps.filter((s) => s.status === "completed").pop();
+  return {
+    currentStepKey: current?.key || null,
+    currentStepLabel: current?.label || null,
+    steps,
+    progressPercent,
+    proposalStatus: proposal.status,
+    awardsVisible: canViewAwards,
+    grantsVisible,
+  };
+}
+
+async function buildWorkflowForProject(projectId, tierFilter, viewerRole = null) {
+  const project = await Project.findOne({ _id: projectId, ...tierFilter });
+  if (!project) return null;
+
+  const proposalId = project.proposalId || project.proposal;
+  let proposal = proposalId ? await Proposal.findOne({ _id: proposalId, ...tierFilter }) : null;
+  if (!proposal) proposal = syntheticProposalForProject(project);
+
+  const researcherId = project.researcherId;
+  const [trackGrants, publications, repositoryItems] = await Promise.all([
+    Grant.find({ projectId: project._id, ...tierFilter }).sort({ updatedAt: -1 }),
+    Publication.find({ projectId: project._id, ...tierFilter }).sort({ updatedAt: -1 }),
+    RepositoryItem.find({ projectId: project._id, ...tierFilter }).sort({ updatedAt: -1 }),
+  ]);
+  const primaryGrant = pickPrimaryGrant(trackGrants);
+  const budget = primaryGrant ? await Budget.findOne({ grantId: primaryGrant._id, ...tierFilter }) : null;
+
+  const publication = pickPublicationForProject(publications, project);
+  const repositoryItem = pickRepositoryForProject(repositoryItems, project);
+  const canViewAwards = canViewProjectAwards({
+    role: viewerRole,
+    hasProjectPublication: Boolean(publication),
+  });
+
+  const track = buildTrackResult(
+    proposal,
+    project,
+    trackGrants,
+    budget,
+    publications,
+    repositoryItems,
+    viewerRole
+  );
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(__dirname, "../../../debug-15a9cf.log"),
+      `${JSON.stringify({
+        sessionId: "15a9cf",
+        location: "researchJourney.js:buildWorkflowForProject",
+        message: "scoped records for project",
+        data: {
+          projectId: String(project._id),
+          projectTitle: String(project.title).slice(0, 55),
+          viewerRole: viewerRole || "unknown",
+          grantCount: trackGrants.length,
+          grantTitles: trackGrants.map((g) => String(g.title).slice(0, 40)),
+          publicationTitle: publication ? String(publication.title).slice(0, 55) : null,
+          publicationProjectId: publication?.projectId ? String(publication.projectId) : null,
+          repositoryTitle: repositoryItem ? String(repositoryItem.title).slice(0, 55) : null,
+          repositoryProjectId: repositoryItem?.projectId ? String(repositoryItem.projectId) : null,
+          crossPub: publication && String(publication.projectId) !== String(project._id),
+          crossRepo: repositoryItem && String(repositoryItem.projectId) !== String(project._id),
+          hypothesisId: "H2-scoped-records",
+          runId: "post-repair-verify",
+        },
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch (_) {}
+  // #endregion
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(__dirname, "../../../debug-15a9cf.log"),
+      `${JSON.stringify({
+        sessionId: "15a9cf",
+        location: "researchJourney.js:buildWorkflowForProject",
+        message: "awards visibility only",
+        data: {
+          projectId: String(project._id),
+          viewerRole: viewerRole || "unknown",
+          awardsVisible: canViewAwards,
+          grantsVisible: isProjectCompleted(project),
+          grantsHidden: !isProjectCompleted(project),
+          projectCompleted: isProjectCompleted(project),
+          projectStatus: project.status,
+          stepOrder: track.steps.map((s) => s.key),
+          grantStepCount: track.steps.filter(
+            (s) => s.key === GRANT_APPLY_KEY || s.key === GRANT_AWARD_KEY
+          ).length,
+          lockedGrantSteps: track.steps.filter(
+            (s) =>
+              (s.key === GRANT_APPLY_KEY || s.key === GRANT_AWARD_KEY) && s.status === "pending" && !isProjectCompleted(project)
+          ).length,
+          hypothesisId: "L-no-locked",
+          runId: "post-fix-12",
+        },
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch (_) {}
+  // #endregion
+
+  return {
+    projectId: project._id,
+    title: project.title,
+    projectStatus: project.status,
+    proposalId: proposal._id,
+    awardsVisible: canViewAwards,
+    grantsVisible: isProjectCompleted(project),
+    ...track,
+  };
+}
+
+module.exports = {
+  buildResearchJourneyForResearcher,
+  listResearchersForJourney,
+  buildWorkflowForProject,
+  pickPrimaryGrant,
+  canViewProjectAwards,
+  sanitizeLinkedGrantsForViewer,
+  redactAwardStepDetails,
+  maskGrantStepsUntilComplete,
+  isProjectCompleted,
+};

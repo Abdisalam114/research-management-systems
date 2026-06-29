@@ -100,10 +100,15 @@ function sanitizeGrantDetail(g) {
 
 async function listGrants(req, res) {
   const { role } = req.user;
-  const { status } = req.query || {};
+  const { status, projectId } = req.query || {};
 
   const filter = {};
   if (status && Object.values(GRANT_STATUSES).includes(status)) filter.status = status;
+  if (projectId) {
+    const { validateProjectQuery } = require("../utils/projectScopedRecords");
+    await validateProjectQuery(req, projectId, { ownerOnly: role === "researcher" });
+    filter.projectId = projectId;
+  }
 
   if (role === "researcher") filter.researcherId = req.user.id;
   // finance_officer, faculty_coordinator, research_director can view all (MVP baseline)
@@ -174,9 +179,10 @@ async function updateGrant(req, res) {
   if (donorRef !== undefined) grant.donorRef = String(donorRef).trim();
   if (complianceNotes !== undefined) grant.complianceNotes = String(complianceNotes);
   if (projectId !== undefined) {
-    grant.projectId = projectId
-      ? await resolveGrantProjectId(req, projectId, req.user.id)
-      : null;
+    if (projectId === null || projectId === "") {
+      throw new AppError("projectId cannot be removed — link a research project", 400);
+    }
+    grant.projectId = await resolveGrantProjectId(req, projectId, req.user.id);
   }
 
   await grant.save();

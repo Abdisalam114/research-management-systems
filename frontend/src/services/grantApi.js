@@ -1,7 +1,10 @@
 import { api } from "./api";
 
-export async function listGrants(accessToken) {
-  const res = await api.get("/api/grants", { headers: { Authorization: `Bearer ${accessToken}` } });
+export async function listGrants(accessToken, params = {}) {
+  const res = await api.get("/api/grants", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params,
+  });
   return res.data;
 }
 

@@ -1,0 +1,446 @@
+================================================================================
+JAMHURIYA RMS — TUSAALE DHAB AH 100% (FULL REAL EXAMPLE)
+From zero to repository — one research line, every role, every stage
+================================================================================
+
+0. UJeeddo
+--------------------------------------------------------------------------------
+Dukumeentigan wuxuu kuu tusayaa HAL sheeko cilmi-baariseed oo dhammaystiran.
+Waxaan adeegsanaynaa accounts-ka seed-ka (npm run seed) iyo portal Undergraduate (UG).
+
+Tusaale-cilmi: "AI Early Warning System for At-Risk Undergraduate Students"
+Cilmi-baaraha: Dr. Sarah Chen (asha@rms.edu)
+Department: Computer Science
+Portal: Undergraduate
+
+================================================================================
+1. ACCOUNTS-KA SYSTEM-KA (SEED DATA)
+================================================================================
+
+ROLE                    NAME                      EMAIL                    PASSWORD
+--------------------------------------------------------------------------------
+Research Director       Dr. Catherine Morrison    director@rms.edu         Director2024!
+Faculty Coordinator     Dr. Emma Richardson       coordinator@rms.edu    Coordinator2024!
+Finance Officer         Michael Brooks            finance@rms.edu          Finance2024!
+Researcher (UG)         Dr. Sarah Chen            asha@rms.edu             Researcher2024!
+Researcher (UG)         Dr. Priya Sharma          sahra@rms.edu            Researcher2024!
+
+Director wuxuu dooranayaa Undergraduate ama Postgraduate marka uu galo.
+Researchers / Coordinator / Finance waxay ku xiran yihiin portal-ka ay dooratay.
+
+================================================================================
+2. GALITAANKA & PORTAL
+================================================================================
+
+Tallaabo 1: Fur http://localhost:5173
+Tallaabo 2: Login → asha@rms.edu / Researcher2024!
+Tallaabo 3: Dooro "Undergraduate" portal
+Tallaabo 4: Dashboard wuxuu muujinayaa modules + metrics
+
+Waxa dhacaya nidaamka:
+  • JWT token waa la siiyaa
+  • programTier = "undergraduate" waa la keydiyaa
+  • Dhammaan API calls waxay filter-gareeyaan UG data kaliya
+
+================================================================================
+3. SHEEKADA BUUXA — 11 TALLAABO (100%)
+================================================================================
+
+--------------------------------------------------------------------------------
+TALLAABO 1 — Create research proposal ✓ Done
+--------------------------------------------------------------------------------
+Yaa: Dr. Sarah Chen (Researcher)
+Module: Proposals → New Proposal + Ethics
+URL: /proposals/new
+
+Waxa la geliyaa (REAL EXAMPLE):
+
+  PROPOSAL (Qaybta 1):
+    Title:    AI Early Warning System for At-Risk Undergraduate Students
+    Abstract: This research develops a machine learning pipeline that uses
+              attendance, LMS activity, and midterm scores to flag students
+              at academic risk by week 4 of semester, enabling early advisor
+              intervention. We evaluate precision/recall on three cohorts.
+    Department:     Computer Science
+    Research area:  Educational Data Mining
+    Document:       early_warning_proposal.pdf (optional)
+    Requires ethics: Yes ✓
+
+  ETHICS FORM — Required fields (Qaybta REC):
+    Project title:     (same as proposal — auto-fill)
+    PI first name:     Sarah          (auto from profile)
+    PI last name:      Chen
+    Project level:     Undergraduate  (auto from UG portal)
+    Aims & objectives: (from abstract — editable)
+    Design:            Mixed-methods: retrospective cohort analysis on
+                       anonymized SIS/LMS data (n≈800), plus structured
+                       interviews with 12 academic advisors. Models: logistic
+                       regression, random forest, XGBoost. Ethics: no direct
+                       student identifiers stored in ML feature store.
+    Signature:         Dr. Sarah Chen
+
+  Kadib: Save draft
+
+Xaaladaha database-ka:
+  Proposal.status        = draft
+  Proposal.ethicsStatus  = pending
+  EthicsApplication.status = draft
+  EthicsApplication.formComplete = true (haddii 7 fields buuxaan)
+
+Research Workflow Status → Research pipeline:
+  ✓ Create research proposal — Done
+  → Ethics (REC) approval — Current (haddii aan weli la gudbin)
+  ○ Submit proposal — Pending
+
+--------------------------------------------------------------------------------
+TALLAABO 2 — Ethics (REC) approval
+--------------------------------------------------------------------------------
+Yaa ansixiya: Dr. Catherine Morrison (Director)
+Module: Proposals → open Sarah's proposal → Ethics panel
+URL: /proposals/{id}/review  (Director view)
+
+Waxa Director sameeyo:
+  1. Login director@rms.edu → dooro Undergraduate
+  2. Proposals → dooro "AI Early Warning System..."
+  3. Review page → Approve ethics & issue certificate
+
+Xaaladaha ka dib:
+  EthicsApplication.status = approved
+  Proposal.ethicsStatus    = approved
+  Certificate ID           = la abuuraa (approval block)
+
+Research Workflow Status (Sarah):
+  ✓ Ethics (REC) approval — Done
+  → Submit proposal for review — Current
+
+Haddii Director diido:
+  ethicsStatus = rejected → tallaabada waa ✕ Blocked
+
+--------------------------------------------------------------------------------
+TALLAABO 3 — Submit proposal for review
+--------------------------------------------------------------------------------
+Yaa: Dr. Sarah Chen
+Module: Proposals → Edit → Submit to Director (Proposal + Ethics)
+
+Shuruudaha system-ku hubiyo:
+  ✓ Title, abstract, department, research area
+  ✓ Ethics form complete (7 required fields)
+  ✓ Ethics ma aha rejected
+
+Waxa dhacaya:
+  Proposal.status     = submitted
+  Proposal.submittedAt = timestamp
+  EthicsApplication.status = submitted (haddii draft/rejected)
+
+Notification → Director & Coordinator
+
+Research Workflow Status:
+  ✓ Submit proposal — Done
+  → Faculty coordinator pre-review — Current
+
+--------------------------------------------------------------------------------
+TALLAABO 4 — Faculty coordinator pre-review
+--------------------------------------------------------------------------------
+Yaa: Dr. Emma Richardson (coordinator@rms.edu)
+Module: Proposals → Review
+URL: /proposals/{id}/review
+
+Waxa sameeyo:
+  • Akhriyaa proposal + ethics
+  • Comment: "Methodology sound. Confirm data-sharing MOU with IT before data pull."
+  • Action: Forward to Director / Recommend approval
+
+Xaaladaha:
+  Proposal.status = under_review
+
+Research Workflow Status:
+  ✓ Coordinator pre-review — Done
+  → Director decision — Current
+
+--------------------------------------------------------------------------------
+TALLAABO 5 — Director decision
+--------------------------------------------------------------------------------
+Yaa: Dr. Catherine Morrison
+Module: Proposals → Review → Director decision
+
+Shuruud: Ethics waa in horay u approved tahay
+
+Go'aannada:
+  • Approved → project la abuuraa
+  • Rejected → ✕ Blocked
+  • Revision requested → Sarah wax ka beddeshaa
+
+Tusaale — Approved:
+  Proposal.status = approved
+  Project record   = AUTO-CREATED:
+    Title: AI Early Warning System for At-Risk Undergraduate Students
+    PI: Sarah Chen
+    Status: active
+    Milestones: Ethics clearance ✓, Literature review, Data collection, ...
+
+Notification → Sarah: "Proposal approved — project created"
+
+Research Workflow Status:
+  ✓ Director decision — Done
+  → Active research project — Current
+
+--------------------------------------------------------------------------------
+TALLAABO 6 — Active research project
+--------------------------------------------------------------------------------
+Yaa: Dr. Sarah Chen
+Module: Projects → /projects/{id}
+
+Waxa sameeyo:
+  • Team members: Dr. Priya Sharma (Co-researcher)
+  • Milestones: mark complete as work progresses
+  • Progress update: /projects/{id}/progress
+      Note: "Completed feature engineering on cohort 2024-A"
+      Progress: 35%
+
+Xaaladaha project:
+  active | completed | on_hold
+
+Research Workflow Status:
+  ✓ Active research project — Done (marka project jiro + socda)
+  → Grant / funding request — Current
+
+--------------------------------------------------------------------------------
+TALLAABO 7 — Grant / funding request
+--------------------------------------------------------------------------------
+Yaa: Dr. Sarah Chen
+Module: Grants → New grant
+URL: /grants
+
+REAL EXAMPLE — Grant form:
+  Title:           EDU Analytics Pilot Grant — Early Warning System
+  Funding source:  Jamhuriya University Internal Research Fund
+  Currency:        USD
+  Amount requested: 4,500
+  Linked project:  AI Early Warning System... (dropdown)
+  Document:        grant_budget_breakdown.pdf
+
+Save draft → Submit grant
+
+Xaaladaha:
+  Grant.status     = submitted
+  Grant.projectId  = linked to Sarah's project
+
+Research Workflow Status:
+  ✓ Grant apply — Done
+  → Grant awarded — Current
+
+--------------------------------------------------------------------------------
+TALLAABO 8 — Grant awarded
+--------------------------------------------------------------------------------
+Yaa: Dr. Catherine Morrison
+Module: Grants → Grant details → Director decision
+
+Tusaale — Approve:
+  Amount awarded: 4,500 USD
+  Grant.status:   approved → active
+  decidedAt:      timestamp
+
+System AUTO (ensureBudgetForGrant):
+  Budget record la abuuraa / cusbooneysiiyaa
+  totalAllocated = 4,500 USD
+
+Notification → Sarah → link /budgets
+
+Research Workflow Status:
+  ✓ Grant awarded — Done
+  → Budget allocated — Current (marka budget auto-create)
+
+--------------------------------------------------------------------------------
+TALLAABO 9 — Budget allocated
+--------------------------------------------------------------------------------
+Yaa maamulka: Michael Brooks (finance@rms.edu)
+Module: Finance & Budgets → /budgets
+
+Sarah aragtaa:
+  Budget total: $4,500
+  Line items tusaale:
+    • Cloud GPU compute     $1,200  (approved)
+    • Survey incentives       $800  (pending)
+    • Conference travel     $1,500  (pending)
+    • Software licenses       $500  (approved)
+
+Finance Officer:
+  • Approves / processes payments
+  • Payment status: pending → approved → disbursed
+
+Research Workflow Status:
+  ✓ Budget allocated — Done
+  → Research publication — Current
+
+--------------------------------------------------------------------------------
+TALLAABO 10 — Research publication
+--------------------------------------------------------------------------------
+Yaa: Dr. Sarah Chen
+Module: Publications → New
+URL: /publications
+
+REAL EXAMPLE:
+  Title:   Early Warning Models for Undergraduate Retention Using LMS Telemetry
+  Type:    conference
+  Year:    2026
+  Venue:   International Conference on Educational Data Mining
+  Authors: Dr. Sarah Chen, Dr. Priya Sharma
+  DOI:     (optional)
+  Status flow: draft → submitted
+
+PUBLICATION WORKFLOW (Research Workflow Status — Qaybta 2):
+
+  Stage 1 — Submitted 📤
+    Sarah submits → appears in workflow
+
+  Stage 2 — In process ⚙️
+    Dr. Emma Richardson (Coordinator) clicks → In process
+    Comment implicit: faculty validation
+
+  Stage 3 — Pipeline 📋
+    Coordinator/Director advances — paper under journal/conference review
+
+  Stage 4 — Published ✅
+    Director/Coordinator marks Published
+    Publication.status → validated automatically
+    Sarah gets notification
+
+Research Workflow Status (pipeline):
+  ✓ Research publication — Done (marka validated)
+
+--------------------------------------------------------------------------------
+TALLAABO 11 — Archive in repository
+--------------------------------------------------------------------------------
+Yaa: Dr. Sarah Chen
+Module: Repository → Upload
+URL: /repository
+
+REAL EXAMPLE:
+  Title:       Final Report — AI Early Warning System Pilot 2026
+  Type:        Research report
+  Access:      Institutional
+  File:        final_report_early_warning_2026.pdf
+  Tags:        education, machine-learning, undergraduate
+
+Research Workflow Status:
+  ✓ Archive in repository — Done
+  Dhammaan 11 tallaabood waa ✓ Done — pipeline complete!
+
+================================================================================
+4. RESEARCH WORKFLOW STATUS — SARAH'S VIEW (FINAL)
+================================================================================
+
+Bogga /research-workflow wuxuu muujinayaa:
+
+QAYBTA A — Research pipeline (11 steps):
+  ✓ Create research proposal
+  ✓ Ethics (REC) approval
+  ✓ Submit proposal for review
+  ✓ Faculty coordinator pre-review
+  ✓ Director decision
+  ✓ Active research project
+  ✓ Grant / funding request
+  ✓ Grant awarded
+  ✓ Budget allocated
+  ✓ Research publication
+  ✓ Archive in repository
+
+QAYBTA B — Publication workflow:
+  Submitted → In process → Pipeline → Published (midab leh)
+
+QAYBTA C — Recent activity timeline:
+  • Proposal created: AI Early Warning...
+  • Proposal submitted
+  • Grant awarded: EDU Analytics Pilot Grant
+  • Progress update: 35%
+  • Publication: Early Warning Models... (validated)
+
+================================================================================
+5. ROLE WALBA — MAXAY SAMEEYAAN ISLA SHEEKADA?
+================================================================================
+
+RESEARCHER (Sarah Chen):
+  Tallaabo 1,3,6,7,10,11 — sameeya, buuxiyaa, gudbiyaa
+
+FACULTY COORDINATOR (Emma Richardson):
+  Tallaabo 4 — pre-review proposal
+  Tallaabo 10 — publication workflow (Submitted → In process → Pipeline)
+
+RESEARCH DIRECTOR (Catherine Morrison):
+  Tallaabo 2 — ethics approval
+  Tallaabo 5 — proposal approval + project creation
+  Tallaabo 8 — grant award + budget trigger
+  Tallaabo 10 — can advance any publication stage
+
+FINANCE OFFICER (Michael Brooks):
+  Tallaabo 9 — budget lines, payment approval, disbursement
+
+================================================================================
+6. XAALADAHA (STATUSES) — QUICK REFERENCE
+================================================================================
+
+Proposal:     draft → submitted → under_review → approved | rejected | revision_requested
+Ethics (prop): pending → approved | rejected
+Ethics (app):  draft → submitted → approved | rejected
+Project:       active | completed | on_hold
+Grant:         draft → submitted → approved → active | rejected | closed
+Publication:   draft → submitted → validated | rejected
+Pub workflow:  submitted → in_process → pipeline → published
+
+Pipeline colours:
+  ✓ Done (green)     — completed
+  → Current (blue)   — you are here
+  ○ Pending (grey)   — not yet reached
+  ✕ Blocked (red)    — rejected
+  — Skipped          — not required
+
+================================================================================
+7. SEED DATA — WAXA HORE U JIRA DATABASE-KA
+================================================================================
+
+Markaad npm run seed sameyso, Sarah Chen (asha@rms.edu) waxay hore u leedahay
+records tusaale ah UG portal-ka, tusaale:
+
+  • "Predictive Analytics for Undergraduate Course Performance" — APPROVED
+  • Grants, budgets, publications, groups — ~12 per module per portal
+
+Sheekada kor ku xusan waa TUSAALE CUSUB aad adigu ku tijaabin karto.
+Seed-ku wuxuu ku siinayaa xog diyaar ah si aad u aragto Director/Coordinator views.
+
+================================================================================
+8. CHECKLIST 100% — MA DHAMMAATAY CILMI-BAARISTA?
+================================================================================
+
+  [ ] Proposal approved
+  [ ] Ethics REC approved (certificate)
+  [ ] Project active + progress updates logged
+  [ ] Grant awarded + amount recorded
+  [ ] Budget created + payments processed
+  [ ] Publication submitted + workflow = Published + validated
+  [ ] Final output archived in Repository
+  [ ] Research Workflow Status — all 11 steps ✓ Done
+
+================================================================================
+9. TROUBLESHOOTING (COMMON)
+================================================================================
+
+"Required fields incomplete" on submit:
+  → Buuxi Design + Project level + Signature on ethics form
+
+"Ethics must be approved before proposal approval":
+  → Director must approve ethics FIRST, then proposal
+
+"Cannot submit — ethics incomplete":
+  → Save draft after filling all 7 required REC fields
+
+Researcher cannot advance publication workflow:
+  → Normal — only Coordinator/Director can
+
+Wrong data visible:
+  → Check portal (UG vs PG) at login
+
+================================================================================
+DHAMAAD
+Jamhuriya RMS — Full Real Example Document
+GitHub: https://github.com/Abdisalam114/research-management-systems
+================================================================================

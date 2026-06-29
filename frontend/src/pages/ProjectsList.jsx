@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
+import { ProjectWorkflowSummary } from "../components/ProjectWorkflowPanel";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 
 export function ProjectsListPage() {
@@ -81,6 +82,7 @@ export function ProjectsListPage() {
                         </>
                       ) : null}
                     </div>
+                    <ProjectWorkflowSummary workflow={p.workflow} />
                   </div>
                   <Link className="btn" to={`/projects/${p.id}`}>
                     Details

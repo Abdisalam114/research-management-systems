@@ -1,28 +1,39 @@
 const { RepositoryItem, REPOSITORY_ACCESS } = require("../models/RepositoryItem");
 const { ResearchGroup } = require("../models/ResearchGroup");
+const { validateProjectQuery } = require("../utils/projectScopedRecords");
 
 async function fetchItemsForUser(req) {
   const { role } = req.user;
   const tw = (base = {}) => (req.tierWhere ? req.tierWhere(base) : base);
+  const projectFilter = {};
+
+  if (req.query?.projectId) {
+    await validateProjectQuery(req, req.query.projectId, { ownerOnly: role === "researcher" });
+    projectFilter.projectId = req.query.projectId;
+  }
 
   if (["research_director", "faculty_coordinator"].includes(role)) {
-    return RepositoryItem.find(tw({})).sort({ createdAt: -1 });
+    return RepositoryItem.find(tw({ ...projectFilter })).sort({ createdAt: -1 });
   }
 
   if (role === "finance_officer") {
-    return RepositoryItem.find(tw({ access: REPOSITORY_ACCESS.INSTITUTION })).sort({ createdAt: -1 });
+    return RepositoryItem.find(tw({ access: REPOSITORY_ACCESS.INSTITUTION, ...projectFilter })).sort({ createdAt: -1 });
   }
 
   const groups = await ResearchGroup.find(tw({ "members.userId": req.user.id })).select("_id");
   const groupIds = groups.map((g) => g._id);
 
-  return RepositoryItem.find(tw({
-    $or: [
-      { uploadedBy: req.user.id },
-      { access: REPOSITORY_ACCESS.INSTITUTION },
-      { access: REPOSITORY_ACCESS.GROUP, groupId: { $in: groupIds } },
-    ],
-  })).sort({ createdAt: -1 });
+  const accessOr = [
+    { uploadedBy: req.user.id },
+    { access: REPOSITORY_ACCESS.INSTITUTION },
+    { access: REPOSITORY_ACCESS.GROUP, groupId: { $in: groupIds } },
+  ];
+
+  if (Object.keys(projectFilter).length) {
+    return RepositoryItem.find(tw({ ...projectFilter, $or: accessOr })).sort({ createdAt: -1 });
+  }
+
+  return RepositoryItem.find(tw({ $or: accessOr })).sort({ createdAt: -1 });
 }
 
 function itemsToExportRows(items, fileBaseUrl = "") {

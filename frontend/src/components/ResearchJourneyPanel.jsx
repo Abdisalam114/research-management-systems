@@ -108,7 +108,6 @@ function StatusLegend() {
                 color: s.iconColor,
                 fontSize: 11,
                 fontWeight: 900,
-                flexShrink: 0,
               }}
             >
               {s.icon}
@@ -190,12 +189,96 @@ function StepRow({ step, index }) {
   );
 }
 
-/** Research pipeline tracker — proposal through repository (embedded in Research Workflow Status). */
+function PipelineCard({ item, kind = "project" }) {
+  const isProject = kind === "project";
+  const progress = item.progressPercent;
+
+  return (
+    <div
+      className="card"
+      style={{
+        marginTop: 14,
+        borderColor: isProject ? "rgba(56,189,248,0.45)" : "rgba(148,163,184,0.35)",
+        borderStyle: isProject ? "solid" : "dashed",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: isProject ? "#0ea5e9" : "#64748b" }}>
+            {isProject ? "Project" : "Proposal (before project)"}
+          </div>
+          <div style={{ fontWeight: 900, fontSize: 17, marginTop: 4 }}>{item.title}</div>
+          <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+            {isProject ? (
+              <>
+                Status: <strong>{item.projectStatus}</strong>
+                {item.proposalStatus ? ` • Proposal: ${item.proposalStatus}` : null}
+              </>
+            ) : (
+              <>Proposal status: <strong>{item.proposalStatus}</strong></>
+            )}
+            {item.currentStepLabel ? (
+              <>
+                {" "}
+                • Current: <strong style={{ color: "#0369a1" }}>{item.currentStepLabel}</strong>
+              </>
+            ) : null}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {isProject && progress != null ? (
+            <div style={{ minWidth: 120, textAlign: "right" }}>
+              <div style={{ fontSize: 12, fontWeight: 700 }}>{progress}% progress</div>
+              <div
+                style={{
+                  marginTop: 4,
+                  height: 6,
+                  borderRadius: 999,
+                  background: "rgba(148,163,184,0.25)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${Math.min(100, Math.max(0, progress))}%`,
+                    height: "100%",
+                    background: "#0ea5e9",
+                    borderRadius: 999,
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+          {isProject && item.projectId ? (
+            <Link className="btn primary" to={`/projects/${item.projectId}`} style={{ fontSize: 12 }}>
+              Open project
+            </Link>
+          ) : null}
+          {!isProject && item.proposalId ? (
+            <Link className="btn" to={`/proposals/${item.proposalId}`} style={{ fontSize: 12 }}>
+              Open proposal
+            </Link>
+          ) : null}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(56,189,248,0.15)" }}>
+        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: "#64748b" }}>
+          Workflow steps for this {isProject ? "project" : "proposal"}
+        </div>
+        {(item.steps || []).map((step, idx) => (
+          <StepRow key={step.key} step={step} index={idx} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Projects with embedded workflow steps (Research Workflow Status page). */
 export function ResearchJourneyPanel() {
   const { accessToken, user } = useAuth();
   const [data, setData] = useState(null);
   const [selectedResearcherId, setSelectedResearcherId] = useState("");
-  const [activeTrackIdx, setActiveTrackIdx] = useState(0);
 
   const isStaff = ["research_director", "faculty_coordinator"].includes(user?.role);
 
@@ -205,7 +288,6 @@ export function ResearchJourneyPanel() {
       isStaff && selectedResearcherId ? selectedResearcherId : undefined
     );
     setData(res);
-    setActiveTrackIdx(0);
   }, [accessToken, isStaff, selectedResearcherId]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load, [selectedResearcherId]);
@@ -216,21 +298,20 @@ export function ResearchJourneyPanel() {
     }
   }, [data, selectedResearcherId]);
 
-  const tracks = data?.tracks || [];
-  const activeTrack = tracks[activeTrackIdx] || null;
+  const projectItems = data?.projects || [];
+  const pendingItems = data?.pendingProposals || [];
   const timeline = data?.timeline || [];
+  const hasContent = projectItems.length > 0 || pendingItems.length > 0;
 
   return (
     <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.35)" }}>
-      <div style={{ fontWeight: 800, fontSize: 16 }}>Research pipeline</div>
+      <div style={{ fontWeight: 800, fontSize: 16 }}>Projects & workflow progress</div>
       <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-        Proposal → ethics → project → grant → budget → publication → repository.
+        Each project shows the full workflow — proposal, ethics, project stages, grant, publication, and repository.
       </div>
       <StatusLegend />
 
-      {error ? (
-        <div style={{ color: "#f87171", marginTop: 12 }}>{error}</div>
-      ) : null}
+      {error ? <div style={{ color: "#f87171", marginTop: 12 }}>{error}</div> : null}
 
       {isStaff && data?.mode === "picker" ? (
         <div style={{ marginTop: 12 }}>
@@ -256,62 +337,58 @@ export function ResearchJourneyPanel() {
         </div>
       ) : null}
 
-      {loading ? <div className="muted" style={{ marginTop: 12 }}>Loading pipeline…</div> : null}
+      {loading ? <div className="muted" style={{ marginTop: 12 }}>Loading projects…</div> : null}
 
       {!loading && data?.mode === "journey" ? (
         <>
           {data.summary ? (
             <div className="overviewGrid" style={{ marginTop: 12 }}>
-              <div className="overviewTile"><div className="label">Proposals</div><div className="value">{data.summary.proposals}</div></div>
               <div className="overviewTile"><div className="label">Projects</div><div className="value">{data.summary.projects}</div></div>
+              <div className="overviewTile"><div className="label">Proposals</div><div className="value">{data.summary.proposals}</div></div>
               <div className="overviewTile"><div className="label">Grants</div><div className="value">{data.summary.grants}</div></div>
               <div className="overviewTile"><div className="label">Publications</div><div className="value">{data.summary.publications}</div></div>
             </div>
           ) : null}
 
-          {tracks.length > 1 ? (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontWeight: 800, marginBottom: 8 }}>Research lines</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {tracks.map((t, idx) => (
-                  <button
-                    key={t.proposalId}
-                    type="button"
-                    className={idx === activeTrackIdx ? "btn primary" : "btn"}
-                    onClick={() => setActiveTrackIdx(idx)}
-                  >
-                    {t.title.slice(0, 40)}{t.title.length > 40 ? "…" : ""}
-                  </button>
-                ))}
-              </div>
+          {isStaff && data.researcher ? (
+            <div className="muted" style={{ marginTop: 12, fontSize: 13 }}>
+              Showing workflow for <strong>{data.researcher.fullName}</strong> ({data.researcher.department || "—"})
             </div>
           ) : null}
 
-          {activeTrack ? (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontWeight: 900, fontSize: 17 }}>{activeTrack.title}</div>
-              <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
-                Proposal: {activeTrack.proposalStatus}
-                {activeTrack.currentStepLabel ? ` • Current: ${activeTrack.currentStepLabel}` : ""}
-              </div>
-              <div style={{ marginTop: 14 }}>
-                {activeTrack.steps.map((step, idx) => (
-                  <StepRow key={step.key} step={step} index={idx} />
-                ))}
-              </div>
+          {projectItems.length > 0 ? (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontWeight: 800, marginTop: 8 }}>Active projects ({projectItems.length})</div>
+              {projectItems.map((item) => (
+                <PipelineCard key={item.projectId} item={item} kind="project" />
+              ))}
             </div>
-          ) : (
+          ) : null}
+
+          {pendingItems.length > 0 ? (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontWeight: 800, marginTop: 8 }}>Proposals not yet a project ({pendingItems.length})</div>
+              <p className="muted" style={{ fontSize: 13, margin: "4px 0 0" }}>
+                These are still in the proposal / ethics / review stage.
+              </p>
+              {pendingItems.map((item) => (
+                <PipelineCard key={item.proposalId} item={item} kind="proposal" />
+              ))}
+            </div>
+          ) : null}
+
+          {!hasContent ? (
             <div style={{ marginTop: 12 }}>
-              <div className="muted">No proposals yet. Start by creating a research proposal.</div>
+              <div className="muted">No projects or proposals yet.</div>
               <Link className="btn primary" to="/proposals/new" style={{ marginTop: 10, display: "inline-block" }}>
                 New proposal
               </Link>
             </div>
-          )}
+          ) : null}
 
           {timeline.length ? (
             <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid rgba(56,189,248,0.18)" }}>
-              <div style={{ fontWeight: 800, marginBottom: 10 }}>Recent activity timeline</div>
+              <div style={{ fontWeight: 800, marginBottom: 10 }}>Recent activity</div>
               <div style={{ display: "grid", gap: 8 }}>
                 {timeline.map((ev, idx) => (
                   <div key={`${ev.at}-${idx}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>

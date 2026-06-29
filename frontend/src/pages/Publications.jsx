@@ -1,8 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as publicationApi from "../services/publicationApi";
+import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 import {
@@ -23,23 +25,45 @@ const EMPTY_FORM = {
   doi: "",
   orcid: "",
   communityImpact: "",
+  projectId: "",
 };
 
 export function PublicationsPage() {
   const { accessToken, user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const projectIdFromUrl = searchParams.get("projectId") || "";
   const [publications, setPublications] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState({ ...EMPTY_FORM, projectId: projectIdFromUrl });
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
 
   const canCreate = user?.role === "researcher";
   const canValidate = ["faculty_coordinator", "research_director"].includes(user?.role);
 
+  useEffect(() => {
+    if (projectIdFromUrl) {
+      setForm((f) => ({ ...f, projectId: projectIdFromUrl }));
+    }
+  }, [projectIdFromUrl]);
+
   const load = useCallback(async () => {
-    const res = await publicationApi.listPublications(accessToken);
+    const params = projectIdFromUrl ? { projectId: projectIdFromUrl } : {};
+    const res = await publicationApi.listPublications(accessToken, params);
     setPublications(res.publications || []);
-  }, [accessToken]);
+  }, [accessToken, projectIdFromUrl]);
+
+  useEffect(() => {
+    if (!canCreate || !accessToken) return;
+    projectApi.listProjects(accessToken).then((res) => {
+      const list = res.projects || [];
+      setProjects(list);
+      if (list.length === 1) {
+        setForm((f) => (f.projectId ? f : { ...f, projectId: list[0].id }));
+      }
+    }).catch(() => setProjects([]));
+  }, [accessToken, canCreate]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
@@ -95,6 +119,13 @@ export function PublicationsPage() {
         </p>
       ) : null}
 
+      {projectIdFromUrl ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Filtered to one project —{" "}
+          <Link to="/publications">show all outputs</Link>
+        </p>
+      ) : null}
+
       {loading ? <p className="muted">Loading publications…</p> : null}
       {error ? (
         <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>
@@ -139,6 +170,21 @@ export function PublicationsPage() {
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ fontWeight: 800 }}>Register research output</div>
           <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
+            <div className="field">
+              <label>Research project (required)</label>
+              <select
+                value={form.projectId}
+                onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))}
+                required
+              >
+                <option value="">Select project…</option>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div className="field">
               <label>Title</label>
               <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
@@ -210,8 +256,12 @@ export function PublicationsPage() {
                     setError("Community research impact description is required for this output type.");
                     return;
                   }
+                  if (!form.projectId) {
+                    setError("Select the research project this output belongs to.");
+                    return;
+                  }
                   await publicationApi.createPublication(accessToken, form);
-                  setForm(EMPTY_FORM);
+                  setForm({ ...EMPTY_FORM, projectId: projects.length === 1 ? projects[0].id : projectIdFromUrl || "" });
                   setShowForm(false);
                   await reload();
                 } catch (e) {
@@ -238,6 +288,7 @@ export function PublicationsPage() {
                   <div className="muted">
                     {publicationTypeLabel(p.type)} • {p.year} • {p.status}
                     {p.venue ? ` • ${p.venue}` : ""}
+                    {p.projectTitle ? ` • Project: ${p.projectTitle}` : p.projectId ? ` • Project linked` : ""}
                   </div>
                   {p.workflowStage ? (
                     <div style={{ fontSize: 12, marginTop: 4, color: workflowStageMeta(p.workflowStage).accent }}>

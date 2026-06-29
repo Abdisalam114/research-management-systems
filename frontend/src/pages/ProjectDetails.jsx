@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as projectApi from "../services/projectApi";
+import { ProjectWorkflowPanel } from "../components/ProjectWorkflowPanel";
 
 const emptyMilestone = { title: "", dueDate: "", completed: false };
 const emptyMember = { name: "", role: "member" };
@@ -96,9 +97,21 @@ export function ProjectDetailsPage() {
                     <div style={{ fontWeight: 700 }}>{g.title}</div>
                     <div className="muted" style={{ fontSize: 13 }}>
                       {g.fundingSource} • {g.status}
-                      {Number(g.amountAwarded || 0) > 0
-                        ? ` • Awarded ${g.currency} ${Number(g.amountAwarded).toLocaleString()}`
-                        : ` • Requested ${g.currency} ${Number(g.amountRequested || 0).toLocaleString()}`}
+                      {project.awardsVisible !== false &&
+                      Number(g.amountAwarded || 0) > 0 ? (
+                        <>
+                          {" "}
+                          • Awarded {g.currency} {Number(g.amountAwarded).toLocaleString()}
+                        </>
+                      ) : project.awardsVisible !== false &&
+                        Number(g.amountRequested || 0) > 0 ? (
+                        <>
+                          {" "}
+                          • Requested {g.currency} {Number(g.amountRequested).toLocaleString()}
+                        </>
+                      ) : g.awardsHidden ? (
+                        <> • Award amount — visible after publication (director authorized)</>
+                      ) : null}
                     </div>
                   </div>
                   <Link className="btn" to={`/grants/${g.id}`}>
@@ -108,7 +121,7 @@ export function ProjectDetailsPage() {
               ))}
             </div>
           </div>
-        ) : (
+        ) : project.awardsVisible === false ? null : (
           <div className="muted" style={{ marginTop: 14, fontSize: 13 }}>
             No grants linked to this project yet.
           </div>
@@ -137,6 +150,25 @@ export function ProjectDetailsPage() {
           </button>
         ) : null}
       </div>
+
+      <ProjectWorkflowPanel workflow={project.workflow} />
+
+      {isOwner ? (
+        <div className="card" style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <span className="muted" style={{ width: "100%", fontSize: 13, marginBottom: 4 }}>
+            Add records for this project only:
+          </span>
+          <Link className="btn" to={`/publications?projectId=${id}`}>
+            + Research output
+          </Link>
+          <Link className="btn" to={`/repository?projectId=${id}`}>
+            + Repository file
+          </Link>
+          <Link className="btn" to={`/grants?projectId=${id}`}>
+            + Grant request
+          </Link>
+        </div>
+      ) : null}
 
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800, marginBottom: 8 }}>Milestones</div>

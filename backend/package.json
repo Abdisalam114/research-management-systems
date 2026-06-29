@@ -11,8 +11,11 @@
     "fix:grant-awards": "node src/scripts/fixGrantAwards.js",
     "fix:grant-budgets": "node src/scripts/fixGrantBudgets.js",
     "fix:grant-project-links": "node src/scripts/fixGrantProjectLinks.js",
+    "repair:project-links": "node src/scripts/repairProjectScopedLinks.js",
     "docs:database-pdf": "node src/scripts/generateDatabaseDocsPdf.js",
     "docs:system-pdf": "node src/scripts/generateSystemDocsPdf.js",
+    "docs:roles-docx": "node src/scripts/generateRolesStagesDocx.js",
+    "docs:example-docx": "node src/scripts/generateRolesStagesDocx.js ../docs/FULL_SYSTEM_REAL_EXAMPLE.txt ../docs/FULL_SYSTEM_REAL_EXAMPLE.docx",
     "docs:pdf": "node src/scripts/generateDatabaseDocsPdf.js && node src/scripts/generateSystemDocsPdf.js",
     "verify:roles": "node ../scripts/verify-all-roles.cjs",
     "test": "echo \"No tests yet\" && exit 0"
@@ -34,6 +37,7 @@
     "pdfkit": "^0.18.0"
   },
   "devDependencies": {
+    "docx": "^9.7.1",
     "nodemon": "^3.1.10"
   }
 }

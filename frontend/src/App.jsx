@@ -85,7 +85,7 @@ export default function App() {
           </Route>
 
           <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director"]} />}>
-            <Route path="/research-journey" element={<Navigate to="/research-workflow" replace />} />
+            <Route path="/research-journey" element={<Navigate to="/projects" replace />} />
             <Route path="/publications" element={<PublicationsPage />} />
             <Route path="/research-workflow" element={<ResearchWorkflowPage />} />
             <Route path="/repository" element={<RepositoryPage />} />

@@ -2,6 +2,7 @@ const PDFDocument = require("pdfkit");
 const { RepositoryItem, REPOSITORY_ACCESS } = require("../models/RepositoryItem");
 const { ResearchGroup } = require("../models/ResearchGroup");
 const { AppError } = require("../utils/AppError");
+const { resolveOwnedProjectId, requireOwnedProjectId, validateProjectQuery } = require("../utils/projectScopedRecords");
 const {
   fetchItemsForUser,
   itemsToExportRows,
@@ -52,7 +53,9 @@ function sanitizeItem(i) {
     fileSize: i.fileSize,
     access: i.access,
     groupId: i.groupId,
-    projectId: i.projectId,
+    projectId: i.projectId?._id ? String(i.projectId._id) : i.projectId || null,
+    projectTitle:
+      i.projectId && typeof i.projectId === "object" && i.projectId.title ? i.projectId.title : null,
     uploadedBy: i.uploadedBy,
     createdAt: i.createdAt,
     updatedAt: i.updatedAt,
@@ -61,7 +64,8 @@ function sanitizeItem(i) {
 
 async function listItems(req, res) {
   const items = await fetchItemsForUser(req);
-  return res.json({ items: items.map(sanitizeItem) });
+  const populated = await RepositoryItem.populate(items, { path: "projectId", select: "title status" });
+  return res.json({ items: populated.map(sanitizeItem) });
 }
 
 async function uploadItem(req, res) {
@@ -82,6 +86,13 @@ async function uploadItem(req, res) {
     if (!isMember) throw new AppError("Forbidden", 403);
   }
 
+  const linkedProjectId =
+    req.user.role === "researcher"
+      ? await requireOwnedProjectId(req, projectId, req.user.id)
+      : projectId
+        ? await validateProjectQuery(req, projectId)
+        : null;
+
   const item = await RepositoryItem.create(req.tierAssign({
     type,
     title: String(title).trim(),
@@ -91,7 +102,7 @@ async function uploadItem(req, res) {
     fileSize: req.file.size || 0,
     access: normalizedAccess,
     groupId: normalizedGroupId,
-    projectId: projectId || null,
+    projectId: linkedProjectId,
     uploadedBy: req.user.id,
   }));
 

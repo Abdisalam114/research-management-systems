@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
@@ -99,6 +99,8 @@ function logGrantDebug(location, message, data, hypothesisId) {
 
 export function GrantsPage() {
   const { accessToken, user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const projectIdFromUrl = searchParams.get("projectId") || "";
   const [grants, setGrants] = useState([]);
   const [projects, setProjects] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -119,8 +121,9 @@ export function GrantsPage() {
 
   const load = useCallback(async () => {
     const isResearcher = user?.role === "researcher";
+    const grantParams = projectIdFromUrl ? { projectId: projectIdFromUrl } : {};
     const [res, projRes] = await Promise.all([
-      grantApi.listGrants(accessToken),
+      grantApi.listGrants(accessToken, grantParams),
       isResearcher
         ? projectApi.listProjects(accessToken).catch(() => ({ projects: [] }))
         : Promise.resolve({ projects: [] }),
@@ -150,7 +153,7 @@ export function GrantsPage() {
       },
       "A,B,E"
     );
-  }, [accessToken, user?.role]);
+  }, [accessToken, user?.role, projectIdFromUrl]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
@@ -208,6 +211,12 @@ export function GrantsPage() {
           </>
         }
       />
+      {projectIdFromUrl ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Filtered to one project —{" "}
+          <Link to="/grants">show all grants</Link>
+        </p>
+      ) : null}
       {statusFilter !== "all" ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
           Showing: <strong>{statFilterLabel(stats, statusFilter)}</strong> ({filteredGrants.length})

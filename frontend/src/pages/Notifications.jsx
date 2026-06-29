@@ -62,7 +62,7 @@ export function NotificationsPage() {
                   {formatWhen(n.createdAt)}
                 </span>
               </div>
-              <div className="muted" style={{ marginTop: 4 }}>
+              <div className="muted" style={{ marginTop: 4, whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.5 }}>
                 {n.body}
               </div>
               <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>

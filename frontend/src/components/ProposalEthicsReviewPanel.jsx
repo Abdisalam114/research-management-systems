@@ -54,9 +54,10 @@ export function ProposalEthicsReviewPanel({ ethics, isDirector, onApproveEthics,
         <Row label="Instruments" value={(ethics.instruments || []).join(", ") || "—"} />
         <Row label="Sample size" value={ethics.sampleSize} />
         <Row label="Applicant signature" value={ethics.applicantSignature?.name} />
-        {ethics.approval?.certificateId ? (
-          <Row label="Certificate ID" value={ethics.approval.certificateId} />
+        {ethics.approval?.certificateNumber || ethics.approval?.certificateId ? (
+          <Row label="Certificate Number" value={ethics.approval.certificateNumber || ethics.approval.certificateId} />
         ) : null}
+        {ethics.approval?.refNumber ? <Row label="JUREC Ref" value={ethics.approval.refNumber} /> : null}
       </div>
 
       {isDirector && ethics.status === "submitted" ? (

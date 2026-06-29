@@ -1,5 +1,6 @@
 const { Budget, BUDGET_ITEM_STATUSES, BUDGET_ITEM_TYPES } = require("../models/Budget");
 const { Grant } = require("../models/Grant");
+const { Project } = require("../models/Project");
 const { AppError } = require("../utils/AppError");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
 
@@ -67,7 +68,7 @@ async function getBudget(req, res) {
 }
 
 async function createBudget(req, res) {
-  const { grantId, projectId, totalAllocated, currency } = req.body || {};
+  let { grantId, projectId, totalAllocated, currency } = req.body || {};
   if (!grantId && !projectId) throw new AppError("grantId or projectId is required", 400);
 
   // If grantId provided, ensure it exists and belongs to owner (or staff creating on behalf—kept simple: researcher only).
@@ -75,6 +76,19 @@ async function createBudget(req, res) {
     const grant = await Grant.findOne(req.tierWhere({ _id: grantId }));
     if (!grant) throw new AppError("Grant not found", 404);
     if (String(grant.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
+    if (projectId && grant.projectId && String(projectId) !== String(grant.projectId)) {
+      throw new AppError("projectId must match the grant's linked project", 400);
+    }
+    if (!projectId && grant.projectId) {
+      projectId = grant.projectId;
+    }
+  }
+
+  if (projectId) {
+    const project = await Project.findOne(req.tierWhere({ _id: projectId, researcherId: req.user.id }));
+    if (!project) throw new AppError("Research project not found", 404);
+  } else if (grantId) {
+    throw new AppError("projectId is required when linking a budget to a grant", 400);
   }
 
   const budget = await Budget.create(req.tierAssign({

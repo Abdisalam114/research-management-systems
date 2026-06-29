@@ -308,7 +308,10 @@ export function EthicsPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `ethics-certificate-${a.approval?.certificateId || a.id}.pdf`;
+      link.download = `JUREC-certificate-${a.approval?.refNumber || a.approval?.certificateNumber || a.id}.pdf`.replace(
+        /[^\w.-]+/g,
+        "-"
+      );
       link.click();
       URL.revokeObjectURL(url);
     } catch (e) {
@@ -543,7 +546,7 @@ function EthicsEditor({
         <AppButton onClick={onClose}>Close</AppButton>
       </div>
 
-      <EthicsBrandingHeader approval={approval} showCertificateMeta={showCertificateMeta} />
+      <EthicsBrandingHeader approval={approval} showCertificateMeta={showCertificateMeta} status={editing.status} />
 
       <EthicsApplicationForm
         form={form}

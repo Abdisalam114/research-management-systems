@@ -8,7 +8,7 @@ const { Budget } = require("../models/Budget");
 async function main() {
   await connectDB(process.env.MONGO_URI || process.env.MONGODB_URI);
   const result = await syncGrantProjectLinks();
-  console.log(`Grant–project links synced: ${result.updated} updated (${result.scanned} unlinked)`);
+  console.log(`Grant–project links synced: ${result.updated} updated, ${result.skipped} skipped (${result.scanned} unlinked)`);
 
   const budgets = await Budget.find({ projectId: null, grantId: { $ne: null } });
   let budgetUpdated = 0;

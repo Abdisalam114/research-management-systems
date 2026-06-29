@@ -1,7 +1,10 @@
 import { api } from "./api";
 
-export async function listRepositoryItems(accessToken) {
-  const res = await api.get("/api/repository", { headers: { Authorization: `Bearer ${accessToken}` } });
+export async function listRepositoryItems(accessToken, params = {}) {
+  const res = await api.get("/api/repository", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params,
+  });
   return res.data;
 }
 

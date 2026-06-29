@@ -8,6 +8,7 @@ const NOTIFICATION_TYPES = Object.freeze({
   BUDGET: "budget",
   PUBLICATION: "publication",
   REPOSITORY: "repository",
+  ETHICS: "ethics",
   MESSAGE: "message",
   SYSTEM: "system",
 });

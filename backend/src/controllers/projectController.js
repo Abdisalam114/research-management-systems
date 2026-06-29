@@ -6,8 +6,13 @@ const { userDisplayName } = require("../utils/userDisplay");
 const {
   resolvePrincipalInvestigatorId,
   resolvePrincipalInvestigatorName,
-  PROJECT_PI_POPULATE,
 } = require("../utils/projectPrincipalInvestigator");
+const {
+  buildWorkflowForProject,
+  canViewProjectAwards,
+  sanitizeLinkedGrantsForViewer,
+} = require("../utils/researchJourney");
+const { Publication, PUBLICATION_STATUSES } = require("../models/Publication");
 
 function normalizeTeamMembers(team) {
   if (!Array.isArray(team)) return [];
@@ -71,9 +76,22 @@ const PROJECT_POPULATE = { path: "researcherId", select: "fullName name email de
 
 async function listProjects(req, res) {
   const { role } = req.user;
-  const filter = req.tierWhere(role === "researcher" ? { researcherId: req.user.id } : {});
-  const projects = await Project.find(filter).sort({ createdAt: -1 }).populate(PROJECT_POPULATE);
-  const sanitized = projects.map(sanitizeProject);
+  const tierFilter = req.tierWhere(role === "researcher" ? { researcherId: req.user.id } : {});
+  const projects = await Project.find(tierFilter).sort({ createdAt: -1 }).populate(PROJECT_POPULATE);
+  const sanitized = await Promise.all(
+    projects.map(async (p) => {
+      const base = sanitizeProject(p);
+      const wf = await buildWorkflowForProject(p._id, tierFilter, role);
+      if (wf) {
+        base.workflow = {
+          currentStepLabel: wf.currentStepLabel,
+          currentStepKey: wf.currentStepKey,
+          progressPercent: wf.progressPercent,
+        };
+      }
+      return base;
+    })
+  );
 
   // #region agent log
   try {
@@ -111,16 +129,35 @@ async function getProject(req, res) {
     .sort({ createdAt: -1 })
     .select("title status amountRequested amountAwarded currency fundingSource");
 
+  const tierFilter = req.tierWhere({});
+  const hasPublication = await Publication.exists({
+    ...tierFilter,
+    projectId: project._id,
+    status: { $ne: PUBLICATION_STATUSES.DRAFT },
+  });
+  const canViewAwards = canViewProjectAwards({
+    role: req.user.role,
+    hasProjectPublication: Boolean(hasPublication),
+  });
+
   const out = sanitizeProject(project);
-  out.linkedGrants = grantDocs.map((g) => ({
-    id: g._id,
-    title: g.title,
-    status: g.status,
-    amountRequested: g.amountRequested,
-    amountAwarded: g.amountAwarded,
-    currency: g.currency,
-    fundingSource: g.fundingSource,
-  }));
+  out.grantsVisible = project.status === PROJECT_STATUSES.COMPLETED;
+  out.awardsVisible = canViewAwards;
+  out.linkedGrants = sanitizeLinkedGrantsForViewer(
+    grantDocs.map((g) => ({
+      id: g._id,
+      title: g.title,
+      status: g.status,
+      amountRequested: g.amountRequested,
+      amountAwarded: g.amountAwarded,
+      currency: g.currency,
+      fundingSource: g.fundingSource,
+    })),
+    canViewAwards,
+    project
+  );
+
+  out.workflow = await buildWorkflowForProject(id, tierFilter, req.user.role);
 
   res.json({ project: out });
 }

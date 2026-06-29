@@ -1,7 +1,7 @@
 const { Grant } = require("../models/Grant");
 const { Project } = require("../models/Project");
 
-/** Link grants without projectId to the researcher's project in the same portal. */
+/** Link unlinked grants only when the researcher has exactly one project (safe backfill). */
 async function syncGrantProjectLinks(filter = {}) {
   const grants = await Grant.find({
     ...filter,
@@ -9,20 +9,24 @@ async function syncGrantProjectLinks(filter = {}) {
   });
 
   let updated = 0;
+  let skipped = 0;
   for (const grant of grants) {
-    const project = await Project.findOne({
+    const projects = await Project.find({
       programTier: grant.programTier,
       researcherId: grant.researcherId,
-    }).sort({ updatedAt: -1 });
+    }).sort({ createdAt: 1 });
 
-    if (!project) continue;
+    if (projects.length !== 1) {
+      skipped += 1;
+      continue;
+    }
 
-    grant.projectId = project._id;
+    grant.projectId = projects[0]._id;
     await grant.save();
     updated += 1;
   }
 
-  return { scanned: grants.length, updated };
+  return { scanned: grants.length, updated, skipped };
 }
 
 module.exports = { syncGrantProjectLinks };

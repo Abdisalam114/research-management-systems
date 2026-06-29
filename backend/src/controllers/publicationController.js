@@ -7,6 +7,7 @@ const {
 } = require("../models/Publication");
 const { AppError } = require("../utils/AppError");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
+const { resolveOwnedProjectId, requireOwnedProjectId, validateProjectQuery } = require("../utils/projectScopedRecords");
 const {
   resolveWorkflowStage,
   workflowStageLabel,
@@ -32,6 +33,9 @@ function sanitizePublication(p) {
     workflowStage,
     workflowStageLabel: workflowStageLabel(workflowStage),
     researcherId: p.researcherId,
+    projectId: p.projectId?._id ? String(p.projectId._id) : p.projectId || null,
+    projectTitle:
+      p.projectId && typeof p.projectId === "object" && p.projectId.title ? p.projectId.title : null,
     validatedBy: p.validatedBy,
     validatedAt: p.validatedAt,
     validationComment: p.validationComment,
@@ -45,8 +49,15 @@ async function listPublications(req, res) {
   const filter = {};
 
   if (role === "researcher") filter.researcherId = req.user.id;
+  if (req.query.projectId) {
+    await validateProjectQuery(req, req.query.projectId, { ownerOnly: true });
+    filter.projectId = req.query.projectId;
+  }
 
-  const pubs = await Publication.find(req.tierWhere(filter)).sort({ createdAt: -1 }).populate("researcherId", "fullName department");
+  const pubs = await Publication.find(req.tierWhere(filter))
+    .sort({ createdAt: -1 })
+    .populate("researcherId", "fullName department")
+    .populate("projectId", "title status");
   res.json({ publications: pubs.map(sanitizePublication) });
 }
 
@@ -116,7 +127,7 @@ function normalizeType(value) {
 }
 
 async function createPublication(req, res) {
-  const { title, type, year, venue, doi, orcid, url, authors, communityImpact } = req.body || {};
+  const { title, type, year, venue, doi, orcid, url, authors, communityImpact, projectId } = req.body || {};
   if (!title) throw new AppError("title is required", 400);
 
   const normalizedType = normalizeType(type);
@@ -124,6 +135,25 @@ async function createPublication(req, res) {
   if (normalizedType === PUBLICATION_TYPES.COMMUNITY_IMPACT && !impactText) {
     throw new AppError("communityImpact description is required for community research impact outputs", 400);
   }
+
+  const linkedProjectId = await requireOwnedProjectId(req, projectId, req.user.id);
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(__dirname, "../../../debug-15a9cf.log"),
+      `${JSON.stringify({
+        sessionId: "15a9cf",
+        location: "publicationController.js:createPublication",
+        message: "publication scoped to project",
+        data: { projectId: String(linkedProjectId), title: String(title).slice(0, 40), hypothesisId: "H3-create-scope", runId: "real-data-prep" },
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch (_) {}
+  // #endregion
 
   const pub = await Publication.create(req.tierAssign({
     title: String(title).trim(),
@@ -136,6 +166,7 @@ async function createPublication(req, res) {
     authors: Array.isArray(authors) ? authors.map((a) => String(a).trim()).filter(Boolean) : [],
     communityImpact: impactText,
     researcherId: req.user.id,
+    projectId: linkedProjectId,
     status: PUBLICATION_STATUSES.DRAFT,
   }));
 
@@ -152,7 +183,7 @@ async function updatePublication(req, res) {
     throw new AppError("Only draft or rejected publications can be edited", 400);
   }
 
-  const { title, type, year, venue, doi, orcid, url, authors, citationCount, communityImpact } = req.body || {};
+  const { title, type, year, venue, doi, orcid, url, authors, citationCount, communityImpact, projectId } = req.body || {};
   if (title !== undefined) pub.title = String(title).trim();
   if (type !== undefined) pub.type = normalizeType(type);
   if (year !== undefined) pub.year = year;
@@ -165,6 +196,12 @@ async function updatePublication(req, res) {
   if (authors !== undefined) {
     pub.authors = Array.isArray(authors) ? authors.map((a) => String(a).trim()).filter(Boolean) : [];
   }
+  if (projectId !== undefined) {
+    if (!projectId) {
+      throw new AppError("projectId cannot be removed — link a research project", 400);
+    }
+    pub.projectId = await requireOwnedProjectId(req, projectId, req.user.id);
+  }
 
   await pub.save();
   res.json({ publication: sanitizePublication(pub) });
@@ -176,6 +213,9 @@ async function submitPublication(req, res) {
   if (!pub) throw new AppError("Publication not found", 404);
   if (String(pub.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
   if (pub.status !== PUBLICATION_STATUSES.DRAFT) throw new AppError("Only draft publications can be submitted", 400);
+  if (!pub.projectId) {
+    throw new AppError("Link this output to a research project before submitting", 400);
+  }
 
   pub.status = PUBLICATION_STATUSES.SUBMITTED;
   pub.workflowStage = WORKFLOW_STAGES.SUBMITTED;

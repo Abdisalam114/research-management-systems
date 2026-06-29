@@ -1,0 +1,379 @@
+================================================================================
+JAMHURIYA RESEARCH MANAGEMENT SYSTEM (RMS)
+SHARAXAADDA ROLES-KA IYO STAGES-KA
+Document for Microsoft Word / Thesis
+================================================================================
+
+1. HORDHAC (INTRODUCTION)
+--------------------------------------------------------------------------------
+Jamhuriya RMS waa nidaam maamul oo cilmi-baarista jaamacadda u horseeda 
+socodka: Proposal → Ethics → Review → Project → Grant → Budget → Publication → Repository.
+
+Marka la galo, isticmaale wuxuu dooranayaa portal-ka:
+  • Undergraduate (UG) — cilmi-baarista heerka Bachelor
+  • Postgraduate (PG) — Master, PGD, iyo cilmi-baarista sare
+
+================================================================================
+QAYBTA A: ROLES-KA (DOORASHADA MAS’UULIYADDA)
+================================================================================
+
+--------------------------------------------------------------------------------
+A.1 RESEARCH DIRECTOR (Agaasimaha Cilmi-baarista)
+--------------------------------------------------------------------------------
+Magaca nidaamka: research_director
+
+Sharaxaad:
+Agaasimaha cilmi-baarista waa mas’uulka ugu sarreeya ee nidaamka RMS. Wuxuu 
+leeyahay aragti guud (institutional oversight) dhammaan qaybaha cilmi-baarista 
+jaamacadda.
+
+Mas’uuliyadaha ugu muhiimsan:
+  • Ansixinta isticmaaleyaasha cusub (User Approval — /pending-users)
+  • Maamulka faculties & departments (/departments)
+  • Ansixinta anshaxa REC (Ethics approval) marka proposal la gudbiyo
+  • Go’aanka ugu dambeeya ee proposal-ka (approve / reject / revision)
+  • Maamulka deeqaha (grants) — ansixin ama diidid
+  • Aragtida analytics-ka guud ee jaamacadda (Dashboard)
+  • Eegista Research Workflow Status ee dhammaan researchers-ka
+  • Horumarinta marxaladaha publication workflow (Submitted → Published)
+  • Maamulka thesis groups, repository, iyo modules-ka kale
+
+Modules-ka uu geli karo:
+Dashboard, Research Workflow Status, Ethics, Proposals, Projects, Publications, 
+Thesis, Grants, Budgets, Repository, Collaboration, Groups, Messages, 
+Notifications, Users, Departments, Profile.
+
+Ma geli karo (si gaar ah):
+Ma aha Finance Officer — ma maamulo bixinta lacagaha maalinlaha ah, laakiin 
+wuu arki karaa budgets-ka guud.
+
+--------------------------------------------------------------------------------
+A.2 FACULTY COORDINATOR (Isku-duwaha Faculty-ga)
+--------------------------------------------------------------------------------
+Magaca nidaamka: faculty_coordinator
+
+Sharaxaad:
+Isku-duwaha faculty-ga wuxuu matalaa qaybta / department-ka uu ka tirsan yahay. 
+Wuxuu ka shaqeeyaa heer faculty, ma aha heer jaamacadeed oo dhan.
+
+Mas’uuliyadaha ugu muhiimsan:
+  • Dib-u-eegista hore ee proposal-ka (pre-review) ka dib marka researcher gudbiyo
+  • Hubinta in proposal-ku u qalmo in uu u gudbo Director
+  • Ansixinta / diidmada publications-ka (validation) ee faculty-giisa
+  • Horumarinta publication workflow — hal marxalad hal mar (Submitted → In process → Pipeline → Published)
+  • Eegista Research Workflow Status ee researchers-ka faculty-giisa
+  • Faculty dashboard & reports
+
+Modules-ka uu geli karo:
+Dashboard, Research Workflow Status, Ethics, Proposals, Projects, Publications, 
+Thesis, Grants, Repository, Collaboration, Groups, Messages, Notifications, Profile.
+
+Xaddidaad:
+Wuxuu arkaa kaliya publications iyo data-ka ku xiran department-kiisa (marka la dejiyo).
+
+--------------------------------------------------------------------------------
+A.3 FINANCE OFFICER (Sarkaalka Maaliyadda)
+--------------------------------------------------------------------------------
+Magaca nidaamka: finance_officer
+
+Sharaxaad:
+Sarkaalka maaliyaddu wuxuu maamulaa dhinaca lacagta, miisaaniyadda, iyo bixinta 
+deeqaha la ansixiyay.
+
+Mas’uuliyadaha ugu muhiimsan:
+  • Maamulka budgets-ka (Budget allocated marka grant la siiyo)
+  • Raadraaca bixinta lacagaha (payments / disbursements)
+  • Warbixinnada maaliyadeed
+  • Eegista grants-ka la ansixiyay
+
+Modules-ka uu geli karo:
+Dashboard, Grants, Finance & Budgets, Collaboration, Messages, Notifications, Profile.
+
+Ma geli karo:
+Proposals, Ethics, Projects, Publications, Research Workflow Status, Thesis, 
+Repository (ma aha shaqadiisa asaasiga ah).
+
+--------------------------------------------------------------------------------
+A.4 RESEARCHER (Cilmi-baaraha)
+--------------------------------------------------------------------------------
+Magaca nidaamka: researcher
+
+Sharaxaad:
+Cilmi-baaruhu waa isticmaale sameeya cilmi-baarista — arday ama macalin / 
+faculty member. Waa qofka bilaaba socodka cilmi-baarista.
+
+Mas’uuliyadaha ugu muhiimsan:
+  • Sameynta proposal + buuxinta foomka Ethics (REC)
+  • Gudbinta proposal + ethics Director-ka
+  • Maamulka project-kiisa ka dib ansixinta
+  • Codsiga grant / funding
+  • Diiwaangelinta publications & outputs
+  • Soo gelinta files repository-ga
+  • Ka qaybgalka groups, thesis, collaboration, messages
+
+Modules-ka uu geli karo:
+Dashboard, Research Workflow Status, Ethics, Proposals, Projects, Publications, 
+Thesis, Grants, Budgets (budget-kiisa), Repository, Collaboration, Groups, 
+Messages, Notifications, Profile.
+
+Xaddidaad:
+Wuxuu arkaa kaliya xogtiisa (My proposals, My projects, My outputs). Ma beddeli 
+karo publication workflow stage — taasi waa Coordinator/Director.
+
+================================================================================
+QAYBTA B: RESEARCH WORKFLOW STATUS — PIPELINE-KA GUUD (11 TALLAABO)
+================================================================================
+Bogga: /research-workflow → Qaybta "Research pipeline"
+
+Tallaabo kasta waxay leedahay midab / xaalad:
+
+  ✓ Done (Cagaar)        — Waa la dhammeeyay
+  → Current step (Buluug) — Hadda waa kan aad ku jirto
+  ○ Pending (Cawl)       — Wali ma imaan
+  ✕ Blocked (Guduud)     — Waa la diiday / xannibay
+  — Skipped              — Looma baahna (tusaale ethics aan loo baahnayn)
+
+--------------------------------------------------------------------------------
+B.1 Create research proposal
+--------------------------------------------------------------------------------
+Sharaxaad: Researcher wuxuu abuuraa proposal cusub (title, abstract, department, 
+research area, document). Haddii ethics loo baahan yahay, foomka REC waa la buuxiyaa 
+isla bogga.
+
+Yaa sameeyaa: Researcher
+Xaalad marka la bilaabo: Done (marka proposal la abuuro)
+
+--------------------------------------------------------------------------------
+B.2 Ethics (REC) approval
+--------------------------------------------------------------------------------
+Sharaxaad: Research Ethics Committee (REC) waa in ay ansixisaa cilmi-baarista ka 
+hor inta aan la gudbin si rasmi ah. Foomka REC wuxuu ka kooban yahay PI name, 
+project level, aims, design, signature, iwm.
+
+Yaa ansixiyaa: Research Director
+Xaaladaha ethicsStatus: pending → approved / rejected
+Haddii requiresEthics = false: Skipped
+
+--------------------------------------------------------------------------------
+B.3 Submit proposal for review
+--------------------------------------------------------------------------------
+Sharaxaad: Researcher wuxuu guud ahaan u gudbiyaa proposal + ethics Director-ka 
+(hal badhan). Proposal status wuxuu noqdaa "submitted".
+
+Yaa sameeyaa: Researcher
+Shuruud: Ethics form waa in uu dhammaystiran yahay (haddii loo baahan yahay)
+
+--------------------------------------------------------------------------------
+B.4 Faculty coordinator pre-review
+--------------------------------------------------------------------------------
+Sharaxaad: Isku-duwaha faculty-ga wuxuu dib u eegaa proposal-ka, wuxuu ku darayaa 
+faallo, wuxuuna u diyaariyaa Director.
+
+Yaa sameeyaa: Faculty Coordinator
+Proposal status: submitted → under_review
+
+--------------------------------------------------------------------------------
+B.5 Director decision
+--------------------------------------------------------------------------------
+Sharaxaad: Director wuxuu qaataa go’aanka ugu dambeeya:
+  • Approved — proposal waa la ansixiyay, project waa la abuuri karaa
+  • Rejected — waa la diiday (Blocked)
+  • Revision requested — researcher waa in uu wax ka beddelaa
+
+Yaa sameeyaa: Research Director
+Shuruud: Ethics waa in ay horay u ansixisay (REC approved)
+
+--------------------------------------------------------------------------------
+B.6 Active research project
+--------------------------------------------------------------------------------
+Sharaxaad: Marka proposal la ansixiyo, mashruuc cilmi-baariseed (project) ayaa 
+la abuuraa. Researcher wuxuu geli karaa milestones, team, progress updates.
+
+Xaaladaha project: active | completed | on_hold
+Yaa maamulaa: Researcher (progress), Director (oversee)
+
+--------------------------------------------------------------------------------
+B.7 Grant / funding request
+--------------------------------------------------------------------------------
+Sharaxaad: Researcher wuxuu codsan karaa deeq lacageed mashruuciisa.
+Grant status marka hore: draft → submitted
+
+Yaa sameeyaa: Researcher (codsiga)
+Yaa ansixiyaa: Research Director
+
+--------------------------------------------------------------------------------
+B.8 Grant awarded
+--------------------------------------------------------------------------------
+Sharaxaad: Director wuxuu ansixiyaa ama diidaa deeqda. Marka la ansixiyo, 
+amountAwarded waa la dejiyaa.
+
+Grant status: approved / active (deeq la siiyay)
+Marka grant la ansixiyo: Budget waa la abuuri karaa si toos ah
+
+--------------------------------------------------------------------------------
+B.9 Budget allocated
+--------------------------------------------------------------------------------
+Sharaxaad: Miisaaniyadda mashruuca waa la dejiyaa ka dib marka grant la siiyo.
+Finance Officer wuxuu maamulaa bixinta lacagaha.
+
+Yaa arkaa: Researcher (budget-kiisa), Finance Officer (maamulka)
+
+--------------------------------------------------------------------------------
+B.10 Research publication
+--------------------------------------------------------------------------------
+Sharaxaad: Researcher wuxuu diiwaangeliyaa natiijada cilmi-baarista (paper, 
+journal, conference, thesis, iwm.) module-ka Publications.
+
+Publication status: draft → submitted → validated / rejected
+Wuxuu ku xiran yahay publication workflow (Qaybta C hoose)
+
+--------------------------------------------------------------------------------
+B.11 Archive in repository
+--------------------------------------------------------------------------------
+Sharaxaad: Diiwaanka ugu dambeeya — files, reports, ama outputs waa la kaydiyaa 
+Repository-ga jaamacadda si loo ilaaliyo loona heli karo mustaqbalka.
+
+Yaa sameeyaa: Researcher (upload), Director/Coordinator (eegista)
+
+================================================================================
+QAYBTA C: PUBLICATION WORKFLOW (4 MARXALADOOD)
+================================================================================
+Bogga: /research-workflow → Qaybta "Publication workflow"
+
+Kani waa socodka gaarka ah ee outputs-ka (publications) ka dib marka la gudbiyo.
+
+--------------------------------------------------------------------------------
+C.1 Submitted (📤 La gudbiyay)
+--------------------------------------------------------------------------------
+Sharaxaad: Researcher wuxuu gudbiyay publication validation. Waxaa sugaya 
+Faculty Coordinator ama Director.
+
+Yaa sameeyaa: Researcher (gudbinta)
+Xaalad: First stage after submit
+
+--------------------------------------------------------------------------------
+C.2 In process (⚙️ Socda)
+--------------------------------------------------------------------------------
+Sharaxaad: Faculty wuxuu dib u eegayaa output-ka, wuxuu hubinayaa in uu u qalmo 
+in uu galo pipeline-ka daabacaadda.
+
+Yaa horumariyaa: Faculty Coordinator (hal marxalad) ama Director
+
+--------------------------------------------------------------------------------
+C.3 Pipeline (📋 Jidka daabacaadda)
+--------------------------------------------------------------------------------
+Sharaxaad: Output-ku wuxuu ku jiraa habka daabacaadda — journal submission, 
+conference review, ama hab kale oo daabacaadeed.
+
+Yaa horumariyaa: Faculty Coordinator / Director
+
+--------------------------------------------------------------------------------
+C.4 Published (✅ La daabacay)
+--------------------------------------------------------------------------------
+Sharaxaad: Output-ku waa la daabacay ama si rasmi ah loo ansixiyay. System-ku 
+wuxuu si toos ah u beddelaa publication status → validated.
+
+Yaa horumariyaa: Faculty Coordinator / Director
+Natiijo: Researcher wuxuu helaa notification
+
+Xeerka horumarinta:
+  • Coordinator: hal marxalad hal mar (Submitted → In process → Pipeline → Published)
+  • Director: wuu horumarin karaa marxaladaha si toos ah
+
+================================================================================
+QAYBTA D: XAALADAHA PROPOSAL (PROPOSAL STATUSES)
+================================================================================
+
+  draft              — Qabyo; researcher wuu wax ka beddeli karaa
+  submitted          — La gudbiyay; sugaya coordinator review
+  under_review       — Coordinator / Director way dib u eegayaan
+  approved           — La ansixiyay; project waa la abuuri karaa
+  rejected           — La diiday
+  revision_requested — Wax ka beddel ayaa la codsaday
+
+================================================================================
+QAYBTA E: XAALADAHA ETHICS / REC (ETHICS STATUSES)
+================================================================================
+
+Proposal ethicsStatus:
+  not_required       — Anshax looma baahna proposal-kan
+  pending            — Sugaya ansixin
+  approved           — REC waa ansixisay
+  rejected           — REC waa diiday
+  revision_requested — Wax ka beddel ayaa la codsaday
+
+Ethics Application (standalone) status:
+  draft     — Qabyo
+  submitted — La gudbiyay
+  approved  — La ansixiyay (certificate issued)
+  rejected  — La diiday
+
+================================================================================
+QAYBTA F: XAALADAHA GRANT (GRANT STATUSES)
+================================================================================
+
+  draft     — Qabyo; researcher wuu qorayaa codsiga
+  submitted — La gudbiyay Director-ka
+  approved  — La ansixiyay
+  rejected  — La diiday
+  active    — Deeq firfircoon / la siiyay
+  closed    — La xiray / dhammaatay
+
+================================================================================
+QAYBTA G: XAALADAHA PROJECT (PROJECT STATUSES)
+================================================================================
+
+  active    — Mashruuc socda
+  completed — La dhammeeyay
+  on_hold   — La hakiyay
+
+================================================================================
+QAYBTA H: XAALADAHA PUBLICATION VALIDATION
+================================================================================
+
+  draft     — Qabyo; kaliya researcher buu arkaa
+  submitted — La gudbiyay validation
+  validated — La ansixiyay (Faculty / system)
+  rejected  — La diiday
+
+Noocyada publication-ka:
+  paper, journal_article, conference, book, book_chapter, patent, thesis, 
+  review, case_study, letter_to_editor, community_research_impact
+
+================================================================================
+QAYBTA I: SOCDKA GUUD — TUSAALE RESEARCHER
+================================================================================
+
+1. Researcher wuxuu galaa RMS → dooranayaa UG ama PG portal
+2. Wuxuu abuuraa Proposal + buuxiyaa Ethics form (REC)
+3. Wuxuu gudbiyaa Director-ka
+4. Faculty Coordinator wuu dib u eegaa
+5. Director wuu ansixiyaa ethics, kadib wuu ansixiyaa proposal
+6. Project waa la abuuraa — researcher wuu socodsiiyaa cilmi-baarista
+7. Wuxuu codsanayaa Grant → Director ansixiyaa → Budget la dejiyaa
+8. Wuxuu diiwaangeliyaa Publication → Coordinator horumariyaa workflow
+9. Wuxuu kaydiyaa Repository-ga
+10. Research Workflow Status wuxuu muujinayaa halka uu joogo tallaabo kasta
+
+================================================================================
+QAYBTA J: MODULES-KA JAAMACADDA (8 CORE + EXTENSION)
+================================================================================
+
+8 Modules (University spec):
+  1. Ethics (REC)
+  2. Proposals
+  3. Projects
+  4. Grants & Funding
+  5. Finance & Budgets
+  6. Publications & Outputs
+  7. Repository
+  8. Collaboration / Groups
+
+Extension:
+  • Thesis Supervision (/thesis) — maamulka kooxaha thesis-ka
+
+================================================================================
+DHAMAAD
+Jamhuriya Research Management System — JUST RMS
+GitHub: https://github.com/Abdisalam114/research-management-systems
+================================================================================

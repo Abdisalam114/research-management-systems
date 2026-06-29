@@ -1,6 +1,6 @@
 import { Navigate } from "react-router-dom";
 
-/** Legacy route — merged into Research Workflow Status. */
+/** Legacy route — project workflow lives on each project page. */
 export function ResearchJourneyPage() {
-  return <Navigate to="/research-workflow" replace />;
+  return <Navigate to="/projects" replace />;
 }

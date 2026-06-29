@@ -1,7 +1,10 @@
 import { api } from "./api";
 
-export async function listPublications(accessToken) {
-  const res = await api.get("/api/publications", { headers: { Authorization: `Bearer ${accessToken}` } });
+export async function listPublications(accessToken, params = {}) {
+  const res = await api.get("/api/publications", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params,
+  });
   return res.data;
 }
 
