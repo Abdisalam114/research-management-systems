@@ -68,13 +68,14 @@ async function login(req, res) {
 
   res.json({
     accessToken,
+    refreshToken,
     user: sanitizeUser(user),
   });
 }
 
 async function logout(req, res) {
   const cookieName = getRefreshCookieName();
-  const refreshToken = req.cookies?.[cookieName];
+  const refreshToken = req.body?.refreshToken || req.cookies?.[cookieName];
 
   if (refreshToken) {
     const user = await User.findOne({ refreshToken }).select("+refreshToken");
@@ -90,7 +91,7 @@ async function logout(req, res) {
 
 async function refresh(req, res) {
   const cookieName = getRefreshCookieName();
-  const refreshToken = req.cookies?.[cookieName];
+  const refreshToken = req.body?.refreshToken || req.cookies?.[cookieName];
   if (!refreshToken) throw new AppError("Missing refresh token", 401);
 
   let decoded;
@@ -111,7 +112,7 @@ async function refresh(req, res) {
   await user.save();
 
   res.cookie(cookieName, newRefreshToken, getRefreshCookieOptions());
-  res.json({ accessToken: newAccessToken });
+  res.json({ accessToken: newAccessToken, refreshToken: newRefreshToken });
 }
 
 async function me(req, res) {

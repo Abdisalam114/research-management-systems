@@ -1,6 +1,7 @@
 import axios from "axios";
 import { API_BASE } from "../config/apiBase";
-import { PROGRAM_TIER_HEADER, PROGRAM_TIER_STORAGE_KEY } from "../constants/programTier";
+import { PROGRAM_TIER_HEADER } from "../constants/programTier";
+import { getProgramTier } from "../utils/programTierStorage";
 
 export const api = axios.create({
   baseURL: API_BASE,
@@ -8,7 +9,7 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const tier = localStorage.getItem(PROGRAM_TIER_STORAGE_KEY);
+  const tier = getProgramTier();
   if (tier) {
     config.headers = config.headers || {};
     config.headers[PROGRAM_TIER_HEADER] = tier;

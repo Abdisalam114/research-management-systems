@@ -1,50 +1,93 @@
 import { createContext, useCallback, useEffect, useMemo, useState } from "react";
 import * as authApi from "../services/authApi";
-import { PROGRAM_TIER_STORAGE_KEY } from "../constants/programTier";
+import {
+  getAccessToken,
+  getRefreshToken,
+  initAuthStorage,
+  setAuthTokens,
+} from "../utils/authStorage";
+import { clearProgramTier } from "../utils/programTierStorage";
 
 export const AuthContext = createContext(null);
 
-const STORAGE_KEY = "just_rms_access_token";
+initAuthStorage();
+
+function logAuthDebug(message, data) {
+  // #region agent log
+  fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15a9cf" },
+    body: JSON.stringify({
+      sessionId: "15a9cf",
+      location: "AuthContext.jsx",
+      message,
+      data,
+      hypothesisId: "H-TAB-SESSION",
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+}
 
 export function AuthProvider({ children }) {
-  const [accessToken, setAccessToken] = useState(() => localStorage.getItem(STORAGE_KEY));
+  const [accessToken, setAccessToken] = useState(() => getAccessToken());
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const setToken = useCallback((token) => {
-    setAccessToken(token);
-    if (token) localStorage.setItem(STORAGE_KEY, token);
-    else localStorage.removeItem(STORAGE_KEY);
+  const applyTokens = useCallback(({ accessToken: nextAccess, refreshToken: nextRefresh }) => {
+    setAccessToken(nextAccess || null);
+    setAuthTokens({ accessToken: nextAccess || null, refreshToken: nextRefresh || null });
   }, []);
 
-  const loadMe = useCallback(
-    async (token) => {
-      if (!token) {
-        setUser(null);
-        return;
-      }
-      const res = await authApi.me(token);
-      setUser(res.user);
-    },
-    [setUser]
-  );
+  const loadMe = useCallback(async (token) => {
+    if (!token) {
+      setUser(null);
+      return;
+    }
+    const res = await authApi.me(token);
+    setUser(res.user);
+    return res.user;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        if (accessToken) {
-          await loadMe(accessToken);
-          if (!cancelled) setLoading(false);
-          return;
+        const storedAccess = getAccessToken();
+        const storedRefresh = getRefreshToken();
+
+        if (storedAccess) {
+          try {
+            const loadedUser = await loadMe(storedAccess);
+            if (!cancelled) {
+              logAuthDebug("session bootstrap from access token", {
+                email: loadedUser?.email,
+                role: loadedUser?.role,
+              });
+            }
+            return;
+          } catch {
+            if (!storedRefresh) throw new Error("access expired");
+          }
         }
 
-        // Try cookie-based refresh to bootstrap a new access token
-        const refreshed = await authApi.refresh();
-        setToken(refreshed.accessToken);
-        await loadMe(refreshed.accessToken);
+        if (storedRefresh) {
+          const refreshed = await authApi.refresh(storedRefresh);
+          applyTokens({
+            accessToken: refreshed.accessToken,
+            refreshToken: refreshed.refreshToken || storedRefresh,
+          });
+          const loadedUser = await loadMe(refreshed.accessToken);
+          if (!cancelled) {
+            logAuthDebug("session bootstrap from refresh token", {
+              email: loadedUser?.email,
+              role: loadedUser?.role,
+            });
+          }
+          return;
+        }
       } catch {
-        setToken(null);
+        applyTokens({ accessToken: null, refreshToken: null });
         setUser(null);
       } finally {
         if (!cancelled) setLoading(false);
@@ -53,31 +96,33 @@ export function AuthProvider({ children }) {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [applyTokens, loadMe]);
 
   const signIn = useCallback(
     async (email, password) => {
       const res = await authApi.login({ email, password });
-      setToken(res.accessToken);
+      applyTokens({ accessToken: res.accessToken, refreshToken: res.refreshToken });
       setUser(res.user);
       if (res.user?.role === "research_director") {
-        localStorage.removeItem(PROGRAM_TIER_STORAGE_KEY);
+        clearProgramTier();
       }
+      logAuthDebug("signIn", { email: res.user?.email, role: res.user?.role });
       return res;
     },
-    [setToken]
+    [applyTokens]
   );
 
   const signOut = useCallback(async () => {
+    const refreshToken = getRefreshToken();
     try {
-      await authApi.logout();
+      await authApi.logout(refreshToken);
     } finally {
-      setToken(null);
+      applyTokens({ accessToken: null, refreshToken: null });
       setUser(null);
-      localStorage.removeItem(PROGRAM_TIER_STORAGE_KEY);
+      clearProgramTier();
+      logAuthDebug("signOut", { cleared: true });
     }
-  }, [setToken]);
+  }, [applyTokens]);
 
   const value = useMemo(
     () => ({
@@ -85,14 +130,13 @@ export function AuthProvider({ children }) {
       user,
       loading,
       isAuthenticated: Boolean(accessToken && user),
-      setToken,
+      setToken: (token) => applyTokens({ accessToken: token, refreshToken: getRefreshToken() }),
       loadMe,
       signIn,
       signOut,
     }),
-    [accessToken, user, loading, setToken, loadMe, signIn, signOut]
+    [accessToken, user, loading, applyTokens, loadMe, signIn, signOut]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
-

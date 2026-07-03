@@ -26,6 +26,28 @@ router.patch(
 );
 
 router.post(
+  "/:id/title-proposal",
+  authenticateUser,
+  requireActiveUser,
+  asyncHandler(thesisGroupController.proposeTitle)
+);
+
+router.post(
+  "/:id/title-proposal/review",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("faculty_coordinator", "research_director"),
+  asyncHandler(thesisGroupController.reviewTitleProposal)
+);
+
+router.patch(
+  "/:id/chapters/:chapterKey",
+  authenticateUser,
+  requireActiveUser,
+  asyncHandler(thesisGroupController.updateChapter)
+);
+
+router.post(
   "/:id/meetings",
   authenticateUser,
   requireActiveUser,
