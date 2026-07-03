@@ -23,6 +23,14 @@ router.get(
 );
 
 router.get(
+  "/:id/certificate-preview",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("research_director"),
+  asyncHandler(ethicsController.previewCertificate)
+);
+
+router.get(
   "/:id/certificate.pdf",
   authenticateUser,
   requireActiveUser,

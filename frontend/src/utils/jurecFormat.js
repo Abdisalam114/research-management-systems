@@ -29,3 +29,17 @@ export function formatJurecDate(value) {
   if (Number.isNaN(d.getTime())) return "—";
   return `${ordinalDay(d.getDate())} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
+
+export function formatJurecDateShort(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${MONTHS[d.getMonth()].slice(0, 3)} ${d.getDate()} ${d.getFullYear()}`;
+}
+
+export function toDateInputValue(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().slice(0, 10);
+}

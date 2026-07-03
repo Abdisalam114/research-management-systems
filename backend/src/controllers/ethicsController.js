@@ -8,6 +8,8 @@ const { notifyUser, notifyUsersByRole } = require("../utils/notify");
 const {
   buildJurecApprovalMeta,
   buildCertificateNotificationBody,
+  previewJurecCertificate,
+  resolveSignatory,
   renderJurecCertificatePdf,
 } = require("../utils/jurecCertificate");
 
@@ -179,8 +181,33 @@ function defaultAcademicYear() {
   return `${y}/${y + 1}`;
 }
 
+function parseOptionalDate(value, fallback) {
+  if (value === undefined || value === null || value === "") return fallback;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? fallback : d;
+}
+
 async function directorDecision(req, res) {
-  const { decision, rejectionReason, serialNumber, academicYear, year, reviewedAt } = req.body || {};
+  const {
+    decision,
+    rejectionReason,
+    serialNumber,
+    refNumber,
+    certificateNumber,
+    academicYear,
+    year,
+    reviewedAt,
+    receivedAt,
+    signedAt,
+    signatoryKey,
+    signatoryTitle,
+    chairpersonLine,
+    includeSignature,
+    includeStamp,
+    principalInvestigator,
+    facultyCenter,
+    projectTitle,
+  } = req.body || {};
   if (!["approve", "reject"].includes(decision)) {
     throw new AppError("decision must be 'approve' or 'reject'", 400);
   }
@@ -191,28 +218,40 @@ async function directorDecision(req, res) {
   }
 
   if (decision === "approve") {
-    const issueDate = new Date();
+    const issueDate = parseOptionalDate(signedAt, new Date());
     const jurec = await buildJurecApprovalMeta(a, {
       EthicsApplication,
       tierFilter: req.tierWhere({}),
       issueDate,
-      reviewedAt,
+      reviewedAt: reviewedAt ? parseOptionalDate(reviewedAt, null) : undefined,
     });
+    const signatory = resolveSignatory(
+      signatoryKey === "director" ? null : signatoryKey,
+      signatoryKey === "director" ? req.user.fullName : chairpersonLine || null
+    );
+    const finalChairperson = chairpersonLine?.trim() || signatory.line;
     a.status = ETHICS_STATUSES.APPROVED;
     a.approval = {
       decision: "approved",
       signedByUserId: req.user.id,
-      signedByName: req.user.fullName || "Research Director",
+      signedByName: signatory.name,
       signedAt: issueDate,
-      certificateId: jurec.certificateNumber,
-      serialNumber: serialNumber ? String(serialNumber).trim() : jurec.refNumber,
-      refNumber: jurec.refNumber,
-      certificateNumber: jurec.certificateNumber,
+      certificateId: certificateNumber?.trim() || jurec.certificateNumber,
+      serialNumber: serialNumber?.trim() || jurec.serialNumber,
+      refNumber: refNumber?.trim() || jurec.refNumber,
+      certificateNumber: certificateNumber?.trim() || jurec.certificateNumber,
       academicYear: academicYear ? String(academicYear).trim() : defaultAcademicYear(),
       year: year ? String(year).trim() : String(issueDate.getFullYear()),
-      receivedAt: jurec.receivedAt,
-      reviewedAt: jurec.reviewedAt,
-      chairpersonLine: jurec.chairpersonLine,
+      receivedAt: parseOptionalDate(receivedAt, jurec.receivedAt),
+      reviewedAt: parseOptionalDate(reviewedAt, jurec.reviewedAt),
+      chairpersonLine: finalChairperson,
+      signatoryKey: signatoryKey || signatory.key || "joint",
+      signatoryTitle: signatoryTitle?.trim() || signatory.title || "Chairperson",
+      includeSignature: includeSignature !== false,
+      includeStamp: includeStamp !== false,
+      displayPrincipalInvestigator: principalInvestigator ? String(principalInvestigator).trim() : "",
+      displayFacultyCenter: facultyCenter ? String(facultyCenter).trim() : "",
+      displayProjectTitle: projectTitle ? String(projectTitle).trim() : "",
       rejectionReason: "",
     };
     if (a.proposalId) {
@@ -314,6 +353,43 @@ async function directorDecision(req, res) {
   res.json({ message: `Application ${decision}d`, application: sanitize(a) });
 }
 
+async function previewCertificate(req, res) {
+  const a = await EthicsApplication.findOne(req.tierWhere({ _id: req.params.id }));
+  if (!a) throw new AppError("Application not found", 404);
+  if (req.user.role !== "research_director") throw new AppError("Only the research director can preview certificates", 403);
+  if (a.status !== ETHICS_STATUSES.SUBMITTED) {
+    throw new AppError("Certificate preview is only available for submitted applications awaiting approval", 400);
+  }
+
+  const preview = await previewJurecCertificate(a, {
+    EthicsApplication,
+    tierFilter: req.tierWhere({}),
+  });
+
+  const signatories = [
+    ...preview.signatories,
+    { key: "director", name: `${req.user.fullName || "Research Director"} (you)`, title: "Chairperson", line: req.user.fullName || "Research Director" },
+    { key: "custom", name: "Custom signatory name", title: "Chairperson", line: "" },
+  ];
+
+  res.json({
+    preview: {
+      refNumber: preview.refNumber,
+      certificateNumber: preview.certificateNumber,
+      serialNumber: preview.serialNumber,
+      signedAt: preview.signedAt,
+      receivedAt: preview.receivedAt,
+      reviewedAt: preview.reviewedAt,
+      principalInvestigator: preview.principalInvestigator,
+      facultyCenter: preview.facultyCenter,
+      projectTitle: preview.projectTitle,
+      chairpersonLine: preview.chairpersonLine,
+      signatoryTitle: preview.signatoryTitle,
+    },
+    signatories,
+  });
+}
+
 async function downloadCertificate(req, res) {
   const a = await EthicsApplication.findOne(req.tierWhere({ _id: req.params.id }));
   if (!a) throw new AppError("Application not found", 404);
@@ -351,5 +427,6 @@ module.exports = {
   updateEthicsApplication,
   submitEthicsApplication,
   directorDecision,
+  previewCertificate,
   downloadCertificate,
 };

@@ -33,6 +33,11 @@ export async function directorDecision(t, id, body) {
   return data;
 }
 
+export async function previewCertificate(t, id) {
+  const { data } = await api.get(`/api/ethics/${id}/certificate-preview`, auth(t));
+  return data;
+}
+
 export async function downloadCertificate(t, id) {
   const res = await fetch(`${apiOrigin()}/api/ethics/${id}/certificate.pdf`, {
     headers: { Authorization: `Bearer ${t}` },

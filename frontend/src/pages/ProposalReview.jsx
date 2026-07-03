@@ -203,6 +203,8 @@ export function ProposalReviewPage() {
       <EthicsDirectorDecisionModal
         open={Boolean(ethicsDecisionModal)}
         mode={ethicsDecisionModal}
+        applicationId={ethics?.id}
+        accessToken={accessToken}
         applicationTitle={ethics?.projectTitle || proposal?.title}
         busy={busy}
         onClose={() => !busy && setEthicsDecisionModal(null)}

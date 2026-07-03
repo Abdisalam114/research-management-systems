@@ -1,26 +1,122 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import * as ethicsApi from "../services/ethicsApi";
+import { JurecCertificatePreview } from "./JurecCertificatePreview";
+import { toDateInputValue } from "../utils/jurecFormat";
 
 const defaultAcademicYear = () => {
   const y = new Date().getFullYear();
   return `${y}/${y + 1}`;
 };
 
-/** Modal for Director approve/reject — replaces window.prompt (often blocked or confusing). */
-export function EthicsDirectorDecisionModal({ open, mode, applicationTitle, busy, onClose, onConfirm }) {
+const EMPTY_CERT = {
+  refNumber: "",
+  serialNumber: "",
+  certificateNumber: "",
+  signedAt: "",
+  receivedAt: "",
+  reviewedAt: "",
+  principalInvestigator: "",
+  facultyCenter: "",
+  projectTitle: "",
+  chairpersonLine: "",
+  signatoryTitle: "Chairperson",
+};
+
+/** Modal for Director approve/reject — full editable certificate preview before printing. */
+export function EthicsDirectorDecisionModal({
+  open,
+  mode,
+  applicationId,
+  accessToken,
+  applicationTitle,
+  busy,
+  onClose,
+  onConfirm,
+}) {
   const [academicYear, setAcademicYear] = useState(defaultAcademicYear);
   const [year, setYear] = useState(() => String(new Date().getFullYear()));
-  const [serialNumber, setSerialNumber] = useState("");
+  const [cert, setCert] = useState(EMPTY_CERT);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [signatoryKey, setSignatoryKey] = useState("joint");
+  const [includeSignature, setIncludeSignature] = useState(true);
+  const [includeStamp, setIncludeStamp] = useState(true);
+  const [signatories, setSignatories] = useState([]);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [localError, setLocalError] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setAcademicYear(defaultAcademicYear());
     setYear(String(new Date().getFullYear()));
-    setSerialNumber("");
+    setCert(EMPTY_CERT);
     setRejectionReason("");
+    setSignatoryKey("joint");
+    setIncludeSignature(true);
+    setIncludeStamp(true);
+    setSignatories([]);
     setLocalError("");
   }, [open, mode]);
+
+  useEffect(() => {
+    if (!open || mode !== "approve" || !applicationId || !accessToken) return;
+    let cancelled = false;
+    (async () => {
+      setPreviewLoading(true);
+      try {
+        const res = await ethicsApi.previewCertificate(accessToken, applicationId);
+        if (cancelled) return;
+        const p = res.preview || {};
+        setSignatories(res.signatories || []);
+        setCert({
+          refNumber: p.refNumber || "",
+          serialNumber: p.serialNumber || "",
+          certificateNumber: p.certificateNumber || "",
+          signedAt: toDateInputValue(p.signedAt),
+          receivedAt: toDateInputValue(p.receivedAt),
+          reviewedAt: toDateInputValue(p.reviewedAt),
+          principalInvestigator: p.principalInvestigator || "",
+          facultyCenter: p.facultyCenter || "",
+          projectTitle: p.projectTitle || "",
+          chairpersonLine: p.chairpersonLine || "",
+          signatoryTitle: p.signatoryTitle || "Chairperson",
+        });
+      } catch (e) {
+        if (!cancelled) setLocalError(e?.response?.data?.message || "Could not load certificate preview");
+      } finally {
+        if (!cancelled) setPreviewLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, mode, applicationId, accessToken]);
+
+  const liveCert = useMemo(
+    () => ({
+      ...cert,
+      signedAt: cert.signedAt ? new Date(cert.signedAt).toISOString() : null,
+      receivedAt: cert.receivedAt ? new Date(cert.receivedAt).toISOString() : null,
+      reviewedAt: cert.reviewedAt ? new Date(cert.reviewedAt).toISOString() : null,
+    }),
+    [cert]
+  );
+
+  function updateCert(field, value) {
+    setCert((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleSignatoryChange(key) {
+    setSignatoryKey(key);
+    if (key === "custom") return;
+    const found = signatories.find((s) => s.key === key);
+    if (found) {
+      setCert((prev) => ({
+        ...prev,
+        chairpersonLine: found.line || found.name || prev.chairpersonLine,
+        signatoryTitle: found.title || "Chairperson",
+      }));
+    }
+  }
 
   if (!open) return null;
 
@@ -31,11 +127,28 @@ export function EthicsDirectorDecisionModal({ open, mode, applicationTitle, busy
       return;
     }
     if (mode === "approve") {
+      if (!cert.refNumber?.trim() || !cert.serialNumber?.trim() || !cert.certificateNumber?.trim()) {
+        setLocalError("Ref, serial, and certificate numbers are required.");
+        return;
+      }
       onConfirm({
         decision: "approve",
         academicYear: academicYear.trim() || defaultAcademicYear(),
         year: year.trim() || String(new Date().getFullYear()),
-        serialNumber: serialNumber.trim() || undefined,
+        refNumber: cert.refNumber.trim(),
+        serialNumber: cert.serialNumber.trim(),
+        certificateNumber: cert.certificateNumber.trim(),
+        signedAt: cert.signedAt || undefined,
+        receivedAt: cert.receivedAt || undefined,
+        reviewedAt: cert.reviewedAt || undefined,
+        principalInvestigator: cert.principalInvestigator.trim(),
+        facultyCenter: cert.facultyCenter.trim(),
+        projectTitle: cert.projectTitle.trim(),
+        chairpersonLine: cert.chairpersonLine.trim(),
+        signatoryTitle: cert.signatoryTitle.trim() || "Chairperson",
+        signatoryKey,
+        includeSignature,
+        includeStamp,
       });
     } else {
       onConfirm({ decision: "reject", rejectionReason: rejectionReason.trim() });
@@ -60,29 +173,121 @@ export function EthicsDirectorDecisionModal({ open, mode, applicationTitle, busy
         if (e.target === e.currentTarget && !busy) onClose();
       }}
     >
-      <div className="card" style={{ maxWidth: 440, width: "100%" }} onClick={(e) => e.stopPropagation()}>
+      <div
+        className="card"
+        style={{ maxWidth: mode === "approve" ? 960 : 440, width: "100%", maxHeight: "92vh", overflowY: "auto" }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div style={{ fontWeight: 800, marginBottom: 8 }}>
-          {mode === "approve" ? "Approve & issue certificate" : "Reject ethics"}
+          {mode === "approve" ? "Edit certificate & approve" : "Reject ethics"}
         </div>
         <p className="muted" style={{ marginTop: 0, fontSize: 13 }}>
           {applicationTitle || "Ethics application"}
         </p>
 
         {mode === "approve" ? (
-          <>
-            <div className="field">
-              <label>Academic year</label>
-              <input value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} disabled={busy} />
+          previewLoading ? (
+            <p className="muted">Loading certificate draft…</p>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "minmax(280px, 1fr) minmax(300px, 1fr)",
+                gap: 16,
+                alignItems: "start",
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 8 }}>Live preview (ka hor daabacaadda)</div>
+                <JurecCertificatePreview cert={liveCert} includeSignature={includeSignature} includeStamp={includeStamp} />
+              </div>
+
+              <div style={{ display: "grid", gap: 10 }}>
+                <div style={{ fontWeight: 800, fontSize: 13 }}>Edit certificate fields</div>
+
+                <div className="field">
+                  <label>Serial Number *</label>
+                  <input value={cert.serialNumber} onChange={(e) => updateCert("serialNumber", e.target.value)} disabled={busy} />
+                </div>
+                <div className="field">
+                  <label>Ref Number *</label>
+                  <input value={cert.refNumber} onChange={(e) => updateCert("refNumber", e.target.value)} disabled={busy} />
+                </div>
+                <div className="field">
+                  <label>Certificate Number *</label>
+                  <input value={cert.certificateNumber} onChange={(e) => updateCert("certificateNumber", e.target.value)} disabled={busy} />
+                </div>
+
+                <div style={{ marginTop: 4 }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8 }}>Approval Details</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                    <DateBox label="Received" value={cert.receivedAt} onChange={(v) => updateCert("receivedAt", v)} disabled={busy} />
+                    <DateBox label="Reviewed" value={cert.reviewedAt} onChange={(v) => updateCert("reviewedAt", v)} disabled={busy} />
+                    <DateBox label="Approved" value={cert.signedAt} onChange={(v) => updateCert("signedAt", v)} disabled={busy} />
+                  </div>
+                </div>
+
+                <div className="field">
+                  <label>Date of issue (header date)</label>
+                  <input type="date" value={cert.signedAt} onChange={(e) => updateCert("signedAt", e.target.value)} disabled={busy} />
+                </div>
+
+                <div className="field">
+                  <label>Principal Investigator</label>
+                  <input value={cert.principalInvestigator} onChange={(e) => updateCert("principalInvestigator", e.target.value)} disabled={busy} />
+                </div>
+                <div className="field">
+                  <label>Faculty / Center</label>
+                  <input value={cert.facultyCenter} onChange={(e) => updateCert("facultyCenter", e.target.value)} disabled={busy} />
+                </div>
+                <div className="field">
+                  <label>Title of project</label>
+                  <textarea rows={2} value={cert.projectTitle} onChange={(e) => updateCert("projectTitle", e.target.value)} disabled={busy} />
+                </div>
+
+                <div className="field">
+                  <label>Signatory (qofka saxiixa)</label>
+                  <select value={signatoryKey} onChange={(e) => handleSignatoryChange(e.target.value)} disabled={busy}>
+                    {signatories.map((s) => (
+                      <option key={s.key} value={s.key}>
+                        {s.name} — {s.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Name on certificate (saxiix)</label>
+                  <input value={cert.chairpersonLine} onChange={(e) => updateCert("chairpersonLine", e.target.value)} disabled={busy} />
+                </div>
+                <div className="field">
+                  <label>Signatory title</label>
+                  <input value={cert.signatoryTitle} onChange={(e) => updateCert("signatoryTitle", e.target.value)} disabled={busy} />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                    <input type="checkbox" checked={includeSignature} onChange={(e) => setIncludeSignature(e.target.checked)} disabled={busy} />
+                    Include signature (saxiix)
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                    <input type="checkbox" checked={includeStamp} onChange={(e) => setIncludeStamp(e.target.checked)} disabled={busy} />
+                    Include official stamp (shaabad)
+                  </label>
+                </div>
+
+                <div className="row">
+                  <div className="field">
+                    <label>Academic year</label>
+                    <input value={academicYear} onChange={(e) => setAcademicYear(e.target.value)} disabled={busy} />
+                  </div>
+                  <div className="field">
+                    <label>Year</label>
+                    <input value={year} onChange={(e) => setYear(e.target.value)} disabled={busy} />
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="field">
-              <label>Year</label>
-              <input value={year} onChange={(e) => setYear(e.target.value)} disabled={busy} />
-            </div>
-            <div className="field">
-              <label>Serial number (optional)</label>
-              <input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} disabled={busy} />
-            </div>
-          </>
+          )
         ) : (
           <div className="field">
             <label>Rejection reason *</label>
@@ -90,17 +295,39 @@ export function EthicsDirectorDecisionModal({ open, mode, applicationTitle, busy
           </div>
         )}
 
-        {localError ? <div style={{ color: "#f87171", fontSize: 13, marginBottom: 8 }}>{localError}</div> : null}
+        {localError ? <div style={{ color: "#f87171", fontSize: 13, marginTop: 10 }}>{localError}</div> : null}
 
-        <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-          <button type="button" className="btn primary" disabled={busy} onClick={handleConfirm}>
-            {busy ? "Working…" : mode === "approve" ? "Approve" : "Reject"}
+        <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+          <button type="button" className="btn primary" disabled={busy || (mode === "approve" && previewLoading)} onClick={handleConfirm}>
+            {busy ? "Working…" : mode === "approve" ? "Approve & issue certificate" : "Reject"}
           </button>
           <button type="button" className="btn" disabled={busy} onClick={onClose}>
             Cancel
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function DateBox({ label, value, onChange, disabled }) {
+  return (
+    <div
+      style={{
+        border: "1px solid rgba(14,165,233,0.35)",
+        borderRadius: 8,
+        padding: 8,
+        background: "rgba(14,165,233,0.04)",
+      }}
+    >
+      <div style={{ fontWeight: 800, fontSize: 11, marginBottom: 6, textAlign: "center" }}>{label}</div>
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        style={{ width: "100%", fontSize: 12 }}
+      />
     </div>
   );
 }

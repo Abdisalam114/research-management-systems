@@ -508,6 +508,8 @@ export function EthicsPage() {
       <EthicsDirectorDecisionModal
         open={Boolean(decisionModal)}
         mode={decisionModal?.mode}
+        applicationId={decisionModal?.app?.id}
+        accessToken={accessToken}
         applicationTitle={decisionModal?.app?.projectTitle}
         busy={decisionBusy}
         onClose={() => !decisionBusy && setDecisionModal(null)}

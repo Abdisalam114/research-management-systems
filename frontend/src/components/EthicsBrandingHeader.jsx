@@ -1,5 +1,6 @@
 import logo from "../assets/jamhuriya-logo.png";
 import { formatJurecDate } from "../utils/jurecFormat";
+import { ApprovalDetailsBoxes } from "./JurecCertificatePreview";
 
 function MetaLine({ label, value }) {
   if (!value) return null;
@@ -41,8 +42,17 @@ export function EthicsBrandingHeader({ approval, showCertificateMeta = false, st
           </div>
           <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>On Research Involving Human Subjects</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 14, alignItems: "center" }}>
+            <MetaLine label="Serial Number" value={approval.serialNumber || approval.refNumber} />
             <MetaLine label="Certificate Number" value={approval.certificateNumber || approval.certificateId} />
             <MetaLine label="Date of Issue" value={approval.signedAt ? formatJurecDate(approval.signedAt) : null} />
+          </div>
+          <div style={{ marginTop: 14, maxWidth: 420, marginInline: "auto", textAlign: "left" }}>
+            <div style={{ fontWeight: 800, fontSize: 12, marginBottom: 4, textAlign: "center" }}>Approval Details</div>
+            <ApprovalDetailsBoxes
+              receivedAt={approval.receivedAt}
+              reviewedAt={approval.reviewedAt}
+              approvedAt={approval.signedAt}
+            />
           </div>
         </>
       ) : showCertificateMeta && approval ? (
