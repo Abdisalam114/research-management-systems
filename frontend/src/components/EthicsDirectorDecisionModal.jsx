@@ -37,7 +37,7 @@ export function EthicsDirectorDecisionModal({
   const [year, setYear] = useState(() => String(new Date().getFullYear()));
   const [cert, setCert] = useState(EMPTY_CERT);
   const [rejectionReason, setRejectionReason] = useState("");
-  const [signatoryKey, setSignatoryKey] = useState("joint");
+  const [signatoryKey, setSignatoryKey] = useState("kasim");
   const [includeSignature, setIncludeSignature] = useState(true);
   const [includeStamp, setIncludeStamp] = useState(true);
   const [signatories, setSignatories] = useState([]);
@@ -50,7 +50,7 @@ export function EthicsDirectorDecisionModal({
     setYear(String(new Date().getFullYear()));
     setCert(EMPTY_CERT);
     setRejectionReason("");
-    setSignatoryKey("joint");
+    setSignatoryKey("kasim");
     setIncludeSignature(true);
     setIncludeStamp(true);
     setSignatories([]);
@@ -66,19 +66,23 @@ export function EthicsDirectorDecisionModal({
         const res = await ethicsApi.previewCertificate(accessToken, applicationId);
         if (cancelled) return;
         const p = res.preview || {};
-        setSignatories(res.signatories || []);
+        const options = res.signatories || [];
+        const defaultKey = p.signatoryKey || options[0]?.key || "kasim";
+        const defaultSignatory = options.find((s) => s.key === defaultKey) || options[0];
+        setSignatories(options);
+        setSignatoryKey(defaultKey);
         setCert({
-          refNumber: p.refNumber || "",
+          refNumber: "",
           serialNumber: p.serialNumber || "",
-          certificateNumber: p.certificateNumber || "",
+          certificateNumber: "",
           signedAt: toDateInputValue(p.signedAt),
           receivedAt: toDateInputValue(p.receivedAt),
           reviewedAt: toDateInputValue(p.reviewedAt),
           principalInvestigator: p.principalInvestigator || "",
           facultyCenter: p.facultyCenter || "",
           projectTitle: p.projectTitle || "",
-          chairpersonLine: p.chairpersonLine || "",
-          signatoryTitle: p.signatoryTitle || "Chairperson",
+          chairpersonLine: defaultSignatory?.line || defaultSignatory?.name || "",
+          signatoryTitle: defaultSignatory?.title || "Chairperson",
         });
       } catch (e) {
         if (!cancelled) setLocalError(e?.response?.data?.message || "Could not load certificate preview");
@@ -107,7 +111,6 @@ export function EthicsDirectorDecisionModal({
 
   function handleSignatoryChange(key) {
     setSignatoryKey(key);
-    if (key === "custom") return;
     const found = signatories.find((s) => s.key === key);
     if (found) {
       setCert((prev) => ({
@@ -127,8 +130,12 @@ export function EthicsDirectorDecisionModal({
       return;
     }
     if (mode === "approve") {
-      if (!cert.refNumber?.trim() || !cert.serialNumber?.trim() || !cert.certificateNumber?.trim()) {
-        setLocalError("Ref, serial, and certificate numbers are required.");
+      if (!cert.refNumber?.trim() || !cert.certificateNumber?.trim()) {
+        setLocalError("Ref number iyo certificate number waa in Director-ku geliyo (labadaba waa qasab).");
+        return;
+      }
+      if (!signatoryKey || !signatories.some((s) => s.key === signatoryKey)) {
+        setLocalError("Dooro chairperson — Kasim ama Dr. Nur.");
         return;
       }
       onConfirm({
@@ -204,18 +211,32 @@ export function EthicsDirectorDecisionModal({
 
               <div style={{ display: "grid", gap: 10 }}>
                 <div style={{ fontWeight: 800, fontSize: 13 }}>Edit certificate fields</div>
+                <p className="muted" style={{ margin: 0, fontSize: 12 }}>
+                  Ref Number iyo Certificate Number — Director-ku ayaa gelinaya.
+                </p>
 
                 <div className="field">
-                  <label>Serial Number *</label>
+                  <label>Ref Number * (Director geliyo)</label>
+                  <input
+                    value={cert.refNumber}
+                    onChange={(e) => updateCert("refNumber", e.target.value)}
+                    disabled={busy}
+                    placeholder="e.g. JUREC/0001/faculty/062026"
+                  />
+                </div>
+                <div className="field">
+                  <label>Certificate Number * (Director geliyo)</label>
+                  <input
+                    value={cert.certificateNumber}
+                    onChange={(e) => updateCert("certificateNumber", e.target.value)}
+                    disabled={busy}
+                    placeholder="e.g. JUREC0001/faculty/062026"
+                  />
+                </div>
+
+                <div className="field">
+                  <label>Serial Number</label>
                   <input value={cert.serialNumber} onChange={(e) => updateCert("serialNumber", e.target.value)} disabled={busy} />
-                </div>
-                <div className="field">
-                  <label>Ref Number *</label>
-                  <input value={cert.refNumber} onChange={(e) => updateCert("refNumber", e.target.value)} disabled={busy} />
-                </div>
-                <div className="field">
-                  <label>Certificate Number *</label>
-                  <input value={cert.certificateNumber} onChange={(e) => updateCert("certificateNumber", e.target.value)} disabled={busy} />
                 </div>
 
                 <div style={{ marginTop: 4 }}>
@@ -246,22 +267,14 @@ export function EthicsDirectorDecisionModal({
                 </div>
 
                 <div className="field">
-                  <label>Signatory (qofka saxiixa)</label>
+                  <label>Chairperson (doorasho) *</label>
                   <select value={signatoryKey} onChange={(e) => handleSignatoryChange(e.target.value)} disabled={busy}>
                     {signatories.map((s) => (
                       <option key={s.key} value={s.key}>
-                        {s.name} — {s.title}
+                        {s.name}
                       </option>
                     ))}
                   </select>
-                </div>
-                <div className="field">
-                  <label>Name on certificate (saxiix)</label>
-                  <input value={cert.chairpersonLine} onChange={(e) => updateCert("chairpersonLine", e.target.value)} disabled={busy} />
-                </div>
-                <div className="field">
-                  <label>Signatory title</label>
-                  <input value={cert.signatoryTitle} onChange={(e) => updateCert("signatoryTitle", e.target.value)} disabled={busy} />
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

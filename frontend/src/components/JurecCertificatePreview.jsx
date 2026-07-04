@@ -63,7 +63,7 @@ export function JurecCertificatePreview({ cert, includeSignature, includeStamp }
         <div style={{ flex: 1 }}>
           {includeSignature ? (
             <div style={{ marginBottom: 6, fontStyle: "italic", fontSize: 18, color: "#334155", lineHeight: 1 }}>
-              {cert.chairpersonLine?.split("/")[0]?.trim() || "—"}
+              {cert.chairpersonLine || "—"}
             </div>
           ) : null}
           <div style={{ fontWeight: 600 }}>{cert.chairpersonLine || "—"}</div>

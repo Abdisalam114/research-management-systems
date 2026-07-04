@@ -11,6 +11,7 @@ const {
   previewJurecCertificate,
   resolveSignatory,
   renderJurecCertificatePdf,
+  JUREC_CHAIRPERSON_OPTIONS,
 } = require("../utils/jurecCertificate");
 
 function sanitize(a) {
@@ -218,6 +219,14 @@ async function directorDecision(req, res) {
   }
 
   if (decision === "approve") {
+    if (!refNumber?.trim() || !certificateNumber?.trim()) {
+      throw new AppError("Ref number and certificate number are required (Director must enter both)", 400);
+    }
+    const chairKey = signatoryKey === "director" ? null : signatoryKey;
+    if (!JUREC_CHAIRPERSON_OPTIONS.some((s) => s.key === chairKey)) {
+      throw new AppError("Select a chairperson: Kasim Abdi Jimale or Dr. Nur Rashid Ahmed", 400);
+    }
+
     const issueDate = parseOptionalDate(signedAt, new Date());
     const jurec = await buildJurecApprovalMeta(a, {
       EthicsApplication,
@@ -225,27 +234,24 @@ async function directorDecision(req, res) {
       issueDate,
       reviewedAt: reviewedAt ? parseOptionalDate(reviewedAt, null) : undefined,
     });
-    const signatory = resolveSignatory(
-      signatoryKey === "director" ? null : signatoryKey,
-      signatoryKey === "director" ? req.user.fullName : chairpersonLine || null
-    );
-    const finalChairperson = chairpersonLine?.trim() || signatory.line;
+    const signatory = resolveSignatory(chairKey, null);
+    const finalChairperson = signatory.line;
     a.status = ETHICS_STATUSES.APPROVED;
     a.approval = {
       decision: "approved",
       signedByUserId: req.user.id,
       signedByName: signatory.name,
       signedAt: issueDate,
-      certificateId: certificateNumber?.trim() || jurec.certificateNumber,
+      certificateId: certificateNumber.trim(),
       serialNumber: serialNumber?.trim() || jurec.serialNumber,
-      refNumber: refNumber?.trim() || jurec.refNumber,
-      certificateNumber: certificateNumber?.trim() || jurec.certificateNumber,
+      refNumber: refNumber.trim(),
+      certificateNumber: certificateNumber.trim(),
       academicYear: academicYear ? String(academicYear).trim() : defaultAcademicYear(),
       year: year ? String(year).trim() : String(issueDate.getFullYear()),
       receivedAt: parseOptionalDate(receivedAt, jurec.receivedAt),
       reviewedAt: parseOptionalDate(reviewedAt, jurec.reviewedAt),
       chairpersonLine: finalChairperson,
-      signatoryKey: signatoryKey || signatory.key || "joint",
+      signatoryKey: signatory.key,
       signatoryTitle: signatoryTitle?.trim() || signatory.title || "Chairperson",
       includeSignature: includeSignature !== false,
       includeStamp: includeStamp !== false,
@@ -366,11 +372,7 @@ async function previewCertificate(req, res) {
     tierFilter: req.tierWhere({}),
   });
 
-  const signatories = [
-    ...preview.signatories,
-    { key: "director", name: `${req.user.fullName || "Research Director"} (you)`, title: "Chairperson", line: req.user.fullName || "Research Director" },
-    { key: "custom", name: "Custom signatory name", title: "Chairperson", line: "" },
-  ];
+  const signatories = preview.signatories;
 
   res.json({
     preview: {
@@ -385,6 +387,7 @@ async function previewCertificate(req, res) {
       projectTitle: preview.projectTitle,
       chairpersonLine: preview.chairpersonLine,
       signatoryTitle: preview.signatoryTitle,
+      signatoryKey: preview.signatoryKey,
     },
     signatories,
   });

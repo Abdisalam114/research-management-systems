@@ -10,6 +10,9 @@ const JUREC_SIGNATORIES = Object.freeze([
   { key: "joint", name: "Kasim Abdi Jimale / Dr. Nur Rashid Ahmed", title: "Chairperson", line: CHAIRPERSON_DEFAULT },
 ]);
 
+/** Chairperson choices shown to the Director when issuing a certificate (pick one). */
+const JUREC_CHAIRPERSON_OPTIONS = Object.freeze(JUREC_SIGNATORIES.filter((s) => s.key === "kasim" || s.key === "nur"));
+
 const MONTHS = [
   "January",
   "February",
@@ -115,10 +118,10 @@ function renderSignatureBlock(doc, x, y, name, includeSignature) {
 
 async function previewJurecCertificate(application, { EthicsApplication, tierFilter, issueDate = new Date() }) {
   const meta = await buildJurecApprovalMeta(application, { EthicsApplication, tierFilter, issueDate });
-  const signatory = resolveSignatory("joint");
+  const signatory = JUREC_CHAIRPERSON_OPTIONS[0];
   return {
-    refNumber: meta.refNumber,
-    certificateNumber: meta.certificateNumber,
+    refNumber: "",
+    certificateNumber: "",
     serialNumber: meta.serialNumber,
     receivedAt: meta.receivedAt,
     reviewedAt: meta.reviewedAt,
@@ -128,7 +131,8 @@ async function previewJurecCertificate(application, { EthicsApplication, tierFil
     projectTitle: application.projectTitle || "",
     chairpersonLine: signatory.line,
     signatoryTitle: signatory.title,
-    signatories: JUREC_SIGNATORIES.map(({ key, name, title, line }) => ({ key, name, title, line })),
+    signatoryKey: signatory.key,
+    signatories: JUREC_CHAIRPERSON_OPTIONS.map(({ key, name, title, line }) => ({ key, name, title, line })),
   };
 }
 
@@ -357,6 +361,7 @@ module.exports = {
   CHAIRPERSON_DEFAULT,
   COMMITTEE_NAME,
   JUREC_SIGNATORIES,
+  JUREC_CHAIRPERSON_OPTIONS,
   formatJurecDate,
   formatJurecDateShort,
   buildJurecApprovalMeta,

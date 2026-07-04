@@ -30,6 +30,7 @@ import { ThesisGroupsPage } from "./pages/ThesisGroups";
 import { ResearchWorkflowPage } from "./pages/ResearchWorkflowPage";
 import { FundingCallsPage } from "./pages/FundingCalls";
 import { ReviewAssignmentsPage } from "./pages/ReviewAssignments";
+import { ProgramTierSelectPage } from "./pages/ProgramTierSelect";
 
 export default function App() {
   return (
