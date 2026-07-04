@@ -28,7 +28,8 @@ import { CoordinatorDashboardPage } from "./pages/CoordinatorDashboard";
 import { EthicsPage } from "./pages/Ethics";
 import { ThesisGroupsPage } from "./pages/ThesisGroups";
 import { ResearchWorkflowPage } from "./pages/ResearchWorkflowPage";
-import { ProgramTierSelectPage } from "./pages/ProgramTierSelect";
+import { FundingCallsPage } from "./pages/FundingCalls";
+import { ReviewAssignmentsPage } from "./pages/ReviewAssignments";
 
 export default function App() {
   return (
@@ -71,7 +72,7 @@ export default function App() {
               <Route path="/proposals/:id/edit" element={<ProposalFormPage />} />
             </Route>
             <Route path="/proposals/:id" element={<ProposalDetailsPage />} />
-            <Route element={<ProtectedRoute roles={["faculty_coordinator", "research_director"]} />}>
+            <Route element={<ProtectedRoute roles={["faculty_coordinator", "research_director", "finance_officer"]} />}>
               <Route path="/proposals/:id/review" element={<ProposalReviewPage />} />
             </Route>
           </Route>
@@ -100,6 +101,11 @@ export default function App() {
           <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "finance_officer"]} />}>
             <Route path="/grants" element={<GrantsPage />} />
             <Route path="/grants/:id" element={<GrantDetailsPage />} />
+            <Route path="/funding-calls" element={<FundingCallsPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director"]} />}>
+            <Route path="/review-assignments" element={<ReviewAssignmentsPage />} />
           </Route>
 
           <Route element={<ProtectedRoute roles={["researcher", "finance_officer", "research_director"]} />}>

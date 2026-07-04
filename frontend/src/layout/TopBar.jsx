@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { BackButton } from "../components/BackButton";
+import { GlobalSearchBar } from "../components/GlobalSearchBar";
 import * as notificationApi from "../services/notificationApi";
 import logo from "../assets/jamhuriya-logo.png";
 import { PROGRAM_TIER_OPTIONS } from "../constants/programTier";
@@ -67,6 +68,7 @@ export function TopBar({ title = "Dashboard" }) {
       </div>
 
       <div className="topBarActions">
+        <GlobalSearchBar />
         {showTierBadge ? (
           <button
             type="button"

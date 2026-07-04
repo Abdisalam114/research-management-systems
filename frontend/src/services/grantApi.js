@@ -36,3 +36,10 @@ export async function directorDecision(accessToken, id, payload) {
   });
   return res.data;
 }
+
+export async function financeDecision(accessToken, id, payload) {
+  const res = await api.post(`/api/grants/${id}/finance-decision`, payload, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}

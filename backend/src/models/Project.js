@@ -5,6 +5,16 @@ const PROJECT_STATUSES = Object.freeze({
   ACTIVE: "active",
   COMPLETED: "completed",
   ON_HOLD: "on_hold",
+  CLOSING: "closing",
+  CLOSED: "closed",
+});
+
+const CLOSURE_STATUSES = Object.freeze({
+  NONE: "none",
+  SUBMITTED: "submitted",
+  DIRECTOR_APPROVED: "director_approved",
+  FINANCE_APPROVED: "finance_approved",
+  ARCHIVED: "archived",
 });
 
 const milestoneSchema = new mongoose.Schema({
@@ -44,6 +54,19 @@ const projectSchema = new mongoose.Schema(
     endDate: { type: Date, default: null },
     status: { type: String, enum: Object.values(PROJECT_STATUSES), default: PROJECT_STATUSES.ACTIVE, index: true },
     progressReports: [progressReportSchema],
+    closure: {
+      status: { type: String, enum: Object.values(CLOSURE_STATUSES), default: CLOSURE_STATUSES.NONE },
+      finalReport: { type: String, default: "" },
+      finalReportDocument: { type: String, default: null },
+      auditNotes: { type: String, default: "" },
+      assetHandover: { type: String, default: "" },
+      submittedAt: { type: Date, default: null },
+      directorApprovedAt: { type: Date, default: null },
+      directorApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      financeApprovedAt: { type: Date, default: null },
+      financeApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+      archivedAt: { type: Date, default: null },
+    },
     ...programTierField,
   },
   { timestamps: true }
@@ -51,4 +74,4 @@ const projectSchema = new mongoose.Schema(
 
 const Project = mongoose.model("Project", projectSchema);
 
-module.exports = { Project, PROJECT_STATUSES };
+module.exports = { Project, PROJECT_STATUSES, CLOSURE_STATUSES };

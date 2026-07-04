@@ -5,6 +5,7 @@ import * as proposalApi from "../services/proposalApi";
 import * as ethicsApi from "../services/ethicsApi";
 import { ProposalEthicsReviewPanel } from "../components/ProposalEthicsReviewPanel";
 import { EthicsDirectorDecisionModal } from "../components/EthicsDirectorDecisionModal";
+import { ProposalMultiStageReview } from "../components/ProposalMultiStageReview";
 import { apiOrigin } from "../config/apiBase";
 
 export function ProposalReviewPage() {
@@ -135,6 +136,8 @@ export function ProposalReviewPage() {
           busy={busy}
         />
       ) : null}
+
+      <ProposalMultiStageReview proposal={proposal} onReload={load} />
 
       {(isCoordinator || isDirector) && ["submitted", "under_review", "revision_requested"].includes(proposal.status) ? (
         <div className="card" style={{ marginTop: 12 }}>

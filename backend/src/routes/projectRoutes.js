@@ -34,5 +34,34 @@ router.post(
   asyncHandler(projectController.backfillProjectFromApprovedProposal)
 );
 
+router.post(
+  "/:id/closure/submit",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("researcher"),
+  asyncHandler(projectController.submitClosure)
+);
+router.post(
+  "/:id/closure/director-approve",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("research_director"),
+  asyncHandler(projectController.directorClosureApproval)
+);
+router.post(
+  "/:id/closure/finance-approve",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("finance_officer"),
+  asyncHandler(projectController.financeClosureApproval)
+);
+router.post(
+  "/:id/closure/archive",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("research_director"),
+  asyncHandler(projectController.archiveProject)
+);
+
 module.exports = { projectRoutes: router };
 

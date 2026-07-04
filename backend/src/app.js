@@ -22,6 +22,9 @@ const { paymentRoutes } = require("./routes/paymentRoutes");
 const { purchaseOrderRoutes } = require("./routes/purchaseOrderRoutes");
 const { ethicsRoutes } = require("./routes/ethicsRoutes");
 const { thesisGroupRoutes } = require("./routes/thesisGroupRoutes");
+const { fundingCallRoutes } = require("./routes/fundingCallRoutes");
+const { searchRoutes } = require("./routes/searchRoutes");
+const { auditRoutes } = require("./routes/auditRoutes");
 
 function createApp() {
   const app = express();
@@ -68,6 +71,9 @@ function createApp() {
   app.use("/api/procurement", purchaseOrderRoutes);
   app.use("/api/ethics", ethicsRoutes);
   app.use("/api/thesis-groups", thesisGroupRoutes);
+  app.use("/api/funding-calls", fundingCallRoutes);
+  app.use("/api/search", searchRoutes);
+  app.use("/api/audit", auditRoutes);
 
   app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 

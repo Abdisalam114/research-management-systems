@@ -9,6 +9,8 @@ const { User, USER_STATUSES, ROLES } = require("../models/User");
 const { Department } = require("../models/Department");
 const { EthicsApplication } = require("../models/EthicsApplication");
 const { ThesisGroup } = require("../models/ThesisGroup");
+const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
+const { AuditEvent } = require("../models/AuditEvent");
 const {
   buildResearchJourneyForResearcher,
   listResearchersForJourney,
@@ -376,6 +378,15 @@ async function buildInstitutionalAnalytics(programTier) {
 
   const facultyAnalytics = Object.values(facultyMap).sort((a, b) => b.publications - a.publications);
 
+  const openFundingCalls = await FundingCall.countDocuments(tf({ status: CALL_STATUSES.OPEN }));
+  const pendingFinanceGrants = grants.filter((g) => g.status === GRANT_STATUSES.PENDING_FINANCE).length;
+  const projectsClosing = allProjectsForFaculty.filter((p) => p.status === PROJECT_STATUSES.CLOSING).length;
+  const projectsClosed = allProjectsForFaculty.filter((p) => p.status === PROJECT_STATUSES.CLOSED).length;
+  const approvedProposals = allProposals.filter((p) => p.status === PROPOSAL_STATUSES.APPROVED).length;
+  const proposalApprovalRate = allProposals.length
+    ? Math.round((approvedProposals / allProposals.length) * 100)
+    : 0;
+
   const annualReport = {
     year: new Date().getFullYear(),
     overview: {
@@ -476,6 +487,15 @@ async function buildInstitutionalAnalytics(programTier) {
       itemsPaid: allBudgetItems.filter((i) => i.status === BUDGET_ITEM_STATUSES.PAID).length,
     },
     grantSuccessRate,
+    kpiMetrics: {
+      grantSuccessRate,
+      proposalApprovalRate,
+      openFundingCalls,
+      pendingFinanceGrants,
+      projectsClosing,
+      projectsClosed,
+      activeProjects: activeProjects,
+    },
     facultyAnalytics,
     annualReport,
     preview: {

@@ -14,6 +14,8 @@ const {
   submitLinkedEthics,
 } = require("../utils/proposalEthicsLink");
 const { applyEthicsPayload, parseEthicsJson } = require("../utils/ethicsFormMerge");
+const { ensureReviewPipeline, assertStagesBeforeDirector, getCurrentReviewStage, defaultReviewPipeline, STAGE_STATUS } = require("../utils/proposalReviewPipeline");
+const { recordAudit } = require("../utils/audit");
 
 function sanitizeProposal(p) {
   const researcher = p.researcherId;
@@ -35,6 +37,9 @@ function sanitizeProposal(p) {
     ethicsApplicationId: p.ethicsApplicationId,
     assignedReviewers: p.assignedReviewers || [],
     reviewerComments: p.reviewerComments,
+    peerReviews: p.peerReviews || [],
+    reviewPipeline: ensureReviewPipeline(p),
+    currentReviewStage: getCurrentReviewStage(p),
     submittedAt: p.submittedAt,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
@@ -305,6 +310,7 @@ async function submitProposal(req, res) {
 
   proposal.status = PROPOSAL_STATUSES.SUBMITTED;
   proposal.submittedAt = new Date();
+  proposal.reviewPipeline = defaultReviewPipeline();
   await proposal.save();
 
   try {
@@ -385,6 +391,15 @@ async function coordinatorReview(req, res) {
 
   proposal.status = PROPOSAL_STATUSES.UNDER_REVIEW;
   proposal.reviewerComments.push({ role: "faculty_coordinator", comment });
+  const pipe = ensureReviewPipeline(proposal);
+  if (pipe.adminScreening.status === "pending") {
+    pipe.adminScreening = {
+      status: action === "recommend_approval" ? "passed" : "in_progress",
+      completedAt: new Date(),
+      completedBy: req.user.id,
+      comment,
+    };
+  }
   await proposal.save();
 
   res.json({ message: "Review saved", proposal: sanitizeProposal(proposal) });
@@ -404,6 +419,20 @@ async function directorDecision(req, res) {
     throw new AppError("Proposal is not decision-ready in its current status", 400);
   }
 
+  if (decision === PROPOSAL_STATUSES.APPROVED) {
+    const pipe = ensureReviewPipeline(proposal);
+    const pipelineStarted = [pipe.adminScreening, pipe.peerReview, pipe.committeeReview, pipe.financeReview].some(
+      (s) => s.status !== STAGE_STATUS.PENDING
+    );
+    if (pipelineStarted) {
+      try {
+        assertStagesBeforeDirector(proposal);
+      } catch (e) {
+        throw new AppError(e.message, e.statusCode || 400);
+      }
+    }
+  }
+
   if (decision === PROPOSAL_STATUSES.APPROVED && proposal.requiresEthics) {
     try {
       await assertEthicsApprovedForDirectorApproval(proposal);
@@ -417,6 +446,17 @@ async function directorDecision(req, res) {
   proposal.status = decision;
   proposal.reviewerComments.push({ role: "research_director", comment });
   await proposal.save();
+
+  await recordAudit({
+    entityType: "proposal",
+    entityId: proposal._id,
+    action: decision === PROPOSAL_STATUSES.APPROVED ? "director_approved" : decision,
+    label: `Director decision: ${decision}`,
+    detail: proposal.title,
+    actorId: req.user.id,
+    actorRole: req.user.role,
+    programTier: req.programTier,
+  });
 
   if (decision === PROPOSAL_STATUSES.APPROVED) {
     const existing = await Project.findOne(req.tierWhere({ proposalId: proposal._id }));
@@ -477,6 +517,7 @@ async function assignReviewers(req, res) {
     assignedBy: req.user.id,
     assignedAt: new Date(),
   }));
+  ensureReviewPipeline(proposal);
   await proposal.save();
 
   res.json({ message: "Reviewers assigned", proposal: sanitizeProposal(proposal) });

@@ -22,6 +22,7 @@ function statusLabel(status) {
     draft: "Draft",
     submitted: "Submitted — awaiting review",
     approved: "Approved",
+    pending_finance: "Pending finance approval",
     rejected: "Rejected",
     active: "Active (awarded)",
     closed: "Closed",
@@ -46,6 +47,7 @@ export function GrantDetailsPage() {
   const isOwner = grant && String(grant.researcherId) === String(user?.id);
   const canEditLink = isOwner && ["draft", "rejected"].includes(grant?.status || "");
   const canDecide = isDirector && grant?.status === "submitted";
+  const canFinanceDecide = user?.role === "finance_officer" && grant?.status === "pending_finance";
 
   const load = useCallback(async () => {
     const res = await grantApi.getGrant(accessToken, id);
@@ -109,6 +111,35 @@ export function GrantDetailsPage() {
       await reload();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to reject grant");
+    } finally {
+      setRejectBusy(false);
+    }
+  }
+
+  async function handleFinanceApprove() {
+    if (!grant) return;
+    const comment = window.prompt("Finance approval comment (optional):") || "";
+    try {
+      setAwardBusy(true);
+      const res = await grantApi.financeDecision(accessToken, grant.id, { decision: "approve", comment });
+      if (res?.budget?.created) setMessage("Finance approved — budget created.");
+      await reload();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Finance approval failed");
+    } finally {
+      setAwardBusy(false);
+    }
+  }
+
+  async function handleFinanceReject() {
+    if (!grant) return;
+    const comment = window.prompt("Rejection reason:") || "Rejected";
+    try {
+      setRejectBusy(true);
+      await grantApi.financeDecision(accessToken, grant.id, { decision: "reject", comment });
+      await reload();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Finance rejection failed");
     } finally {
       setRejectBusy(false);
     }
@@ -180,6 +211,17 @@ export function GrantDetailsPage() {
             </div>
           ) : null}
 
+          {canFinanceDecide ? (
+            <div className="card" style={{ marginTop: 12, borderColor: "rgba(45,212,191,0.35)" }}>
+              <div style={{ fontWeight: 800 }}>Finance approval gate</div>
+              <p className="muted" style={{ fontSize: 13 }}>Director approved — finance must approve before budget activation.</p>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                <button type="button" className="btn primary" onClick={handleFinanceApprove} disabled={awardBusy || rejectBusy}>Approve & activate</button>
+                <button type="button" className="btn" onClick={handleFinanceReject} disabled={awardBusy || rejectBusy}>Reject</button>
+              </div>
+            </div>
+          ) : null}
+
           <div className="card" style={{ marginTop: 12 }}>
             <div style={{ fontWeight: 900, fontSize: 18 }}>{grant.title}</div>
             <div className="muted" style={{ marginTop: 6 }}>
@@ -235,6 +277,12 @@ export function GrantDetailsPage() {
                 <div className="muted" style={{ whiteSpace: "pre-wrap" }}>
                   {grant.complianceNotes}
                 </div>
+              </div>
+            ) : null}
+            {grant.fundingCall ? (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontWeight: 800 }}>Funding call</div>
+                <div>{grant.fundingCall.title} ({grant.fundingCall.status})</div>
               </div>
             ) : null}
           </div>

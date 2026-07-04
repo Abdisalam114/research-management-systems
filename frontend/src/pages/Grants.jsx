@@ -5,12 +5,14 @@ import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as grantApi from "../services/grantApi";
 import * as projectApi from "../services/projectApi";
+import * as fundingCallApi from "../services/fundingCallApi";
 import { PageHeader } from "../components/PageHeader";
 import { filterByStatKey, isAwardedItem, statFilterLabel } from "../utils/pageHeaderFilters";
 
 const GRANT_STATUS_STYLES = {
   draft: { bg: "rgba(148,163,184,0.2)", color: "#cbd5e1", label: "Draft" },
   submitted: { bg: "rgba(56,189,248,0.2)", color: "#7dd3fc", label: "Submitted" },
+  pending_finance: { bg: "rgba(251,191,36,0.2)", color: "#fcd34d", label: "Pending finance" },
   approved: { bg: "rgba(29,78,216,0.25)", color: "#93c5fd", label: "Approved" },
   active: { bg: "rgba(34,197,94,0.2)", color: "#86efac", label: "Awarded" },
   rejected: { bg: "rgba(239,68,68,0.2)", color: "#fca5a5", label: "Rejected" },
@@ -101,6 +103,8 @@ export function GrantsPage() {
   const { accessToken, user } = useAuth();
   const [searchParams] = useSearchParams();
   const projectIdFromUrl = searchParams.get("projectId") || "";
+  const callIdFromUrl = searchParams.get("callId") || "";
+  const [linkedCall, setLinkedCall] = useState(null);
   const [grants, setGrants] = useState([]);
   const [projects, setProjects] = useState([]);
   const [showForm, setShowForm] = useState(false);
@@ -111,6 +115,7 @@ export function GrantsPage() {
     amountRequested: 0,
     currency: "USD",
     projectId: "",
+    callId: "",
   });
   const [donorFilter, setDonorFilter] = useState(false);
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
@@ -154,6 +159,24 @@ export function GrantsPage() {
       "A,B,E"
     );
   }, [accessToken, user?.role, projectIdFromUrl]);
+
+  useEffect(() => {
+    if (!callIdFromUrl || !accessToken) return;
+    fundingCallApi.getFundingCall(accessToken, callIdFromUrl).then((res) => {
+      const c = res.call;
+      setLinkedCall(c);
+      setForm((f) => ({
+        ...f,
+        callId: c.id,
+        title: f.title || c.title,
+        fundingSource: c.fundingSource,
+        donorRef: c.donorRef || "",
+        currency: c.currency || "USD",
+        amountRequested: c.amountCap || f.amountRequested,
+      }));
+      setShowForm(true);
+    }).catch(() => {});
+  }, [callIdFromUrl, accessToken]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 

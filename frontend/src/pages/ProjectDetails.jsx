@@ -305,6 +305,47 @@ export function ProjectDetailsPage() {
           </div>
         )}
       </div>
+
+      <div className="card" style={{ marginTop: 12 }}>
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>Project closure (URGMS Step 6)</div>
+        <p className="muted" style={{ fontSize: 13 }}>Status: {project.closure?.status || "none"} · Project: {project.status}</p>
+        {isOwner && (!project.closure?.status || project.closure.status === "none") ? (
+          <>
+            <textarea rows={4} placeholder="Final report summary" id="finalReport" style={{ width: "100%" }} />
+            <textarea rows={2} placeholder="Asset handover notes" id="assetHandover" style={{ width: "100%", marginTop: 8 }} />
+            <button type="button" className="btn primary" style={{ marginTop: 8 }} onClick={async () => {
+              const finalReport = document.getElementById("finalReport")?.value;
+              const assetHandover = document.getElementById("assetHandover")?.value;
+              if (!finalReport?.trim()) { setError("Final report required"); return; }
+              try {
+                await projectApi.submitClosure(accessToken, id, { finalReport, assetHandover });
+                setMessage("Closure submitted");
+                await load();
+              } catch (e) { setError(e?.response?.data?.message || "Submit failed"); }
+            }}>Submit closure</button>
+          </>
+        ) : null}
+        {project.closure?.finalReport ? <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{project.closure.finalReport}</div> : null}
+        {user?.role === "research_director" && project.closure?.status === "submitted" ? (
+          <button type="button" className="btn primary" style={{ marginTop: 8 }} onClick={async () => {
+            await projectApi.directorClosureApproval(accessToken, id, "Approved");
+            await load();
+          }}>Director approve closure</button>
+        ) : null}
+        {user?.role === "finance_officer" && project.closure?.status === "director_approved" ? (
+          <button type="button" className="btn primary" style={{ marginTop: 8 }} onClick={async () => {
+            await projectApi.financeClosureApproval(accessToken, id, "Finance cleared");
+            await load();
+          }}>Finance approve closure</button>
+        ) : null}
+        {user?.role === "research_director" && project.closure?.status === "finance_approved" ? (
+          <button type="button" className="btn primary" style={{ marginTop: 8 }} onClick={async () => {
+            await projectApi.archiveProject(accessToken, id);
+            setMessage("Project archived");
+            await load();
+          }}>Archive project</button>
+        ) : null}
+      </div>
     </div>
   );
 }

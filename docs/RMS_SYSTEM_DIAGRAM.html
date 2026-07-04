@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jamhuriya RMS — System Diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #fafafa;
+      --card: #fff;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --muted: #555;
+      --accent: #2563eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      line-height: 1.5;
+      color: var(--text);
+      background: var(--bg);
+      margin: 0;
+      padding: 24px 32px 48px;
+      max-width: 960px;
+      margin-inline: auto;
+    }
+    h1 { font-size: 1.75rem; margin: 0 0 8px; }
+    h2 {
+      font-size: 1.15rem;
+      margin: 32px 0 12px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid var(--accent);
+    }
+    .subtitle { color: var(--muted); margin-bottom: 24px; }
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 28px;
+    }
+    .toolbar button {
+      padding: 8px 16px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .toolbar button.primary {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+    section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    section p { margin: 0 0 12px; color: var(--muted); }
+    .grid2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 16px;
+    }
+    @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+    .mini-card {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+    }
+    .mini-card h3 { margin: 0 0 8px; font-size: 0.95rem; }
+    .mini-card p { margin: 0; font-size: 0.9rem; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f3f4f6; font-weight: 600; }
+    .mermaid { margin: 12px 0; }
+    footer {
+      margin-top: 32px;
+      font-size: 0.8rem;
+      color: #888;
+    }
+    @media print {
+      body { background: #fff; padding: 12px; }
+      .toolbar { display: none; }
+      section { break-inside: avoid; page-break-inside: avoid; }
+      h2 { break-after: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Jamhuriya RMS — System Diagram</h1>
+  <p class="subtitle">
+    Research Management System: architecture, workflows, JUREC ethics certificate, thesis supervision, and roles.
+  </p>
+
+  <div class="toolbar">
+    <button class="primary" type="button" onclick="window.print()">Print / Save as PDF</button>
+    <button type="button" onclick="location.href='RMS_SYSTEM_DIAGRAM.html'">Refresh diagrams</button>
+  </div>
+
+  <h2>1. Architecture</h2>
+  <section>
+    <p>React frontend, Express API, MongoDB. Users pick UG or PG portal; data is separated by <code>programTier</code>.</p>
+    <div class="mermaid">
+flowchart TB
+  users["4 roles (Browser)"]
+  react["React + Vite UI"]
+  api["Express /api/* + JWT"]
+  db["MongoDB"]
+  users --> react --> api --> db
+    </div>
+    <div class="grid2">
+      <div class="mini-card">
+        <h3>Frontend</h3>
+        <p>Pages: Ethics, Proposals, Projects, Grants, Budgets, Publications, Repository, Groups, Thesis, Workflow</p>
+        <p><small>Auth: sessionStorage per tab (dual-user safe)</small></p>
+      </div>
+      <div class="mini-card">
+        <h3>Backend</h3>
+        <p>REST controllers + RBAC middleware</p>
+        <p><small>JUREC PDF, notifications, project-scoped data, OAI-PMH export</small></p>
+      </div>
+    </div>
+  </section>
+
+  <h2>2. Research workflow</h2>
+  <section>
+    <p>End-to-end research lifecycle from login to repository.</p>
+    <div class="mermaid">
+flowchart TB
+  login["Login UG/PG"]
+  prop["Proposal + Ethics"]
+  coord["Coordinator review"]
+  ethics["Director REC cert"]
+  aprop["Director approve"]
+  project["Active project"]
+  grant["Grant approved"]
+  budget["Finance budget"]
+  pub["Publications"]
+  repo["Repository"]
+  login --> prop --> coord --> ethics --> aprop --> project --> grant --> budget --> pub --> repo
+    </div>
+  </section>
+
+  <h2>3. Ethics / JUREC certificate</h2>
+  <section>
+    <div class="mermaid">
+flowchart TB
+  fill["Researcher: 7 required fields"]
+  submit["Submit to Director"]
+  preview["Director: live preview"]
+  edit["Edit full certificate"]
+  approve["Accept + notify"]
+  pdf["Download PDF"]
+  fill --> submit --> preview --> edit --> approve --> pdf
+    </div>
+    <p><strong>7 required ethics fields</strong> (cannot submit empty):</p>
+    <table>
+      <thead>
+        <tr><th>Field</th><th>Note</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Project title</td><td>Ethics form title</td></tr>
+        <tr><td>PI first name</td><td>Principal investigator</td></tr>
+        <tr><td>PI last name</td><td>Principal investigator</td></tr>
+        <tr><td>Project level</td><td>UG / PGD / Master</td></tr>
+        <tr><td>Aims &amp; objectives</td><td>Required text</td></tr>
+        <tr><td>Design</td><td>Methodology</td></tr>
+        <tr><td>Signature</td><td>Full name</td></tr>
+      </tbody>
+    </table>
+    <p style="margin-top:12px">
+      <small>Certificate editor: serial, ref, certificate number, PI, faculty, title,
+      Received / Reviewed / Approved boxes, signatory, signature, stamp.</small>
+    </p>
+  </section>
+
+  <h2>4. Thesis supervision (/thesis)</h2>
+  <section>
+    <div class="mermaid">
+flowchart TB
+  create["Coordinator creates group"]
+  super["Assign supervisor"]
+  choose["Students choose title"]
+  enter["Supervisor enters title"]
+  accept["Coordinator accepts"]
+  meet["Chapters + meetings log"]
+  create --> super --> choose --> enter --> accept --> meet
+    </div>
+  </section>
+
+  <h2>5. Roles &amp; modules</h2>
+  <section>
+    <table>
+      <thead>
+        <tr><th>Role</th><th>Main access</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Research Director</td>
+          <td>All modules, user approval, departments, ethics certificate, final proposal/grant decisions, analytics</td>
+        </tr>
+        <tr>
+          <td>Faculty Coordinator</td>
+          <td>Proposals pre-review, publication validation, thesis groups, faculty workflow view</td>
+        </tr>
+        <tr>
+          <td>Finance Officer</td>
+          <td>Grants (view), budgets, payments, purchase orders</td>
+        </tr>
+        <tr>
+          <td>Researcher</td>
+          <td>Own proposals, ethics, projects, grants, publications, repository, thesis supervision</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="margin-top:16px">
+      <strong>8 core modules:</strong> Ethics, Proposals, Projects, Grants, Budgets, Publications, Repository, Collaboration/Groups<br />
+      <strong>Extensions:</strong> Thesis supervision, Research Workflow Status, Analytics dashboard
+    </p>
+  </section>
+
+  <footer>
+    Source: research-management-systems · GitHub Abdisalam114/research-management-systems · Generated for download/print
+  </footer>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: "neutral", flowchart: { curve: "basis" } });
+  </script>
+</body>
+</html>

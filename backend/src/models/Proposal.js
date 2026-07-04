@@ -75,6 +75,41 @@ const proposalSchema = new mongoose.Schema(
         at: { type: Date, default: Date.now },
       },
     ],
+    peerReviews: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        score: { type: Number, min: 1, max: 5, required: true },
+        comment: { type: String, default: "" },
+        at: { type: Date, default: Date.now },
+      },
+    ],
+    reviewPipeline: {
+      adminScreening: {
+        status: { type: String, default: "pending" },
+        completedAt: { type: Date, default: null },
+        completedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        comment: { type: String, default: "" },
+      },
+      peerReview: {
+        status: { type: String, default: "pending" },
+        completedAt: { type: Date, default: null },
+        reviews: { type: Array, default: [] },
+      },
+      committeeReview: {
+        status: { type: String, default: "pending" },
+        completedAt: { type: Date, default: null },
+        completedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        decision: { type: String, default: "" },
+        comment: { type: String, default: "" },
+      },
+      financeReview: {
+        status: { type: String, default: "pending" },
+        completedAt: { type: Date, default: null },
+        completedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+        decision: { type: String, default: "" },
+        comment: { type: String, default: "" },
+      },
+    },
     submittedAt: { type: Date, default: null },
     ...programTierField,
   },

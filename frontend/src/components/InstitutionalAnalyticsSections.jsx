@@ -20,6 +20,28 @@ export function InstitutionalAnalyticsSections({ data }) {
         Budget workflow, research groups, publications, and repository — counts from database; tables show the most recent records.
       </p>
 
+      <p className="muted dashSectionSub">
+        Budget workflow, research groups, publications, and repository — counts from database; tables show the most recent records.
+      </p>
+
+      {data.kpiMetrics ? (
+        <div className="dashGrid" style={{ marginTop: 12 }}>
+          {[
+            { label: "Grant success rate", value: `${data.kpiMetrics.grantSuccessRate}%` },
+            { label: "Proposal approval rate", value: `${data.kpiMetrics.proposalApprovalRate}%` },
+            { label: "Open funding calls", value: data.kpiMetrics.openFundingCalls },
+            { label: "Pending finance grants", value: data.kpiMetrics.pendingFinanceGrants },
+            { label: "Projects closing", value: data.kpiMetrics.projectsClosing },
+            { label: "Projects archived", value: data.kpiMetrics.projectsClosed },
+          ].map((k) => (
+            <div key={k.label} className="dashCard dashSpan4">
+              <div className="muted" style={{ fontSize: 12 }}>{k.label}</div>
+              <div style={{ fontWeight: 900, fontSize: 22 }}>{k.value}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <div className="dashGrid" style={{ marginTop: 12 }}>
         <div className="dashCard dashSpan6">
           <div className="dashCardTitle">Budget workflow</div>

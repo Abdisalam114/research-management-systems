@@ -39,5 +39,13 @@ router.post(
   asyncHandler(grantController.directorDecision)
 );
 
+router.post(
+  "/:id/finance-decision",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("finance_officer"),
+  asyncHandler(grantController.financeDecision)
+);
+
 module.exports = { grantRoutes: router };
 

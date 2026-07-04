@@ -105,3 +105,55 @@ export async function assignReviewers(accessToken, id, reviewerIds) {
   return data;
 }
 
+export async function listMyReviewAssignments(accessToken) {
+  const { data } = await api.get("/api/proposals/my-review-assignments", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
+export async function adminScreening(accessToken, id, decision, comment) {
+  const { data } = await api.post(
+    `/api/proposals/${id}/admin-screening`,
+    { decision, comment },
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return data;
+}
+
+export async function submitPeerReview(accessToken, id, score, comment) {
+  const { data } = await api.post(
+    `/api/proposals/${id}/peer-review`,
+    { score, comment },
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return data;
+}
+
+export async function completePeerReview(accessToken, id) {
+  const { data } = await api.post(
+    `/api/proposals/${id}/complete-peer-review`,
+    {},
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return data;
+}
+
+export async function committeeReview(accessToken, id, decision, comment) {
+  const { data } = await api.post(
+    `/api/proposals/${id}/committee-review`,
+    { decision, comment },
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return data;
+}
+
+export async function financeProposalReview(accessToken, id, decision, comment) {
+  const { data } = await api.post(
+    `/api/proposals/${id}/finance-review`,
+    { decision, comment },
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return data;
+}
+

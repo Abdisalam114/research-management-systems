@@ -5,6 +5,7 @@ const GRANT_STATUSES = Object.freeze({
   DRAFT: "draft",
   SUBMITTED: "submitted",
   APPROVED: "approved",
+  PENDING_FINANCE: "pending_finance",
   REJECTED: "rejected",
   ACTIVE: "active",
   CLOSED: "closed",
@@ -23,6 +24,11 @@ const grantSchema = new mongoose.Schema(
 
     researcherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     projectId: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null, index: true },
+    callId: { type: mongoose.Schema.Types.ObjectId, ref: "FundingCall", default: null, index: true },
+
+    financeApprovedAt: { type: Date, default: null },
+    financeApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    financeComment: { type: String, default: "" },
 
     submittedAt: { type: Date, default: null },
     decidedAt: { type: Date, default: null },
