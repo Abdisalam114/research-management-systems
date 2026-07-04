@@ -12,6 +12,7 @@ import { EthicsDirectorDecisionModal } from "../components/EthicsDirectorDecisio
 import { AppButton } from "../components/AppButton";
 import { SubmitValidationAlert } from "../components/SubmitValidationAlert";
 import { isEthicsFormComplete } from "../utils/ethicsForm";
+import { getEthicsMissingFields } from "../utils/proposalSubmitValidation";
 import { ethicsApplicationToForm, emptyEthicsForm } from "../utils/ethicsFormState";
 import { buildStatusFilterStats, filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 

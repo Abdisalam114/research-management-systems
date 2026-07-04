@@ -151,7 +151,13 @@ export function ProjectDetailsPage() {
         ) : null}
       </div>
 
-      <ProjectWorkflowPanel workflow={project.workflow} />
+      <ProjectWorkflowPanel
+        workflow={{
+          ...(project.workflow || {}),
+          projectStatus: project.status,
+          awardsVisible: project.awardsVisible,
+        }}
+      />
 
       {isOwner ? (
         <div className="card" style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
