@@ -22,12 +22,16 @@ const { Notification, NOTIFICATION_TYPES } = require("../models/Notification");
 const { Department } = require("../models/Department");
 const { EthicsApplication, ETHICS_STATUSES } = require("../models/EthicsApplication");
 const { Payment, PAYMENT_CATEGORIES, PAYMENT_STATUSES } = require("../models/Payment");
+const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
+const { AuditEvent } = require("../models/AuditEvent");
+const { recordAudit } = require("../utils/audit");
 const { writeSimplePdf } = require("../utils/pdf");
 const { syncGrantAwards } = require("../utils/syncGrantAwards");
 const { syncGrantProjectLinks } = require("../utils/syncGrantProjectLinks");
 const { INSTITUTIONAL_USERS, PORTAL_ORDER, PROGRAM_TIERS } = require("./seedData");
 const {
   RECORDS_PER_TIER,
+  MAX_SAMPLE_RECORDS,
   GRANT_TEMPLATES,
   PUBLICATION_TEMPLATES,
   COLLABORATION_GROUPS,
@@ -35,6 +39,7 @@ const {
   DEPARTMENTS,
   REPOSITORY_ITEMS,
   NOTIFICATION_TEMPLATES,
+  FUNDING_CALL_TEMPLATES,
   proposalsForTier,
 } = require("./seedRecords");
 
@@ -120,8 +125,47 @@ async function portalContext(users, programTier) {
   return { programTier, director, researchers, coordinator, finance };
 }
 
+async function sampleSlots(Model, programTier, extraFilter = {}) {
+  const count = await Model.countDocuments({ programTier, ...extraFilter });
+  return Math.max(0, MAX_SAMPLE_RECORDS - count);
+}
+
+function facultySlugForJurec(department) {
+  return String(department || "faculty")
+    .trim()
+    .toLowerCase()
+    .replace(/\//g, " ")
+    .replace(/\s+/g, " ")
+    .slice(0, 24);
+}
+
+function jurecCertificateMeta(index, department, issueDate = new Date()) {
+  const seq = String(index + 1).padStart(4, "0");
+  const faculty = facultySlugForJurec(department);
+  const suffix = `${String(issueDate.getMonth() + 1).padStart(2, "0")}${issueDate.getFullYear()}`;
+  const refNumber = `JUREC/${seq}/${faculty}/${suffix}`;
+  const certificateNumber = `JUREC${seq}/${faculty}/${suffix}`;
+  return { refNumber, certificateNumber, serialNumber: refNumber };
+}
+
+function defaultAcademicYear(date = new Date()) {
+  const y = date.getFullYear();
+  return `${y}/${y + 1}`;
+}
+
 async function existsByTitle(Model, title, programTier) {
   return Model.exists({ title, programTier });
+}
+
+async function auditOnce(payload) {
+  const exists = await AuditEvent.exists({
+    entityType: payload.entityType,
+    entityId: payload.entityId,
+    action: payload.action,
+  });
+  if (exists) return false;
+  await recordAudit(payload);
+  return true;
 }
 
 async function seedDepartments(ctx) {
@@ -142,7 +186,9 @@ async function seedDepartments(ctx) {
 
 async function seedProposals(ctx) {
   const { programTier, researchers } = ctx;
-  const templates = proposalsForTier(programTier).slice(0, RECORDS_PER_TIER);
+  const slots = await sampleSlots(Proposal, programTier);
+  if (slots < 1) return 0;
+  const templates = proposalsForTier(programTier).slice(0, Math.min(slots, RECORDS_PER_TIER));
   const uploadsDir = path.join(__dirname, "../../uploads");
   let inserted = 0;
 
@@ -196,28 +242,60 @@ async function seedProposals(ctx) {
 }
 
 async function seedEthics(ctx) {
-  const { programTier, researchers } = ctx;
+  const { programTier, researchers, director } = ctx;
+  const ethicsSlots = await sampleSlots(EthicsApplication, programTier);
+  if (ethicsSlots < 1) return 0;
+
   const proposals = await Proposal.find({
     programTier,
     status: { $in: [PROPOSAL_STATUSES.APPROVED, PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW] },
-  }).limit(RECORDS_PER_TIER);
+  }).limit(ethicsSlots);
 
   let inserted = 0;
   for (const proposal of proposals) {
     const researcher = researchers.find((r) => String(r._id) === String(proposal.researcherId)) || researchers[0];
     const approved = proposal.status === PROPOSAL_STATUSES.APPROVED;
     const principal = principalFromResearcher(researcher, proposal.department);
+    const submittedAt = proposal.submittedAt || new Date(Date.now() - (inserted + 1) * 86400000 * 5);
 
     const existing = await EthicsApplication.findOne({ proposalId: proposal._id });
     if (existing) {
       existing.principal = { ...existing.principal, ...principal };
       existing.projectTitle = proposal.title;
-      existing.applicantSignature = { name: researcher.fullName };
+      existing.applicantSignature = { name: researcher.fullName, signedAt: submittedAt };
+      if (approved && !existing.approval?.refNumber) {
+        const signedAt = new Date(Date.now() - (inserted + 1) * 86400000 * 3);
+        const jurec = jurecCertificateMeta(inserted, proposal.department, signedAt);
+        const signatoryKey = inserted % 2 === 0 ? "kasim" : "nur";
+        const chairpersonLine =
+          signatoryKey === "kasim" ? "Kasim Abdi Jimale" : "Dr. Nur Rashid Ahmed";
+        existing.status = ETHICS_STATUSES.APPROVED;
+        existing.submittedAt = submittedAt;
+        existing.approval = {
+          decision: "approved",
+          signedByUserId: director._id,
+          signedByName: director.fullName,
+          signedAt,
+          certificateId: jurec.certificateNumber,
+          serialNumber: jurec.serialNumber,
+          refNumber: jurec.refNumber,
+          certificateNumber: jurec.certificateNumber,
+          academicYear: defaultAcademicYear(signedAt),
+          year: String(signedAt.getFullYear()),
+          receivedAt: submittedAt,
+          reviewedAt: new Date(signedAt.getTime() - 86400000 * 2),
+          chairpersonLine,
+          signatoryKey,
+          signatoryTitle: "Chairperson",
+          includeSignature: true,
+          includeStamp: true,
+        };
+      }
       await existing.save();
       continue;
     }
 
-    await EthicsApplication.create({
+    const ethicsDoc = {
       proposalId: proposal._id,
       researcherId: researcher._id,
       programTier,
@@ -233,8 +311,37 @@ async function seedEthics(ctx) {
       sampleSize: approved ? "120 participants" : "To be finalized after pilot",
       consent: { hasForm: true, language: "english", interpreter: false },
       principal,
-      applicantSignature: { name: researcher.fullName },
-    });
+      applicantSignature: { name: researcher.fullName, signedAt: submittedAt },
+      submittedAt,
+    };
+
+    if (approved) {
+      const signedAt = new Date(Date.now() - (inserted + 1) * 86400000 * 3);
+      const jurec = jurecCertificateMeta(inserted, proposal.department, signedAt);
+      const signatoryKey = inserted % 2 === 0 ? "kasim" : "nur";
+      const chairpersonLine = signatoryKey === "kasim" ? "Kasim Abdi Jimale" : "Dr. Nur Rashid Ahmed";
+      ethicsDoc.approval = {
+        decision: "approved",
+        signedByUserId: director._id,
+        signedByName: director.fullName,
+        signedAt,
+        certificateId: jurec.certificateNumber,
+        serialNumber: jurec.serialNumber,
+        refNumber: jurec.refNumber,
+        certificateNumber: jurec.certificateNumber,
+        academicYear: defaultAcademicYear(signedAt),
+        year: String(signedAt.getFullYear()),
+        receivedAt: submittedAt,
+        reviewedAt: new Date(signedAt.getTime() - 86400000 * 2),
+        chairpersonLine,
+        signatoryKey,
+        signatoryTitle: "Chairperson",
+        includeSignature: true,
+        includeStamp: true,
+      };
+    }
+
+    await EthicsApplication.create(ethicsDoc);
 
     proposal.ethicsStatus = approved ? PROPOSAL_ETHICS_STATUSES.APPROVED : PROPOSAL_ETHICS_STATUSES.PENDING;
     await proposal.save();
@@ -280,7 +387,9 @@ async function seedProjects(ctx) {
 
 async function seedGrantsAndBudgets(ctx) {
   const { programTier, researchers, finance } = ctx;
-  const templates = GRANT_TEMPLATES.slice(0, RECORDS_PER_TIER);
+  const slots = await sampleSlots(Grant, programTier);
+  if (slots < 1) return 0;
+  const templates = GRANT_TEMPLATES.slice(0, Math.min(slots, RECORDS_PER_TIER));
   let inserted = 0;
 
   for (let i = 0; i < templates.length; i += 1) {
@@ -362,7 +471,9 @@ async function seedGrantsAndBudgets(ctx) {
 
 async function seedPublications(ctx) {
   const { programTier, researchers, coordinator } = ctx;
-  const templates = PUBLICATION_TEMPLATES.slice(0, RECORDS_PER_TIER);
+  const slots = await sampleSlots(Publication, programTier);
+  if (slots < 1) return 0;
+  const templates = PUBLICATION_TEMPLATES.slice(0, Math.min(slots, RECORDS_PER_TIER));
   const proposalDefs = proposalsForTier(programTier);
   let inserted = 0;
 
@@ -396,9 +507,11 @@ async function seedPublications(ctx) {
 
 async function seedCollaborationGroups(ctx) {
   const { programTier, researchers, coordinator } = ctx;
+  const slots = await sampleSlots(ResearchGroup, programTier, { kind: GROUP_KINDS.COLLABORATION });
+  if (slots < 1) return 0;
   let inserted = 0;
 
-  for (let i = 0; i < Math.min(COLLABORATION_GROUPS.length, RECORDS_PER_TIER); i += 1) {
+  for (let i = 0; i < Math.min(COLLABORATION_GROUPS.length, slots); i += 1) {
     const tpl = COLLABORATION_GROUPS[i];
     if (await ResearchGroup.exists({ name: tpl.name, programTier })) continue;
 
@@ -423,9 +536,11 @@ async function seedCollaborationGroups(ctx) {
 
 async function seedThesisGroups(ctx) {
   const { programTier, researchers, coordinator } = ctx;
+  const slots = await sampleSlots(ThesisGroup, programTier);
+  if (slots < 1) return 0;
   let inserted = 0;
 
-  for (let i = 0; i < Math.min(THESIS_GROUPS.length, RECORDS_PER_TIER); i += 1) {
+  for (let i = 0; i < Math.min(THESIS_GROUPS.length, slots); i += 1) {
     const tpl = THESIS_GROUPS[i];
     if (await ThesisGroup.exists({ title: tpl.title, programTier })) continue;
 
@@ -461,10 +576,12 @@ async function ensureRepositoryFile(fileName, content) {
 
 async function seedRepository(ctx) {
   const { programTier, researchers } = ctx;
+  const slots = await sampleSlots(RepositoryItem, programTier);
+  if (slots < 1) return 0;
   const proposalDefs = proposalsForTier(programTier);
   let inserted = 0;
 
-  for (let i = 0; i < Math.min(REPOSITORY_ITEMS.length, RECORDS_PER_TIER); i += 1) {
+  for (let i = 0; i < Math.min(REPOSITORY_ITEMS.length, slots); i += 1) {
     const tpl = REPOSITORY_ITEMS[i];
     if (await existsByTitle(RepositoryItem, tpl.title, programTier)) continue;
 
@@ -501,9 +618,11 @@ async function seedRepository(ctx) {
 
 async function seedNotifications(ctx) {
   const { programTier, researchers } = ctx;
+  const slots = await sampleSlots(Notification, programTier);
+  if (slots < 1) return 0;
   let inserted = 0;
 
-  for (let i = 0; i < Math.min(NOTIFICATION_TEMPLATES.length, RECORDS_PER_TIER); i += 1) {
+  for (let i = 0; i < Math.min(NOTIFICATION_TEMPLATES.length, slots); i += 1) {
     const tpl = NOTIFICATION_TEMPLATES[i];
     const researcher = researchers[i % researchers.length];
     const exists = await Notification.exists({
@@ -528,11 +647,13 @@ async function seedNotifications(ctx) {
 
 async function seedPayments(ctx) {
   const { programTier, finance, researchers } = ctx;
-  const budgets = await Budget.find({ programTier }).populate("ownerResearcherId").limit(8);
+  const slots = await sampleSlots(Payment, programTier);
+  if (slots < 1) return 0;
+  const budgets = await Budget.find({ programTier }).populate("ownerResearcherId").limit(slots);
   let inserted = 0;
 
   for (const budget of budgets) {
-    if (inserted >= 6) break;
+    if (inserted >= slots) break;
     const exists = await Payment.exists({ budgetId: budget._id, programTier });
     if (exists) continue;
 
@@ -553,6 +674,281 @@ async function seedPayments(ctx) {
   return inserted;
 }
 
+async function seedFundingCalls(ctx) {
+  const { programTier, director } = ctx;
+  const slots = await sampleSlots(FundingCall, programTier);
+  if (slots < 1) return 0;
+  let inserted = 0;
+
+  for (let i = 0; i < Math.min(FUNDING_CALL_TEMPLATES.length, slots); i += 1) {
+    const tpl = FUNDING_CALL_TEMPLATES[i];
+    if (await existsByTitle(FundingCall, tpl.title, programTier)) continue;
+
+    const deadline =
+      tpl.daysUntilDeadline != null ? new Date(Date.now() + tpl.daysUntilDeadline * 86400000) : null;
+    const publishedAt =
+      tpl.status === CALL_STATUSES.OPEN || tpl.status === CALL_STATUSES.CLOSED
+        ? new Date(Date.now() - (i + 1) * 86400000 * 7)
+        : null;
+    const closedAt = tpl.status === CALL_STATUSES.CLOSED ? new Date(Date.now() - 86400000 * 3) : null;
+
+    await FundingCall.create({
+      title: tpl.title,
+      description: tpl.description,
+      fundingSource: tpl.fundingSource,
+      donorRef: tpl.donorRef,
+      amountCap: tpl.amountCap,
+      currency: "USD",
+      deadline,
+      eligibilityTier: tpl.eligibilityTier,
+      requiredDocuments: "CV, budget breakdown, ethics approval (if human subjects), and signed institutional endorsement.",
+      status: tpl.status,
+      publishedAt,
+      closedAt,
+      createdBy: director._id,
+      programTier,
+    });
+    inserted += 1;
+  }
+  return inserted;
+}
+
+async function seedAuditTrail(ctx) {
+  const { programTier, director, coordinator, finance } = ctx;
+  let inserted = 0;
+
+  const proposals = await Proposal.find({ programTier }).limit(MAX_SAMPLE_RECORDS);
+  for (const proposal of proposals) {
+    if (
+      await auditOnce({
+        entityType: "proposal",
+        entityId: proposal._id,
+        action: "submitted",
+        label: "Proposal submitted",
+        detail: proposal.title,
+        actorId: proposal.researcherId,
+        actorRole: "researcher",
+        programTier,
+      })
+    ) {
+      inserted += 1;
+    }
+    if (proposal.status === PROPOSAL_STATUSES.APPROVED) {
+      if (
+        await auditOnce({
+          entityType: "proposal",
+          entityId: proposal._id,
+          action: "director_approved",
+          label: "Director decision: approved",
+          detail: proposal.title,
+          actorId: director._id,
+          actorRole: director.role,
+          programTier,
+        })
+      ) {
+        inserted += 1;
+      }
+    }
+  }
+
+  const ethicsApps = await EthicsApplication.find({ programTier }).limit(MAX_SAMPLE_RECORDS);
+  for (const app of ethicsApps) {
+    if (
+      await auditOnce({
+        entityType: "ethics",
+        entityId: app._id,
+        action: "submitted",
+        label: "Ethics application submitted",
+        detail: app.projectTitle,
+        actorId: app.researcherId,
+        actorRole: "researcher",
+        programTier,
+      })
+    ) {
+      inserted += 1;
+    }
+    if (app.status === ETHICS_STATUSES.APPROVED && app.approval?.refNumber) {
+      if (
+        await auditOnce({
+          entityType: "ethics",
+          entityId: app._id,
+          action: "certificate_issued",
+          label: "JUREC certificate issued",
+          detail: `${app.approval.refNumber} · ${app.approval.certificateNumber}`,
+          actorId: director._id,
+          actorRole: director.role,
+          metadata: {
+            refNumber: app.approval.refNumber,
+            certificateNumber: app.approval.certificateNumber,
+            signatoryKey: app.approval.signatoryKey,
+          },
+          programTier,
+        })
+      ) {
+        inserted += 1;
+      }
+    }
+  }
+
+  const projects = await Project.find({ programTier }).limit(MAX_SAMPLE_RECORDS);
+  for (const project of projects) {
+    if (
+      await auditOnce({
+        entityType: "project",
+        entityId: project._id,
+        action: "created",
+        label: "Project created from approved proposal",
+        detail: project.title,
+        actorId: director._id,
+        actorRole: director.role,
+        programTier,
+      })
+    ) {
+      inserted += 1;
+    }
+  }
+
+  const grants = await Grant.find({ programTier }).limit(MAX_SAMPLE_RECORDS);
+  for (const grant of grants) {
+    if (
+      await auditOnce({
+        entityType: "grant",
+        entityId: grant._id,
+        action: "created",
+        label: "Grant application created",
+        detail: grant.title,
+        actorId: grant.researcherId,
+        actorRole: "researcher",
+        programTier,
+      })
+    ) {
+      inserted += 1;
+    }
+    if (grant.submittedAt) {
+      if (
+        await auditOnce({
+          entityType: "grant",
+          entityId: grant._id,
+          action: "submitted",
+          label: "Grant submitted",
+          detail: grant.title,
+          actorId: grant.researcherId,
+          actorRole: "researcher",
+          programTier,
+        })
+      ) {
+        inserted += 1;
+      }
+    }
+    if ([GRANT_STATUSES.APPROVED, GRANT_STATUSES.ACTIVE].includes(grant.status)) {
+      if (
+        await auditOnce({
+          entityType: "grant",
+          entityId: grant._id,
+          action: "director_approved",
+          label: "Director approved grant",
+          detail: grant.title,
+          actorId: director._id,
+          actorRole: director.role,
+          programTier,
+        })
+      ) {
+        inserted += 1;
+      }
+      if (grant.amountAwarded > 0 && finance) {
+        if (
+          await auditOnce({
+            entityType: "grant",
+            entityId: grant._id,
+            action: "finance_approved",
+            label: "Finance approved grant",
+            detail: grant.title,
+            actorId: finance._id,
+            actorRole: finance.role,
+            programTier,
+          })
+        ) {
+          inserted += 1;
+        }
+      }
+    }
+  }
+
+  const calls = await FundingCall.find({ programTier }).limit(MAX_SAMPLE_RECORDS);
+  for (const call of calls) {
+    if (
+      await auditOnce({
+        entityType: "funding_call",
+        entityId: call._id,
+        action: "created",
+        label: "Funding call created",
+        detail: call.title,
+        actorId: director._id,
+        actorRole: director.role,
+        programTier,
+      })
+    ) {
+      inserted += 1;
+    }
+    if (call.publishedAt) {
+      if (
+        await auditOnce({
+          entityType: "funding_call",
+          entityId: call._id,
+          action: "published",
+          label: "Funding call published",
+          detail: call.title,
+          actorId: director._id,
+          actorRole: director.role,
+          programTier,
+        })
+      ) {
+        inserted += 1;
+      }
+    }
+    if (call.status === CALL_STATUSES.CLOSED) {
+      if (
+        await auditOnce({
+          entityType: "funding_call",
+          entityId: call._id,
+          action: "closed",
+          label: "Funding call closed",
+          detail: call.title,
+          actorId: director._id,
+          actorRole: director.role,
+          programTier,
+        })
+      ) {
+        inserted += 1;
+      }
+    }
+  }
+
+  if (coordinator) {
+    const publications = await Publication.find({ programTier, status: PUBLICATION_STATUSES.VALIDATED }).limit(
+      MAX_SAMPLE_RECORDS
+    );
+    for (const pub of publications) {
+      if (
+        await auditOnce({
+          entityType: "publication",
+          entityId: pub._id,
+          action: "validated",
+          label: "Publication validated",
+          detail: pub.title,
+          actorId: coordinator._id,
+          actorRole: coordinator.role,
+          programTier,
+        })
+      ) {
+        inserted += 1;
+      }
+    }
+  }
+
+  return inserted;
+}
+
 async function seedPortal(ctx) {
   console.log(`\n--- Portal: ${ctx.programTier} ---`);
 
@@ -569,9 +965,11 @@ async function seedPortal(ctx) {
   const repo = await seedRepository(ctx);
   const notif = await seedNotifications(ctx);
   const pay = await seedPayments(ctx);
+  const fc = await seedFundingCalls(ctx);
+  const audit = await seedAuditTrail(ctx);
 
   console.log(
-    `  +${dept} departments, +${p} proposals, +${eth} ethics, +${pr} projects, +${g} grants, +${pub} publications, +${grp} groups, +${th} thesis, +${repo} repository, +${notif} notifications, +${pay} payments`
+    `  +${dept} departments, +${p} proposals, +${eth} ethics, +${pr} projects, +${g} grants, +${fc} funding calls, +${pub} publications, +${grp} groups, +${th} thesis, +${repo} repository, +${notif} notifications, +${pay} payments, +${audit} audit events`
   );
   if (awardSync.updated) console.log(`  synced ${awardSync.updated} grant award amount(s)`);
   if (linkSync.updated) console.log(`  linked ${linkSync.updated} grant(s) to project(s)`);
@@ -589,11 +987,12 @@ async function run() {
   await connectDB(process.env.MONGO_URI);
 
   console.log("=== Jamhuriya RMS institutional seed ===\n");
+  console.log(`Sample cap: ${MAX_SAMPLE_RECORDS} records per entity type per portal.\n`);
   console.log("1/3 User accounts...");
   const users = await seedUsers();
   console.log(`     ${INSTITUTIONAL_USERS.length} accounts upserted`);
 
-  console.log("2/3 Research records (English, per portal)...");
+  console.log("2/3 Research records (English, realistic, audit trail)...");
   for (const tier of PORTAL_ORDER) {
     const ctx = await portalContext(users, tier);
     if (ctx.researchers.length < 1) {

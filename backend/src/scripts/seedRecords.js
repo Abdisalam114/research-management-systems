@@ -9,7 +9,9 @@ const { ETHICS_STATUSES } = require("../models/EthicsApplication");
 const { THESIS_STATUSES } = require("../models/ThesisGroup");
 const { PROGRAM_TIERS } = require("../constants/programTier");
 
-const RECORDS_PER_TIER = 12;
+const RECORDS_PER_TIER = 10;
+/** Maximum sample records per entity type per portal (never exceed). */
+const MAX_SAMPLE_RECORDS = 10;
 
 const UNDERGRADUATE_PROPOSALS = [
   {
@@ -384,8 +386,111 @@ const NOTIFICATION_TEMPLATES = [
   { type: "publication", title: "Publication validated", body: "Your publication has been validated and added to the institutional research output report." },
   { type: "project", title: "Progress report reminder", body: "Please submit a quarterly progress report for your active research project." },
   { type: "repository", title: "Repository upload processed", body: "Your dataset upload completed successfully and is available under the selected access level." },
-  { type: "system", title: "Ethics application update", body: "Your ethics application status has changed — review the decision in the ethics module." },
-  { type: "message", title: "New message in research group", body: "You have unread messages in your collaboration group workspace." },
+];
+
+const { CALL_STATUSES } = require("../models/FundingCall");
+
+const FUNDING_CALL_TEMPLATES = [
+  {
+    title: "Internal Research Excellence Fund 2026",
+    description: "Competitive internal grants for faculty-led projects with measurable impact on teaching, research, or community engagement.",
+    fundingSource: "University Research Office",
+    donorRef: "JUST-REF-2026-01",
+    amountCap: 15000,
+    eligibilityTier: "all",
+    status: CALL_STATUSES.OPEN,
+    daysUntilDeadline: 45,
+  },
+  {
+    title: "Graduate Thesis Support Call — Cycle I",
+    description: "Support for postgraduate students completing fieldwork, lab consumables, or conference dissemination.",
+    fundingSource: "Graduate School",
+    donorRef: "GS-THESIS-26A",
+    amountCap: 6000,
+    eligibilityTier: "pg",
+    status: CALL_STATUSES.OPEN,
+    daysUntilDeadline: 30,
+  },
+  {
+    title: "Faculty Innovation Grant — Computing & IT",
+    description: "Seed funding for software prototypes, cybersecurity pilots, and educational technology experiments.",
+    fundingSource: "Faculty of Computing",
+    donorRef: "FOC-INNOV-26",
+    amountCap: 8500,
+    eligibilityTier: "ug",
+    status: CALL_STATUSES.OPEN,
+    daysUntilDeadline: 60,
+  },
+  {
+    title: "WHO Regional Health Research Award",
+    description: "Funding for public health studies aligned with WHO Eastern Mediterranean priorities.",
+    fundingSource: "World Health Organization",
+    donorRef: "WHO-EMRO-2026-HLTH",
+    amountCap: 42000,
+    eligibilityTier: "pg",
+    status: CALL_STATUSES.OPEN,
+    daysUntilDeadline: 90,
+  },
+  {
+    title: "Campus Sustainability Challenge Fund",
+    description: "Projects reducing energy use, water consumption, or waste across university facilities.",
+    fundingSource: "Green Campus Initiative",
+    donorRef: "GCI-SUST-26",
+    amountCap: 12000,
+    eligibilityTier: "all",
+    status: CALL_STATUSES.OPEN,
+    daysUntilDeadline: 75,
+  },
+  {
+    title: "Industry Collaboration — IoT Analytics",
+    description: "Industry-matched funding for sensor networks, edge analytics, and field deployment studies.",
+    fundingSource: "TechBridge Industries",
+    donorRef: "TBI-IOT-2026",
+    amountCap: 28000,
+    eligibilityTier: "all",
+    status: CALL_STATUSES.CLOSED,
+    daysUntilDeadline: -14,
+  },
+  {
+    title: "Clinical Trials Infrastructure Grant",
+    description: "Equipment and data-management support for ethically approved clinical research.",
+    fundingSource: "Ministry of Health",
+    donorRef: "MOH-CT-INFRA-26",
+    amountCap: 95000,
+    eligibilityTier: "pg",
+    status: CALL_STATUSES.OPEN,
+    daysUntilDeadline: 120,
+  },
+  {
+    title: "Early Career Researcher Seed Fund",
+    description: "First-time PI support for lecturers within five years of appointment.",
+    fundingSource: "National Research Council",
+    donorRef: "NRC-ECR-2026",
+    amountCap: 22000,
+    eligibilityTier: "all",
+    status: CALL_STATUSES.DRAFT,
+    daysUntilDeadline: null,
+  },
+  {
+    title: "Open Data Commons Research Award",
+    description: "Support for publishing reproducible datasets and open-access research outputs.",
+    fundingSource: "Open Knowledge Foundation",
+    donorRef: "OKF-ODC-26",
+    amountCap: 18000,
+    eligibilityTier: "all",
+    status: CALL_STATUSES.OPEN,
+    daysUntilDeadline: 50,
+  },
+  {
+    title: "Engineering Equipment Acquisition Grant",
+    description: "Capital items for labs supporting accredited engineering programmes.",
+    fundingSource: "Engineering Faculty Board",
+    donorRef: "EFB-EQUIP-26",
+    amountCap: 35000,
+    eligibilityTier: "all",
+    status: CALL_STATUSES.CLOSED,
+    daysUntilDeadline: -30,
+  },
 ];
 
 function proposalsForTier(programTier) {
@@ -394,6 +499,7 @@ function proposalsForTier(programTier) {
 
 module.exports = {
   RECORDS_PER_TIER,
+  MAX_SAMPLE_RECORDS,
   UNDERGRADUATE_PROPOSALS,
   POSTGRADUATE_PROPOSALS,
   GRANT_TEMPLATES,
@@ -403,5 +509,6 @@ module.exports = {
   DEPARTMENTS,
   REPOSITORY_ITEMS,
   NOTIFICATION_TEMPLATES,
+  FUNDING_CALL_TEMPLATES,
   proposalsForTier,
 };
