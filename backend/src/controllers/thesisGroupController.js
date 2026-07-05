@@ -1,5 +1,3 @@
-const fs = require("fs");
-const path = require("path");
 const { ThesisGroup, THESIS_STATUSES } = require("../models/ThesisGroup");
 const { User, ROLES } = require("../models/User");
 const { FACULTIES, matchFacultyByName } = require("../utils/facultyMatcher");
@@ -7,46 +5,108 @@ const { AppError } = require("../utils/AppError");
 const { ResearchGroup, GROUP_MEMBER_ROLES, GROUP_KINDS } = require("../models/ResearchGroup");
 const { Department } = require("../models/Department");
 const { notifyUser } = require("../utils/notify");
+const { THESIS_GROUPS } = require("../scripts/seedRecords");
 const {
   CHAPTER_STATUSES,
   TITLE_PROPOSAL_STATUSES,
   defaultChapters,
   emptyTitleProposal,
   buildActivityTimeline,
+  normalizeStudentRows,
+  assertMinThesisStudents,
+  MIN_THESIS_GROUP_STUDENTS,
 } = require("../utils/thesisDefaults");
 
-function debugLog(location, message, data, hypothesisId = "thesis-title") {
-  // #region agent log
-  try {
-    const logPath = path.resolve(__dirname, "../../../debug-15a9cf.log");
-    const entry = {
-      sessionId: "15a9cf",
-      runId: "thesis-title",
-      hypothesisId,
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-    };
-    fs.appendFileSync(logPath, JSON.stringify(entry) + "\n");
-  } catch (_) {}
-  // #endregion
-}
-
 function resolveTitleProposal(plain) {
-  if (plain.titleProposal?.status) return plain.titleProposal;
-  if (plain.title?.trim()) {
+  const tp = plain.titleProposal || {};
+  const status = tp.status || TITLE_PROPOSAL_STATUSES.NONE;
+
+  if (status === TITLE_PROPOSAL_STATUSES.PENDING || status === TITLE_PROPOSAL_STATUSES.REJECTED) {
     return {
-      title: plain.title,
+      title: tp.title || "",
+      status,
+      proposedAt: tp.proposedAt || null,
+      proposedBy: tp.proposedBy || null,
+      reviewedAt: tp.reviewedAt || null,
+      reviewedBy: tp.reviewedBy || null,
+      reviewNote: tp.reviewNote || "",
+    };
+  }
+
+  if (status === TITLE_PROPOSAL_STATUSES.ACCEPTED) {
+    const title = (tp.title || plain.title || "").trim();
+    if (title) {
+      return {
+        title,
+        status: TITLE_PROPOSAL_STATUSES.ACCEPTED,
+        proposedAt: tp.proposedAt || plain.createdAt || null,
+        proposedBy: tp.proposedBy || plain.createdBy || null,
+        reviewedAt: tp.reviewedAt || plain.createdAt || null,
+        reviewedBy: tp.reviewedBy || plain.createdBy || null,
+        reviewNote: tp.reviewNote || "",
+      };
+    }
+  }
+
+  const legacyTitle = (plain.title || "").trim();
+  if (legacyTitle && status === TITLE_PROPOSAL_STATUSES.NONE && !tp.title?.trim()) {
+    return {
+      title: legacyTitle,
       status: TITLE_PROPOSAL_STATUSES.ACCEPTED,
       proposedAt: plain.createdAt || null,
-      proposedBy: plain.createdBy || null,
+      proposedBy: plain.supervisorId || plain.createdBy || null,
       reviewedAt: plain.createdAt || null,
-      reviewedBy: plain.createdBy || null,
+      reviewedBy: plain.coordinatorId || plain.createdBy || null,
       reviewNote: "",
     };
   }
+
   return emptyTitleProposal();
+}
+
+function titleIsLocked(group) {
+  const tp = group.titleProposal || {};
+  const status = tp.status || TITLE_PROPOSAL_STATUSES.NONE;
+  if (status === TITLE_PROPOSAL_STATUSES.ACCEPTED) return true;
+  if (status === TITLE_PROPOSAL_STATUSES.NONE && group.title?.trim()) return true;
+  return false;
+}
+
+async function syncLegacyTitleProposal(group) {
+  if (!group.title?.trim()) return false;
+  const tp = group.titleProposal || {};
+  const status = tp.status || TITLE_PROPOSAL_STATUSES.NONE;
+  if (status === TITLE_PROPOSAL_STATUSES.PENDING || status === TITLE_PROPOSAL_STATUSES.REJECTED) return false;
+  if (status === TITLE_PROPOSAL_STATUSES.ACCEPTED && tp.title?.trim()) return false;
+
+  group.titleProposal = {
+    title: group.title.trim(),
+    status: TITLE_PROPOSAL_STATUSES.ACCEPTED,
+    proposedAt: tp.proposedAt || group.createdAt || null,
+    proposedBy: tp.proposedBy || group.supervisorId || group.createdBy || null,
+    reviewedAt: tp.reviewedAt || group.createdAt || null,
+    reviewedBy: tp.reviewedBy || group.coordinatorId || group.createdBy || null,
+    reviewNote: tp.reviewNote || "",
+  };
+  await group.save();
+  return true;
+}
+
+async function syncThesisGroupStudents(group) {
+  const count = group.students?.length || 0;
+  if (count >= MIN_THESIS_GROUP_STUDENTS) return false;
+
+  const title = (group.title || "").trim();
+  const tpl = THESIS_GROUPS.find((t) => t.title === title);
+  if (!tpl?.students?.length) return false;
+
+  group.students = tpl.students.map((s) => ({
+    fullName: String(s.fullName || "").trim(),
+    studentId: String(s.studentId || "").trim(),
+    email: String(s.email || "").trim().toLowerCase(),
+  }));
+  await group.save();
+  return true;
 }
 
 function sanitize(g) {
@@ -133,6 +193,9 @@ async function listGroups(req, res) {
     .populate("coordinatorId", "fullName email")
     .populate("createdBy", "fullName email role");
 
+  await Promise.all(groups.map((g) => syncLegacyTitleProposal(g)));
+  await Promise.all(groups.map((g) => syncThesisGroupStudents(g)));
+
   res.json({ groups: groups.map(sanitize) });
 }
 
@@ -166,8 +229,11 @@ async function createGroup(req, res) {
     status,
   } = req.body || {};
 
-  if (!Array.isArray(students) || students.length === 0) {
-    throw new AppError("students array is required (at least one student)", 400);
+  let cleanStudents;
+  try {
+    cleanStudents = assertMinThesisStudents(students);
+  } catch (e) {
+    throw new AppError(e.message, e.statusCode || 400);
   }
 
   let resolvedSupervisorId = null;
@@ -210,11 +276,7 @@ async function createGroup(req, res) {
 
   const groupData = req.tierAssign({
     title: "",
-    students: students.map((s) => ({
-      fullName: String(s.fullName || "").trim(),
-      studentId: String(s.studentId || "").trim(),
-      email: String(s.email || "").trim().toLowerCase(),
-    })),
+    students: cleanStudents,
     researchGroupId: researchGroup._id,
     supervisorId: resolvedSupervisorId,
     supervisorAssignedAt: resolvedSupervisorId ? new Date() : null,
@@ -233,13 +295,6 @@ async function createGroup(req, res) {
   if (resolvedSupervisorId) {
     await notifySupervisorAssignment(group, req.programTier);
   }
-
-  debugLog("thesisGroupController.js:createGroup", "Thesis group created", {
-    thesisGroupId: String(group._id),
-    supervisorId: resolvedSupervisorId ? String(resolvedSupervisorId) : null,
-    titleProposalStatus: group.titleProposal?.status,
-    proposedTitle: group.titleProposal?.title || "",
-  });
 
   res.status(201).json({ group: sanitize(group) });
 }
@@ -269,11 +324,11 @@ async function updateGroup(req, res) {
   const prevSupervisorId = group.supervisorId ? String(group.supervisorId) : null;
 
   if (Array.isArray(students)) {
-    group.students = students.map((s) => ({
-      fullName: String(s.fullName || "").trim(),
-      studentId: String(s.studentId || "").trim(),
-      email: String(s.email || "").trim().toLowerCase(),
-    }));
+    try {
+      group.students = assertMinThesisStudents(students);
+    } catch (e) {
+      throw new AppError(e.message, e.statusCode || 400);
+    }
   }
   if (supervisorId !== undefined) {
     if (supervisorId === null || supervisorId === "") {
@@ -321,18 +376,12 @@ async function proposeTitle(req, res) {
     throw new AppError("Only the assigned supervisor can enter the student-chosen thesis title", 403);
   }
 
-  if (group.titleProposal?.status === TITLE_PROPOSAL_STATUSES.ACCEPTED) {
+  if (titleIsLocked(group)) {
     throw new AppError("Title is already accepted; contact coordinator to change it", 400);
   }
 
   applyStudentTitleProposal(group, trimmed, userId);
   await group.save();
-
-  debugLog("thesisGroupController.js:proposeTitle", "Supervisor recorded student title", {
-    thesisGroupId: String(group._id),
-    supervisorId: String(userId),
-    title: trimmed,
-  }, "title-proposal");
 
   const notifyTarget = group.coordinatorId || group.createdBy;
   if (notifyTarget) {
@@ -386,12 +435,6 @@ async function reviewTitleProposal(req, res) {
 
   await group.save();
 
-  debugLog("thesisGroupController.js:reviewTitleProposal", "Title proposal reviewed", {
-    thesisGroupId: String(group._id),
-    decision: accepting ? "accepted" : "rejected",
-    title: group.titleProposal.title,
-  }, "title-review");
-
   if (group.supervisorId) {
     await notifyUser(group.supervisorId, {
       type: "system",
@@ -436,12 +479,6 @@ async function updateChapter(req, res) {
 
   await group.save();
 
-  debugLog("thesisGroupController.js:updateChapter", "Chapter updated", {
-    thesisGroupId: String(group._id),
-    chapterKey,
-    status: chapter.status,
-  }, "chapter-progress");
-
   res.json({ group: sanitize(group) });
 }
 
@@ -474,12 +511,6 @@ async function addMeeting(req, res) {
     loggedBy: userId,
   });
   await group.save();
-
-  debugLog("thesisGroupController.js:addMeeting", "Meeting logged", {
-    thesisGroupId: String(group._id),
-    chaptersDiscussed: chapterKeys,
-    meetingCount: group.meetings.length,
-  }, "meeting-log");
 
   res.status(201).json({ group: sanitize(group) });
 }

@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import * as analyticsApi from "../services/analyticsApi";
 
+import { PageHeader } from "../components/PageHeader";
+
 export function FinanceReportsPage() {
   const { accessToken } = useAuth();
   const [report, setReport] = useState(null);
@@ -14,15 +16,28 @@ export function FinanceReportsPage() {
       .catch((e) => setError(e?.response?.data?.message || "Failed to load finance report"));
   }, [accessToken]);
 
-  if (error) return <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>{error}</div>;
-  if (!report) return <p className="muted">Loading financial report…</p>;
+  if (error) {
+    return (
+      <div>
+        <PageHeader title="Finance reports" subtitle="Budget utilization and grant financial summary." />
+        <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)", marginTop: 12 }}>{error}</div>
+      </div>
+    );
+  }
+  if (!report) {
+    return (
+      <div>
+        <PageHeader title="Finance reports" subtitle="Budget utilization and grant financial summary." />
+        <p className="muted">Loading financial report…</p>
+      </div>
+    );
+  }
 
   const s = report.summary;
 
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Financial reporting</h2>
-      <p className="muted">Budget utilization and grant financial summary.</p>
+      <PageHeader title="Finance reports" subtitle="Budget utilization and grant financial summary." />
 
       <div className="overviewGrid" style={{ marginTop: 12 }}>
         <div className="overviewTile">

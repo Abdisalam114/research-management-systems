@@ -28,22 +28,7 @@ export function TopBar({ title = "Dashboard" }) {
       try {
         const res = await notificationApi.getUnreadCount(accessToken);
         if (!cancelled) setUnread(res.unread || 0);
-        // #region agent log
-        fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
-          body: JSON.stringify({
-            sessionId: "6113cc",
-            location: "TopBar.jsx:poll",
-            message: "unread count fetched",
-            data: { unread: res.unread || 0, userId: user?.id },
-            timestamp: Date.now(),
-            hypothesisId: "MSG2",
-            runId: "collab-comms",
-          }),
-        }).catch(() => {});
-        // #endregion
-      } catch {
+} catch {
         if (!cancelled) setUnread(0);
       }
     }

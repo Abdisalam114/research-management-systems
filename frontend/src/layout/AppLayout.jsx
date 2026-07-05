@@ -18,26 +18,6 @@ function scrollAppToTop(contentEl) {
     el.scrollTop = 0;
   }
   window.scrollTo(0, 0);
-
-  // #region agent log
-  fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
-    body: JSON.stringify({
-      sessionId: "6113cc",
-      location: "AppLayout.jsx:scrollAppToTop",
-      message: "scroll to top",
-      data: {
-        contentScrollTop: contentEl?.scrollTop ?? null,
-        windowScrollY: window.scrollY,
-        docScrollTop: document.documentElement.scrollTop,
-      },
-      timestamp: Date.now(),
-      hypothesisId: "H-scroll",
-      runId: "scroll-fix",
-    }),
-  }).catch(() => {});
-  // #endregion
 }
 
 function scrollAfterPaint(contentEl) {

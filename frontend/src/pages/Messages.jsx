@@ -120,22 +120,7 @@ export function MessagesPage() {
       await conversationApi.sendMessage(accessToken, active.id, messageBody.trim());
       setMessageBody("");
       await Promise.all([loadActive(active.id), loadList()]);
-      // #region agent log
-      fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
-        body: JSON.stringify({
-          sessionId: "6113cc",
-          location: "Messages.jsx:handleSend",
-          message: "message sent from UI",
-          data: { conversationId: active.id, senderId: user?.id },
-          timestamp: Date.now(),
-          hypothesisId: "MSG1",
-          runId: "collab-comms",
-        }),
-      }).catch(() => {});
-      // #endregion
-    } catch (e) {
+} catch (e) {
       setError(e?.response?.data?.message || "Failed to send");
     } finally {
       setSending(false);

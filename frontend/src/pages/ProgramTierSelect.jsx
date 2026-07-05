@@ -24,8 +24,8 @@ export function ProgramTierSelectPage() {
           </div>
           <h2 className="authTitle">Select Program Portal</h2>
           <p className="authSub muted">
-            Welcome, {user?.fullName || "Director"}. Choose which research environment to manage. Each portal has
-            separate data — Undergraduate and Postgraduate do not mix.
+            Welcome, {user?.fullName || "Director"}. As Research Director you can switch between both portals.
+            Each user account is assigned to <strong>Undergraduate</strong> or <strong>Postgraduate</strong> only — not both.
           </p>
         </div>
 

@@ -82,23 +82,6 @@ function GrantAmounts({ grant }) {
   );
 }
 
-function logGrantDebug(location, message, data, hypothesisId) {
-  // #region agent log
-  fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
-    body: JSON.stringify({
-      sessionId: "6113cc",
-      location,
-      message,
-      data,
-      hypothesisId,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-}
-
 export function GrantsPage() {
   const { accessToken, user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -140,24 +123,6 @@ export function GrantsPage() {
     if (isResearcher && projectList.length === 1) {
       setForm((f) => (f.projectId ? f : { ...f, projectId: projectList[0].id }));
     }
-    const byStatus = list.reduce((acc, g) => {
-      acc[g.status] = (acc[g.status] || 0) + 1;
-      return acc;
-    }, {});
-    const totalAwarded = list.reduce((acc, g) => acc + Number(g.amountAwarded || 0), 0);
-    logGrantDebug(
-      "Grants.jsx:load",
-      "grants loaded",
-      {
-        count: list.length,
-        byStatus,
-        totalAwarded,
-        awardedCount: list.filter(isAwardedItem).length,
-        approvedFilterCount: list.filter((g) => g.status === "approved").length,
-        activeCount: list.filter((g) => g.status === "active").length,
-      },
-      "A,B,E"
-    );
   }, [accessToken, user?.role, projectIdFromUrl]);
 
   useEffect(() => {
@@ -202,12 +167,6 @@ export function GrantsPage() {
 
   useEffect(() => {
     if (loading) return;
-    logGrantDebug(
-      "Grants.jsx:filter",
-      "filter applied",
-      { statusFilter, filteredCount: filteredGrants.length, totalCount: grants.length },
-      "A,B"
-    );
   }, [statusFilter, filteredGrants.length, grants.length, loading]);
 
   return (

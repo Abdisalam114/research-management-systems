@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JUST RMS — Simple Flow / Sawir Fudud</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #f0f9ff;
+      --card: #fff;
+      --border: #bae6fd;
+      --text: #0f172a;
+      --muted: #475569;
+      --accent: #0369a1;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      line-height: 1.5;
+      color: var(--text);
+      background: var(--bg);
+      margin: 0;
+      padding: 24px 20px 48px;
+      max-width: 900px;
+      margin-inline: auto;
+    }
+    h1 { font-size: 1.6rem; margin: 0 0 4px; color: var(--accent); }
+    .subtitle { color: var(--muted); margin-bottom: 20px; font-size: 1rem; }
+    section {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px 16px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .mermaid { display: flex; justify-content: center; overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+      margin-top: 8px;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #e0f2fe; font-weight: 600; }
+    .step-num { font-weight: 700; color: var(--accent); width: 48px; }
+    .note {
+      background: #fefce8;
+      border: 1px solid #fde047;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.9rem;
+      margin-top: 16px;
+    }
+    @media print {
+      body { background: #fff; padding: 12px; }
+      section { box-shadow: none; break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <h1>JUST RMS — Simple Picture</h1>
+  <p class="subtitle">Sawir fudud — safka cilmi-baarista laga bilaabo proposal ilaa xiritaan</p>
+
+  <section>
+    <div class="mermaid">
+flowchart TD
+    A["📢 STEP 1<br/>Funding Call<br/><i>Call deeq / Funding</i>"]
+    B["💰 Grant Application<br/><i>Codsiga deeqda</i>"]
+    C["📄 STEP 2<br/>Proposal + Ethics + Budget + Docs<br/><i>Proposal + Anshax + Miisaaniyad</i>"]
+    D["✍️ STEP 3<br/>Multi-stage Review<br/><i>Dib u eegis badan</i>"]
+    E["✅ Director Approves<br/><i>Director ansixiyo</i>"]
+    F["📁 STEP 4<br/>Project Created<br/><i>Mashruuc la abuuray</i>"]
+    G["📋 Work Plan + Activities<br/><i>Qorshe shaqo + Hawlaha</i>"]
+    H["🧾 STEP 5<br/>Payments + Procurement<br/><i>Lacag bixin + Iibsiga PO</i>"]
+    I["📚 STEP 6<br/>Publications + Repository<br/><i>Daabacaad + Kayd</i>"]
+    J["📊 Progress Reports<br/><i>Warbixin horumar</i>"]
+    K["☑️ STEP 8<br/>Closure Checklist<br/>+ Lessons Learned<br/><i>Checklist + Casharro</i>"]
+    L["🏁 Director + Finance<br/>→ Archived / Closed<br/><i>La xiray</i>"]
+
+    A --> B
+    B -.-> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    F --> H
+    F --> I
+    F --> J
+    G --> K
+    H --> K
+    I --> K
+    J --> K
+    K --> L
+
+    style A fill:#dbeafe,stroke:#0369a1
+    style C fill:#dbeafe,stroke:#0369a1
+    style D fill:#fef3c7,stroke:#d97706
+    style F fill:#dbeafe,stroke:#0369a1
+    style H fill:#dbeafe,stroke:#0369a1
+    style K fill:#fce7f3,stroke:#be185d
+    style L fill:#dcfce7,stroke:#16a34a
+    </div>
+  </section>
+
+  <section>
+    <h2 style="margin:0 0 12px;font-size:1.1rem;color:var(--accent);">Step legend / Sharaxaadda tallaabooyinka</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>English</th>
+          <th>Somali</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="step-num">1</td><td>Funding Call → Grant</td><td>Call deeq → Codsiga grant</td></tr>
+        <tr><td class="step-num">2</td><td>Proposal + Ethics + Budget + Documents</td><td>Proposal + Anshax + Miisaaniyad + Dukumeenti</td></tr>
+        <tr><td class="step-num">3</td><td>Peer / Committee / Ethics / Finance review</td><td>Dib u eegis (peer, committee, anshax, maaliyad)</td></tr>
+        <tr><td class="step-num">4</td><td>Project — work plan, activities, team</td><td>Mashruuc — qorshe, hawlaha, kooxda</td></tr>
+        <tr><td class="step-num">5</td><td>Payments + PO (Procurement → Director → Finance)</td><td>Lacag bixin + PO (Procurement → Director → Finance)</td></tr>
+        <tr><td class="step-num">6</td><td>Publications, Repository, Thesis</td><td>Daabacaad, Kayd, Thesis</td></tr>
+        <tr><td class="step-num">7</td><td>Dashboard, Finance Reports, Audit Trail</td><td>Dashboard, Warbixin maaliyad, Audit Trail</td></tr>
+        <tr><td class="step-num">8</td><td>Closure checklist → Director → Finance → Archive</td><td>Checklist xiritaan → Director → Finance → Archive</td></tr>
+      </tbody>
+    </table>
+    <div class="note">
+      <strong>One line / Hal jumlad:</strong><br/>
+      EN: Propose → review → project → run with finance → close with checklist.<br/>
+      SO: Proposal → dib u eegis → mashruuc → maaliyad → xiritaan checklist.
+    </div>
+  </section>
+
+  <p class="subtitle" style="margin-top:24px;font-size:0.85rem;">
+    Open this file in Chrome or Edge · File: docs/SYSTEM_FLOW_SIMPLE.html<br/>
+    Full guide: FULL_SYSTEM_GUIDE_SOM_EN.docx
+  </p>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: "base",
+      themeVariables: {
+        fontFamily: "system-ui, sans-serif",
+        fontSize: "14px",
+        primaryColor: "#dbeafe",
+        primaryTextColor: "#0f172a",
+        primaryBorderColor: "#0369a1",
+        lineColor: "#64748b",
+        secondaryColor: "#f1f5f9",
+        tertiaryColor: "#fef3c7"
+      },
+      flowchart: { curve: "basis", padding: 12, htmlLabels: true }
+    });
+  </script>
+</body>
+</html>

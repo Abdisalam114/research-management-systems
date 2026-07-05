@@ -257,28 +257,12 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
   );
 
   steps.push(...buildProjectSteps(project, approved));
+  steps.push(buildProjectCompletedStep(project));
 
   const grant = pickPrimaryGrant(grants);
   const grantAwarded = grant && AWARDED_GRANT.includes(grant.status) && Number(grant.amountAwarded || 0) > 0;
 
-  if (budget) {
-    steps.push(
-      step("budget", "Budget allocated", "completed", {
-        at: ts(budget.createdAt),
-        link: "/budgets",
-        detail: `${budget.currency || "USD"} ${budget.totalAllocated}`,
-      })
-    );
-  } else if (grantAwarded) {
-    steps.push(step("budget", "Budget allocated", "current", { link: "/budgets", detail: "Pending budget setup" }));
-  } else {
-    steps.push(step("budget", "Budget allocated", "pending", { link: "/budgets" }));
-  }
-
-  steps.push(buildProjectCompletedStep(project));
-
   if (grant) {
-    const grantLink = project ? `/grants?projectId=${project._id}` : "/grants";
     steps.push(
       step("grant_apply", "Grant / funding request", grant.status !== GRANT_STATUSES.DRAFT ? "completed" : "current", {
         at: ts(grant.submittedAt || grant.createdAt),
@@ -300,6 +284,20 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
   } else {
     steps.push(step("grant_apply", "Grant / funding request", "pending", { link: "/grants" }));
     steps.push(step("grant_award", "Grant awarded", "pending", { link: "/grants" }));
+  }
+
+  if (budget) {
+    steps.push(
+      step("budget", "Budget allocated", "completed", {
+        at: ts(budget.createdAt),
+        link: "/budgets",
+        detail: `${budget.currency || "USD"} ${budget.totalAllocated}`,
+      })
+    );
+  } else if (grantAwarded) {
+    steps.push(step("budget", "Budget allocated", "current", { link: "/budgets", detail: "Pending budget setup" }));
+  } else {
+    steps.push(step("budget", "Budget allocated", "pending", { link: "/budgets" }));
   }
 
   const pubLink = project ? `/publications?projectId=${project._id}` : "/publications";
@@ -545,7 +543,7 @@ async function buildResearchJourneyForResearcher(researcherId, tierFilter) {
 async function listResearchersForJourney(tierFilter, department) {
   const filter = { role: "researcher", ...tierFilter };
   if (department) filter.department = department;
-  const researchers = await User.find(filter).select("fullName email department").sort({ fullName: 1 });
+  const researchers = await User.find(filter).select("fullName email department programTier").sort({ fullName: 1 });
 
   const summaries = await Promise.all(
     researchers.map(async (r) => {
@@ -555,6 +553,7 @@ async function listResearchersForJourney(tierFilter, department) {
         fullName: r.fullName,
         email: r.email,
         department: r.department,
+        programTier: r.programTier,
         latestProposal: latest ? { title: latest.title, status: latest.status } : null,
       };
     })
@@ -649,73 +648,7 @@ async function buildWorkflowForProject(projectId, tierFilter, viewerRole = null)
     viewerRole
   );
 
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(__dirname, "../../../debug-15a9cf.log"),
-      `${JSON.stringify({
-        sessionId: "15a9cf",
-        location: "researchJourney.js:buildWorkflowForProject",
-        message: "scoped records for project",
-        data: {
-          projectId: String(project._id),
-          projectTitle: String(project.title).slice(0, 55),
-          viewerRole: viewerRole || "unknown",
-          grantCount: trackGrants.length,
-          grantTitles: trackGrants.map((g) => String(g.title).slice(0, 40)),
-          publicationTitle: publication ? String(publication.title).slice(0, 55) : null,
-          publicationProjectId: publication?.projectId ? String(publication.projectId) : null,
-          repositoryTitle: repositoryItem ? String(repositoryItem.title).slice(0, 55) : null,
-          repositoryProjectId: repositoryItem?.projectId ? String(repositoryItem.projectId) : null,
-          crossPub: publication && String(publication.projectId) !== String(project._id),
-          crossRepo: repositoryItem && String(repositoryItem.projectId) !== String(project._id),
-          hypothesisId: "H2-scoped-records",
-          runId: "post-repair-verify",
-        },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch (_) {}
-  // #endregion
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(__dirname, "../../../debug-15a9cf.log"),
-      `${JSON.stringify({
-        sessionId: "15a9cf",
-        location: "researchJourney.js:buildWorkflowForProject",
-        message: "awards visibility only",
-        data: {
-          projectId: String(project._id),
-          viewerRole: viewerRole || "unknown",
-          awardsVisible: canViewAwards,
-          grantsVisible: isProjectCompleted(project),
-          grantsHidden: !isProjectCompleted(project),
-          projectCompleted: isProjectCompleted(project),
-          projectStatus: project.status,
-          stepOrder: track.steps.map((s) => s.key),
-          grantStepCount: track.steps.filter(
-            (s) => s.key === GRANT_APPLY_KEY || s.key === GRANT_AWARD_KEY
-          ).length,
-          lockedGrantSteps: track.steps.filter(
-            (s) =>
-              (s.key === GRANT_APPLY_KEY || s.key === GRANT_AWARD_KEY) && s.status === "pending" && !isProjectCompleted(project)
-          ).length,
-          hypothesisId: "L-no-locked",
-          runId: "post-fix-12",
-        },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch (_) {}
-  // #endregion
-
-  return {
+return {
     projectId: project._id,
     title: project.title,
     projectStatus: project.status,

@@ -40,6 +40,17 @@ function sanitizeProject(p) {
     researcherId: researcherId ? String(researcherId) : null,
     milestones: p.milestones || [],
     teamMembers: p.teamMembers || [],
+    workPlan: p.workPlan || [],
+    activities: p.activities || [],
+    communicationLog: (p.communicationLog || []).map((entry) => ({
+      id: entry._id,
+      type: entry.type,
+      subject: entry.subject,
+      body: entry.body,
+      loggedAt: entry.loggedAt,
+      loggedBy: entry.loggedBy?._id || entry.loggedBy,
+      authorName: entry.loggedBy?.fullName || null,
+    })),
     startDate: p.startDate,
     endDate: p.endDate,
     status: p.status,
@@ -70,11 +81,13 @@ async function listProjects(req, res) {
 
 async function getProject(req, res) {
   const { id } = req.params;
-  const project = await Project.findOne(req.tierWhere({ _id: id })).populate(PROJECT_POPULATE);
+  const project = await Project.findOne(req.tierWhere({ _id: id }))
+    .populate(PROJECT_POPULATE)
+    .populate("communicationLog.loggedBy", "fullName email role");
   if (!project) throw new AppError("Project not found", 404);
 
   const isOwner = String(project.researcherId?._id || project.researcherId) === String(req.user.id);
-  const isStaff = ["faculty_coordinator", "research_director", "finance_officer"].includes(req.user.role);
+  const isStaff = ["faculty_coordinator", "research_director", "finance_officer", "procurement_officer", "ethics_committee"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
   const grantDocs = await Grant.find(req.tierWhere({ projectId: id })).sort({ createdAt: -1 }).select("title status amountRequested amountAwarded currency fundingSource");
@@ -101,10 +114,33 @@ async function updateProject(req, res) {
   const isDirector = req.user.role === "research_director";
   if (!isOwner && !isDirector) throw new AppError("Forbidden", 403);
 
-  const { milestones, teamMembers, startDate, endDate, status } = req.body;
+  const { milestones, teamMembers, workPlan, activities, startDate, endDate, status } = req.body;
   if (milestones !== undefined) {
     if (!Array.isArray(milestones)) throw new AppError("milestones must be an array", 400);
     project.milestones = milestones.map((m) => ({ title: m.title, dueDate: m.dueDate ? new Date(m.dueDate) : null, completed: Boolean(m.completed) }));
+  }
+  if (workPlan !== undefined) {
+    if (!Array.isArray(workPlan)) throw new AppError("workPlan must be an array", 400);
+    project.workPlan = workPlan.map((w) => ({
+      phase: String(w.phase || "").trim(),
+      description: String(w.description || "").trim(),
+      startDate: w.startDate ? new Date(w.startDate) : null,
+      endDate: w.endDate ? new Date(w.endDate) : null,
+      owner: String(w.owner || "").trim(),
+      status: ["planned", "in_progress", "completed"].includes(w.status) ? w.status : "planned",
+    })).filter((w) => w.phase);
+  }
+  if (activities !== undefined) {
+    if (!Array.isArray(activities)) throw new AppError("activities must be an array", 400);
+    project.activities = activities.map((a) => ({
+      title: String(a.title || "").trim(),
+      description: String(a.description || "").trim(),
+      dueDate: a.dueDate ? new Date(a.dueDate) : null,
+      status: ["todo", "in_progress", "done", "blocked"].includes(a.status) ? a.status : "todo",
+      assignedTo: String(a.assignedTo || "").trim(),
+      completedAt: a.status === "done" ? (a.completedAt ? new Date(a.completedAt) : new Date()) : null,
+      createdBy: a.createdBy || req.user.id,
+    })).filter((a) => a.title);
   }
   if (teamMembers !== undefined) {
     if (!Array.isArray(teamMembers)) throw new AppError("teamMembers must be an array", 400);
@@ -138,7 +174,7 @@ async function addProgressReport(req, res) {
 }
 
 async function submitClosure(req, res) {
-  const { finalReport, auditNotes, assetHandover } = req.body || {};
+  const { finalReport, auditNotes, assetHandover, lessonsLearned, checklist } = req.body || {};
   if (!finalReport) throw new AppError("finalReport is required", 400);
 
   const project = await Project.findOne(req.tierWhere({ _id: req.params.id }));
@@ -148,11 +184,26 @@ async function submitClosure(req, res) {
     throw new AppError("Closure already in progress", 400);
   }
 
+  const checklistData = checklist || {};
+  const mergedChecklist = {
+    publicationsArchived: Boolean(checklistData.publicationsArchived),
+    assetsHandedOver: Boolean(checklistData.assetsHandedOver),
+    dataArchived: Boolean(checklistData.dataArchived),
+    financialCleared: Boolean(checklistData.financialCleared),
+    ethicsClosed: Boolean(checklistData.ethicsClosed),
+  };
+  const allChecked = Object.values(mergedChecklist).every(Boolean);
+  if (!allChecked) {
+    throw new AppError("Complete the closure checklist before submitting", 400);
+  }
+
   project.closure = {
     status: CLOSURE_STATUSES.SUBMITTED,
     finalReport: String(finalReport),
     auditNotes: auditNotes ? String(auditNotes) : "",
     assetHandover: assetHandover ? String(assetHandover) : "",
+    lessonsLearned: lessonsLearned ? String(lessonsLearned) : "",
+    checklist: mergedChecklist,
     submittedAt: new Date(),
   };
   project.status = PROJECT_STATUSES.CLOSING;
@@ -283,6 +334,43 @@ async function archiveProject(req, res) {
   res.json({ message: "Project archived", project: sanitizeProject(project) });
 }
 
+async function addCommunicationLog(req, res) {
+  const { type, subject, body } = req.body || {};
+  if (!body?.trim()) throw new AppError("body is required", 400);
+
+  const project = await Project.findOne(req.tierWhere({ _id: req.params.id }));
+  if (!project) throw new AppError("Project not found", 404);
+
+  const isOwner = String(project.researcherId) === String(req.user.id);
+  const isStaff = ["research_director", "faculty_coordinator", "finance_officer", "procurement_officer"].includes(req.user.role);
+  if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+
+  project.communicationLog.unshift({
+    type: ["note", "email", "meeting", "decision", "other"].includes(type) ? type : "note",
+    subject: subject ? String(subject).trim() : "",
+    body: String(body).trim(),
+    loggedBy: req.user.id,
+    loggedAt: new Date(),
+  });
+  await project.save();
+
+  await recordAudit({
+    entityType: "project",
+    entityId: project._id,
+    action: "communication_logged",
+    label: "Project communication logged",
+    detail: subject || String(body).slice(0, 120),
+    actorId: req.user.id,
+    actorRole: req.user.role,
+    programTier: req.programTier,
+  });
+
+  const updated = await Project.findById(project._id)
+    .populate(PROJECT_POPULATE)
+    .populate("communicationLog.loggedBy", "fullName email role");
+  res.status(201).json({ message: "Communication logged", project: sanitizeProject(updated) });
+}
+
 async function backfillProjectFromApprovedProposal(req, res) {
   const { proposalId } = req.params;
   const proposal = await Proposal.findOne(req.tierWhere({ _id: proposalId }));
@@ -315,5 +403,6 @@ module.exports = {
   directorClosureApproval,
   financeClosureApproval,
   archiveProject,
+  addCommunicationLog,
   backfillProjectFromApprovedProposal,
 };

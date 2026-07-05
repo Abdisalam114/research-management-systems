@@ -39,6 +39,42 @@ const progressReportSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const workPlanItemSchema = new mongoose.Schema(
+  {
+    phase: { type: String, required: true, trim: true },
+    description: { type: String, default: "", trim: true },
+    startDate: { type: Date, default: null },
+    endDate: { type: Date, default: null },
+    owner: { type: String, default: "", trim: true },
+    status: { type: String, enum: ["planned", "in_progress", "completed"], default: "planned" },
+  },
+  { _id: true }
+);
+
+const activitySchema = new mongoose.Schema(
+  {
+    title: { type: String, required: true, trim: true },
+    description: { type: String, default: "" },
+    dueDate: { type: Date, default: null },
+    status: { type: String, enum: ["todo", "in_progress", "done", "blocked"], default: "todo" },
+    assignedTo: { type: String, default: "", trim: true },
+    completedAt: { type: Date, default: null },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+  },
+  { _id: true, timestamps: true }
+);
+
+const communicationLogSchema = new mongoose.Schema(
+  {
+    type: { type: String, enum: ["note", "email", "meeting", "decision", "other"], default: "note" },
+    subject: { type: String, default: "", trim: true },
+    body: { type: String, required: true },
+    loggedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+    loggedAt: { type: Date, default: Date.now },
+  },
+  { _id: true }
+);
+
 const projectSchema = new mongoose.Schema(
   {
     proposalId: { type: mongoose.Schema.Types.ObjectId, ref: "Proposal", index: true },
@@ -54,12 +90,23 @@ const projectSchema = new mongoose.Schema(
     endDate: { type: Date, default: null },
     status: { type: String, enum: Object.values(PROJECT_STATUSES), default: PROJECT_STATUSES.ACTIVE, index: true },
     progressReports: [progressReportSchema],
+    workPlan: [workPlanItemSchema],
+    activities: [activitySchema],
+    communicationLog: [communicationLogSchema],
     closure: {
       status: { type: String, enum: Object.values(CLOSURE_STATUSES), default: CLOSURE_STATUSES.NONE },
       finalReport: { type: String, default: "" },
       finalReportDocument: { type: String, default: null },
       auditNotes: { type: String, default: "" },
       assetHandover: { type: String, default: "" },
+      lessonsLearned: { type: String, default: "" },
+      checklist: {
+        publicationsArchived: { type: Boolean, default: false },
+        assetsHandedOver: { type: Boolean, default: false },
+        dataArchived: { type: Boolean, default: false },
+        financialCleared: { type: Boolean, default: false },
+        ethicsClosed: { type: Boolean, default: false },
+      },
       submittedAt: { type: Date, default: null },
       directorApprovedAt: { type: Date, default: null },
       directorApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },

@@ -73,7 +73,11 @@ export function LoginPage() {
                   navigate("/program-tier", { replace: true });
                   return;
                 }
-                navigate(redirectTo, { replace: true });
+                const roleHome = {
+                  ethics_committee: "/ethics",
+                  procurement_officer: "/budgets",
+                };
+                navigate(roleHome[res.user?.role] || redirectTo, { replace: true });
               } catch (e) {
                 setError(e?.response?.data?.message || "Login failed");
               } finally {

@@ -49,8 +49,8 @@ export function EthicsPage() {
   const [searchParams] = useSearchParams();
   const proposalIdFromUrl = searchParams.get("proposalId");
   const isResearcher = user?.role === "researcher";
-  const isDirector = user?.role === "research_director";
-  const isStaff = ["research_director", "faculty_coordinator"].includes(user?.role);
+  const isDirector = user?.role === "research_director" || user?.role === "ethics_committee";
+  const isStaff = ["research_director", "faculty_coordinator", "ethics_committee"].includes(user?.role);
 
   const [applications, setApplications] = useState([]);
   const [editing, setEditing] = useState(null); // {id, form, status, proposalId?}
@@ -159,29 +159,7 @@ export function EthicsPage() {
 
   /** Director/staff: View → proposal review if linked, otherwise scroll to form below. */
   function openViewApplication(a) {
-    // #region agent log
-    fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
-      body: JSON.stringify({
-        sessionId: "6113cc",
-        location: "Ethics.jsx:openViewApplication",
-        message: "director/staff view ethics",
-        data: {
-          appId: a.id,
-          proposalId: a.proposalId || null,
-          status: a.status,
-          isDirector,
-          willNavigateToProposal: Boolean(isDirector && a.proposalId),
-        },
-        timestamp: Date.now(),
-        hypothesisId: "H-director-eeg-nav",
-        runId: "director-eeg",
-      }),
-    }).catch(() => {});
-    // #endregion
-
-    if (isDirector && a.proposalId) {
+if (isDirector && a.proposalId) {
       navigate(`/proposals/${a.proposalId}/review`);
       return;
     }
@@ -249,22 +227,7 @@ export function EthicsPage() {
         setInfoMsg("Submitted to REC — await the Director's response.");
         closeEditor();
       }
-      // #region agent log
-      fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
-        body: JSON.stringify({
-          sessionId: "6113cc",
-          location: "Ethics.jsx:save",
-          message: "ethics saved",
-          data: { submit, linkedProposalId: !!linkedProposalId, status: app?.status },
-          timestamp: Date.now(),
-          hypothesisId: "ethics-fix",
-          runId: "post-fix",
-        }),
-      }).catch(() => {});
-      // #endregion
-    } catch (e) {
+} catch (e) {
       setError(e?.response?.data?.message || "Failed to save");
     } finally {
       setSaveBusy(false);
@@ -576,22 +539,7 @@ function EthicsEditor({
       ) : !readOnly ? (
         <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
           <AppButton loading={saveBusy} onClick={() => {
-            // #region agent log
-            fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
-              body: JSON.stringify({
-                sessionId: "6113cc",
-                location: "Ethics.jsx:KaydiDraft",
-                message: "ethics save draft clicked",
-                data: { hasId: Boolean(editing.id), linked: Boolean(linkedToProposal) },
-                timestamp: Date.now(),
-                hypothesisId: "H-btn-click",
-                runId: "buttons-fix",
-              }),
-            }).catch(() => {});
-            // #endregion
-            onSave();
+onSave();
           }}>
             💾 Save draft
           </AppButton>

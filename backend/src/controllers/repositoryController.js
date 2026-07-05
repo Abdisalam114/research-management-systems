@@ -137,24 +137,6 @@ async function buildExportRows(req) {
 }
 
 function logRepositoryExport(format, rowCount) {
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(__dirname, "../../../debug-6113cc.log"),
-      `${JSON.stringify({
-        sessionId: "6113cc",
-        location: "repositoryController.js:export",
-        message: "repository export",
-        data: { format, rowCount },
-        timestamp: Date.now(),
-        hypothesisId: "REPOEXP",
-        runId: "repo-formats",
-      })}\n`
-    );
-  } catch (_) {}
-  // #endregion
 }
 
 async function exportRepositoryCsv(req, res) {
@@ -215,32 +197,7 @@ async function oaiPmhh(req, res, overrides = {}) {
   const resumptionToken = q.resumptionToken ? String(q.resumptionToken) : "";
 
   res.setHeader("Content-Type", "application/xml; charset=utf-8");
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(__dirname, "../../../debug-6113cc.log"),
-      `${JSON.stringify({
-        sessionId: "6113cc",
-        location: "repositoryController.js:oaiPmhh:entry",
-        message: "OAI request",
-        data: {
-          verb: verb || "(missing)",
-          host: req.get("host"),
-          forwardedHost: req.get("x-forwarded-host"),
-          oaiEndpoint: getOaiEndpoint(req),
-        },
-        timestamp: Date.now(),
-        hypothesisId: "OAI5173",
-        runId: "oai-5173-fix",
-      })}\n`
-    );
-  } catch (_) {}
-  // #endregion
-
-  if (!verb) {
+if (!verb) {
     return res.status(400).send(oaiError(req, "badVerb", "Missing verb argument", {}));
   }
 
@@ -257,25 +214,7 @@ async function oaiPmhh(req, res, overrides = {}) {
   <deletedRecord>no</deletedRecord>
   <granularity>YYYY-MM-DDThh:mm:ssZ</granularity>
 </Identify>`;
-      // #region agent log
-      try {
-        const fs = require("fs");
-        const path = require("path");
-        fs.appendFileSync(
-          path.join(__dirname, "../../../debug-6113cc.log"),
-          `${JSON.stringify({
-            sessionId: "6113cc",
-            location: "repositoryController.js:oaiPmhh",
-            message: "OAI Identify",
-            data: { verb, endpoint: getOaiEndpoint(req) },
-            timestamp: Date.now(),
-            hypothesisId: "OAI1",
-            runId: "oai-fix",
-          })}\n`
-        );
-      } catch (_) {}
-      // #endregion
-      return res.send(wrapOaiResponse(req, body, { verb: "Identify" }));
+return res.send(wrapOaiResponse(req, body, { verb: "Identify" }));
     }
 
     if (verb === "ListMetadataFormats") {
@@ -373,27 +312,7 @@ async function oaiPmhh(req, res, overrides = {}) {
         })}</resumptionToken>`;
       }
       listBody += `\n</${verb}>`;
-
-      // #region agent log
-      try {
-        const fs = require("fs");
-        const path = require("path");
-        fs.appendFileSync(
-          path.join(__dirname, "../../../debug-6113cc.log"),
-          `${JSON.stringify({
-            sessionId: "6113cc",
-            location: "repositoryController.js:oaiPmhh",
-            message: "OAI list response",
-            data: { verb, recordCount: slice.length, total: completeListSize, set: activeSet || "all" },
-            timestamp: Date.now(),
-            hypothesisId: "OAI2",
-            runId: "oai-fix",
-          })}\n`
-        );
-      } catch (_) {}
-      // #endregion
-
-      return res.send(
+return res.send(
         wrapOaiResponse(req, listBody, {
           verb,
           metadataPrefix,

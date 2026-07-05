@@ -28,6 +28,7 @@ const { recordAudit } = require("../utils/audit");
 const { writeSimplePdf } = require("../utils/pdf");
 const { syncGrantAwards } = require("../utils/syncGrantAwards");
 const { syncGrantProjectLinks } = require("../utils/syncGrantProjectLinks");
+const { defaultChapters, TITLE_PROPOSAL_STATUSES, MIN_THESIS_GROUP_STUDENTS } = require("../utils/thesisDefaults");
 const { INSTITUTIONAL_USERS, PORTAL_ORDER, PROGRAM_TIERS } = require("./seedData");
 const {
   RECORDS_PER_TIER,
@@ -542,13 +543,33 @@ async function seedThesisGroups(ctx) {
 
   for (let i = 0; i < Math.min(THESIS_GROUPS.length, slots); i += 1) {
     const tpl = THESIS_GROUPS[i];
-    if (await ThesisGroup.exists({ title: tpl.title, programTier })) continue;
+    const existing = await ThesisGroup.findOne({ title: tpl.title, programTier });
+    if (existing) {
+      if ((existing.students?.length || 0) < MIN_THESIS_GROUP_STUDENTS && tpl.students.length >= MIN_THESIS_GROUP_STUDENTS) {
+        existing.students = tpl.students;
+        await existing.save();
+      }
+      continue;
+    }
 
     const supervisor = researchers[i % researchers.length];
     const collab = await ResearchGroup.findOne({ programTier, "members.userId": supervisor._id });
 
+    const reviewerId = coordinator?._id || supervisor._id;
+    const acceptedAt = new Date();
+
     await ThesisGroup.create({
       title: tpl.title,
+      titleProposal: {
+        title: tpl.title,
+        status: TITLE_PROPOSAL_STATUSES.ACCEPTED,
+        proposedAt: acceptedAt,
+        proposedBy: supervisor._id,
+        reviewedAt: acceptedAt,
+        reviewedBy: reviewerId,
+        reviewNote: "",
+      },
+      chapters: defaultChapters(),
       students: tpl.students,
       researchGroupId: collab?._id || null,
       supervisorId: supervisor._id,
@@ -558,7 +579,7 @@ async function seedThesisGroups(ctx) {
       facultyResearchArea: tpl.facultyResearchArea,
       status: tpl.status,
       meetingSchedule: tpl.meetingSchedule,
-      createdBy: coordinator?._id || supervisor._id,
+      createdBy: reviewerId,
       programTier,
     });
     inserted += 1;
@@ -990,6 +1011,7 @@ async function run() {
   console.log(`Sample cap: ${MAX_SAMPLE_RECORDS} records per entity type per portal.\n`);
   console.log("1/3 User accounts...");
   const users = await seedUsers();
+  await User.updateMany({ role: { $ne: ROLES.RESEARCH_DIRECTOR } }, { $unset: { programTiers: "" } });
   console.log(`     ${INSTITUTIONAL_USERS.length} accounts upserted`);
 
   console.log("2/3 Research records (English, realistic, audit trail)...");

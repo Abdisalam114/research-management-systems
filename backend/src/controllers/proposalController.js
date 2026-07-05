@@ -28,6 +28,11 @@ function sanitizeProposal(p) {
     document: p.document,
     version: p.version,
     versionHistory: p.versionHistory || [],
+    budgetBreakdown: p.budgetBreakdown || [],
+    budgetTotal: p.budgetTotal || 0,
+    budgetCurrency: p.budgetCurrency || "USD",
+    complianceDocuments: p.complianceDocuments || [],
+    supportingDocuments: p.supportingDocuments || [],
     researcherId: researcher?._id ? researcher._id : researcher,
     researcherName: researcher?.fullName || null,
     status: p.status,
@@ -122,35 +127,63 @@ async function persistProposalEthics(proposal, user, reqBody) {
     if (proposal.department) ethics.principal = { ...(ethics.principal || {}), department: proposal.department };
   }
   await ethics.save();
-  // #region agent log
+}
+
+function parseJsonField(raw, fallback = null) {
+  if (raw == null || raw === "") return fallback;
+  if (typeof raw === "object") return raw;
   try {
-    const logPath = path.join(process.cwd(), "debug-15a9cf.log");
-    fs.appendFileSync(
-      logPath,
-      `${JSON.stringify({
-        sessionId: "15a9cf",
-        location: "proposalController.js:persistProposalEthics",
-        message: "ethics persisted",
-        data: {
-          proposalId: String(proposal._id),
-          hasProjectTitle: Boolean(String(ethics.projectTitle || "").trim()),
-          hasPiFirst: Boolean(String(ethics.principal?.firstName || "").trim()),
-          hasPiLast: Boolean(String(ethics.principal?.lastName || "").trim()),
-          hasProjectLevel: Boolean(String(ethics.projectLevel || "").trim()),
-          hasAims: Boolean(String(ethics.aimsObjectives || "").trim()),
-          hasDesign: Boolean(String(ethics.design || "").trim()),
-          hasSignature: Boolean(String(ethics.applicantSignature?.name || "").trim()),
-          formComplete: isEthicsFormComplete(ethics),
-        },
-        timestamp: Date.now(),
-        hypothesisId: "E",
-        runId: "pre-fix",
-      })}\n`
-    );
+    return JSON.parse(raw);
   } catch {
-    /* ignore log errors */
+    return fallback;
   }
-  // #endregion
+}
+
+function normalizeBudgetBreakdown(raw) {
+  const rows = Array.isArray(raw) ? raw : [];
+  const budgetBreakdown = rows
+    .map((r) => ({
+      category: String(r.category || "").trim(),
+      description: String(r.description || "").trim(),
+      amount: Number(r.amount) || 0,
+      currency: String(r.currency || "USD").trim() || "USD",
+    }))
+    .filter((r) => r.category || r.description || r.amount > 0);
+  const budgetTotal = budgetBreakdown.reduce((sum, r) => sum + (r.amount || 0), 0);
+  const budgetCurrency = budgetBreakdown[0]?.currency || "USD";
+  return { budgetBreakdown, budgetTotal, budgetCurrency };
+}
+
+function applyProposalDocuments(proposal, req) {
+  const complianceMeta = parseJsonField(req.body?.complianceMeta, null);
+  const supportingMeta = parseJsonField(req.body?.supportingMeta, null);
+  if (complianceMeta === null && supportingMeta === null) return;
+
+  const complianceFiles = req.files?.complianceFiles || [];
+  const supportingFiles = req.files?.supportingFiles || [];
+  const singleDoc = req.files?.document?.[0] || req.file;
+
+  if (singleDoc && !proposal.document) {
+    proposal.document = `/uploads/${singleDoc.filename}`;
+  }
+
+  if (Array.isArray(complianceMeta)) {
+    proposal.complianceDocuments = complianceMeta.map((m, idx) => ({
+      docType: String(m.docType || "compliance").trim(),
+      label: String(m.label || m.docType || "Compliance document").trim(),
+      filePath: complianceFiles[idx] ? `/uploads/${complianceFiles[idx].filename}` : m.filePath || null,
+      uploadedAt: complianceFiles[idx] || m.filePath ? new Date() : m.uploadedAt || null,
+    }));
+  }
+
+  if (Array.isArray(supportingMeta)) {
+    proposal.supportingDocuments = supportingMeta.map((m, idx) => ({
+      docType: String(m.docType || "other").trim(),
+      label: String(m.label || "Supporting document").trim(),
+      filePath: supportingFiles[idx] ? `/uploads/${supportingFiles[idx].filename}` : m.filePath || null,
+      uploadedAt: supportingFiles[idx] || m.filePath ? new Date() : m.uploadedAt || null,
+    }));
+  }
 }
 
 async function createProposal(req, res) {
@@ -159,8 +192,9 @@ async function createProposal(req, res) {
     throw new AppError("title, abstract, department, and researchArea are required", 400);
   }
 
-  const document = req.file ? `/uploads/${req.file.filename}` : null;
+  const document = req.files?.document?.[0] ? `/uploads/${req.files.document[0].filename}` : (req.file ? `/uploads/${req.file.filename}` : null);
   const needsEthics = requiresEthics !== "false" && requiresEthics !== false;
+  const budget = normalizeBudgetBreakdown(parseJsonField(req.body?.budgetBreakdown, []));
 
   const proposal = await Proposal.create(req.tierAssign({
     title,
@@ -168,12 +202,18 @@ async function createProposal(req, res) {
     department,
     researchArea,
     document,
+    ...budget,
     researcherId: req.user.id,
     status: PROPOSAL_STATUSES.DRAFT,
     version: 1,
     requiresEthics: needsEthics,
     ethicsStatus: needsEthics ? ETHICS_STATUSES.PENDING : ETHICS_STATUSES.NOT_REQUIRED,
   }));
+
+  applyProposalDocuments(proposal, req);
+  if (proposal.complianceDocuments?.length || proposal.supportingDocuments?.length) {
+    await proposal.save();
+  }
 
   if (needsEthics) {
     const user = await User.findById(req.user.id);
@@ -199,6 +239,13 @@ async function updateProposal(req, res) {
   if (department) proposal.department = department;
   if (researchArea) proposal.researchArea = researchArea;
 
+  const budgetRaw = parseJsonField(req.body?.budgetBreakdown, null);
+  if (budgetRaw) {
+    Object.assign(proposal, normalizeBudgetBreakdown(budgetRaw));
+  }
+
+  applyProposalDocuments(proposal, req);
+
   if (title && proposal.ethicsApplicationId) {
     await EthicsApplication.updateOne(
       { _id: proposal.ethicsApplicationId },
@@ -213,7 +260,10 @@ async function updateProposal(req, res) {
     }
   }
 
-  if (req.file) {
+  if (req.files?.document?.[0]) {
+    pushVersionHistory(proposal, "Document replaced before resubmit");
+    proposal.document = `/uploads/${req.files.document[0].filename}`;
+  } else if (req.file) {
     pushVersionHistory(proposal, "Document replaced before resubmit");
     proposal.document = `/uploads/${req.file.filename}`;
   }

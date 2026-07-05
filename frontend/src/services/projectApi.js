@@ -30,6 +30,13 @@ export async function addProgress(accessToken, id, note, progressPercent) {
   return data;
 }
 
+export async function addCommunicationLog(accessToken, id, body) {
+  const { data } = await api.post(`/api/projects/${id}/communication`, body, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
 export async function submitClosure(accessToken, id, payload) {
   const { data } = await api.post(`/api/projects/${id}/closure/submit`, payload, {
     headers: { Authorization: `Bearer ${accessToken}` },

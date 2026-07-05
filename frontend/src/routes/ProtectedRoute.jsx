@@ -22,7 +22,11 @@ export function ProtectedRoute({ roles }) {
   }
 
   if (roles?.length && !roles.includes(user?.role)) {
-    return <Navigate to="/dashboard" replace />;
+    const homeByRole = {
+      ethics_committee: "/ethics",
+      procurement_officer: "/budgets",
+    };
+    return <Navigate to={homeByRole[user?.role] || "/dashboard"} replace />;
   }
 
   return <Outlet />;

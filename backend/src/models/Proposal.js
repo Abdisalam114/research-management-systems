@@ -111,6 +111,32 @@ const proposalSchema = new mongoose.Schema(
       },
     },
     submittedAt: { type: Date, default: null },
+    budgetBreakdown: [
+      {
+        category: { type: String, default: "", trim: true },
+        description: { type: String, default: "", trim: true },
+        amount: { type: Number, default: 0, min: 0 },
+        currency: { type: String, default: "USD", trim: true },
+      },
+    ],
+    budgetTotal: { type: Number, default: 0, min: 0 },
+    budgetCurrency: { type: String, default: "USD", trim: true },
+    complianceDocuments: [
+      {
+        docType: { type: String, default: "", trim: true },
+        label: { type: String, default: "", trim: true },
+        filePath: { type: String, default: null },
+        uploadedAt: { type: Date, default: null },
+      },
+    ],
+    supportingDocuments: [
+      {
+        docType: { type: String, default: "other", trim: true },
+        label: { type: String, default: "", trim: true },
+        filePath: { type: String, default: null },
+        uploadedAt: { type: Date, default: null },
+      },
+    ],
     ...programTierField,
   },
   { timestamps: true }

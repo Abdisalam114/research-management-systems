@@ -6,7 +6,7 @@ import logo from "../assets/jamhuriya-logo.png";
 const MENU = [
   { to: "/dashboard", label: "Dashboard & Analytics", icon: "🏠", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
   { to: "/research-workflow", label: "Research Workflow Status", icon: "🔄", roles: ["research_director", "faculty_coordinator", "researcher"] },
-  { to: "/ethics", label: "Ethics", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { to: "/ethics", label: "Ethics", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher", "ethics_committee"] },
   { to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/review-assignments", label: "Peer Reviews", icon: "✍️", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher"] },
@@ -14,15 +14,18 @@ const MENU = [
   { to: "/thesis", label: "Thesis", icon: "🎓", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/funding-calls", label: "Funding Calls", icon: "📢", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
   { to: "/grants", label: "Grants", icon: "💰", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
-  { to: "/budgets", label: "Finance & Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher"] },
+  { to: "/budgets", label: "Finance & Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher", "procurement_officer"] },
+  { to: "/finance-reports", label: "Finance Reports", icon: "📊", roles: ["research_director", "finance_officer"] },
+  { to: "/donor-reports", label: "Donor Reports", icon: "🌍", roles: ["research_director", "finance_officer"] },
+  { to: "/audit-trail", label: "Audit Trail", icon: "📝", roles: ["research_director", "faculty_coordinator"] },
   { to: "/repository", label: "Repository", icon: "🗄️", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/collaboration", label: "Collaboration", icon: "🤝", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
   { to: "/groups", label: "Groups", icon: "🧑‍🤝‍🧑", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/messages", label: "Messages", icon: "💬", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
-  { to: "/notifications", label: "Notifications", icon: "🔔", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
+  { to: "/notifications", label: "Notifications", icon: "🔔", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher", "ethics_committee", "procurement_officer"] },
   { to: "/pending-users", label: "Users", icon: "👥", roles: ["research_director"] },
   { to: "/departments", label: "Departments", icon: "🏛️", roles: ["research_director"] },
-  { to: "/profile", label: "Profile", icon: "⚙️", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
+  { to: "/profile", label: "Profile", icon: "⚙️", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher", "ethics_committee", "procurement_officer"] },
 ];
 
 export function Sidebar({ onNavigate }) {

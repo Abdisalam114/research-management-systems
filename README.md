@@ -53,12 +53,26 @@ Configure bootstrap passwords in `backend/.env` (`SEED_*` variables) or edit `ba
 
 ## Documentation
 
+All files are in the **`docs/`** folder. Start with **[docs/DOCS_INDEX.md](docs/DOCS_INDEX.md)**.
+
 | Document | Purpose |
 |----------|---------|
-| **[docs/RMS_GUIDE.md](docs/RMS_GUIDE.md)** | Comprehensive guide — data architecture, the 11 core models + 3 extra models, real-world workflow |
-| **[docs/SPEC_GAP_ANALYSIS.md](docs/SPEC_GAP_ANALYSIS.md)** | Full university spec (8 modules, 4 roles) mapped to what is implemented vs missing |
-| **[docs/DATABASE_STRUCTURE.pdf](docs/DATABASE_STRUCTURE.pdf)** | MongoDB collections reference |
-| **[docs/SYSTEM_DOCUMENTATION.pdf](docs/SYSTEM_DOCUMENTATION.pdf)** | Full system + API guide |
+| **[docs/FULL_SYSTEM_GUIDE_SOM_EN.docx](docs/FULL_SYSTEM_GUIDE_SOM_EN.docx)** | **Full guide (Word)** — English + Somali step-by-step (qeybta xalay) |
+| **[docs/FULL_SYSTEM_GUIDE_SOM_EN.md](docs/FULL_SYSTEM_GUIDE_SOM_EN.md)** | Same guide — Markdown |
+| **[docs/WHATS_NEW_JULY_2026.md](docs/WHATS_NEW_JULY_2026.md)** | New features — Phases 1–4 detail |
+| **[docs/USER_GUIDE_SOM_EN.md](docs/USER_GUIDE_SOM_EN.md)** | Main guide — summary |
+| **[docs/ROLES_AND_STAGES_GUIDE.docx](docs/ROLES_AND_STAGES_GUIDE.docx)** | Roles & stages (Somali, Word) |
+| **[docs/RMS_SYSTEM_DIAGRAM.html](docs/RMS_SYSTEM_DIAGRAM.html)** | System diagram — open in browser |
+| **[docs/URGMS_GAP_ANALYSIS_SOM_EN.md](docs/URGMS_GAP_ANALYSIS_SOM_EN.md)** | URGMS blueprint vs implementation |
+| **[docs/SPEC_GAP_ANALYSIS.md](docs/SPEC_GAP_ANALYSIS.md)** | Technical module gap analysis |
+
+Generate PDFs (not committed until you run this):
+
+```bash
+cd backend && npm run docs:pdf
+```
+
+Creates `docs/DATABASE_STRUCTURE.pdf` and `docs/SYSTEM_DOCUMENTATION.pdf`.
 
 ## Free online deployment (no cost)
 

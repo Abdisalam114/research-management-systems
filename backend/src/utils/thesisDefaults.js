@@ -1,3 +1,5 @@
+const MIN_THESIS_GROUP_STUDENTS = 4;
+
 const CHAPTER_STATUSES = Object.freeze({
   PENDING: "pending",
   IN_PROGRESS: "in_progress",
@@ -79,7 +81,7 @@ function buildActivityTimeline(group) {
     items.push({
       type: "title_accepted",
       at: proposal.reviewedAt,
-      label: "Thesis title accepted (wa la aqbalay)",
+      label: "Thesis title accepted",
       detail: proposal.title || group.title || "",
     });
   }
@@ -125,11 +127,35 @@ function buildActivityTimeline(group) {
   return items.sort((a, b) => new Date(b.at) - new Date(a.at));
 }
 
+function normalizeStudentRows(students) {
+  if (!Array.isArray(students)) return [];
+  return students
+    .map((s) => ({
+      fullName: String(s.fullName || "").trim(),
+      studentId: String(s.studentId || "").trim(),
+      email: String(s.email || "").trim().toLowerCase(),
+    }))
+    .filter((s) => s.fullName);
+}
+
+function assertMinThesisStudents(students) {
+  const clean = normalizeStudentRows(students);
+  if (clean.length < MIN_THESIS_GROUP_STUDENTS) {
+    const err = new Error(`Each thesis group requires at least ${MIN_THESIS_GROUP_STUDENTS} students`);
+    err.statusCode = 400;
+    throw err;
+  }
+  return clean;
+}
+
 module.exports = {
+  MIN_THESIS_GROUP_STUDENTS,
   CHAPTER_STATUSES,
   TITLE_PROPOSAL_STATUSES,
   DEFAULT_THESIS_CHAPTERS,
   defaultChapters,
   emptyTitleProposal,
   buildActivityTimeline,
+  normalizeStudentRows,
+  assertMinThesisStudents,
 };

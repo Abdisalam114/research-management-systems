@@ -2,6 +2,9 @@ const { User, USER_STATUSES, ROLES } = require("../models/User");
 const { AppError } = require("../utils/AppError");
 
 function sanitizeUser(userDoc) {
+  const tier = userDoc.programTier;
+  const programTierLabel =
+    tier === "undergraduate" ? "Undergraduate" : tier === "postgraduate" ? "Postgraduate" : tier || "—";
   return {
     id: userDoc._id,
     fullName: userDoc.fullName,
@@ -10,6 +13,8 @@ function sanitizeUser(userDoc) {
     department: userDoc.department,
     rank: userDoc.rank,
     status: userDoc.status,
+    programTier: tier,
+    programTierLabel,
     isProtected: Boolean(userDoc.isProtected),
     createdAt: userDoc.createdAt,
     updatedAt: userDoc.updatedAt,
@@ -28,7 +33,11 @@ async function listPendingUsers(req, res) {
 }
 
 async function createUserByDirector(req, res) {
-  const { fullName, email, password, role, department, rank, status } = req.body || {};
+  const { fullName, email, password, role, department, rank, status, dualPlatform } = req.body || {};
+
+  if (dualPlatform === true || dualPlatform === "true") {
+    throw new AppError("Only the Research Director can access both portals. Assign each user to UG or PG only.", 400);
+  }
 
   if (!fullName || !email || !password || !role || !department || !rank) {
     throw new AppError("All fields are required", 400);
@@ -64,7 +73,7 @@ async function createUserByDirector(req, res) {
   }));
 
   res.status(201).json({
-    message: nextStatus === USER_STATUSES.ACTIVE ? "User created and activated" : "User created (pending)",
+    message: `${nextStatus === USER_STATUSES.ACTIVE ? "User created and activated" : "User created (pending)"} — assigned to ${sanitizeUser(user).programTierLabel} portal`,
     user: sanitizeUser(user),
   });
 }

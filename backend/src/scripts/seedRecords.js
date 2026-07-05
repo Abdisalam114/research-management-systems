@@ -243,6 +243,8 @@ const THESIS_GROUPS = [
     students: [
       { fullName: "Daniel Okafor", studentId: "UG2021041", email: "d.okafor@student.rms.edu" },
       { fullName: "Maria Santos", studentId: "UG2021088", email: "m.santos@student.rms.edu" },
+      { fullName: "James Okello", studentId: "UG2021092", email: "j.okello@student.rms.edu" },
+      { fullName: "Hana Yusuf", studentId: "UG2021105", email: "h.yusuf@student.rms.edu" },
     ],
   },
   {
@@ -252,7 +254,12 @@ const THESIS_GROUPS = [
     facultyResearchArea: "Human-Computer Interaction",
     status: THESIS_STATUSES.PROPOSED,
     meetingSchedule: "Monthly — first Monday 10:00, IT Building Room 12",
-    students: [{ fullName: "Ethan Walker", studentId: "UG2021120", email: "e.walker@student.rms.edu" }],
+    students: [
+      { fullName: "Ethan Walker", studentId: "UG2021120", email: "e.walker@student.rms.edu" },
+      { fullName: "Layla Ahmed", studentId: "UG2021124", email: "l.ahmed@student.rms.edu" },
+      { fullName: "Noah Ibrahim", studentId: "UG2021131", email: "n.ibrahim@student.rms.edu" },
+      { fullName: "Chloe Bennett", studentId: "UG2021140", email: "c.bennett@student.rms.edu" },
+    ],
   },
   {
     title: "Machine Learning Detection of Network Anomalies in Enterprise Wi-Fi",
@@ -261,7 +268,12 @@ const THESIS_GROUPS = [
     facultyResearchArea: "Cybersecurity",
     status: THESIS_STATUSES.IN_PROGRESS,
     meetingSchedule: "Weekly — Fridays 09:00, Cyber Lab 3",
-    students: [{ fullName: "Aisha Rahman", studentId: "UG2020067", email: "a.rahman@student.rms.edu" }],
+    students: [
+      { fullName: "Aisha Rahman", studentId: "UG2020067", email: "a.rahman@student.rms.edu" },
+      { fullName: "Marcus Lee", studentId: "UG2020071", email: "m.lee@student.rms.edu" },
+      { fullName: "Priya Sharma", studentId: "UG2020079", email: "p.sharma@student.rms.edu" },
+      { fullName: "Yusuf Ali", studentId: "UG2020083", email: "y.ali@student.rms.edu" },
+    ],
   },
   {
     title: "Cost-Benefit Analysis of Rooftop Solar on Academic Campuses",
@@ -270,7 +282,12 @@ const THESIS_GROUPS = [
     facultyResearchArea: "Renewable Energy",
     status: THESIS_STATUSES.SUBMITTED,
     meetingSchedule: "Biweekly — Tuesdays 11:00, Energy Systems Lab",
-    students: [{ fullName: "Thomas Nguyen", studentId: "UG2020093", email: "t.nguyen@student.rms.edu" }],
+    students: [
+      { fullName: "Thomas Nguyen", studentId: "UG2020093", email: "t.nguyen@student.rms.edu" },
+      { fullName: "Amira Hassan", studentId: "UG2020098", email: "a.hassan@student.rms.edu" },
+      { fullName: "Peter Ochieng", studentId: "UG2020102", email: "p.ochieng@student.rms.edu" },
+      { fullName: "Sara Kowalski", studentId: "UG2020110", email: "s.kowalski@student.rms.edu" },
+    ],
   },
   {
     title: "Deep Learning Models for Diabetic Retinopathy Screening",
@@ -279,7 +296,12 @@ const THESIS_GROUPS = [
     facultyResearchArea: "Medical Imaging",
     status: THESIS_STATUSES.IN_PROGRESS,
     meetingSchedule: "Weekly — Thursdays 15:30, Medical Research Wing",
-    students: [{ fullName: "Grace Mbeki", studentId: "PG2022004", email: "g.mbeki@student.rms.edu" }],
+    students: [
+      { fullName: "Grace Mbeki", studentId: "PG2022004", email: "g.mbeki@student.rms.edu" },
+      { fullName: "Henry Walsh", studentId: "PG2022008", email: "h.walsh@student.rms.edu" },
+      { fullName: "Iman Farah", studentId: "PG2022012", email: "i.farah@student.rms.edu" },
+      { fullName: "Kevin Brooks", studentId: "PG2022016", email: "k.brooks@student.rms.edu" },
+    ],
   },
   {
     title: "Microgrid Dispatch Policies Under Stochastic Solar Generation",
@@ -291,6 +313,8 @@ const THESIS_GROUPS = [
     students: [
       { fullName: "Oliver Chen", studentId: "PG2022011", email: "o.chen@student.rms.edu" },
       { fullName: "Fatima Al-Hassan", studentId: "PG2022019", email: "f.alhassan@student.rms.edu" },
+      { fullName: "Ryan Murphy", studentId: "PG2022023", email: "r.murphy@student.rms.edu" },
+      { fullName: "Zainab Noor", studentId: "PG2022027", email: "z.noor@student.rms.edu" },
     ],
   },
   {
@@ -300,7 +324,12 @@ const THESIS_GROUPS = [
     facultyResearchArea: "Health Policy",
     status: THESIS_STATUSES.PROPOSED,
     meetingSchedule: "Monthly — third Wednesday 16:00, Library Study Room B",
-    students: [{ fullName: "Rachel Kim", studentId: "PG2022033", email: "r.kim@student.rms.edu" }],
+    students: [
+      { fullName: "Rachel Kim", studentId: "PG2022033", email: "r.kim@student.rms.edu" },
+      { fullName: "Adam Selassie", studentId: "PG2022037", email: "a.selassie@student.rms.edu" },
+      { fullName: "Beatrice Cole", studentId: "PG2022041", email: "b.cole@student.rms.edu" },
+      { fullName: "Carlos Mendez", studentId: "PG2022045", email: "c.mendez@student.rms.edu" },
+    ],
   },
   {
     title: "Privacy-Preserving Analytics on Multi-Institutional Health Registries",
@@ -309,7 +338,12 @@ const THESIS_GROUPS = [
     facultyResearchArea: "Privacy-Preserving Computing",
     status: THESIS_STATUSES.DEFENDED,
     meetingSchedule: "Completed — defense held March 2025",
-    students: [{ fullName: "Samuel Ortiz", studentId: "PG2021045", email: "s.ortiz@student.rms.edu" }],
+    students: [
+      { fullName: "Samuel Ortiz", studentId: "PG2021045", email: "s.ortiz@student.rms.edu" },
+      { fullName: "Diana Park", studentId: "PG2021049", email: "d.park@student.rms.edu" },
+      { fullName: "Emmanuel Boateng", studentId: "PG2021053", email: "e.boateng@student.rms.edu" },
+      { fullName: "Fiona Reid", studentId: "PG2021057", email: "f.reid@student.rms.edu" },
+    ],
   },
   {
     title: "Structural Vibration Monitoring for Bridge Asset Management",
@@ -318,7 +352,12 @@ const THESIS_GROUPS = [
     facultyResearchArea: "Civil Engineering",
     status: THESIS_STATUSES.IN_PROGRESS,
     meetingSchedule: "Weekly — Wednesdays 08:30, Structures Lab",
-    students: [{ fullName: "Lucia Fernandez", studentId: "PG2022050", email: "l.fernandez@student.rms.edu" }],
+    students: [
+      { fullName: "Lucia Fernandez", studentId: "PG2022050", email: "l.fernandez@student.rms.edu" },
+      { fullName: "George Tan", studentId: "PG2022054", email: "g.tan@student.rms.edu" },
+      { fullName: "Helen Osei", studentId: "PG2022058", email: "h.osei@student.rms.edu" },
+      { fullName: "Ian Peterson", studentId: "PG2022061", email: "i.peterson@student.rms.edu" },
+    ],
   },
   {
     title: "Climate Downscaling Methods for Agricultural Planning",
@@ -327,7 +366,12 @@ const THESIS_GROUPS = [
     facultyResearchArea: "Climate Science",
     status: THESIS_STATUSES.IN_PROGRESS,
     meetingSchedule: "Biweekly — Thursdays 10:00, HPC Suite",
-    students: [{ fullName: "Benjamin Clarke", studentId: "PG2022062", email: "b.clarke@student.rms.edu" }],
+    students: [
+      { fullName: "Benjamin Clarke", studentId: "PG2022062", email: "b.clarke@student.rms.edu" },
+      { fullName: "Julia Njoroge", studentId: "PG2022066", email: "j.njoroge@student.rms.edu" },
+      { fullName: "Khalid Mansour", studentId: "PG2022070", email: "k.mansour@student.rms.edu" },
+      { fullName: "Laura Schmidt", studentId: "PG2022074", email: "l.schmidt@student.rms.edu" },
+    ],
   },
   {
     title: "Evaluating Digital Payment Trust Among Undergraduate Cohorts",
@@ -336,7 +380,12 @@ const THESIS_GROUPS = [
     facultyResearchArea: "Financial Technology",
     status: THESIS_STATUSES.COMPLETED,
     meetingSchedule: "Completed — May 2025",
-    students: [{ fullName: "Sophie Miller", studentId: "UG2020078", email: "s.miller@student.rms.edu" }],
+    students: [
+      { fullName: "Sophie Miller", studentId: "UG2020078", email: "s.miller@student.rms.edu" },
+      { fullName: "Michael Torres", studentId: "UG2020082", email: "m.torres@student.rms.edu" },
+      { fullName: "Nadia Elmi", studentId: "UG2020086", email: "n.elmi@student.rms.edu" },
+      { fullName: "Oscar Hughes", studentId: "UG2020090", email: "o.hughes@student.rms.edu" },
+    ],
   },
   {
     title: "Community Health Worker Impact on Childhood Immunization Rates",
@@ -345,7 +394,12 @@ const THESIS_GROUPS = [
     facultyResearchArea: "Community Health",
     status: THESIS_STATUSES.IN_PROGRESS,
     meetingSchedule: "Weekly — Tuesdays 14:00, Community Health Center",
-    students: [{ fullName: "David Mensah", studentId: "PG2022077", email: "d.mensah@student.rms.edu" }],
+    students: [
+      { fullName: "David Mensah", studentId: "PG2022077", email: "d.mensah@student.rms.edu" },
+      { fullName: "Pauline Wanjiku", studentId: "PG2022081", email: "p.wanjiku@student.rms.edu" },
+      { fullName: "Quentin Lowe", studentId: "PG2022085", email: "q.lowe@student.rms.edu" },
+      { fullName: "Ruth Nakato", studentId: "PG2022089", email: "r.nakato@student.rms.edu" },
+    ],
   },
 ];
 

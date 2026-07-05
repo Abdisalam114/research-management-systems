@@ -49,6 +49,14 @@ router.get(
 );
 
 router.get(
+  "/donor-report",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("research_director", "finance_officer"),
+  asyncHandler(analyticsController.getDonorReport)
+);
+
+router.get(
   "/research-journey",
   authenticateUser,
   requireActiveUser,

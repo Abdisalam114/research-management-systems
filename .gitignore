@@ -23,6 +23,8 @@ Thumbs.db
 .idea/
 .vscode/
 *.sw?
+~$*
+docs/~$*
 
 # Debug / temp scripts output
 scripts/*.log

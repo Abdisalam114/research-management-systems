@@ -62,30 +62,7 @@ export function ethicsApplicationToForm(a) {
     applicantSignature: { ...empty.applicantSignature, ...(a.applicantSignature || {}) },
     otherInvestigators: a.otherInvestigators || [],
   };
-  // #region agent log
-  fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15a9cf" },
-    body: JSON.stringify({
-      sessionId: "15a9cf",
-      location: "ethicsFormState.js:ethicsApplicationToForm",
-      message: "ethics API mapped to form",
-      data: {
-        hasProjectTitle: Boolean(String(form.projectTitle || "").trim()),
-        hasPiFirst: Boolean(String(form.principal?.firstName || "").trim()),
-        hasPiLast: Boolean(String(form.principal?.lastName || "").trim()),
-        hasProjectLevel: Boolean(String(form.projectLevel || "").trim()),
-        hasAims: Boolean(String(form.aimsObjectives || "").trim()),
-        hasDesign: Boolean(String(form.design || "").trim()),
-        hasSignature: Boolean(String(form.applicantSignature?.name || "").trim()),
-      },
-      timestamp: Date.now(),
-      hypothesisId: "B",
-      runId: "pre-fix",
-    }),
-  }).catch(() => {});
-  // #endregion
-  return form;
+return form;
 }
 
 /** Pre-fill ethics from logged-in researcher + proposal fields. */

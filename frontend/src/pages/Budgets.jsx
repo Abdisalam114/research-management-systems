@@ -68,6 +68,7 @@ export function BudgetsPage() {
   const isResearcher = user?.role === "researcher";
   const isDirector = user?.role === "research_director";
   const isFinance = user?.role === "finance_officer";
+  const isProcurement = user?.role === "procurement_officer";
   const canSeeFinanceReport = isDirector || isFinance;
 
   const load = useCallback(async () => {
@@ -141,9 +142,21 @@ export function BudgetsPage() {
   }, [payments, pos]);
 
   const directorQueuePayments = payments.filter((p) => p.status === "requested");
-  const directorQueuePOs = pos.filter((p) => p.status === "requested");
+  const procurementQueuePOs = pos.filter((p) => p.status === "requested");
+  const directorQueuePOs = pos.filter((p) => p.status === "requested" || p.status === "procurement_approved");
   const financeQueuePayments = payments.filter((p) => p.status === "director_approved");
   const financeQueuePOs = pos.filter((p) => p.status === "director_approved");
+
+  async function decideProcurementPO(id, decision) {
+    let rejectedReason;
+    if (decision === "reject") rejectedReason = window.prompt("Reason for rejection?") || "Rejected";
+    try {
+      await procurementApi.procurementDecision(accessToken, id, { decision, rejectedReason });
+      await reload();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to record procurement decision");
+    }
+  }
 
   async function decideDirectorPO(id, decision) {
     let rejectedReason;
@@ -294,6 +307,26 @@ export function BudgetsPage() {
           onChange={reload}
           setError={setError}
         />
+      ) : null}
+
+      {isProcurement && procurementQueuePOs.length ? (
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800 }}>Procurement review queue</div>
+          <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+            {procurementQueuePOs.map((p) => (
+              <div key={p.id} className="card" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>🛒 PO: {p.vendorName}</div>
+                  <div className="muted">{p.currency} {p.totalAmount} • {p.items?.length || 0} item(s)</div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button type="button" className="btn primary" onClick={() => decideProcurementPO(p.id, "approve")}>Approve</button>
+                  <button type="button" className="btn" onClick={() => decideProcurementPO(p.id, "reject")}>Reject</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       ) : null}
 
       {isDirector && (directorQueuePayments.length || directorQueuePOs.length) ? (

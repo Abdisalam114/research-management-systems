@@ -46,27 +46,7 @@ export function EthicsApplicationForm({
   const missing = getEthicsMissingFields(form);
 
   useEffect(() => {
-    // #region agent log
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15a9cf" },
-      body: JSON.stringify({
-        sessionId: "15a9cf",
-        location: "EthicsApplicationForm.jsx:mount",
-        message: "ethics form rendered",
-        data: {
-          missingCount: missing.length,
-          missingFields: missing.map((m) => m.field),
-          formComplete,
-          embeddedInProposal,
-        },
-        timestamp: Date.now(),
-        hypothesisId: "A",
-        runId: "pre-fix",
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [missing.length, formComplete, embeddedInProposal]);
+}, [missing.length, formComplete, embeddedInProposal]);
 
   const toggleInArray = (path, value) => {
     const arr = path.split(".").reduce((acc, k) => acc?.[k], form) || [];

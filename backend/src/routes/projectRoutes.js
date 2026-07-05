@@ -35,6 +35,14 @@ router.post(
 );
 
 router.post(
+  "/:id/communication",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("researcher", "research_director", "faculty_coordinator", "finance_officer", "procurement_officer"),
+  asyncHandler(projectController.addCommunicationLog)
+);
+
+router.post(
   "/:id/closure/submit",
   authenticateUser,
   requireActiveUser,

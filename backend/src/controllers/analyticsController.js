@@ -166,33 +166,7 @@ async function getDashboardMetrics(req, res) {
     messages: "—",
     notificationsUnread: notifUnread,
   };
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    const logLine = `${JSON.stringify({
-      sessionId: "6113cc",
-      location: "analyticsController.js:getDashboardMetrics",
-      message: "dashboard metrics audit",
-      data: {
-        role,
-        activeProjectCount,
-        tableLength: base.activeProjects?.length ?? 0,
-        piWithNames: (base.activeProjects || []).filter((p) => p.principalInvestigator && p.principalInvestigator !== "—").length,
-        piSample: (base.activeProjects || []).slice(0, 3).map((p) => ({ title: p.title, pi: p.principalInvestigator })),
-        grants: { total: grants.length, awardedCount: base.grants.awardedCount, awardedSum: base.grants.awardedTotal },
-        workflow: workflowPubCount,
-      },
-      timestamp: Date.now(),
-      hypothesisId: "PI3",
-      runId: "project-pi",
-    })}\n`;
-    fs.appendFileSync(path.join(__dirname, "../../../debug-6113cc.log"), logLine);
-  } catch (_) {}
-  // #endregion
-
-  res.json({ metrics: base, generatedAt: new Date().toISOString() });
+res.json({ metrics: base, generatedAt: new Date().toISOString() });
 }
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -507,37 +481,7 @@ async function buildInstitutionalAnalytics(programTier) {
     },
     metricDefinitions: METRIC_DEFINITIONS,
   };
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    const logLine = `${JSON.stringify({
-      sessionId: "6113cc",
-      location: "analyticsController.js:buildInstitutionalAnalytics",
-      message: "institutional metrics audit",
-      data: {
-        projects: {
-          total: projectCount,
-          active: activeProjectCount,
-          completed: completedProjectCount,
-          onHold: onHoldProjectCount,
-          trackedSum: trackedProjects,
-          balanced: trackedProjects === totalProjects,
-        },
-        grants: { total: grantCount, awardedCount: awardedGrantCount, awardedSum: awardedTotal },
-        groups: { collabTotal: collabGroupCount, previewShown: groups.length },
-        workflow: { nonDraft: workflowPubCount, publicationTotal: publicationCount },
-      },
-      timestamp: Date.now(),
-      hypothesisId: "M1",
-      runId: "metrics-audit",
-    })}\n`;
-    fs.appendFileSync(path.join(__dirname, "../../../debug-6113cc.log"), logLine);
-  } catch (_) {}
-  // #endregion
-
-  return result;
+return result;
 }
 
 async function getInstitutionalAnalytics(req, res) {
@@ -810,12 +754,58 @@ async function getResearchJourney(req, res) {
   res.json({ mode: "journey", ...journey });
 }
 
+async function getDonorReport(req, res) {
+  const [grants, calls] = await Promise.all([
+    Grant.find(req.tierWhere({})).select("title donorRef fundingSource amountAwarded amountRequested status"),
+    FundingCall.find(req.tierWhere({})).select("title donorRef fundingSource amountCap status"),
+  ]);
+
+  const byDonor = {};
+  for (const g of grants) {
+    const key = (g.donorRef || g.fundingSource || "Unspecified").trim();
+    if (!byDonor[key]) {
+      byDonor[key] = { donorRef: key, grantCount: 0, totalAwarded: 0, totalRequested: 0, grants: [] };
+    }
+    byDonor[key].grantCount += 1;
+    byDonor[key].totalAwarded += g.amountAwarded || 0;
+    byDonor[key].totalRequested += g.amountRequested || 0;
+    byDonor[key].grants.push({
+      title: g.title,
+      status: g.status,
+      amountAwarded: g.amountAwarded,
+      amountRequested: g.amountRequested,
+    });
+  }
+
+  const donors = Object.values(byDonor).sort((a, b) => b.totalAwarded - a.totalAwarded);
+  const totals = {
+    awarded: donors.reduce((sum, d) => sum + d.totalAwarded, 0),
+    requested: donors.reduce((sum, d) => sum + d.totalRequested, 0),
+    openCalls: calls.filter((c) => c.status === CALL_STATUSES.OPEN).length,
+  };
+
+  res.json({
+    generatedAt: new Date().toISOString(),
+    totals,
+    donors,
+    fundingCalls: calls.map((c) => ({
+      id: c._id,
+      title: c.title,
+      donorRef: c.donorRef,
+      fundingSource: c.fundingSource,
+      amountCap: c.amountCap,
+      status: c.status,
+    })),
+  });
+}
+
 module.exports = {
   getDashboardMetrics,
   buildInstitutionalAnalytics,
   getInstitutionalAnalytics,
   exportAnnualReportPdf,
   getFinanceReport,
+  getDonorReport,
   getFacultyReport,
   exportFacultyReportPdf,
   getResearchJourney,

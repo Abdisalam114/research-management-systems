@@ -3,6 +3,7 @@ const { programTierField } = require("../constants/programTierField");
 
 const PO_STATUSES = Object.freeze({
   REQUESTED: "requested",
+  PROCUREMENT_APPROVED: "procurement_approved",
   DIRECTOR_APPROVED: "director_approved",
   PAID: "paid",
   REJECTED: "rejected",
@@ -43,6 +44,8 @@ const purchaseOrderSchema = new mongoose.Schema(
     projectId: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null, index: true },
     grantId: { type: mongoose.Schema.Types.ObjectId, ref: "Grant", default: null, index: true },
     requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
+    procurementApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    procurementApprovedAt: { type: Date, default: null },
     directorApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     directorApprovedAt: { type: Date, default: null },
     paidBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },

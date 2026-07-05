@@ -6,6 +6,8 @@ const ROLES = Object.freeze({
   RESEARCH_DIRECTOR: "research_director",
   FACULTY_COORDINATOR: "faculty_coordinator",
   FINANCE_OFFICER: "finance_officer",
+  ETHICS_COMMITTEE: "ethics_committee",
+  PROCUREMENT_OFFICER: "procurement_officer",
   RESEARCHER: "researcher",
 });
 

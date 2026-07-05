@@ -67,26 +67,7 @@ export function DirectorDashboard() {
         const res = await analyticsApi.institutionalAnalytics(accessToken);
         if (!cancelled) {
           setData(res);
-          // #region agent log
-          fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
-            body: JSON.stringify({
-              sessionId: "6113cc",
-              location: "DirectorDashboard.jsx:load",
-              message: "director active projects rendered",
-              data: {
-                totalActive: res?.projectStatus?.active,
-                tableLength: res?.activeProjects?.length ?? 0,
-                titles: (res?.activeProjects || []).map((p) => p.title),
-              },
-              timestamp: Date.now(),
-              hypothesisId: "C",
-              runId: "active-projects",
-            }),
-          }).catch(() => {});
-          // #endregion
-        }
+}
       } catch (e) {
         if (!cancelled) setError(e?.response?.data?.message || "Failed to load institutional dashboard");
       }

@@ -44,6 +44,13 @@ export async function downloadFacultyReportPdf(accessToken) {
   return res.data;
 }
 
+export async function donorReport(accessToken) {
+  const res = await api.get("/api/analytics/donor-report", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
+
 export async function researchJourney(accessToken, researcherId) {
   const params = researcherId ? { researcherId } : {};
   const res = await api.get("/api/analytics/research-journey", {

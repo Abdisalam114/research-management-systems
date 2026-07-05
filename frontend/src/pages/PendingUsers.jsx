@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as userApi from "../services/userApi";
 import { formatRole } from "../utils/roleLabels";
 
@@ -7,6 +8,8 @@ const CREATE_ROLES = [
   { value: "researcher", label: "Researcher" },
   { value: "faculty_coordinator", label: "Faculty Coordinator" },
   { value: "finance_officer", label: "Finance Officer" },
+  { value: "ethics_committee", label: "Ethics Committee" },
+  { value: "procurement_officer", label: "Procurement Officer" },
 ];
 
 const emptyForm = {
@@ -21,6 +24,7 @@ const emptyForm = {
 
 export function PendingUsersPage() {
   const { accessToken } = useAuth();
+  const { programTierLabel } = useProgramTier();
   const [pending, setPending] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [form, setForm] = useState(emptyForm);
@@ -65,7 +69,8 @@ export function PendingUsersPage() {
     <div>
       <h2 style={{ marginTop: 0 }}>Director — Users</h2>
       <p className="muted" style={{ marginTop: 6 }}>
-        Only the Research Director can create and manage institutional accounts.
+        Only the Research Director can create accounts and switch both portals. Each user is assigned to{" "}
+        <strong>one portal only</strong> — currently viewing <strong>{programTierLabel}</strong> users.
       </p>
 
       {error ? <div className="card" style={{ borderColor: "rgba(255, 99, 132, 0.55)", marginTop: 12 }}>{error}</div> : null}
@@ -77,6 +82,10 @@ export function PendingUsersPage() {
 
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ fontWeight: 800, marginBottom: 12 }}>Create user</div>
+        <p className="muted" style={{ fontSize: 13, marginTop: 0, marginBottom: 12 }}>
+          New user will be assigned to the <strong>{programTierLabel}</strong> portal. Switch portal in the top bar to
+          create UG or PG users separately.
+        </p>
         <form onSubmit={handleCreate}>
           <div className="row">
             <div className="field">
@@ -160,7 +169,7 @@ export function PendingUsersPage() {
               <div key={u.id} className="card">
                 <div style={{ fontWeight: 700 }}>{u.fullName}</div>
                 <div className="muted">
-                  {u.email} • {formatRole(u.role)} • {u.department}
+                  {u.email} • {formatRole(u.role)} • {u.department} • {u.programTierLabel || u.programTier || "—"}
                 </div>
                 <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
                   <button
@@ -214,6 +223,7 @@ export function PendingUsersPage() {
               <th>Name</th>
               <th>Email</th>
               <th>Role</th>
+              <th>Portal</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -223,6 +233,7 @@ export function PendingUsersPage() {
                 <td>{u.fullName}</td>
                 <td>{u.email}</td>
                 <td>{formatRole(u.role)}</td>
+                <td>{u.programTierLabel || u.programTier || "—"}</td>
                 <td>{u.status}</td>
               </tr>
             ))}

@@ -1,5 +1,6 @@
 import { useAuth } from "../hooks/useAuth";
 import { FacultyResearchWorkflowModule } from "../components/FacultyResearchWorkflowModule";
+import { ResearchJourneyPanel } from "../components/ResearchJourneyPanel";
 import { PageHeader } from "../components/PageHeader";
 import { Link } from "react-router-dom";
 
@@ -10,14 +11,14 @@ export function ResearchWorkflowPage() {
     user?.role === "research_director"
       ? "All faculties"
       : user?.role === "researcher"
-        ? "My outputs"
+        ? "My research"
         : user?.department;
 
   return (
     <div>
       <PageHeader
         title="Research Workflow Status"
-        subtitle="Track publication outputs from submission through in process, pipeline, and published."
+        subtitle="Full research pipeline (proposal → ethics → project → grant → publication → repository) plus faculty publication workflow stages."
         actions={
           <>
             <Link className="btn" to="/projects">
@@ -29,6 +30,8 @@ export function ResearchWorkflowPage() {
           </>
         }
       />
+
+      <ResearchJourneyPanel />
 
       <FacultyResearchWorkflowModule
         accessToken={accessToken}

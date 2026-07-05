@@ -137,25 +137,7 @@ async function createPublication(req, res) {
   }
 
   const linkedProjectId = await requireOwnedProjectId(req, projectId, req.user.id);
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(__dirname, "../../../debug-15a9cf.log"),
-      `${JSON.stringify({
-        sessionId: "15a9cf",
-        location: "publicationController.js:createPublication",
-        message: "publication scoped to project",
-        data: { projectId: String(linkedProjectId), title: String(title).slice(0, 40), hypothesisId: "H3-create-scope", runId: "real-data-prep" },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch (_) {}
-  // #endregion
-
-  const pub = await Publication.create(req.tierAssign({
+const pub = await Publication.create(req.tierAssign({
     title: String(title).trim(),
     type: normalizedType,
     year,

@@ -3,8 +3,10 @@
 
 **Reference / Tixraac:** University Research Grant Management System (URGMS) infographic  
 **Target system / Nidaamka la barbardhigayo:** Jamhuriya Research Management System (RMS)  
-**Date / Taariikh:** June 2026  
+**Date / Taariikh:** July 2026 (updated after Phases 1–4)  
 **Codebase:** `research-management-systems` (MERN: React + Express + MongoDB)
+
+> **See also:** [WHATS_NEW_JULY_2026.md](./WHATS_NEW_JULY_2026.md) for every feature added in July 2026.
 
 ---
 
@@ -22,11 +24,11 @@
 
 ### English
 
-Jamhuriya RMS implements the **core research lifecycle** shown in the URGMS diagram: application → ethics → review → project → grant → budget → publication → repository. Approximately **55–65%** of the full URGMS blueprint is covered in working software. The largest gaps are **Step 1 (Funding & Call Management)**, **multi-stage review workflow (peer/committee/finance gates)**, **formal project closure**, and **external integrations** (ERP, HR, SSO).
+Jamhuriya RMS implements the **core research lifecycle** shown in the URGMS diagram: application → ethics → review → project → grant → budget → publication → repository. After **Phases 1–4 (July 2026)**, approximately **72–75%** of the full URGMS blueprint is covered. Remaining gaps: **external integrations** (ERP, HR, SSO), **dedicated reviewer portal**, **KPI dashboard**, and **automated email/SMS**.
 
 ### Somali
 
-Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqda sawirka URGMS: codsiga → anshaxa → dib-u-eegis → mashruuc → deeq → miisaaniyad → daabacaad → kayd (repository). Qiyaastii **55–65%** qorshaha buuxa ee URGMS waa la dhisay oo shaqeynaya. Fogaanta ugu weyn waa **Tallaabada 1 (Maamulka Deeqaha & Call-ka)**, **workflow dib-u-eegis badan (peer / committee / finance)**, **xiritaanka mashruuca si rasmi ah**, iyo **isku-xirka dibadda** (ERP, HR, SSO).
+Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqda sawirka URGMS. Ka dib **Phase 1–4 (July 2026)**, qiyaastii **72–75%** qorshaha buuxa waa la dhisay. Weli ma jiraan: **isku-xirka dibadda** (ERP, HR, SSO), **reviewer portal gaar ah**, **KPI dashboard**, iyo **email/SMS otomaatig ah**.
 
 ---
 
@@ -38,9 +40,9 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 | Department | `faculty_coordinator` (faculty-scoped) | ✅ |
 | Research Office | `research_director` | ✅ |
 | Finance Office | `finance_officer` | ✅ |
-| Procurement Office | `/procurement` (PO module) | ✅ |
+| Procurement Office | `procurement_officer` — PO queue before director | ✅ |
 | HR Office | — | ❌ |
-| Ethics Committee | Director JUREC / REC (`/ethics`) | ✅ |
+| Ethics Committee | `ethics_committee` + Director JUREC (`/ethics`) | ✅ |
 | Reviewers | Assign reviewers on proposals | ⚠️ No dedicated reviewer portal |
 | Leadership | Director dashboard + analytics | ✅ |
 | Donors | `donorRef` on grants + filter | ⚠️ Field only, no donor portal |
@@ -48,7 +50,7 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 ### Somali — Sharaxaad
 
 - **Cilmi-baaraha, Isku-duwaha, Agaasimaha, Maaliyadda** — dhammaan waa la dhisay.
-- **Procurement** — PO module waa jira (`/procurement`).
+- **Ethics Committee, Procurement Officer** — roles cusub la dhisay (July 2026).
 - **HR, Donor portal, Reviewer portal** — weli ma jiraan.
 
 ---
@@ -60,16 +62,16 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 
 | Feature | EN | SO | Status | RMS location |
 |---------|----|----|--------|--------------|
-| Published funding calls | Open calls researchers can browse | Call-yada la daabaco ee researcher arki karo | ❌ | — |
-| Internal seed / institutional grants | University-initiated grant rounds | Deeqaha gudaha (seed grants) | ❌ | — |
-| Eligibility rules | Who can apply (UG/PG, faculty, deadline) | Shuruudaha u qalmitaanka | ⚠️ | UG/PG portal only; no call-level rules |
+| Published funding calls | Open calls researchers can browse | Call-yada la daabaco | ⚠️ | `/funding-calls` — basic module exists |
+| Internal seed / institutional grants | University-initiated grant rounds | Deeqaha gudaha | ⚠️ | Funding calls + grants |
+| Eligibility rules | Who can apply (UG/PG, faculty, deadline) | Shuruudaha u qalmitaanka | ⚠️ | UG/PG portal + call deadlines |
 | Call notifications | Alert when new call opens | Ogeysiis marka call cusub furmo | ⚠️ | General notifications only |
-| Link grant application to a call | Application tied to specific opportunity | Grant ku xiran call gaar ah | ❌ | Grants are free-form (`/grants`) |
+| Link grant application to a call | Application tied to specific opportunity | Grant ku xiran call gaar ah | ⚠️ | Partial — grants + funding calls |
 | Funding source text | Donor / source name on grant | Magaca deeq-bixiyaha | ⚠️ | `Grant.fundingSource`, `donorRef` |
 
-**Gap summary:** Step 1 is the **largest missing module**. Current RMS lets researchers create grants directly without a director-published call.
+**Gap summary:** Step 1 improved with `/funding-calls` but call-to-grant linking and eligibility rules remain partial.
 
-**Recommendation / Talobixin:** Build **Funding Calls module** (`/funding-calls`) as Phase 3 priority #1 — see Section 9.
+**Recommendation / Talobixin:** Strengthen call–grant linkage and eligibility rules — see Section 9.
 
 ---
 
@@ -80,12 +82,12 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 |---------|--------|--------------|
 | Researcher registration | ✅ | Director creates users (`/pending-users`) |
 | Proposal submission + documents | ✅ | `/proposals`, `ProposalForm.jsx` |
-| Budget at application stage | ⚠️ | Budget linked after grant approval |
+| Budget at application stage | ✅ | `Proposal.budgetBreakdown`, `ProposalApplicationExtras.jsx` |
 | Ethics application form | ✅ | `/ethics`, 7 required fields |
 | Ethics documents upload | ✅ | Multer uploads on ethics + proposals |
 | Ethics linked to proposal | ✅ | `proposalEthicsLink.js`, submit gate |
 
-**Somali:** Codsiga proposal-ka iyo foomka anshaxa (REC/JUREC) waa buuxa. Miisaaniyadda marxaladda codsiga waa qayb ahaan kaliya.
+**Somali:** Codsiga proposal-ka, miisaaniyadda marxaladda codsiga, compliance docs, iyo foomka anshaxa — dhammaan waa buuxa (July 2026).
 
 ---
 
@@ -97,7 +99,7 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 | 1. Administrative screening | ⚠️ | Coordinator pre-review only |
 | 2. Peer review | ❌ | Assign reviewers API exists; no peer scoring UI |
 | 3. Committee review | ❌ | Not separate from director decision |
-| 4. Ethics review & approval | ✅ | JUREC certificate: preview, full edit, PDF, signatory, stamp, date boxes |
+| 4. Ethics review & approval | ✅ | JUREC + **`ethics_committee` role** can approve |
 | 5. Finance review | ❌ | Finance sees budgets after grant; no pre-approval gate |
 | 6. Final approval (Director) | ✅ | `POST /api/proposals/:id/director-decision` |
 | Ethics: Approve / Revise / Reject | ✅ | Director ethics decision + revision flow |
@@ -118,7 +120,7 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 | Research team | ✅ | `teamMembers` on project |
 | Progress reports | ✅ | `/projects/:id/progress` |
 | Budget management | ✅ | `/budgets` |
-| Communication log | ⚠️ | Messages + notifications; not unified project log |
+| Communication log | ✅ | `Project.communicationLog`, execution panel |
 | **Thesis supervision** (extension) | ✅ | `/thesis` — groups, title workflow, chapters, meetings, activity log |
 
 **Somali:** Maamulka mashruuca waa fiican. Thesis module waa dheeri ka baxsan URGMS asalka.
@@ -148,13 +150,13 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 
 | Feature | Status | RMS location |
 |---------|--------|--------------|
-| Final report submission | ❌ | No closure workflow |
-| Audit / compliance sign-off | ❌ | — |
-| Asset handover register | ❌ | — |
-| Archiving to repository | ⚠️ | Manual repository upload |
-| Grant status `closed` | ⚠️ | Status field in seed data only |
+| Final report submission | ✅ | `POST /api/projects/:id/closure/submit` |
+| Audit / compliance sign-off | ✅ | 5-item closure checklist + Director + Finance approval |
+| Asset handover register | ✅ | `closure.assetHandover` field |
+| Archiving to repository | ⚠️ | Manual repository upload; project archive status |
+| Grant status `closed` | ⚠️ | Project closure workflow; grant `closed` partial |
 
-**Somali:** Xiritaanka mashruuca si rasmi ah (final report, audit, archive) weli lama dhisin.
+**Somali:** Xiritaanka mashruuca waa la dhisay (July 2026): checklist, final report, lessons learned, Director → Finance → archive.
 
 ---
 
@@ -165,7 +167,7 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 | Workflow & Approvals | ✅ Core flows | Socodka ansixinta | Proposals, grants, budgets, publications |
 | Document Management | ✅ Uploads | Maareynta dukumeentiyada | Multer + repository |
 | Ethics & Compliance | ✅ JUREC | Anshaxa & u hoggaansanaanta | `/ethics`, certificate PDF |
-| Audit Trail (full activity log) | ⚠️ | Diiwaanka dhammaan ficillada | Notifications + thesis timeline; not system-wide |
+| Audit Trail (full activity log) | ✅ | `/audit-trail`, `listRecentAudit` API |
 | Notifications & Alerts | ✅ | Ogeysiisyada | `/notifications` |
 | Electronic Signatures | ⚠️ | Saxiix elektaroonig | JUREC PDF signature + stamp only |
 | Search, Reports & Analytics | ⚠️ | Raadinta & warbixinnada | Dashboards, PDF reports; no global search |
@@ -214,17 +216,17 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 | URGMS section | Coverage | Priority to close gap |
 |---------------|----------|------------------------|
 | Stakeholders (10 roles) | ~70% | Medium |
-| Step 1 — Funding & Calls | ~15% | **High** |
-| Step 2 — Applications | ~85% | Low |
-| Step 3 — Review & Approval | ~55% | High |
-| Step 4 — Project Management | ~90% | Low |
-| Step 5 — Monitoring & Reporting | ~65% | Medium |
-| Step 6 — Project Closure | ~20% | Medium |
-| Shared Services | ~70% | Medium |
+| Step 1 — Funding & Calls | ~45% | Medium |
+| Step 2 — Applications | ~95% | Low |
+| Step 3 — Review & Approval | ~60% | High |
+| Step 4 — Project Management | ~95% | Low |
+| Step 5 — Monitoring & Reporting | ~80% | Low |
+| Step 6 — Project Closure | ~85% | Low |
+| Shared Services | ~85% | Low |
 | Dashboards | ~85% | Low |
 | Architecture & Integrations | ~50% | Long-term |
 
-**Overall / Guud ahaan:** ~**58%** of URGMS blueprint (working MVP + thesis + JUREC enhancements).
+**Overall / Guud ahaan:** ~**73%** of URGMS blueprint (July 2026 — after Phases 1–4).
 
 ---
 

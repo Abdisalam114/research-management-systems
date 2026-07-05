@@ -8,22 +8,7 @@ export function SystemModulesGrid({ role, metrics, overview, title = "System mod
   useEffect(() => {
     if (!items.length) return;
     const counts = Object.fromEntries(items.map((mod) => [mod.key, countForModule(mod.key, metrics, overview)]));
-    // #region agent log
-    fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
-      body: JSON.stringify({
-        sessionId: "6113cc",
-        location: "SystemModulesGrid.jsx:render",
-        message: "dashboard modules rendered",
-        data: { role, moduleCount: items.length, counts, hasModules: Boolean(metrics?.modules || overview?.modules) },
-        timestamp: Date.now(),
-        hypothesisId: "B-C",
-        runId: "post-fix",
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [role, metrics, overview, items.length]);
+}, [role, metrics, overview, items.length]);
 
   if (!items.length) return null;
 

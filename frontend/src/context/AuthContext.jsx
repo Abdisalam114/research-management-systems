@@ -12,23 +12,6 @@ export const AuthContext = createContext(null);
 
 initAuthStorage();
 
-function logAuthDebug(message, data) {
-  // #region agent log
-  fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15a9cf" },
-    body: JSON.stringify({
-      sessionId: "15a9cf",
-      location: "AuthContext.jsx",
-      message,
-      data,
-      hypothesisId: "H-TAB-SESSION",
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-}
-
 export function AuthProvider({ children }) {
   const [accessToken, setAccessToken] = useState(() => getAccessToken());
   const [user, setUser] = useState(null);
@@ -60,10 +43,6 @@ export function AuthProvider({ children }) {
           try {
             const loadedUser = await loadMe(storedAccess);
             if (!cancelled) {
-              logAuthDebug("session bootstrap from access token", {
-                email: loadedUser?.email,
-                role: loadedUser?.role,
-              });
             }
             return;
           } catch {
@@ -79,10 +58,6 @@ export function AuthProvider({ children }) {
           });
           const loadedUser = await loadMe(refreshed.accessToken);
           if (!cancelled) {
-            logAuthDebug("session bootstrap from refresh token", {
-              email: loadedUser?.email,
-              role: loadedUser?.role,
-            });
           }
           return;
         }
@@ -106,7 +81,6 @@ export function AuthProvider({ children }) {
       if (res.user?.role === "research_director") {
         clearProgramTier();
       }
-      logAuthDebug("signIn", { email: res.user?.email, role: res.user?.role });
       return res;
     },
     [applyTokens]
@@ -120,7 +94,6 @@ export function AuthProvider({ children }) {
       applyTokens({ accessToken: null, refreshToken: null });
       setUser(null);
       clearProgramTier();
-      logAuthDebug("signOut", { cleared: true });
     }
   }, [applyTokens]);
 

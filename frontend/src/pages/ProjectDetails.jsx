@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as projectApi from "../services/projectApi";
 import { ProjectWorkflowPanel } from "../components/ProjectWorkflowPanel";
+import { ProjectExecutionPanel, CLOSURE_CHECKLIST_ITEMS } from "../components/ProjectExecutionPanel";
 
 const emptyMilestone = { title: "", dueDate: "", completed: false };
 const emptyMember = { name: "", role: "member" };
@@ -18,7 +19,32 @@ export function ProjectDetailsPage() {
   const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [closureForm, setClosureForm] = useState({
+    finalReport: "",
+    assetHandover: "",
+    lessonsLearned: "",
+    checklist: {
+      publicationsArchived: false,
+      assetsHandedOver: false,
+      dataArchived: false,
+      financialCleared: false,
+      ethicsClosed: false,
+    },
+  });
+
   const [saving, setSaving] = useState(false);
+
+  async function saveExecution(body) {
+    await projectApi.updateProject(accessToken, id, body);
+    setMessage("Work plan and activities saved");
+    await load();
+  }
+
+  async function logCommunication(body) {
+    await projectApi.addCommunicationLog(accessToken, id, body);
+    setMessage("Communication logged");
+    await load();
+  }
 
   async function load() {
     setError("");
@@ -312,19 +338,59 @@ export function ProjectDetailsPage() {
         )}
       </div>
 
+      <ProjectExecutionPanel
+        project={project}
+        canEdit={canEdit || isOwner}
+        onSave={saveExecution}
+        onLogCommunication={logCommunication}
+      />
+
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800, marginBottom: 8 }}>Project closure (URGMS Step 6)</div>
         <p className="muted" style={{ fontSize: 13 }}>Status: {project.closure?.status || "none"} · Project: {project.status}</p>
         {isOwner && (!project.closure?.status || project.closure.status === "none") ? (
           <>
-            <textarea rows={4} placeholder="Final report summary" id="finalReport" style={{ width: "100%" }} />
-            <textarea rows={2} placeholder="Asset handover notes" id="assetHandover" style={{ width: "100%", marginTop: 8 }} />
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>Closure checklist</div>
+            <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
+              {CLOSURE_CHECKLIST_ITEMS.map((item) => (
+                <label key={item.key} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>
+                  <input
+                    type="checkbox"
+                    checked={closureForm.checklist[item.key]}
+                    onChange={(e) => setClosureForm({
+                      ...closureForm,
+                      checklist: { ...closureForm.checklist, [item.key]: e.target.checked },
+                    })}
+                  />
+                  {item.label}
+                </label>
+              ))}
+            </div>
+            <textarea
+              rows={4}
+              placeholder="Final report summary"
+              value={closureForm.finalReport}
+              onChange={(e) => setClosureForm({ ...closureForm, finalReport: e.target.value })}
+              style={{ width: "100%" }}
+            />
+            <textarea
+              rows={2}
+              placeholder="Asset handover notes"
+              value={closureForm.assetHandover}
+              onChange={(e) => setClosureForm({ ...closureForm, assetHandover: e.target.value })}
+              style={{ width: "100%", marginTop: 8 }}
+            />
+            <textarea
+              rows={3}
+              placeholder="Lessons learned"
+              value={closureForm.lessonsLearned}
+              onChange={(e) => setClosureForm({ ...closureForm, lessonsLearned: e.target.value })}
+              style={{ width: "100%", marginTop: 8 }}
+            />
             <button type="button" className="btn primary" style={{ marginTop: 8 }} onClick={async () => {
-              const finalReport = document.getElementById("finalReport")?.value;
-              const assetHandover = document.getElementById("assetHandover")?.value;
-              if (!finalReport?.trim()) { setError("Final report required"); return; }
+              if (!closureForm.finalReport?.trim()) { setError("Final report required"); return; }
               try {
-                await projectApi.submitClosure(accessToken, id, { finalReport, assetHandover });
+                await projectApi.submitClosure(accessToken, id, closureForm);
                 setMessage("Closure submitted");
                 await load();
               } catch (e) { setError(e?.response?.data?.message || "Submit failed"); }
@@ -332,6 +398,12 @@ export function ProjectDetailsPage() {
           </>
         ) : null}
         {project.closure?.finalReport ? <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{project.closure.finalReport}</div> : null}
+        {project.closure?.lessonsLearned ? (
+          <div style={{ marginTop: 8 }}>
+            <div className="muted" style={{ fontSize: 12 }}>Lessons learned</div>
+            <div style={{ whiteSpace: "pre-wrap" }}>{project.closure.lessonsLearned}</div>
+          </div>
+        ) : null}
         {user?.role === "research_director" && project.closure?.status === "submitted" ? (
           <button type="button" className="btn primary" style={{ marginTop: 8 }} onClick={async () => {
             await projectApi.directorClosureApproval(accessToken, id, "Approved");

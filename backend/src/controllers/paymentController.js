@@ -146,20 +146,7 @@ async function createPayment(req, res) {
     notes: notes ? String(notes) : "",
     status: PAYMENT_STATUSES.REQUESTED,
   }));
-
-  // #region agent log
-  fetch('http://127.0.0.1:7385/ingest/4af2e467-e1e9-4128-940b-32687334c4e9', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '6113cc' },
-    body: JSON.stringify({
-      sessionId: '6113cc', hypothesisId: 'H1', location: 'paymentController.js:createPayment',
-      message: 'Payment created', data: { id: String(payment._id), budgetId: String(payment.budgetId), status: payment.status, amount: payment.amount },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-
-  try {
+try {
     await notifyUsersByRole("research_director", {
       type: "payment",
       title: "New payment request awaiting director approval",
@@ -195,20 +182,7 @@ async function directorDecision(req, res) {
     payment.rejectedReason = rejectedReason ? String(rejectedReason) : "Rejected by director";
   }
   await payment.save();
-
-  // #region agent log
-  fetch('http://127.0.0.1:7385/ingest/4af2e467-e1e9-4128-940b-32687334c4e9', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '6113cc' },
-    body: JSON.stringify({
-      sessionId: '6113cc', hypothesisId: 'H2', location: 'paymentController.js:directorDecision',
-      message: 'Director decided on payment', data: { id: String(payment._id), decision, status: payment.status },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-
-  try {
+try {
     await notifyUser(payment.requestedBy, {
       type: "payment",
       title: `Payment ${decision === "approve" ? "approved by director" : "rejected by director"}`,
@@ -253,20 +227,7 @@ async function financePay(req, res) {
   payment.paymentMethodDetails = paymentMethodDetails ? String(paymentMethodDetails) : "";
   if (referenceNumber) payment.referenceNumber = String(referenceNumber).trim();
   await payment.save();
-
-  // #region agent log
-  fetch('http://127.0.0.1:7385/ingest/4af2e467-e1e9-4128-940b-32687334c4e9', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '6113cc' },
-    body: JSON.stringify({
-      sessionId: '6113cc', hypothesisId: 'H3', location: 'paymentController.js:financePay',
-      message: 'Finance paid', data: { id: String(payment._id), paymentMethod: payment.paymentMethod, status: payment.status, paidAt: payment.paidAt },
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-
-  try {
+try {
     await notifyUser(payment.requestedBy, {
       type: "payment",
       title: "Payment disbursed by finance",

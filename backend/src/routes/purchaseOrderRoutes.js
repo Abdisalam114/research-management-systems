@@ -10,7 +10,7 @@ router.get(
   "/",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("researcher", "finance_officer", "research_director"),
+  authorizeRoles("researcher", "finance_officer", "research_director", "procurement_officer"),
   asyncHandler(purchaseOrderController.listPurchaseOrders)
 );
 
@@ -20,6 +20,14 @@ router.post(
   requireActiveUser,
   authorizeRoles("researcher"),
   asyncHandler(purchaseOrderController.createPurchaseOrder)
+);
+
+router.post(
+  "/:id/procurement-decision",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("procurement_officer"),
+  asyncHandler(purchaseOrderController.procurementDecision)
 );
 
 router.post(

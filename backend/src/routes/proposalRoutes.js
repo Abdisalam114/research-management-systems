@@ -23,12 +23,18 @@ router.get(
 );
 router.get("/:id", authenticateUser, requireActiveUser, asyncHandler(proposalController.getProposal));
 
+const proposalUpload = upload.fields([
+  { name: "document", maxCount: 1 },
+  { name: "complianceFiles", maxCount: 8 },
+  { name: "supportingFiles", maxCount: 8 },
+]);
+
 router.post(
   "/",
   authenticateUser,
   requireActiveUser,
   authorizeRoles("researcher"),
-  upload.single("document"),
+  proposalUpload,
   asyncHandler(proposalController.createProposal)
 );
 
@@ -37,7 +43,7 @@ router.put(
   authenticateUser,
   requireActiveUser,
   authorizeRoles("researcher"),
-  upload.single("document"),
+  proposalUpload,
   asyncHandler(proposalController.updateProposal)
 );
 
@@ -69,7 +75,7 @@ router.post(
   "/:id/ethics-decision",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("research_director", "faculty_coordinator"),
+  authorizeRoles("research_director", "faculty_coordinator", "ethics_committee"),
   asyncHandler(proposalController.ethicsDecision)
 );
 

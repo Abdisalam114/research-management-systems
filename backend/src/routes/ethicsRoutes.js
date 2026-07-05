@@ -10,7 +10,7 @@ router.get(
   "/",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("researcher", "faculty_coordinator", "research_director"),
+  authorizeRoles("researcher", "faculty_coordinator", "research_director", "ethics_committee"),
   asyncHandler(ethicsController.listEthicsApplications)
 );
 
@@ -18,7 +18,7 @@ router.get(
   "/:id",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("researcher", "faculty_coordinator", "research_director"),
+  authorizeRoles("researcher", "faculty_coordinator", "research_director", "ethics_committee"),
   asyncHandler(ethicsController.getEthicsApplication)
 );
 
@@ -66,7 +66,7 @@ router.post(
   "/:id/director-decision",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("research_director"),
+  authorizeRoles("research_director", "ethics_committee"),
   asyncHandler(ethicsController.directorDecision)
 );
 

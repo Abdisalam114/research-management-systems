@@ -38,6 +38,37 @@ async function listPurchaseOrders(req, res) {
   res.json({ purchaseOrders: pos.map(sanitizePO) });
 }
 
+async function procurementDecision(req, res) {
+  const { id } = req.params;
+  const { decision, rejectedReason } = req.body || {};
+  if (!["approve", "reject"].includes(decision)) {
+    throw new AppError("decision must be 'approve' or 'reject'", 400);
+  }
+  const po = await PurchaseOrder.findOne(req.tierWhere({ _id: id }));
+  if (!po) throw new AppError("Purchase order not found", 404);
+  if (po.status !== PO_STATUSES.REQUESTED) throw new AppError("PO is not awaiting procurement review", 400);
+
+  if (decision === "approve") {
+    po.status = PO_STATUSES.PROCUREMENT_APPROVED;
+    po.procurementApprovedBy = req.user.id;
+    po.procurementApprovedAt = new Date();
+    po.rejectedReason = "";
+    try {
+      await notifyUsersByRole("research_director", {
+        type: "procurement",
+        title: "PO procurement-approved — director review",
+        body: `${po.vendorName} — ${po.currency} ${po.totalAmount}`,
+        link: "/budgets",
+      }, req.programTier);
+    } catch { /* best-effort */ }
+  } else {
+    po.status = PO_STATUSES.REJECTED;
+    po.rejectedReason = rejectedReason ? String(rejectedReason) : "Rejected by procurement";
+  }
+  await po.save();
+  res.json({ message: "Procurement decision recorded", purchaseOrder: sanitizePO(po) });
+}
+
 async function createPurchaseOrder(req, res) {
   const { budgetId, vendorName, vendorContact, items, currency, notes } = req.body || {};
   if (!budgetId) throw new AppError("budgetId is required", 400);
@@ -76,6 +107,12 @@ async function createPurchaseOrder(req, res) {
   }));
 
   try {
+    await notifyUsersByRole("procurement_officer", {
+      type: "procurement",
+      title: "New purchase order awaiting procurement review",
+      body: `${po.vendorName} — ${po.currency} ${po.totalAmount}`,
+      link: "/budgets",
+    }, req.programTier);
     await notifyUsersByRole("research_director", {
       type: "procurement",
       title: "New purchase order awaiting director approval",
@@ -97,7 +134,9 @@ async function directorDecision(req, res) {
   }
   const po = await PurchaseOrder.findOne(req.tierWhere({ _id: id }));
   if (!po) throw new AppError("Purchase order not found", 404);
-  if (po.status !== PO_STATUSES.REQUESTED) throw new AppError("PO is not in requested status", 400);
+  if (po.status !== PO_STATUSES.REQUESTED && po.status !== PO_STATUSES.PROCUREMENT_APPROVED) {
+    throw new AppError("PO is not ready for director approval", 400);
+  }
 
   if (decision === "approve") {
     po.status = PO_STATUSES.DIRECTOR_APPROVED;
@@ -189,6 +228,7 @@ async function financeReject(req, res) {
 module.exports = {
   listPurchaseOrders,
   createPurchaseOrder,
+  procurementDecision,
   directorDecision,
   financePay,
   financeReject,

@@ -28,6 +28,19 @@ function appendProposalFields(form, payload) {
       form.append("ethics", JSON.stringify(v));
       return;
     }
+    if (k === "budgetBreakdown" || k === "complianceMeta" || k === "supportingMeta") {
+      form.append(k, JSON.stringify(v));
+      return;
+    }
+    if (k === "complianceFiles" || k === "supportingFiles") {
+      if (Array.isArray(v)) v.forEach((file) => { if (file) form.append(k, file); });
+      return;
+    }
+    if (k === "document" && v instanceof File) {
+      form.append("document", v);
+      return;
+    }
+    if (typeof v === "object") return;
     form.append(k, v);
   });
 }

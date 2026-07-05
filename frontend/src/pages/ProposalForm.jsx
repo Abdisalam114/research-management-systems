@@ -14,6 +14,7 @@ import {
 } from "../utils/ethicsFormState";
 import { isEthicsFormComplete } from "../utils/ethicsForm";
 import { useProgramTier } from "../hooks/useProgramTier";
+import { ProposalApplicationExtras, defaultBudgetRows } from "../components/ProposalApplicationExtras";
 import {
   collectSubmitValidationIssues,
   SUBMIT_SUCCESS_MESSAGE,
@@ -42,6 +43,9 @@ export function ProposalFormPage() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [savedId, setSavedId] = useState(id || null);
   const [status, setStatus] = useState("draft");
+  const [budgetRows, setBudgetRows] = useState(defaultBudgetRows);
+  const [complianceDocs, setComplianceDocs] = useState([]);
+  const [supportingDocs, setSupportingDocs] = useState([]);
 
   const formComplete = useMemo(() => isEthicsFormComplete(ethicsForm), [ethicsForm]);
   const readOnly = !["draft", "revision_requested"].includes(status);
@@ -76,6 +80,26 @@ export function ProposalFormPage() {
         );
         setSavedId(p.id);
         setStatus(p.status);
+        if (p.budgetBreakdown?.length) {
+          setBudgetRows(p.budgetBreakdown.map((r) => ({
+            category: r.category || "",
+            description: r.description || "",
+            amount: r.amount ?? "",
+            currency: r.currency || "USD",
+          })));
+        }
+        setComplianceDocs((p.complianceDocuments || []).map((d) => ({
+          docType: d.docType || "data_protection",
+          label: d.label || "",
+          file: null,
+          existingPath: d.filePath,
+        })));
+        setSupportingDocs((p.supportingDocuments || []).map((d) => ({
+          docType: d.docType || "other",
+          label: d.label || "",
+          file: null,
+          existingPath: d.filePath,
+        })));
         setLoaded(true);
       } catch (e) {
         if (!cancelled) setError(e?.response?.data?.message || "Load failed");
@@ -102,13 +126,33 @@ export function ProposalFormPage() {
       department: proposal.department,
       researchArea: proposal.researchArea,
       requiresEthics: proposal.requiresEthics,
-      document: proposal.document,
+      budgetBreakdown: budgetRows
+        .filter((r) => r.category || r.description || Number(r.amount) > 0)
+        .map((r) => ({
+          category: r.category,
+          description: r.description,
+          amount: Number(r.amount) || 0,
+          currency: r.currency || "USD",
+        })),
+      complianceMeta: complianceDocs.map((d) => ({
+        docType: d.docType,
+        label: d.label || d.docType,
+        filePath: d.existingPath || null,
+      })),
+      supportingMeta: supportingDocs.map((d) => ({
+        docType: d.docType,
+        label: d.label || d.docType,
+        filePath: d.existingPath || null,
+      })),
+      complianceFiles: complianceDocs.map((d) => d.file).filter(Boolean),
+      supportingFiles: supportingDocs.map((d) => d.file).filter(Boolean),
     };
+    if (proposal.document instanceof File) base.document = proposal.document;
     if (proposal.requiresEthics) {
       base.ethics = prepareEthicsPayload(ethicsForm);
     }
     return base;
-  }, [proposal, ethicsForm]);
+  }, [proposal, ethicsForm, budgetRows, complianceDocs, supportingDocs]);
 
   const saveDraft = async () => {
     setBusy(true);
@@ -129,32 +173,7 @@ export function ProposalFormPage() {
       }
       setStatus(res.proposal.status);
       setDraftSaved(true);
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15a9cf" },
-        body: JSON.stringify({
-          sessionId: "15a9cf",
-          location: "ProposalForm.jsx:saveDraft",
-          message: "proposal+ethics saved",
-          data: {
-            proposalId: res.proposal.id,
-            hasProjectTitle: Boolean(String(ethicsForm.projectTitle || "").trim()),
-            hasPiFirst: Boolean(String(ethicsForm.principal?.firstName || "").trim()),
-            hasPiLast: Boolean(String(ethicsForm.principal?.lastName || "").trim()),
-            hasProjectLevel: Boolean(String(ethicsForm.projectLevel || "").trim()),
-            hasAims: Boolean(String(ethicsForm.aimsObjectives || "").trim()),
-            hasDesign: Boolean(String(ethicsForm.design || "").trim()),
-            hasSignature: Boolean(String(ethicsForm.applicantSignature?.name || "").trim()),
-            formComplete,
-          },
-          timestamp: Date.now(),
-          hypothesisId: "C",
-          runId: "pre-fix",
-        }),
-      }).catch(() => {});
-      // #endregion
-      return res.proposal;
+return res.proposal;
     } catch (e) {
       setError(e?.response?.data?.message || "Save failed");
       return null;
@@ -171,22 +190,7 @@ export function ProposalFormPage() {
     const issues = collectSubmitValidationIssues(proposal, ethicsForm, proposal.requiresEthics);
     if (issues.length > 0) {
       setValidationIssues(issues);
-      // #region agent log
-      fetch("http://127.0.0.1:7457/ingest/e845c40a-0f0d-41d9-883a-67cbc157bfa2", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "6113cc" },
-        body: JSON.stringify({
-          sessionId: "6113cc",
-          location: "ProposalForm.jsx:submitToDirector",
-          message: "validation blocked submit",
-          data: { issueCount: issues.length, fields: issues.map((i) => i.field) },
-          timestamp: Date.now(),
-          hypothesisId: "H-validation-list",
-          runId: "validation-ux",
-        }),
-      }).catch(() => {});
-      // #endregion
-      requestAnimationFrame(() => {
+requestAnimationFrame(() => {
         document.getElementById("validation-errors")?.scrollIntoView({ behavior: "smooth", block: "start" });
       });
       return;
@@ -308,6 +312,16 @@ export function ProposalFormPage() {
           />
         </div>
       </div>
+
+      <ProposalApplicationExtras
+        readOnly={readOnly}
+        budgetRows={budgetRows}
+        setBudgetRows={setBudgetRows}
+        complianceDocs={complianceDocs}
+        setComplianceDocs={setComplianceDocs}
+        supportingDocs={supportingDocs}
+        setSupportingDocs={setSupportingDocs}
+      />
 
       {proposal.requiresEthics ? (
         <div className="card" style={{ marginTop: 16, border: "1px solid rgba(56,189,248,0.3)" }}>

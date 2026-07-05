@@ -206,27 +206,7 @@ async function sendMessage(req, res) {
     });
     notified += 1;
   }
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(__dirname, "../../../debug-6113cc.log"),
-      `${JSON.stringify({
-        sessionId: "6113cc",
-        location: "conversationController.js:sendMessage",
-        message: "message sent with notifications",
-        data: { conversationId: String(conversation._id), notified, participantCount: conversation.participants?.length },
-        timestamp: Date.now(),
-        hypothesisId: "MSG1",
-        runId: "collab-comms",
-      })}\n`
-    );
-  } catch (_) {}
-  // #endregion
-
-  res.json({ message: "Sent", conversation: await enrichConversation(conversation, req.user.id) });
+res.json({ message: "Sent", conversation: await enrichConversation(conversation, req.user.id) });
 }
 
 async function getConversation(req, res) {

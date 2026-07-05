@@ -10,6 +10,10 @@ import { FACULTIES } from "../constants/faculties";
 import "./groups.css";
 
 const MANAGE_ROLES = ["faculty_coordinator", "research_director"];
+const MIN_THESIS_GROUP_STUDENTS = 4;
+
+const emptyStudentRow = () => ({ fullName: "", studentId: "", email: "" });
+const defaultStudentRows = () => Array.from({ length: MIN_THESIS_GROUP_STUDENTS }, emptyStudentRow);
 
 const THESIS_STATUSES = [
   { value: "proposed", label: "Proposed" },
@@ -22,7 +26,7 @@ const THESIS_STATUSES = [
 const TITLE_PROPOSAL_LABELS = {
   none: "No title yet",
   pending: "Title pending acceptance",
-  accepted: "Title accepted (wa la aqbalay)",
+  accepted: "Title accepted",
   rejected: "Title rejected",
 };
 
@@ -40,7 +44,7 @@ const EMPTY_FORM = {
   supervisorId: "",
   meetingSchedule: "",
   status: "proposed",
-  students: [{ fullName: "", studentId: "", email: "" }],
+  students: defaultStudentRows(),
 };
 
 const EMPTY_MEETING = { date: "", location: "", agenda: "", notes: "", chaptersDiscussed: [] };
@@ -65,6 +69,10 @@ function chapterStatusLabel(s) {
 }
 
 function displayTitle(g) {
+  const status = g.titleProposal?.status;
+  if (status === "pending" || status === "rejected") {
+    if (g.titleProposal?.title?.trim()) return g.titleProposal.title;
+  }
   if (g.title?.trim()) return g.title;
   if (g.titleProposal?.title?.trim()) return g.titleProposal.title;
   return null;
@@ -72,6 +80,18 @@ function displayTitle(g) {
 
 function formTitleValue(g) {
   return g.titleProposal?.title?.trim() || g.title?.trim() || "";
+}
+
+function isTitleAccepted(g) {
+  return g.titleProposal?.status === "accepted";
+}
+
+function isValidThesisGroup(g) {
+  return (g.students?.length || 0) >= MIN_THESIS_GROUP_STUDENTS;
+}
+
+function titleProposalStatus(g) {
+  return g.titleProposal?.status || "none";
 }
 
 export function ThesisGroupsPage() {
@@ -90,8 +110,9 @@ export function ThesisGroupsPage() {
 
   const load = useCallback(async () => {
     const res = await thesisApi.listThesisGroups(accessToken);
-    setGroups(res.groups || []);
-  }, [accessToken]);
+    const list = res.groups || [];
+    setGroups(list);
+}, [accessToken]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
@@ -108,11 +129,11 @@ export function ThesisGroupsPage() {
   }, [accessToken]);
 
   const stats = useMemo(() => {
-    const titled = groups.filter((g) => g.title?.trim()).length;
-    const titleAccepted = groups.filter((g) => g.titleProposal?.status === "accepted" || g.title?.trim()).length;
-    const totalStudents = groups.reduce((acc, g) => acc + (g.students?.length || 0), 0);
+    const validGroups = groups.filter(isValidThesisGroup);
+    const titleAccepted = groups.filter(isTitleAccepted).length;
+    const totalStudents = validGroups.reduce((acc, g) => acc + (g.students?.length || 0), 0);
     return [
-      { label: "Thesis groups", value: groups.length, filterKey: "all", accent: "#0ea5e9" },
+      { label: "Thesis groups", value: validGroups.length, filterKey: "all", accent: "#0ea5e9" },
       { label: "Title accepted", value: titleAccepted, filterKey: "titleAccepted", accent: "#22c55e" },
       { label: "With supervisor", value: groups.filter((g) => g.supervisorId).length, filterKey: "hasSupervisor", accent: "#1d4ed8" },
       { label: "Total students", value: totalStudents, filterKey: "hasStudents", accent: "#7dd3fc" },
@@ -125,8 +146,8 @@ export function ThesisGroupsPage() {
         customFilters: {
           hasTitle: (g) => Boolean(g.title?.trim()),
           hasSupervisor: (g) => Boolean(g.supervisorId),
-          hasStudents: (g) => (g.students?.length || 0) > 0,
-          titleAccepted: (g) => g.titleProposal?.status === "accepted" || Boolean(g.title?.trim()),
+          hasStudents: isValidThesisGroup,
+          titleAccepted: isTitleAccepted,
         },
       }),
     [groups, statusFilter]
@@ -144,6 +165,12 @@ export function ThesisGroupsPage() {
     setShowForm(true);
   }
 
+  function studentRowsForForm(existing) {
+    const rows = existing?.length ? existing.map((s) => ({ ...s })) : [];
+    while (rows.length < MIN_THESIS_GROUP_STUDENTS) rows.push(emptyStudentRow());
+    return rows;
+  }
+
   function openEdit(g) {
     setEditingId(g.id);
     setForm({
@@ -153,7 +180,7 @@ export function ThesisGroupsPage() {
       supervisorId: g.supervisorId?._id || g.supervisorId || "",
       meetingSchedule: g.meetingSchedule || "",
       status: g.status || "proposed",
-      students: g.students && g.students.length ? g.students.map((s) => ({ ...s })) : [{ fullName: "", studentId: "", email: "" }],
+      students: studentRowsForForm(g.students),
     });
     setShowForm(true);
   }
@@ -174,8 +201,8 @@ export function ThesisGroupsPage() {
       const cleanStudents = form.students
         .map((s) => ({ fullName: s.fullName?.trim(), studentId: s.studentId?.trim(), email: s.email?.trim() }))
         .filter((s) => s.fullName);
-      if (cleanStudents.length === 0) {
-        setError("At least one student name is required");
+      if (cleanStudents.length < MIN_THESIS_GROUP_STUDENTS) {
+        setError(`Each thesis group requires at least ${MIN_THESIS_GROUP_STUDENTS} students`);
         return;
       }
       const body = { ...form, students: cleanStudents };
@@ -264,7 +291,7 @@ export function ThesisGroupsPage() {
   }
 
   function removeStudentRow(idx) {
-    if (form.students.length === 1) return;
+    if (form.students.length <= MIN_THESIS_GROUP_STUDENTS) return;
     setForm({ ...form, students: form.students.filter((_, i) => i !== idx) });
   }
 
@@ -302,7 +329,7 @@ export function ThesisGroupsPage() {
 
       <PageHeader
         title="Thesis"
-        subtitle="Students choose the title; supervisor enters it in the system; coordinator/director accepts (wa la aqbalay)."
+        subtitle="Students choose the title; the supervisor enters it; the coordinator or director accepts it."
         stats={stats}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
@@ -383,7 +410,7 @@ export function ThesisGroupsPage() {
 
           <div>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-              <div style={{ fontWeight: 700 }}>Students</div>
+              <div style={{ fontWeight: 700 }}>Students (minimum {MIN_THESIS_GROUP_STUDENTS})</div>
               <button type="button" className="btn" onClick={addStudentRow}>+ Add student</button>
             </div>
             <div style={{ display: "grid", gap: 8 }}>
@@ -406,7 +433,7 @@ export function ThesisGroupsPage() {
                     </div>
                     <div className="field" style={{ justifyContent: "flex-end" }}>
                       <label>&nbsp;</label>
-                      {form.students.length > 1 ? (
+                      {form.students.length > MIN_THESIS_GROUP_STUDENTS ? (
                         <button type="button" className="btn" onClick={() => removeStudentRow(idx)}>Remove</button>
                       ) : null}
                     </div>
@@ -427,7 +454,7 @@ export function ThesisGroupsPage() {
         {filteredGroups.map((g) => {
           const open = expandedId === g.id;
           const supervisorIdValue = g.supervisorId?._id || g.supervisorId || null;
-          const titleStatus = g.titleProposal?.status || (g.title?.trim() ? "accepted" : "none");
+          const titleStatus = titleProposalStatus(g);
           const isAssignedSupervisor =
             user?.role === "researcher" && supervisorIdValue && String(supervisorIdValue) === String(user?.id);
           const canLogMeeting = canManage || isAssignedSupervisor;
@@ -475,9 +502,9 @@ export function ThesisGroupsPage() {
                 <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
                   {canEnterTitle ? (
                     <div className="card" style={{ background: "rgba(251,191,36,0.08)", borderColor: "rgba(251,191,36,0.35)" }}>
-                      <div style={{ fontWeight: 800, marginBottom: 8 }}>Enter student thesis title (ciwaanka ardayda)</div>
+                      <div style={{ fontWeight: 800, marginBottom: 8 }}>Enter student thesis title</div>
                       <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
-                        After students choose their title, enter it here. Coordinator will review and accept (wa la aqbalay).
+                        After students choose their title, enter it here. The coordinator will review and accept it.
                       </p>
                       <div className="field" style={{ marginBottom: 8 }}>
                         <label>Thesis title</label>
@@ -509,7 +536,7 @@ export function ThesisGroupsPage() {
                       </div>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <button type="button" className="btn primary" onClick={() => reviewTitle(g.id, "accept")}>
-                          ✓ Wa la aqbalay / Accept title
+                          Accept title
                         </button>
                         <button type="button" className="btn" onClick={() => reviewTitle(g.id, "reject")}>
                           Reject title

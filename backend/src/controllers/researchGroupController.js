@@ -1,28 +1,6 @@
 const { ResearchGroup, GROUP_MEMBER_ROLES, GROUP_KINDS } = require("../models/ResearchGroup");
 const { AppError } = require("../utils/AppError");
 const { ThesisGroup } = require("../models/ThesisGroup");
-const fs = require("fs");
-const path = require("path");
-
-function debugLog(location, data) {
-  // #region agent log
-  try {
-    const logPath = path.resolve(__dirname, "../../../debug-6113cc.log");
-    fs.appendFileSync(
-      logPath,
-      JSON.stringify({
-        sessionId: "6113cc",
-        runId: "pre-fix",
-        hypothesisId: "thesis-groups-interface",
-        location,
-        message: "groups(thesis) interface mapping",
-        data,
-        timestamp: Date.now(),
-      }) + "\n"
-    );
-  } catch (_) {}
-  // #endregion
-}
 
 function sanitizeGroup(g, thesis) {
   return {
@@ -69,7 +47,6 @@ async function listGroups(req, res) {
       .select("title status faculty department supervisorId meetings meetingSchedule facultyResearchArea researchGroupId")
       .populate("supervisorId", "fullName department");
     const map = new Map(theses.map((t) => [String(t.researchGroupId), t]));
-    debugLog("researchGroupController.js:listGroups(thesis)", { groups: groups.length, theses: theses.length });
     return res.json({ groups: groups.map((g) => sanitizeGroup(g, map.get(String(g._id)))) });
   }
 
@@ -80,8 +57,6 @@ async function getGroupStats(req, res) {
   const total = await ResearchGroup.countDocuments(req.tierWhere({}));
   const thesis = await ResearchGroup.countDocuments(req.tierWhere({ kind: GROUP_KINDS.THESIS }));
   const collaboration = total - thesis;
-
-  debugLog("researchGroupController.js:stats", { total, thesis, collaboration });
 
   res.json({ stats: { total, thesis, collaboration } });
 }

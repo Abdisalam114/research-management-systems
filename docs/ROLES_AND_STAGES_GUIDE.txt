@@ -120,6 +120,46 @@ Xaddidaad:
 Wuxuu arkaa kaliya xogtiisa (My proposals, My projects, My outputs). Ma beddeli 
 karo publication workflow stage — taasi waa Coordinator/Director.
 
+--------------------------------------------------------------------------------
+A.5 ETHICS COMMITTEE (Guddiga Anshaxa) — CUSUB July 2026
+--------------------------------------------------------------------------------
+Magaca nidaamka: ethics_committee
+
+Sharaxaad:
+Xubin ka tirsan Guddiga Anshaxa (JUREC/REC). Wuxuu ansixin ama diidi karaa 
+codsiyada anshaxa isla awoodda Director-ka ee bogga Ethics.
+
+Mas’uuliyadaha:
+  • Eegista liiska ethics applications (/ethics)
+  • Ansixinta / diidmada / revision JUREC
+  • Daawashada shahaadada JUREC ka hor ansixinta
+
+Modules-ka uu geli karo:
+Ethics, Profile.
+
+Tijaabo login: ethics@rms.edu / Ethics2024!
+
+--------------------------------------------------------------------------------
+A.6 PROCUREMENT OFFICER (Sarkaalka Iibsiga) — CUSUB July 2026
+--------------------------------------------------------------------------------
+Magaca nidaamka: procurement_officer
+
+Sharaxaad:
+Wuxuu dib u eegaa Purchase Orders (PO) ka hor inta aan Director u gudbin.
+
+Mas’uuliyadaha:
+  • Eegista PO-yada status = requested
+  • Approve / reject → status procurement_approved
+  • Ka dib Director → Finance bixinta
+
+Socodka PO:
+  Researcher (codsiga) → Procurement Officer → Director → Finance Officer
+
+Modules-ka uu geli karo:
+Finance & Budgets (Procurement review queue), Profile.
+
+Tijaabo login: procurement@rms.edu / Procurement2024!
+
 ================================================================================
 QAYBTA B: RESEARCH WORKFLOW STATUS — PIPELINE-KA GUUD (11 TALLAABO)
 ================================================================================
@@ -150,7 +190,7 @@ Sharaxaad: Research Ethics Committee (REC) waa in ay ansixisaa cilmi-baarista ka
 hor inta aan la gudbin si rasmi ah. Foomka REC wuxuu ka kooban yahay PI name, 
 project level, aims, design, signature, iwm.
 
-Yaa ansixiyaa: Research Director
+Yaa ansixiyaa: Research Director ama Ethics Committee (ethics_committee)
 Xaaladaha ethicsStatus: pending → approved / rejected
 Haddii requiresEthics = false: Skipped
 
@@ -370,7 +410,33 @@ QAYBTA J: MODULES-KA JAAMACADDA (8 CORE + EXTENSION)
   8. Collaboration / Groups
 
 Extension:
-  • Thesis Supervision (/thesis) — maamulka kooxaha thesis-ka
+  • Thesis Supervision (/thesis) — maamulka kooxaha thesis-ka (min 4 arday koox kasta)
+
+================================================================================
+QAYBTA K: MODULES CUSUB — July 2026 (Phase 1–4)
+================================================================================
+
+K.1 Audit Trail (/audit-trail)
+  Director & Coordinator — diiwaanka ficillada nidaamka oo dhan.
+
+K.2 Finance Reports (/finance-reports)
+  Director & Finance — warbixin miisaaniyadeed.
+
+K.3 Donor Reports (/donor-reports)
+  Director & Finance — deeq-bixiyeyaasha (donorRef) iyo wadarta la siiyay.
+
+K.4 Project closure (Projects → details)
+  Researcher: checklist (5 qodob) + final report + lessons learned
+  Director → Finance → Archive
+
+K.5 Proposal budget + compliance + supporting docs
+  Proposals → New — miisaaniyad, compliance files, CV/MoU iwm.
+
+K.6 Work plan, activities, communication log
+  Projects → execution panel — qorshe shaqo, hawlaha, isgaarsiinta.
+
+K.7 Procurement queue (Finance & Budgets)
+  procurement_officer → Director → finance_officer (PO workflow)
 
 ================================================================================
 DHAMAAD

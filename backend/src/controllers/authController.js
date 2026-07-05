@@ -22,6 +22,9 @@ function getRefreshCookieOptions() {
 }
 
 function sanitizeUser(userDoc) {
+  const tier = userDoc.programTier;
+  const programTierLabel =
+    tier === "undergraduate" ? "Undergraduate" : tier === "postgraduate" ? "Postgraduate" : tier || "—";
   return {
     id: userDoc._id,
     fullName: userDoc.fullName,
@@ -31,7 +34,8 @@ function sanitizeUser(userDoc) {
     rank: userDoc.rank,
     researchInterests: normalizeResearchInterests(userDoc.researchInterests),
     status: userDoc.status,
-    programTier: userDoc.programTier,
+    programTier: tier,
+    programTierLabel,
     createdAt: userDoc.createdAt,
     updatedAt: userDoc.updatedAt,
   };

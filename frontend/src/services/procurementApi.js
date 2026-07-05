@@ -12,6 +12,11 @@ export async function createPurchaseOrder(t, body) {
   return data;
 }
 
+export async function procurementDecision(t, id, body) {
+  const { data } = await api.post(`/api/procurement/${id}/procurement-decision`, body, auth(t));
+  return data;
+}
+
 export async function directorDecision(t, id, body) {
   const { data } = await api.post(`/api/procurement/${id}/director-decision`, body, auth(t));
   return data;

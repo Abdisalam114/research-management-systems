@@ -263,28 +263,7 @@ async function directorDecision(req, res) {
     if (a.proposalId) {
       await Proposal.updateOne({ _id: a.proposalId }, { ethicsStatus: PROPOSAL_ETHICS_STATUSES.APPROVED });
     }
-
-    // #region agent log
-    try {
-      fs.appendFileSync(
-        path.join(__dirname, "../../../debug-15a9cf.log"),
-        `${JSON.stringify({
-          sessionId: "15a9cf",
-          location: "ethicsController.js:directorDecision",
-          message: "JUREC certificate issued",
-          data: {
-            applicationId: String(a._id),
-            refNumber: a.approval.refNumber,
-            certificateNumber: a.approval.certificateNumber,
-            hypothesisId: "H-JUREC",
-            runId: "jurec-cert",
-          },
-          timestamp: Date.now(),
-        })}\n`
-      );
-    } catch (_) {}
-    // #endregion
-  } else {
+} else {
     a.status = ETHICS_STATUSES.REJECTED;
     a.approval = {
       ...a.approval,
@@ -310,27 +289,7 @@ async function directorDecision(req, res) {
         link: `/ethics?applicationId=${a._id}`,
         programTier: a.programTier,
       });
-      // #region agent log
-      try {
-        fs.appendFileSync(
-          path.join(__dirname, "../../../debug-15a9cf.log"),
-          `${JSON.stringify({
-            sessionId: "15a9cf",
-            location: "ethicsController.js:notifyResearcher",
-            message: "JUREC notification sent",
-            data: {
-              researcherId: String(a.researcherId),
-              bodyLength: certBody.length,
-              bodyPreview: certBody.slice(0, 120),
-              hypothesisId: "H-NOTIFY-ETHICS",
-              runId: "jurec-notify-fix",
-            },
-            timestamp: Date.now(),
-          })}\n`
-        );
-      } catch (_) {}
-      // #endregion
-    } else {
+} else {
       await notifyUser(a.researcherId, {
         type: "ethics",
         title: "Ethics application rejected",
@@ -340,21 +299,7 @@ async function directorDecision(req, res) {
       });
     }
   } catch (err) {
-    // #region agent log
-    try {
-      fs.appendFileSync(
-        path.join(__dirname, "../../../debug-15a9cf.log"),
-        `${JSON.stringify({
-          sessionId: "15a9cf",
-          location: "ethicsController.js:notifyResearcher",
-          message: "JUREC notification FAILED",
-          data: { error: err.message, hypothesisId: "H-NOTIFY-ETHICS", runId: "jurec-notify-fix" },
-          timestamp: Date.now(),
-        })}\n`
-      );
-    } catch (_) {}
-    // #endregion
-  }
+}
 
   res.json({ message: `Application ${decision}d`, application: sanitize(a) });
 }
