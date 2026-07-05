@@ -44,11 +44,55 @@ Roughly **12 records per module per portal** (200+ documents total on a fresh da
 
 Configure bootstrap passwords in `backend/.env` (`SEED_*` variables) or edit `backend/src/scripts/seedData.js`.
 
+## Seed user accounts
+
+After `npm run seed`, **13 institutional accounts** are created. Verify anytime:
+
+```bash
+cd backend
+node src/scripts/verifySeedUsers.js
+```
+
+Expected output: `13/13 users correct`.
+
+**Portal rules**
+
+- **Research Director** (`director@rms.edu`) — choose **Undergraduate** or **Postgraduate** at login.
+- All other accounts are fixed to **one portal** (UG or PG); they cannot switch.
+
+### Undergraduate (UG)
+
+| Role | Email | Password | Name |
+|------|-------|----------|------|
+| Research Director | `director@rms.edu` | `Director2024!` | Dr. Catherine Morrison |
+| Faculty Coordinator | `coordinator@rms.edu` | `Coordinator2024!` | Dr. Emma Richardson |
+| Finance Officer | `finance@rms.edu` | `Finance2024!` | Michael Brooks |
+| Ethics Committee | `ethics@rms.edu` | `Ethics2024!` | Dr. Hassan Ali |
+| Procurement Officer | `procurement@rms.edu` | `Procurement2024!` | Samira Noor |
+| Researcher | `asha@rms.edu` | `Researcher2024!` | Dr. Sarah Chen |
+| Researcher | `sahra@rms.edu` | `Researcher2024!` | Dr. Priya Sharma |
+
+### Postgraduate (PG)
+
+| Role | Email | Password | Name |
+|------|-------|----------|------|
+| Faculty Coordinator | `coordinator.pg@rms.edu` | `Coordinator2024!` | Dr. Robert Clarke |
+| Finance Officer | `finance.pg@rms.edu` | `Finance2024!` | Linda Martinez |
+| Ethics Committee | `ethics.pg@rms.edu` | `Ethics2024!` | Dr. Amina Farah |
+| Procurement Officer | `procurement.pg@rms.edu` | `Procurement2024!` | Omar Said |
+| Researcher | `mahad@rms.edu` | `Researcher2024!` | Dr. James Okonkwo |
+| Researcher | `amina@rms.edu` | `Researcher2024!` | Amina Yusuf |
+
+**Login shortcuts:** Ethics Committee → `/ethics` · Procurement Officer → `/budgets`
+
+Default passwords can be overridden via `backend/.env`: `SEED_DIRECTOR_PASSWORD`, `SEED_COORDINATOR_PASSWORD`, `SEED_FINANCE_PASSWORD`, `SEED_ETHICS_PASSWORD`, `SEED_PROCUREMENT_PASSWORD`, `SEED_RESEARCHER_PASSWORD`.
+
 ## Scripts
 
 | Command | Description |
 |---------|-------------|
 | `npm run seed` | Bootstrap users and realistic institutional research data |
+| `node src/scripts/verifySeedUsers.js` | Verify all 13 seed accounts (role, portal, password) |
 | `npm run db:audit` | Count documents per collection (backend) |
 
 ## Documentation
