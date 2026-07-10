@@ -8,12 +8,14 @@ const CALL_STATUSES = Object.freeze({
 });
 
 const ELIGIBILITY_TIERS = Object.freeze(["ug", "pg", "pgd", "all"]);
+const CALL_TYPES = Object.freeze(["internal", "external"]);
 
 const fundingCallSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
     fundingSource: { type: String, required: true, trim: true },
+    callType: { type: String, enum: CALL_TYPES, default: "internal" },
     donorRef: { type: String, default: "", trim: true },
     amountCap: { type: Number, min: 0, default: 0 },
     currency: { type: String, default: "USD", trim: true, uppercase: true },
@@ -31,4 +33,4 @@ const fundingCallSchema = new mongoose.Schema(
 
 const FundingCall = mongoose.model("FundingCall", fundingCallSchema);
 
-module.exports = { FundingCall, CALL_STATUSES, ELIGIBILITY_TIERS };
+module.exports = { FundingCall, CALL_STATUSES, ELIGIBILITY_TIERS, CALL_TYPES };

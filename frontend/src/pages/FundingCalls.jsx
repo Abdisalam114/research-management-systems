@@ -9,6 +9,7 @@ const EMPTY = {
   title: "",
   description: "",
   fundingSource: "",
+  callType: "internal",
   donorRef: "",
   amountCap: "",
   currency: "USD",
@@ -87,7 +88,7 @@ export function FundingCallsPage() {
 
   return (
     <div className="pageStack">
-      <PageHeader title="Funding Calls" subtitle="Published grant opportunities (URGMS Step 1)" />
+      <PageHeader title="Funding Calls" subtitle="Published grant opportunities (Phase 1)" />
       {message ? <div className="bannerOk">{message}</div> : null}
       {error ? <div className="bannerErr">{error}</div> : null}
 
@@ -97,6 +98,12 @@ export function FundingCallsPage() {
           <div className="formGrid">
             <label>Title<input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></label>
             <label>Funding source<input required value={form.fundingSource} onChange={(e) => setForm({ ...form, fundingSource: e.target.value })} /></label>
+            <label>Call type
+              <select value={form.callType} onChange={(e) => setForm({ ...form, callType: e.target.value })}>
+                <option value="internal">Internal seed grant</option>
+                <option value="external">External grant</option>
+              </select>
+            </label>
             <label>Amount cap<input type="number" min="0" value={form.amountCap} onChange={(e) => setForm({ ...form, amountCap: e.target.value })} /></label>
             <label>Deadline<input type="date" value={form.deadline} onChange={(e) => setForm({ ...form, deadline: e.target.value })} /></label>
             <label>Eligibility
@@ -120,7 +127,7 @@ export function FundingCallsPage() {
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
               <div>
                 <h3 style={{ margin: 0 }}>{c.title}</h3>
-                <p className="muted">{c.fundingSource} · {c.currency} {Number(c.amountCap || 0).toLocaleString()}</p>
+                <p className="muted">{c.fundingSource} · {c.callType === "external" ? "External" : "Internal"} · {c.currency} {Number(c.amountCap || 0).toLocaleString()}</p>
                 {c.deadline ? <p className="muted">Deadline: {new Date(c.deadline).toLocaleDateString()}</p> : null}
                 <p>{c.description}</p>
                 <span className="badge">{c.status}</span>
@@ -131,7 +138,7 @@ export function FundingCallsPage() {
                 ) : null}
                 {isDirector && c.status === "draft" ? (
                   <>
-                    <button type="button" onClick={() => { setEditingId(c.id); setForm({ title: c.title, description: c.description || "", fundingSource: c.fundingSource, donorRef: c.donorRef || "", amountCap: c.amountCap || "", currency: c.currency || "USD", deadline: c.deadline ? c.deadline.slice(0, 10) : "", eligibilityTier: c.eligibilityTier || "all", requiredDocuments: c.requiredDocuments || "" }); }}>Edit</button>
+                    <button type="button" onClick={() => { setEditingId(c.id); setForm({ title: c.title, description: c.description || "", fundingSource: c.fundingSource, callType: c.callType || "internal", donorRef: c.donorRef || "", amountCap: c.amountCap || "", currency: c.currency || "USD", deadline: c.deadline ? c.deadline.slice(0, 10) : "", eligibilityTier: c.eligibilityTier || "all", requiredDocuments: c.requiredDocuments || "" }); }}>Edit</button>
                     <button type="button" className="btnPrimary" disabled={busy} onClick={() => publish(c.id)}>Publish</button>
                   </>
                 ) : null}

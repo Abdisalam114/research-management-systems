@@ -9,6 +9,13 @@ const router = express.Router();
 router.get("/", authenticateUser, requireActiveUser, asyncHandler(projectController.listProjects));
 router.get("/:id", authenticateUser, requireActiveUser, asyncHandler(projectController.getProject));
 
+router.get(
+  "/:id/technical-report.pdf",
+  authenticateUser,
+  requireActiveUser,
+  asyncHandler(projectController.exportTechnicalReportPdf)
+);
+
 router.put(
   "/:id",
   authenticateUser,

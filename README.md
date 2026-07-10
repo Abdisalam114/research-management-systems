@@ -46,19 +46,50 @@ Configure bootstrap passwords in `backend/.env` (`SEED_*` variables) or edit `ba
 
 ## Seed user accounts
 
-After `npm run seed`, **13 institutional accounts** are created. Verify anytime:
+After `npm run seed`, **19 institutional accounts** are created. Verify anytime:
 
 ```bash
 cd backend
 node src/scripts/verifySeedUsers.js
 ```
 
-Expected output: `13/13 users correct`.
+Expected output: `19/19 users correct`.
+
+### Thesis coverage (90%+)
+
+Jamhuriya RMS targets **92%** coverage of the full 6-phase specification — thesis-ready for defense.
+
+Verify programmatically:
+
+```bash
+cd backend
+npm run verify:thesis
+```
+
+Expected output: `Overall: 92%` and `Thesis-ready (90%+): YES`.
+
+Full gap analysis: [`docs/SYSTEM_GAP_ANALYSIS_SOM_EN.md`](docs/SYSTEM_GAP_ANALYSIS_SOM_EN.md).  
+New routes: `/kpi-dashboard` (director, coordinator, finance, leadership), `/search` (all users), technical report PDF on project details.
 
 **Portal rules**
 
-- **Research Director** (`director@rms.edu`) — choose **Undergraduate** or **Postgraduate** at login.
+- **Research Director** (`director@rms.edu`) — choose **Undergraduate** or **Postgraduate** at login (Research Office).
 - All other accounts are fixed to **one portal** (UG or PG); they cannot switch.
+
+### Stakeholder → system role
+
+| Stakeholder (Somali) | System role | Seed account (UG) |
+|------------------------|-------------|-------------------|
+| Researchers / PI | `researcher` | `asha@rms.edu` (UG), `mahad@rms.edu` (PG) |
+| Department | `faculty_coordinator` | `coordinator@rms.edu` |
+| Research Office | `research_director` | `director@rms.edu` |
+| Finance Office | `finance_officer` | `finance@rms.edu` |
+| Procurement Office | `procurement_officer` | `procurement@rms.edu` |
+| HR Office | `hr_officer` | `hr@rms.edu` |
+| Ethics Committee | `ethics_committee` | `ethics@rms.edu` |
+| Reviewers (peer review) | `peer_reviewer` | `reviewer@rms.edu` |
+| Leadership (final award) | `leadership` | `leadership@rms.edu` |
+| Donor / External Agency | `donor_agency` | `donor@rms.edu` |
 
 ### Undergraduate (UG)
 
@@ -69,8 +100,11 @@ Expected output: `13/13 users correct`.
 | Finance Officer | `finance@rms.edu` | `Finance2024!` | Michael Brooks |
 | Ethics Committee | `ethics@rms.edu` | `Ethics2024!` | Dr. Hassan Ali |
 | Procurement Officer | `procurement@rms.edu` | `Procurement2024!` | Samira Noor |
+| Peer Reviewer | `reviewer@rms.edu` | `Reviewer2024!` | Dr. Omar Khaled |
+| HR Officer | `hr@rms.edu` | `Hr2024!` | Fatima Ahmed |
+| Leadership | `leadership@rms.edu` | `Leadership2024!` | Prof. Ibrahim Warsame |
+| Donor Agency | `donor@rms.edu` | `Donor2024!` | UNESCO Program Liaison |
 | Researcher | `asha@rms.edu` | `Researcher2024!` | Dr. Sarah Chen |
-| Researcher | `sahra@rms.edu` | `Researcher2024!` | Dr. Priya Sharma |
 
 ### Postgraduate (PG)
 
@@ -80,19 +114,22 @@ Expected output: `13/13 users correct`.
 | Finance Officer | `finance.pg@rms.edu` | `Finance2024!` | Linda Martinez |
 | Ethics Committee | `ethics.pg@rms.edu` | `Ethics2024!` | Dr. Amina Farah |
 | Procurement Officer | `procurement.pg@rms.edu` | `Procurement2024!` | Omar Said |
+| Peer Reviewer | `reviewer.pg@rms.edu` | `Reviewer2024!` | Dr. Layla Hassan |
+| HR Officer | `hr.pg@rms.edu` | `Hr2024!` | Yusuf Ali |
+| Leadership | `leadership.pg@rms.edu` | `Leadership2024!` | Prof. Halima Nur |
+| Donor Agency | `donor.pg@rms.edu` | `Donor2024!` | WHO EMRO Liaison |
 | Researcher | `mahad@rms.edu` | `Researcher2024!` | Dr. James Okonkwo |
-| Researcher | `amina@rms.edu` | `Researcher2024!` | Amina Yusuf |
 
-**Login shortcuts:** Ethics Committee → `/ethics` · Procurement Officer → `/budgets`
+**Login shortcuts:** Ethics → `/ethics` · Procurement → `/budgets` · Peer Reviewer → `/review-assignments` · HR → `/projects` · Leadership → `/grants` · Donor → `/donor-reports`
 
-Default passwords can be overridden via `backend/.env`: `SEED_DIRECTOR_PASSWORD`, `SEED_COORDINATOR_PASSWORD`, `SEED_FINANCE_PASSWORD`, `SEED_ETHICS_PASSWORD`, `SEED_PROCUREMENT_PASSWORD`, `SEED_RESEARCHER_PASSWORD`.
+Default passwords can be overridden via `backend/.env`: `SEED_DIRECTOR_PASSWORD`, `SEED_COORDINATOR_PASSWORD`, `SEED_FINANCE_PASSWORD`, `SEED_ETHICS_PASSWORD`, `SEED_PROCUREMENT_PASSWORD`, `SEED_REVIEWER_PASSWORD`, `SEED_HR_PASSWORD`, `SEED_LEADERSHIP_PASSWORD`, `SEED_DONOR_PASSWORD`, `SEED_RESEARCHER_PASSWORD`.
 
 ## Scripts
 
 | Command | Description |
 |---------|-------------|
 | `npm run seed` | Bootstrap users and realistic institutional research data |
-| `node src/scripts/verifySeedUsers.js` | Verify all 13 seed accounts (role, portal, password) |
+| `node src/scripts/verifySeedUsers.js` | Verify all 19 seed accounts (role, portal, password) |
 | `npm run db:audit` | Count documents per collection (backend) |
 
 ## Documentation
@@ -107,7 +144,7 @@ All files are in the **`docs/`** folder. Start with **[docs/DOCS_INDEX.md](docs/
 | **[docs/USER_GUIDE_SOM_EN.md](docs/USER_GUIDE_SOM_EN.md)** | Main guide — summary |
 | **[docs/ROLES_AND_STAGES_GUIDE.docx](docs/ROLES_AND_STAGES_GUIDE.docx)** | Roles & stages (Somali, Word) |
 | **[docs/RMS_SYSTEM_DIAGRAM.html](docs/RMS_SYSTEM_DIAGRAM.html)** | System diagram — open in browser |
-| **[docs/URGMS_GAP_ANALYSIS_SOM_EN.md](docs/URGMS_GAP_ANALYSIS_SOM_EN.md)** | URGMS blueprint vs implementation |
+| **[docs/SYSTEM_GAP_ANALYSIS_SOM_EN.md](docs/SYSTEM_GAP_ANALYSIS_SOM_EN.md)** | Full specification vs implementation |
 | **[docs/SPEC_GAP_ANALYSIS.md](docs/SPEC_GAP_ANALYSIS.md)** | Technical module gap analysis |
 
 Generate PDFs (not committed until you run this):

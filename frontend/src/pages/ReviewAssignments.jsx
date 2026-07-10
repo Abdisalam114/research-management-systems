@@ -18,7 +18,7 @@ export function ReviewAssignmentsPage() {
 
   return (
     <div className="pageStack">
-      <PageHeader title="My review assignments" subtitle="Peer review portal (URGMS Step 3)" />
+      <PageHeader title="My review assignments" subtitle="Peer review portal (Phase 3)" />
       {error ? <div className="bannerErr">{error}</div> : null}
       {loading ? <p>Loading...</p> : null}
       <div className="cardList">

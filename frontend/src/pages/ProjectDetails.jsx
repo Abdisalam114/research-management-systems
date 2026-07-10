@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as projectApi from "../services/projectApi";
+import * as analyticsApi from "../services/analyticsApi";
 import { ProjectWorkflowPanel } from "../components/ProjectWorkflowPanel";
 import { ProjectExecutionPanel, CLOSURE_CHECKLIST_ITEMS } from "../components/ProjectExecutionPanel";
 
@@ -321,7 +322,28 @@ export function ProjectDetailsPage() {
       ) : null}
 
       <div className="card" style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>Progress reports</div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ fontWeight: 800 }}>Progress reports</div>
+          <button
+            type="button"
+            className="btn"
+            onClick={async () => {
+              try {
+                const blob = await analyticsApi.downloadTechnicalReportPdf(accessToken, id);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `technical-report-${project.title || "project"}.pdf`;
+                a.click();
+                URL.revokeObjectURL(url);
+              } catch (e) {
+                setError(e?.response?.data?.message || "Failed to download technical report");
+              }
+            }}
+          >
+            Download technical report (PDF)
+          </button>
+        </div>
         {(project.progressReports || []).length === 0 ? (
           <div className="muted">No progress reports yet.</div>
         ) : (
@@ -346,7 +368,7 @@ export function ProjectDetailsPage() {
       />
 
       <div className="card" style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>Project closure (URGMS Step 6)</div>
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>Project closure (Phase 6)</div>
         <p className="muted" style={{ fontSize: 13 }}>Status: {project.closure?.status || "none"} · Project: {project.status}</p>
         {isOwner && (!project.closure?.status || project.closure.status === "none") ? (
           <>

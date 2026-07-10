@@ -7,6 +7,7 @@ import * as grantApi from "../services/grantApi";
 import * as projectApi from "../services/projectApi";
 import * as fundingCallApi from "../services/fundingCallApi";
 import { PageHeader } from "../components/PageHeader";
+import { GrantBudgetLines, defaultBudgetRows, budgetRowsTotal } from "../components/GrantBudgetLines";
 import { filterByStatKey, isAwardedItem, statFilterLabel } from "../utils/pageHeaderFilters";
 
 const GRANT_STATUS_STYLES = {
@@ -100,12 +101,14 @@ export function GrantsPage() {
     projectId: "",
     callId: "",
   });
+  const [budgetRows, setBudgetRows] = useState(defaultBudgetRows);
   const [donorFilter, setDonorFilter] = useState(false);
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
 
   const canCreate = user?.role === "researcher";
   const isDirector = user?.role === "research_director";
-  const canViewAll = ["research_director", "finance_officer", "faculty_coordinator"].includes(user?.role);
+  const isLeadership = user?.role === "leadership";
+  const canViewAll = ["research_director", "finance_officer", "faculty_coordinator", "leadership"].includes(user?.role);
 
   const load = useCallback(async () => {
     const isResearcher = user?.role === "researcher";
@@ -139,6 +142,7 @@ export function GrantsPage() {
         currency: c.currency || "USD",
         amountRequested: c.amountCap || f.amountRequested,
       }));
+      setBudgetRows(defaultBudgetRows().map((r) => ({ ...r, currency: c.currency || "USD" })));
       setShowForm(true);
     }).catch(() => {});
   }, [callIdFromUrl, accessToken]);
@@ -173,16 +177,16 @@ export function GrantsPage() {
     <div>
       <PageHeader
         title="Grants & Funding"
-        subtitle="Track grant submissions, donor funding, and director approval."
+        subtitle="Apply via Funding Calls — budget and optional project link on call applications only."
         stats={stats}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
         actions={
           <>
             {canCreate ? (
-              <button type="button" className="btn primary" onClick={() => setShowForm((v) => !v)}>
-                {showForm ? "Close form" : "+ New grant"}
-              </button>
+              <Link className="btn primary" to="/funding-calls">
+                Apply via Funding Calls
+              </Link>
             ) : null}
             {isDirector ? (
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
@@ -210,9 +214,20 @@ export function GrantsPage() {
         </div>
       ) : null}
 
-      {canCreate && showForm ? (
+      {canCreate && !callIdFromUrl && !showForm ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Grant applications are only created from an open <Link to="/funding-calls">Funding Call</Link>.
+        </p>
+      ) : null}
+
+      {canCreate && showForm && (linkedCall || form.callId) ? (
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800 }}>New Grant</div>
+          <div style={{ fontWeight: 800 }}>Apply to funding call</div>
+          {linkedCall ? (
+            <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+              Call: <strong>{linkedCall.title}</strong> — budget required; project link optional.
+            </p>
+          ) : null}
           <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
             <div className="row">
               <div className="field">
@@ -221,33 +236,30 @@ export function GrantsPage() {
               </div>
               <div className="field">
                 <label>Funding source</label>
-                <input
-                  value={form.fundingSource}
-                  onChange={(e) => setForm((f) => ({ ...f, fundingSource: e.target.value }))}
-                />
+                <input value={form.fundingSource} disabled />
               </div>
             </div>
             <div className="row">
               <div className="field" style={{ flex: 2 }}>
-                <label>Research project (required)</label>
+                <label>Research project (optional — funding call only)</label>
                 <select
                   value={form.projectId}
                   onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))}
                 >
-                  <option value="">— Select your project —</option>
+                  <option value="">— No project (voluntary) —</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.title} ({p.status})
                     </option>
                   ))}
                 </select>
-                {projects.length === 0 ? (
-                  <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                    No projects yet. Approve a proposal first to create a research project.
-                  </p>
-                ) : null}
               </div>
             </div>
+            <GrantBudgetLines
+              budgetRows={budgetRows}
+              setBudgetRows={setBudgetRows}
+              currency={form.currency || "USD"}
+            />
             <div className="row">
               <div className="field">
                 <label>Donor reference (external donor)</label>
@@ -258,12 +270,8 @@ export function GrantsPage() {
                 />
               </div>
               <div className="field">
-                <label>Amount requested</label>
-                <input
-                  type="number"
-                  value={form.amountRequested}
-                  onChange={(e) => setForm((f) => ({ ...f, amountRequested: Number(e.target.value) }))}
-                />
+                <label>Total requested (from budget lines)</label>
+                <input type="number" value={budgetRowsTotal(budgetRows)} readOnly />
               </div>
               <div className="field">
                 <label>Currency</label>
@@ -276,19 +284,40 @@ export function GrantsPage() {
               onClick={async () => {
                 try {
                   setError("");
-                  if (!form.projectId) {
-                    setError("Please select a research project for this grant");
+                  if (!form.callId) {
+                    setError("Funding call is required");
                     return;
                   }
-                  await grantApi.createGrant(accessToken, form);
+                  const lines = budgetRows
+                    .filter((r) => r.category || r.description || Number(r.amount) > 0)
+                    .map((r) => ({
+                      category: r.category,
+                      description: r.description,
+                      amount: Number(r.amount) || 0,
+                      currency: r.currency || form.currency || "USD",
+                    }));
+                  const payload = {
+                    ...form,
+                    projectId: form.projectId || undefined,
+                    amountRequested: budgetRowsTotal(budgetRows),
+                    budgetBreakdown: lines,
+                  };
+                  if (!payload.title?.trim()) {
+                    setError("Title is required");
+                    return;
+                  }
+                  await grantApi.createGrant(accessToken, payload);
                   setForm({
                     title: "",
                     fundingSource: "",
                     donorRef: "",
                     amountRequested: 0,
                     currency: "USD",
-                    projectId: projects.length === 1 ? projects[0].id : "",
+                    projectId: "",
+                    callId: "",
                   });
+                  setBudgetRows(defaultBudgetRows());
+                  setLinkedCall(null);
                   setShowForm(false);
                   await reload();
                 } catch (e) {
@@ -296,7 +325,7 @@ export function GrantsPage() {
                 }
               }}
             >
-              Create
+              Create draft application
             </button>
           </div>
         </div>
@@ -324,24 +353,29 @@ export function GrantsPage() {
                         {g.project.title}
                       </Link>
                     </div>
-                  ) : (
-                    <div style={{ marginTop: 6, fontSize: 13, color: "#fbbf24" }}>
-                      No linked research project
+                  ) : g.callId ? (
+                    <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
+                      No project linked (optional)
                     </div>
-                  )}
+                  ) : null}
+                  {g.fundingCall?.title ? (
+                    <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+                      Funding call: {g.fundingCall.title}
+                    </div>
+                  ) : null}
                   <GrantAmounts grant={g} />
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   {canViewAll || canCreate ? (
                     <Link
-                      className={isDirector && g.status === "submitted" ? "btn primary" : "btn"}
+                      className={(isDirector || isLeadership) && g.status === "submitted" ? "btn primary" : "btn"}
                       to={`/grants/${g.id}`}
                       title="View full grant details before deciding"
                     >
                       View details
                     </Link>
                   ) : null}
-                  {canCreate && g.status === "draft" ? (
+                  {canCreate && g.status === "draft" && g.callId ? (
                     <button
                       type="button"
                       className="btn"

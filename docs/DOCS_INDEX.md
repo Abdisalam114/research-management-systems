@@ -18,7 +18,7 @@ All documentation lives in the **`docs/`** folder at the project root.
 
 | File | Description |
 |------|-------------|
-| [URGMS_GAP_ANALYSIS_SOM_EN.md](./URGMS_GAP_ANALYSIS_SOM_EN.md) | URGMS blueprint vs built system (Somali + English) |
+| [SYSTEM_GAP_ANALYSIS_SOM_EN.md](./SYSTEM_GAP_ANALYSIS_SOM_EN.md) | Full specification vs built system (Somali + English) |
 | [SPEC_GAP_ANALYSIS.md](./SPEC_GAP_ANALYSIS.md) | Module-by-module technical gap analysis |
 
 ## Examples / Tusaalooyin

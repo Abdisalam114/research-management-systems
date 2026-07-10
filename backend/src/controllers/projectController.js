@@ -2,12 +2,15 @@ const { Project, PROJECT_STATUSES, CLOSURE_STATUSES } = require("../models/Proje
 const { Grant } = require("../models/Grant");
 const { Proposal, PROPOSAL_STATUSES } = require("../models/Proposal");
 const { Publication, PUBLICATION_STATUSES } = require("../models/Publication");
+const { RepositoryItem, REPOSITORY_ITEM_TYPES, REPOSITORY_ACCESS } = require("../models/RepositoryItem");
+const path = require("path");
 const { AppError } = require("../utils/AppError");
 const { userDisplayName } = require("../utils/userDisplay");
 const { resolvePrincipalInvestigatorId, resolvePrincipalInvestigatorName } = require("../utils/projectPrincipalInvestigator");
 const { buildWorkflowForProject, canViewProjectAwards, sanitizeLinkedGrantsForViewer } = require("../utils/researchJourney");
 const { recordAudit } = require("../utils/audit");
 const { notifyUsersByRole, notifyUser } = require("../utils/notify");
+const { writeSimplePdf } = require("../utils/pdf");
 
 function normalizeTeamMembers(team) {
   if (!Array.isArray(team)) return [];
@@ -87,7 +90,7 @@ async function getProject(req, res) {
   if (!project) throw new AppError("Project not found", 404);
 
   const isOwner = String(project.researcherId?._id || project.researcherId) === String(req.user.id);
-  const isStaff = ["faculty_coordinator", "research_director", "finance_officer", "procurement_officer", "ethics_committee"].includes(req.user.role);
+  const isStaff = ["faculty_coordinator", "research_director", "finance_officer", "procurement_officer", "ethics_committee", "hr_officer"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
   const grantDocs = await Grant.find(req.tierWhere({ projectId: id })).sort({ createdAt: -1 }).select("title status amountRequested amountAwarded currency fundingSource");
@@ -310,6 +313,39 @@ async function archiveProject(req, res) {
   project.status = PROJECT_STATUSES.CLOSED;
   await project.save();
 
+  const archiveDir = path.join(process.cwd(), "uploads", "repository", String(project._id));
+  const archiveFile = path.join(archiveDir, `closure-${Date.now()}.pdf`);
+  const lines = [
+    `Project: ${project.title}`,
+    `Status: Closed / Archived`,
+    `Final report: ${project.closure?.finalReport || "—"}`,
+    `Lessons learned: ${project.closure?.lessonsLearned || "—"}`,
+    `Archived at: ${new Date().toISOString()}`,
+  ];
+  await writeSimplePdf({
+    filePath: archiveFile,
+    title: "Project Closure Archive",
+    author: "Jamhuriya RMS",
+    bodyLines: lines,
+  });
+
+  const existingRepo = await RepositoryItem.findOne({
+    projectId: project._id,
+    title: { $regex: /^Project closure archive:/i },
+  });
+  if (!existingRepo) {
+    await RepositoryItem.create(req.tierAssign({
+      type: REPOSITORY_ITEM_TYPES.DOCUMENT,
+      title: `Project closure archive: ${project.title}`,
+      description: project.closure?.finalReport || "Archived on project closure",
+      filePath: archiveFile.replace(/\\/g, "/"),
+      fileSize: 0,
+      access: REPOSITORY_ACCESS.INSTITUTION,
+      projectId: project._id,
+      uploadedBy: project.researcherId,
+    }));
+  }
+
   try {
     await notifyUser(project.researcherId, {
       type: "project",
@@ -334,6 +370,41 @@ async function archiveProject(req, res) {
   res.json({ message: "Project archived", project: sanitizeProject(project) });
 }
 
+async function exportTechnicalReportPdf(req, res) {
+  const project = await Project.findOne(req.tierWhere({ _id: req.params.id })).populate(PROJECT_POPULATE);
+  if (!project) throw new AppError("Project not found", 404);
+
+  const isOwner = String(project.researcherId?._id || project.researcherId) === String(req.user.id);
+  const isStaff = ["research_director", "faculty_coordinator", "finance_officer", "leadership"].includes(req.user.role);
+  if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+
+  const reports = project.progressReports || [];
+  const lines = [
+    `Project: ${project.title}`,
+    `PI: ${userDisplayName(project.researcherId)}`,
+    `Status: ${project.status}`,
+    `Period: ${project.startDate ? new Date(project.startDate).toLocaleDateString() : "—"} – ${project.endDate ? new Date(project.endDate).toLocaleDateString() : "—"}`,
+    "",
+    "Progress reports:",
+    ...(reports.length
+      ? reports.map((r, i) => `${i + 1}. ${r.reportDate ? new Date(r.reportDate).toLocaleDateString() : "—"} — ${r.summary || r.narrative || "—"} (${r.progressPercent ?? "—"}%)`)
+      : ["No progress reports submitted yet."]),
+    "",
+    `Generated: ${new Date().toISOString()}`,
+  ];
+
+  const outDir = path.join(process.cwd(), "uploads", "reports");
+  const outFile = path.join(outDir, `technical-${project._id}-${Date.now()}.pdf`);
+  await writeSimplePdf({
+    filePath: outFile,
+    title: "Technical Progress Report",
+    author: userDisplayName(project.researcherId),
+    bodyLines: lines,
+  });
+
+  res.download(outFile, `technical-report-${project.title.replace(/[^\w.-]+/g, "_").slice(0, 40)}.pdf`);
+}
+
 async function addCommunicationLog(req, res) {
   const { type, subject, body } = req.body || {};
   if (!body?.trim()) throw new AppError("body is required", 400);
@@ -342,7 +413,7 @@ async function addCommunicationLog(req, res) {
   if (!project) throw new AppError("Project not found", 404);
 
   const isOwner = String(project.researcherId) === String(req.user.id);
-  const isStaff = ["research_director", "faculty_coordinator", "finance_officer", "procurement_officer"].includes(req.user.role);
+  const isStaff = ["research_director", "faculty_coordinator", "finance_officer", "procurement_officer", "hr_officer"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
   project.communicationLog.unshift({
@@ -403,6 +474,7 @@ module.exports = {
   directorClosureApproval,
   financeClosureApproval,
   archiveProject,
+  exportTechnicalReportPdf,
   addCommunicationLog,
   backfillProjectFromApprovedProposal,
 };

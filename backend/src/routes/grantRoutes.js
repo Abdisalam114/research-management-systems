@@ -35,7 +35,7 @@ router.post(
   "/:id/director-decision",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("research_director"),
+  authorizeRoles("research_director", "leadership"),
   asyncHandler(grantController.directorDecision)
 );
 

@@ -26,6 +26,16 @@ const grantSchema = new mongoose.Schema(
     projectId: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null, index: true },
     callId: { type: mongoose.Schema.Types.ObjectId, ref: "FundingCall", default: null, index: true },
 
+    budgetBreakdown: [
+      {
+        category: { type: String, default: "", trim: true },
+        description: { type: String, default: "", trim: true },
+        amount: { type: Number, default: 0, min: 0 },
+        currency: { type: String, default: "USD", trim: true, uppercase: true },
+      },
+    ],
+    budgetTotal: { type: Number, default: 0, min: 0 },
+
     financeApprovedAt: { type: Date, default: null },
     financeApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
     financeComment: { type: String, default: "" },

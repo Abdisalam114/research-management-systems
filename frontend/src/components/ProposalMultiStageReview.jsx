@@ -45,7 +45,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
 
   return (
     <div className="card" style={{ marginTop: 12 }}>
-      <div style={{ fontWeight: 800, marginBottom: 8 }}>Multi-stage review (URGMS Step 3)</div>
+      <div style={{ fontWeight: 800, marginBottom: 8 }}>Multi-stage review (Phase 3)</div>
       <p className="muted" style={{ fontSize: 13 }}>Current stage: <strong>{STAGE_LABELS[stage] || stage}</strong></p>
       {err ? <div className="bannerErr">{err}</div> : null}
 

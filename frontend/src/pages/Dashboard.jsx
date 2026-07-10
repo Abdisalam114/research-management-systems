@@ -30,9 +30,13 @@ function RoleDashboard({ role, user }) {
   }, [accessToken]);
 
   const roleHints = {
-    faculty_coordinator: { title: "Faculty Coordinator", focus: "Review proposals and validate publications." },
-    finance_officer: { title: "Finance Officer", focus: "Manage budgets, grants, and payment workflows." },
-    researcher: { title: "Researcher", focus: "Manage your proposals, projects, and publications." },
+    faculty_coordinator: { title: "Department (Faculty Coordinator)", focus: "Support and approve internal department priority." },
+    finance_officer: { title: "Finance Office", focus: "Approve budgets, track expenses, financial reports." },
+    researcher: { title: "Researcher / PI", focus: "Apply for grants, submit proposals, manage projects, reports." },
+    peer_reviewer: { title: "Peer Reviewer", focus: "Evaluate proposal quality and scientific merit." },
+    hr_officer: { title: "HR Office", focus: "Project teams, thesis groups, and staff coordination." },
+    leadership: { title: "University Leadership", focus: "Final approval of grant awards." },
+    donor_agency: { title: "Donor / External Agency", focus: "Monitor funded grants and periodic reports." },
   };
 
   const hint = roleHints[role] || { title: role, focus: "" };

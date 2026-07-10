@@ -5,11 +5,15 @@ import * as userApi from "../services/userApi";
 import { formatRole } from "../utils/roleLabels";
 
 const CREATE_ROLES = [
-  { value: "researcher", label: "Researcher" },
-  { value: "faculty_coordinator", label: "Faculty Coordinator" },
+  { value: "researcher", label: "Researcher / PI" },
+  { value: "faculty_coordinator", label: "Faculty Coordinator (Department)" },
   { value: "finance_officer", label: "Finance Officer" },
   { value: "ethics_committee", label: "Ethics Committee" },
   { value: "procurement_officer", label: "Procurement Officer" },
+  { value: "peer_reviewer", label: "Peer Reviewer" },
+  { value: "hr_officer", label: "HR Officer" },
+  { value: "leadership", label: "University Leadership" },
+  { value: "donor_agency", label: "Donor / External Agency" },
 ];
 
 const emptyForm = {

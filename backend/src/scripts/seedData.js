@@ -56,21 +56,48 @@ const PORTAL_USER_SPECS = {
       status: USER_STATUSES.ACTIVE,
     },
     {
+      fullName: "Dr. Omar Khaled",
+      email: "reviewer@rms.edu",
+      password: process.env.SEED_REVIEWER_PASSWORD || "Reviewer2024!",
+      role: ROLES.PEER_REVIEWER,
+      department: "Faculty of Science",
+      rank: "Peer Reviewer",
+      status: USER_STATUSES.ACTIVE,
+    },
+    {
+      fullName: "Fatima Ahmed",
+      email: "hr@rms.edu",
+      password: process.env.SEED_HR_PASSWORD || "Hr2024!",
+      role: ROLES.HR_OFFICER,
+      department: "HR Office",
+      rank: "Officer",
+      status: USER_STATUSES.ACTIVE,
+    },
+    {
+      fullName: "Prof. Ibrahim Warsame",
+      email: "leadership@rms.edu",
+      password: process.env.SEED_LEADERSHIP_PASSWORD || "Leadership2024!",
+      role: ROLES.LEADERSHIP,
+      department: "University Leadership",
+      rank: "Vice Chancellor",
+      status: USER_STATUSES.ACTIVE,
+    },
+    {
+      fullName: "UNESCO Program Liaison",
+      email: "donor@rms.edu",
+      password: process.env.SEED_DONOR_PASSWORD || "Donor2024!",
+      role: ROLES.DONOR_AGENCY,
+      department: "External Donor Agency",
+      rank: "Program Officer",
+      status: USER_STATUSES.ACTIVE,
+    },
+    {
       fullName: "Dr. Sarah Chen",
       email: "asha@rms.edu",
       password: process.env.SEED_RESEARCHER_PASSWORD || "Researcher2024!",
       role: ROLES.RESEARCHER,
       department: "Computer Science",
       rank: "Lecturer",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
-      fullName: "Dr. Priya Sharma",
-      email: "sahra@rms.edu",
-      password: process.env.SEED_RESEARCHER_PASSWORD || "Researcher2024!",
-      role: ROLES.RESEARCHER,
-      department: "Information Technology",
-      rank: "Assistant Lecturer",
       status: USER_STATUSES.ACTIVE,
     },
   ],
@@ -112,21 +139,48 @@ const PORTAL_USER_SPECS = {
       status: USER_STATUSES.ACTIVE,
     },
     {
+      fullName: "Dr. Layla Hassan",
+      email: "reviewer.pg@rms.edu",
+      password: process.env.SEED_REVIEWER_PASSWORD || "Reviewer2024!",
+      role: ROLES.PEER_REVIEWER,
+      department: "Graduate Research",
+      rank: "Peer Reviewer",
+      status: USER_STATUSES.ACTIVE,
+    },
+    {
+      fullName: "Yusuf Ali",
+      email: "hr.pg@rms.edu",
+      password: process.env.SEED_HR_PASSWORD || "Hr2024!",
+      role: ROLES.HR_OFFICER,
+      department: "HR Office",
+      rank: "Officer",
+      status: USER_STATUSES.ACTIVE,
+    },
+    {
+      fullName: "Prof. Halima Nur",
+      email: "leadership.pg@rms.edu",
+      password: process.env.SEED_LEADERSHIP_PASSWORD || "Leadership2024!",
+      role: ROLES.LEADERSHIP,
+      department: "University Leadership",
+      rank: "Deputy Vice Chancellor",
+      status: USER_STATUSES.ACTIVE,
+    },
+    {
+      fullName: "WHO EMRO Liaison",
+      email: "donor.pg@rms.edu",
+      password: process.env.SEED_DONOR_PASSWORD || "Donor2024!",
+      role: ROLES.DONOR_AGENCY,
+      department: "External Donor Agency",
+      rank: "Grant Monitor",
+      status: USER_STATUSES.ACTIVE,
+    },
+    {
       fullName: "Dr. James Okonkwo",
       email: "mahad@rms.edu",
       password: process.env.SEED_RESEARCHER_PASSWORD || "Researcher2024!",
       role: ROLES.RESEARCHER,
       department: "Engineering",
       rank: "Assistant Professor",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
-      fullName: "Amina Yusuf",
-      email: "amina@rms.edu",
-      password: process.env.SEED_RESEARCHER_PASSWORD || "Researcher2024!",
-      role: ROLES.RESEARCHER,
-      department: "Public Health",
-      rank: "Senior Lecturer",
       status: USER_STATUSES.ACTIVE,
     },
   ],
@@ -144,6 +198,9 @@ function buildInstitutionalUsers() {
 
 const INSTITUTIONAL_USERS = buildInstitutionalUsers();
 
+/** Former seed accounts removed from institutional roster (cleaned on seed). */
+const REMOVED_INSTITUTIONAL_EMAILS = ["sahra@rms.edu", "amina@rms.edu"];
+
 const PORTAL_ORDER = [PROGRAM_TIERS.UNDERGRADUATE, PROGRAM_TIERS.POSTGRADUATE];
 
 module.exports = {
@@ -151,5 +208,6 @@ module.exports = {
   PORTAL_USER_SPECS,
   PORTAL_ORDER,
   INSTITUTIONAL_USERS,
+  REMOVED_INSTITUTIONAL_EMAILS,
   PROGRAM_TIERS,
 };

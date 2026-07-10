@@ -29,7 +29,7 @@ const { writeSimplePdf } = require("../utils/pdf");
 const { syncGrantAwards } = require("../utils/syncGrantAwards");
 const { syncGrantProjectLinks } = require("../utils/syncGrantProjectLinks");
 const { defaultChapters, TITLE_PROPOSAL_STATUSES, MIN_THESIS_GROUP_STUDENTS } = require("../utils/thesisDefaults");
-const { INSTITUTIONAL_USERS, PORTAL_ORDER, PROGRAM_TIERS } = require("./seedData");
+const { INSTITUTIONAL_USERS, PORTAL_ORDER, PROGRAM_TIERS, REMOVED_INSTITUTIONAL_EMAILS } = require("./seedData");
 const {
   RECORDS_PER_TIER,
   MAX_SAMPLE_RECORDS,
@@ -97,6 +97,10 @@ async function seedUsers() {
   for (const spec of INSTITUTIONAL_USERS) {
     const u = await upsertUser(spec);
     users[spec.email.toLowerCase()] = u;
+  }
+
+  for (const email of REMOVED_INSTITUTIONAL_EMAILS) {
+    await User.deleteOne({ email: String(email).toLowerCase().trim() });
   }
 
   const legacyAdmin = await User.findOne({ email: "admin@rms.edu" }).select("+password");

@@ -8,6 +8,10 @@ const ROLES = Object.freeze({
   FINANCE_OFFICER: "finance_officer",
   ETHICS_COMMITTEE: "ethics_committee",
   PROCUREMENT_OFFICER: "procurement_officer",
+  PEER_REVIEWER: "peer_reviewer",
+  HR_OFFICER: "hr_officer",
+  LEADERSHIP: "leadership",
+  DONOR_AGENCY: "donor_agency",
   RESEARCHER: "researcher",
 });
 

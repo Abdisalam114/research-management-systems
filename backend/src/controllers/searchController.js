@@ -54,7 +54,7 @@ async function globalSearch(req, res) {
       projects: projects.map((p) => ({ id: p._id, title: p.title, status: p.status, type: "project", link: `/projects/${p._id}` })),
       grants: grants.map((g) => ({ id: g._id, title: g.title, status: g.status, type: "grant", link: `/grants/${g._id}` })),
       publications: publications.map((p) => ({ id: p._id, title: p.title, status: p.status, type: "publication", link: "/publications" })),
-      fundingCalls: calls.map((c) => ({ id: c._id, title: c.title, status: c.status, type: "funding_call", link: `/funding-calls/${c._id}` })),
+      fundingCalls: calls.map((c) => ({ id: c._id, title: c.title, status: c.status, type: "funding_call", link: `/grants?callId=${c._id}` })),
       repository: repository.map((r) => ({ id: r._id, title: r.title, type: r.type, link: "/repository" })),
     },
   });

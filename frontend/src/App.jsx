@@ -34,6 +34,8 @@ import { ProgramTierSelectPage } from "./pages/ProgramTierSelect";
 import { AuditTrailPage } from "./pages/AuditTrailPage";
 import { FinanceReportsPage } from "./pages/FinanceReports";
 import { DonorReportsPage } from "./pages/DonorReportsPage";
+import { KpiDashboardPage } from "./pages/KpiDashboardPage";
+import { GlobalSearchPage } from "./pages/GlobalSearchPage";
 
 export default function App() {
   return (
@@ -49,9 +51,12 @@ export default function App() {
           <Route path="/analytics" element={<Navigate to="/dashboard#institutional-analytics" replace />} />
           <Route path="/profile" element={<ProfilePage />} />
 
-          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "finance_officer", "ethics_committee", "procurement_officer"]} />}>
-            <Route path="/notifications" element={<NotificationsPage />} />
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "finance_officer", "hr_officer"]} />}>
             <Route path="/messages" element={<MessagesPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "finance_officer", "ethics_committee", "procurement_officer", "peer_reviewer", "hr_officer", "leadership", "donor_agency"]} />}>
+            <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/collaboration" element={<CollaborationPage />} />
           </Route>
 
@@ -64,7 +69,7 @@ export default function App() {
             <Route path="/faculty-dashboard" element={<CoordinatorDashboardPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={["research_director", "finance_officer"]} />}>
+          <Route element={<ProtectedRoute roles={["research_director", "finance_officer", "donor_agency"]} />}>
             <Route path="/finance-reports" element={<FinanceReportsPage />} />
             <Route path="/donor-reports" element={<DonorReportsPage />} />
           </Route>
@@ -72,6 +77,12 @@ export default function App() {
           <Route element={<ProtectedRoute roles={["research_director", "faculty_coordinator"]} />}>
             <Route path="/audit-trail" element={<AuditTrailPage />} />
           </Route>
+
+          <Route element={<ProtectedRoute roles={["research_director", "faculty_coordinator", "finance_officer", "leadership"]} />}>
+            <Route path="/kpi-dashboard" element={<KpiDashboardPage />} />
+          </Route>
+
+          <Route path="/search" element={<GlobalSearchPage />} />
 
           <Route path="/payments" element={<Navigate to="/budgets" replace />} />
           <Route path="/procurement" element={<Navigate to="/budgets" replace />} />
@@ -84,12 +95,9 @@ export default function App() {
               <Route path="/proposals/:id/edit" element={<ProposalFormPage />} />
             </Route>
             <Route path="/proposals/:id" element={<ProposalDetailsPage />} />
-            <Route element={<ProtectedRoute roles={["faculty_coordinator", "research_director", "finance_officer"]} />}>
-              <Route path="/proposals/:id/review" element={<ProposalReviewPage />} />
-            </Route>
           </Route>
 
-          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director"]} />}>
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "hr_officer"]} />}>
             <Route path="/projects" element={<ProjectsListPage />} />
             <Route path="/projects/:id" element={<ProjectDetailsPage />} />
             <Route element={<ProtectedRoute roles={["researcher"]} />}>
@@ -97,7 +105,7 @@ export default function App() {
             </Route>
           </Route>
 
-          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director"]} />}>
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "hr_officer"]} />}>
             <Route path="/research-journey" element={<Navigate to="/projects" replace />} />
             <Route path="/publications" element={<PublicationsPage />} />
             <Route path="/research-workflow" element={<ResearchWorkflowPage />} />
@@ -105,19 +113,23 @@ export default function App() {
             <Route path="/groups" element={<GroupsPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director"]} />}>
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "hr_officer"]} />}>
             <Route path="/thesis" element={<ThesisGroupsPage />} />
             <Route path="/thesis-groups" element={<Navigate to="/thesis" replace />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "finance_officer"]} />}>
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "finance_officer", "leadership"]} />}>
             <Route path="/grants" element={<GrantsPage />} />
             <Route path="/grants/:id" element={<GrantDetailsPage />} />
             <Route path="/funding-calls" element={<FundingCallsPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director"]} />}>
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "peer_reviewer"]} />}>
             <Route path="/review-assignments" element={<ReviewAssignmentsPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute roles={["peer_reviewer", "faculty_coordinator", "research_director", "finance_officer"]} />}>
+            <Route path="/proposals/:id/review" element={<ProposalReviewPage />} />
           </Route>
 
           <Route element={<ProtectedRoute roles={["researcher", "finance_officer", "research_director", "procurement_officer"]} />}>

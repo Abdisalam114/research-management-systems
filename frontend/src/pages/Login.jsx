@@ -76,6 +76,10 @@ export function LoginPage() {
                 const roleHome = {
                   ethics_committee: "/ethics",
                   procurement_officer: "/budgets",
+                  peer_reviewer: "/review-assignments",
+                  hr_officer: "/projects",
+                  leadership: "/grants",
+                  donor_agency: "/donor-reports",
                 };
                 navigate(roleHome[res.user?.role] || redirectTo, { replace: true });
               } catch (e) {

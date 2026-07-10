@@ -6,6 +6,22 @@ const { ensureBudgetForGrant } = require("../utils/ensureBudgetForGrant");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
 const { recordAudit } = require("../utils/audit");
 
+const { normalizeBudgetBreakdown } = require("../utils/budgetBreakdown");
+const { assertEligibleForCall } = require("../utils/fundingCallEligibility");
+const { ROLES } = require("../models/User");
+
+function parseBudgetField(body) {
+  if (!body?.budgetBreakdown) return null;
+  if (typeof body.budgetBreakdown === "string") {
+    try {
+      return normalizeBudgetBreakdown(JSON.parse(body.budgetBreakdown));
+    } catch {
+      return null;
+    }
+  }
+  return normalizeBudgetBreakdown(body.budgetBreakdown);
+}
+
 function sanitizeGrant(g) {
   const researcherRef = g.researcherId;
   const projectRef = g.projectId;
@@ -30,6 +46,8 @@ function sanitizeGrant(g) {
     createdAt: g.createdAt,
     updatedAt: g.updatedAt,
     programTier: g.programTier,
+    budgetBreakdown: g.budgetBreakdown || [],
+    budgetTotal: g.budgetTotal || 0,
   };
   if (projectRef?._id) out.project = sanitizeProjectSummary(projectRef);
   if (callRef?._id) {
@@ -39,9 +57,7 @@ function sanitizeGrant(g) {
 }
 
 async function resolveGrantProjectId(req, projectId, researcherId) {
-  if (!projectId) {
-    throw new AppError("projectId is required — select your research project for this grant", 400);
-  }
+  if (!projectId) return null;
   const project = await Project.findOne(req.tierWhere({ _id: projectId, researcherId }));
   if (!project) throw new AppError("Research project not found or does not belong to you", 404);
   return project._id;
@@ -117,7 +133,7 @@ async function getGrant(req, res) {
   if (!grant) throw new AppError("Grant not found", 404);
 
   const isOwner = String(grant.researcherId?._id || grant.researcherId) === String(req.user.id);
-  const isStaff = ["research_director", "finance_officer", "faculty_coordinator"].includes(req.user.role);
+  const isStaff = ["research_director", "finance_officer", "faculty_coordinator", "leadership"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
   res.json({ grant: sanitizeGrantDetail(grant) });
@@ -126,26 +142,37 @@ async function getGrant(req, res) {
 async function createGrant(req, res) {
   const { title, fundingSource, amountRequested, currency, donorRef, complianceNotes, projectId, callId } = req.body || {};
   if (!title) throw new AppError("title is required", 400);
-  if (typeof amountRequested !== "number" || amountRequested < 0) {
-    throw new AppError("amountRequested must be a non-negative number", 400);
+  if (!callId) {
+    throw new AppError("Grant applications must be created through an open funding call", 400);
   }
 
-  const linkedProjectId = await resolveGrantProjectId(req, projectId, req.user.id);
   const call = await resolveOpenCall(req, callId);
-  const source = call ? call.fundingSource : fundingSource;
-  if (!source) throw new AppError("fundingSource is required when not applying to a call", 400);
+  if (req.user.role === ROLES.RESEARCHER) {
+    assertEligibleForCall(req, call);
+  }
+  const budgetFields = parseBudgetField(req.body);
+  if (budgetFields?.budgetBreakdown?.length && !call) {
+    throw new AppError("Line-item budget is only allowed when applying to an open funding call", 400);
+  }
+
+  let requested = typeof amountRequested === "number" ? amountRequested : Number(amountRequested) || 0;
+  if (budgetFields?.budgetTotal > 0) requested = budgetFields.budgetTotal;
+  if (requested < 0) throw new AppError("amountRequested must be a non-negative number", 400);
+
+  const linkedProjectId = projectId ? await resolveGrantProjectId(req, projectId, req.user.id) : null;
 
   const grant = await Grant.create(req.tierAssign({
     title: String(title).trim(),
-    fundingSource: String(source).trim(),
-    amountRequested,
-    currency: currency ? String(currency).trim().toUpperCase() : call?.currency || "USD",
-    donorRef: donorRef ? String(donorRef).trim() : call?.donorRef || "",
+    fundingSource: String(call.fundingSource).trim(),
+    amountRequested: requested,
+    currency: currency ? String(currency).trim().toUpperCase() : budgetFields?.budgetCurrency || call.currency || "USD",
+    donorRef: donorRef ? String(donorRef).trim() : call.donorRef || "",
     complianceNotes: complianceNotes ? String(complianceNotes) : "",
     projectId: linkedProjectId,
-    callId: call?._id || null,
+    callId: call._id,
     researcherId: req.user.id,
     status: GRANT_STATUSES.DRAFT,
+    ...(budgetFields || { budgetBreakdown: [], budgetTotal: 0 }),
   }));
 
   await recordAudit({
@@ -181,20 +208,29 @@ async function updateGrant(req, res) {
   if (donorRef !== undefined) grant.donorRef = String(donorRef).trim();
   if (complianceNotes !== undefined) grant.complianceNotes = String(complianceNotes);
   if (projectId !== undefined) {
-    grant.projectId = await resolveGrantProjectId(req, projectId, req.user.id);
+    if (!grant.callId) {
+      throw new AppError("Project link is only available for funding call applications", 400);
+    }
+    grant.projectId = projectId ? await resolveGrantProjectId(req, projectId, req.user.id) : null;
   }
   if (callId !== undefined) {
     if (!callId) {
-      grant.callId = null;
-      if (fundingSource !== undefined) grant.fundingSource = String(fundingSource).trim();
-    } else {
-      const call = await resolveOpenCall(req, callId);
-      grant.callId = call._id;
-      grant.fundingSource = call.fundingSource;
-      grant.donorRef = call.donorRef || grant.donorRef;
+      throw new AppError("Funding call cannot be removed from a grant application", 400);
     }
-  } else if (fundingSource !== undefined && !grant.callId) {
-    grant.fundingSource = String(fundingSource).trim();
+    const call = await resolveOpenCall(req, callId);
+    grant.callId = call._id;
+    grant.fundingSource = call.fundingSource;
+    grant.donorRef = call.donorRef || grant.donorRef;
+  }
+
+  const budgetFields = parseBudgetField(req.body);
+  if (budgetFields) {
+    if (budgetFields.budgetBreakdown?.length && !grant.callId) {
+      throw new AppError("Line-item budget is only allowed for funding call applications", 400);
+    }
+    grant.budgetBreakdown = budgetFields.budgetBreakdown;
+    grant.budgetTotal = budgetFields.budgetTotal;
+    if (budgetFields.budgetTotal > 0) grant.amountRequested = budgetFields.budgetTotal;
   }
 
   await grant.save();
@@ -206,7 +242,9 @@ async function submitGrant(req, res) {
   const grant = await Grant.findOne(req.tierWhere({ _id: req.params.id }));
   if (!grant) throw new AppError("Grant not found", 404);
   if (String(grant.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
-  if (!grant.projectId) throw new AppError("Link a research project before submitting this grant", 400);
+  if (!grant.callId) {
+    throw new AppError("Only grant applications linked to a funding call can be submitted", 400);
+  }
   if (grant.status !== GRANT_STATUSES.DRAFT) throw new AppError("Only draft grants can be submitted", 400);
 
   grant.status = GRANT_STATUSES.SUBMITTED;

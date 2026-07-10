@@ -139,21 +139,6 @@ function parseJsonField(raw, fallback = null) {
   }
 }
 
-function normalizeBudgetBreakdown(raw) {
-  const rows = Array.isArray(raw) ? raw : [];
-  const budgetBreakdown = rows
-    .map((r) => ({
-      category: String(r.category || "").trim(),
-      description: String(r.description || "").trim(),
-      amount: Number(r.amount) || 0,
-      currency: String(r.currency || "USD").trim() || "USD",
-    }))
-    .filter((r) => r.category || r.description || r.amount > 0);
-  const budgetTotal = budgetBreakdown.reduce((sum, r) => sum + (r.amount || 0), 0);
-  const budgetCurrency = budgetBreakdown[0]?.currency || "USD";
-  return { budgetBreakdown, budgetTotal, budgetCurrency };
-}
-
 function applyProposalDocuments(proposal, req) {
   const complianceMeta = parseJsonField(req.body?.complianceMeta, null);
   const supportingMeta = parseJsonField(req.body?.supportingMeta, null);
@@ -194,7 +179,6 @@ async function createProposal(req, res) {
 
   const document = req.files?.document?.[0] ? `/uploads/${req.files.document[0].filename}` : (req.file ? `/uploads/${req.file.filename}` : null);
   const needsEthics = requiresEthics !== "false" && requiresEthics !== false;
-  const budget = normalizeBudgetBreakdown(parseJsonField(req.body?.budgetBreakdown, []));
 
   const proposal = await Proposal.create(req.tierAssign({
     title,
@@ -202,7 +186,9 @@ async function createProposal(req, res) {
     department,
     researchArea,
     document,
-    ...budget,
+    budgetBreakdown: [],
+    budgetTotal: 0,
+    budgetCurrency: "USD",
     researcherId: req.user.id,
     status: PROPOSAL_STATUSES.DRAFT,
     version: 1,
@@ -238,11 +224,6 @@ async function updateProposal(req, res) {
   if (abstract) proposal.abstract = abstract;
   if (department) proposal.department = department;
   if (researchArea) proposal.researchArea = researchArea;
-
-  const budgetRaw = parseJsonField(req.body?.budgetBreakdown, null);
-  if (budgetRaw) {
-    Object.assign(proposal, normalizeBudgetBreakdown(budgetRaw));
-  }
 
   applyProposalDocuments(proposal, req);
 
@@ -420,7 +401,10 @@ async function getProposal(req, res) {
 
   const isOwner = String(proposal.researcherId) === String(req.user.id);
   const isStaff = ["faculty_coordinator", "research_director"].includes(req.user.role);
-  if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+  const isAssignedReviewer = (proposal.assignedReviewers || []).some(
+    (r) => String(r.userId?._id || r.userId) === String(req.user.id)
+  );
+  if (!isOwner && !isStaff && !isAssignedReviewer) throw new AppError("Forbidden", 403);
 
   res.json({ proposal: await attachEthicsSummary(proposal) });
 }

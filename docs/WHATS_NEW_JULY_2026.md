@@ -1,5 +1,5 @@
 # What's New — July 2026 / Waxa Cusub
-# URGMS Phases 1–4 + Thesis fixes
+# Jamhuriya RMS — Phases 1–4 + Thesis fixes
 
 **Read this first if you already know the old RMS.**  
 **Akhri tan marka hore haddii aad taqaanid RMS-kii hore.**
@@ -52,7 +52,7 @@
 
 ---
 
-### 1.3 Project closure (URGMS Step 6)
+### 1.3 Project closure (Phase 6)
 
 **EN:** Full closure workflow on **Project Details** page.
 
@@ -237,9 +237,9 @@ Run `cd backend && npm run seed` then login:
 
 ---
 
-## Coverage update / Cusbooneysiinta URGMS
+## Coverage update / Cusbooneysiinta qiyaasta
 
-After Phases 1–4, approximate URGMS blueprint coverage: **~72–75%** (was ~58% in June 2026 gap doc).
+After Phases 1–4, approximate full specification coverage: **~78%** (was ~58% in June 2026 gap doc).
 
 Still missing / weli ma jiraan:
 - External ERP/HR/SSO integrations
@@ -247,4 +247,4 @@ Still missing / weli ma jiraan:
 - Formal KPI dashboard
 - Automated email/SMS gateway
 
-See updated `URGMS_GAP_ANALYSIS_SOM_EN.md` for details.
+See updated `SYSTEM_GAP_ANALYSIS_SOM_EN.md` for details.

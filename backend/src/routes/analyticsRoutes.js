@@ -9,6 +9,14 @@ const router = express.Router();
 router.get("/dashboard", authenticateUser, requireActiveUser, asyncHandler(analyticsController.getDashboardMetrics));
 
 router.get(
+  "/kpi-dashboard",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("research_director", "leadership", "finance_officer", "faculty_coordinator"),
+  asyncHandler(analyticsController.getKpiDashboard)
+);
+
+router.get(
   "/institutional",
   authenticateUser,
   requireActiveUser,
@@ -52,7 +60,7 @@ router.get(
   "/donor-report",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("research_director", "finance_officer"),
+  authorizeRoles("research_director", "finance_officer", "donor_agency"),
   asyncHandler(analyticsController.getDonorReport)
 );
 

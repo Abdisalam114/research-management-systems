@@ -14,7 +14,7 @@ import {
 } from "../utils/ethicsFormState";
 import { isEthicsFormComplete } from "../utils/ethicsForm";
 import { useProgramTier } from "../hooks/useProgramTier";
-import { ProposalApplicationExtras, defaultBudgetRows } from "../components/ProposalApplicationExtras";
+import { ProposalApplicationExtras } from "../components/ProposalApplicationExtras";
 import {
   collectSubmitValidationIssues,
   SUBMIT_SUCCESS_MESSAGE,
@@ -43,7 +43,6 @@ export function ProposalFormPage() {
   const [draftSaved, setDraftSaved] = useState(false);
   const [savedId, setSavedId] = useState(id || null);
   const [status, setStatus] = useState("draft");
-  const [budgetRows, setBudgetRows] = useState(defaultBudgetRows);
   const [complianceDocs, setComplianceDocs] = useState([]);
   const [supportingDocs, setSupportingDocs] = useState([]);
 
@@ -80,14 +79,6 @@ export function ProposalFormPage() {
         );
         setSavedId(p.id);
         setStatus(p.status);
-        if (p.budgetBreakdown?.length) {
-          setBudgetRows(p.budgetBreakdown.map((r) => ({
-            category: r.category || "",
-            description: r.description || "",
-            amount: r.amount ?? "",
-            currency: r.currency || "USD",
-          })));
-        }
         setComplianceDocs((p.complianceDocuments || []).map((d) => ({
           docType: d.docType || "data_protection",
           label: d.label || "",
@@ -126,14 +117,6 @@ export function ProposalFormPage() {
       department: proposal.department,
       researchArea: proposal.researchArea,
       requiresEthics: proposal.requiresEthics,
-      budgetBreakdown: budgetRows
-        .filter((r) => r.category || r.description || Number(r.amount) > 0)
-        .map((r) => ({
-          category: r.category,
-          description: r.description,
-          amount: Number(r.amount) || 0,
-          currency: r.currency || "USD",
-        })),
       complianceMeta: complianceDocs.map((d) => ({
         docType: d.docType,
         label: d.label || d.docType,
@@ -152,7 +135,7 @@ export function ProposalFormPage() {
       base.ethics = prepareEthicsPayload(ethicsForm);
     }
     return base;
-  }, [proposal, ethicsForm, budgetRows, complianceDocs, supportingDocs]);
+  }, [proposal, ethicsForm, complianceDocs, supportingDocs]);
 
   const saveDraft = async () => {
     setBusy(true);
@@ -315,8 +298,6 @@ requestAnimationFrame(() => {
 
       <ProposalApplicationExtras
         readOnly={readOnly}
-        budgetRows={budgetRows}
-        setBudgetRows={setBudgetRows}
         complianceDocs={complianceDocs}
         setComplianceDocs={setComplianceDocs}
         supportingDocs={supportingDocs}

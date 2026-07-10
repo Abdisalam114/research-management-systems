@@ -22,7 +22,7 @@ Other docs in the same folder:
 | `WHATS_NEW_JULY_2026.md` | **All new features** — Phases 1–4, roles, thesis (read first) |
 | `ROLES_AND_STAGES_GUIDE.txt` | Roles & stages (Somali, Word-ready) |
 | `ROLES_AND_STAGES_GUIDE.docx` | Same as above in Word |
-| `URGMS_GAP_ANALYSIS_SOM_EN.md` | What is built vs URGMS blueprint |
+| `SYSTEM_GAP_ANALYSIS_SOM_EN.md` | What is built vs full system specification |
 | `SPEC_GAP_ANALYSIS.md` | Technical module analysis (English) |
 | `FULL_SYSTEM_REAL_EXAMPLE.txt` | End-to-end example walkthrough |
 | `RMS_SYSTEM_DIAGRAM.html` | Open in browser — system diagram |
@@ -288,4 +288,4 @@ On **Project Details** → execution panel:
 |------|---------|
 | [WHATS_NEW_JULY_2026.md](./WHATS_NEW_JULY_2026.md) | **All new features — detailed** |
 | [DOCS_INDEX.md](./DOCS_INDEX.md) | Index of every doc file |
-| [URGMS_GAP_ANALYSIS_SOM_EN.md](./URGMS_GAP_ANALYSIS_SOM_EN.md) | Blueprint vs built (updated July 2026) |
+| [SYSTEM_GAP_ANALYSIS_SOM_EN.md](./SYSTEM_GAP_ANALYSIS_SOM_EN.md) | Specification vs built (updated July 2026) |

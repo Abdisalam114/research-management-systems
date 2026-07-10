@@ -44,9 +44,10 @@ export function GrantDetailsPage() {
   const [message, setMessage] = useState("");
 
   const isDirector = user?.role === "research_director";
+  const isLeadership = user?.role === "leadership";
   const isOwner = grant && String(grant.researcherId) === String(user?.id);
   const canEditLink = isOwner && ["draft", "rejected"].includes(grant?.status || "");
-  const canDecide = isDirector && grant?.status === "submitted";
+  const canDecide = (isDirector || isLeadership) && grant?.status === "submitted";
   const canFinanceDecide = user?.role === "finance_officer" && grant?.status === "pending_finance";
 
   const load = useCallback(async () => {
@@ -84,14 +85,11 @@ export function GrantDetailsPage() {
   }
 
   async function handleLinkProject() {
-    if (!grant || !linkProjectId) {
-      setError("Select a research project to link");
-      return;
-    }
+    if (!grant) return;
     try {
       setLinkBusy(true);
       setError("");
-      await grantApi.updateGrant(accessToken, grant.id, { projectId: linkProjectId });
+      await grantApi.updateGrant(accessToken, grant.id, { projectId: linkProjectId || null });
       await reload();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to link project");
@@ -317,6 +315,33 @@ export function GrantDetailsPage() {
             </div>
           ) : null}
 
+          {grant.budgetBreakdown?.length ? (
+            <div className="card" style={{ marginTop: 12 }}>
+              <div style={{ fontWeight: 900, marginBottom: 10 }}>Call budget breakdown</div>
+              <table className="dashTable">
+                <thead>
+                  <tr>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {grant.budgetBreakdown.map((row, idx) => (
+                    <tr key={idx}>
+                      <td>{row.category || "—"}</td>
+                      <td>{row.description || "—"}</td>
+                      <td>{currency} {formatMoney(row.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+                Total: {currency} {formatMoney(grant.budgetTotal || grant.amountRequested)}
+              </p>
+            </div>
+          ) : null}
+
           {grant.project ? (
             <div className="card" style={{ marginTop: 12 }}>
               <div style={{ fontWeight: 900, marginBottom: 10 }}>Linked project</div>
@@ -342,17 +367,17 @@ export function GrantDetailsPage() {
                 Open project
               </Link>
             </div>
-          ) : canEditLink ? (
+          ) : canEditLink && grant.callId ? (
             <div className="card" style={{ marginTop: 12 }}>
-              <div style={{ fontWeight: 900, marginBottom: 10 }}>Link research project</div>
+              <div style={{ fontWeight: 900, marginBottom: 10 }}>Link research project (optional)</div>
               <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
-                This grant must be linked to your research project before you can submit it.
+                Funding call application — project link is voluntary, not required to submit.
               </p>
               <div className="row">
                 <div className="field" style={{ flex: 2 }}>
                   <label>Your project</label>
                   <select value={linkProjectId} onChange={(e) => setLinkProjectId(e.target.value)}>
-                    <option value="">— Select project —</option>
+                    <option value="">— No project (voluntary) —</option>
                     {projects.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.title} ({p.status})
@@ -365,14 +390,14 @@ export function GrantDetailsPage() {
                 {linkBusy ? "Saving…" : "Save project link"}
               </button>
             </div>
-          ) : (
-            <div className="card" style={{ marginTop: 12, fontSize: 13, borderColor: "rgba(251,191,36,0.35)" }}>
-              <div style={{ fontWeight: 800 }}>No linked research project</div>
+          ) : grant.callId && !grant.project ? (
+            <div className="card" style={{ marginTop: 12, fontSize: 13 }}>
+              <div style={{ fontWeight: 800 }}>No linked project</div>
               <p className="muted" style={{ margin: "6px 0 0" }}>
-                This grant is not connected to a research project yet.
+                Project link is optional for funding call applications.
               </p>
             </div>
-          )}
+          ) : null}
 
           {canDecide ? (
             <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>

@@ -18,6 +18,7 @@
     "docs:example-docx": "node src/scripts/generateRolesStagesDocx.js ../docs/FULL_SYSTEM_REAL_EXAMPLE.txt ../docs/FULL_SYSTEM_REAL_EXAMPLE.docx",
     "docs:pdf": "node src/scripts/generateDatabaseDocsPdf.js && node src/scripts/generateSystemDocsPdf.js",
     "verify:roles": "node ../scripts/verify-all-roles.cjs",
+    "verify:thesis": "node src/scripts/verifyThesisCoverage.js",
     "test": "echo \"No tests yet\" && exit 0"
   },
   "keywords": [],
@@ -34,6 +35,7 @@
     "mongoose": "^9.4.1",
     "morgan": "^1.10.1",
     "multer": "^2.1.1",
+    "nodemailer": "^7.0.5",
     "pdfkit": "^0.18.0"
   },
   "devDependencies": {

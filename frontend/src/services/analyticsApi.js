@@ -51,6 +51,21 @@ export async function donorReport(accessToken) {
   return res.data;
 }
 
+export async function kpiDashboard(accessToken) {
+  const res = await api.get("/api/analytics/kpi-dashboard", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
+
+export async function downloadTechnicalReportPdf(accessToken, projectId) {
+  const res = await api.get(`/api/projects/${projectId}/technical-report.pdf`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    responseType: "blob",
+  });
+  return res.data;
+}
+
 export async function researchJourney(accessToken, researcherId) {
   const params = researcherId ? { researcherId } : {};
   const res = await api.get("/api/analytics/research-journey", {

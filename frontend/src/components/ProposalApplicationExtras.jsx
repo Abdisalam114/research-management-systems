@@ -12,16 +12,8 @@ const SUPPORTING_TYPES = [
   { value: "other", label: "Other supporting doc" },
 ];
 
-const emptyBudgetRow = () => ({ category: "", description: "", amount: "", currency: "USD" });
-
-export function defaultBudgetRows() {
-  return [emptyBudgetRow(), emptyBudgetRow(), emptyBudgetRow()];
-}
-
 export function ProposalApplicationExtras({
   readOnly,
-  budgetRows,
-  setBudgetRows,
   complianceDocs,
   setComplianceDocs,
   supportingDocs,
@@ -29,44 +21,6 @@ export function ProposalApplicationExtras({
 }) {
   return (
     <>
-      <div className="card" style={{ marginTop: 16 }}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>Proposal budget</div>
-        <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>Line-item budget submitted with the application.</p>
-        {budgetRows.map((row, idx) => (
-          <div key={idx} className="card" style={{ marginBottom: 8, background: "rgba(14,165,233,0.04)" }}>
-            <div className="row">
-              <div className="field">
-                <label>Category</label>
-                <input disabled={readOnly} value={row.category} onChange={(e) => {
-                  const next = [...budgetRows];
-                  next[idx] = { ...next[idx], category: e.target.value };
-                  setBudgetRows(next);
-                }} placeholder="e.g. Equipment" />
-              </div>
-              <div className="field">
-                <label>Amount</label>
-                <input disabled={readOnly} type="number" min="0" value={row.amount} onChange={(e) => {
-                  const next = [...budgetRows];
-                  next[idx] = { ...next[idx], amount: e.target.value };
-                  setBudgetRows(next);
-                }} />
-              </div>
-            </div>
-            <div className="field">
-              <label>Description</label>
-              <input disabled={readOnly} value={row.description} onChange={(e) => {
-                const next = [...budgetRows];
-                next[idx] = { ...next[idx], description: e.target.value };
-                setBudgetRows(next);
-              }} />
-            </div>
-          </div>
-        ))}
-        {!readOnly ? (
-          <button type="button" className="btn" onClick={() => setBudgetRows([...budgetRows, emptyBudgetRow()])}>+ Budget line</button>
-        ) : null}
-      </div>
-
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ fontWeight: 800, marginBottom: 8 }}>Compliance documents</div>
         {complianceDocs.map((doc, idx) => (

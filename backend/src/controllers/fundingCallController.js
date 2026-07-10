@@ -2,6 +2,7 @@ const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
 const { AppError } = require("../utils/AppError");
 const { notifyUsersByRole } = require("../utils/notify");
 const { recordAudit } = require("../utils/audit");
+const { tierMatchesCall } = require("../utils/fundingCallEligibility");
 
 function sanitizeCall(c) {
   return {
@@ -9,6 +10,7 @@ function sanitizeCall(c) {
     title: c.title,
     description: c.description,
     fundingSource: c.fundingSource,
+    callType: c.callType || "internal",
     donorRef: c.donorRef,
     amountCap: c.amountCap,
     currency: c.currency,
@@ -23,14 +25,6 @@ function sanitizeCall(c) {
     updatedAt: c.updatedAt,
     programTier: c.programTier,
   };
-}
-
-function tierMatchesCall(req, call) {
-  if (call.eligibilityTier === "all") return true;
-  const pt = req.programTier === "undergraduate" ? "ug" : "pg";
-  if (call.eligibilityTier === "ug") return pt === "ug";
-  if (call.eligibilityTier === "pg" || call.eligibilityTier === "pgd") return pt === "pg";
-  return true;
 }
 
 async function listFundingCalls(req, res) {
@@ -62,7 +56,7 @@ async function getFundingCall(req, res) {
 
 async function createFundingCall(req, res) {
   const {
-    title, description, fundingSource, donorRef, amountCap, currency,
+    title, description, fundingSource, callType, donorRef, amountCap, currency,
     deadline, eligibilityTier, requiredDocuments,
   } = req.body || {};
   if (!title || !fundingSource) throw new AppError("title and fundingSource are required", 400);
@@ -71,6 +65,7 @@ async function createFundingCall(req, res) {
     title: String(title).trim(),
     description: description ? String(description) : "",
     fundingSource: String(fundingSource).trim(),
+    callType: callType === "external" ? "external" : "internal",
     donorRef: donorRef ? String(donorRef).trim() : "",
     amountCap: typeof amountCap === "number" ? amountCap : 0,
     currency: currency ? String(currency).trim().toUpperCase() : "USD",
@@ -100,12 +95,13 @@ async function updateFundingCall(req, res) {
   if (!call) throw new AppError("Funding call not found", 404);
   if (call.status !== CALL_STATUSES.DRAFT) throw new AppError("Only draft calls can be edited", 400);
 
-  const fields = ["title", "description", "fundingSource", "donorRef", "amountCap", "currency", "deadline", "eligibilityTier", "requiredDocuments"];
+  const fields = ["title", "description", "fundingSource", "callType", "donorRef", "amountCap", "currency", "deadline", "eligibilityTier", "requiredDocuments"];
   for (const f of fields) {
     if (req.body?.[f] !== undefined) {
       if (f === "deadline") call.deadline = req.body.deadline ? new Date(req.body.deadline) : null;
       else if (f === "amountCap") call.amountCap = Number(req.body.amountCap) || 0;
       else if (f === "currency") call.currency = String(req.body.currency).trim().toUpperCase();
+      else if (f === "callType") call.callType = req.body.callType === "external" ? "external" : "internal";
       else call[f] = String(req.body[f]).trim();
     }
   }
