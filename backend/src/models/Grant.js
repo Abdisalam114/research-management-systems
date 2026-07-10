@@ -24,7 +24,16 @@ const grantSchema = new mongoose.Schema(
 
     researcherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     projectId: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null, index: true },
+    proposalId: { type: mongoose.Schema.Types.ObjectId, ref: "Proposal", default: null, index: true },
     callId: { type: mongoose.Schema.Types.ObjectId, ref: "FundingCall", default: null, index: true },
+
+    requirementChecklist: [
+      {
+        label: { type: String, required: true, trim: true },
+        met: { type: Boolean, default: false },
+        note: { type: String, default: "", trim: true },
+      },
+    ],
 
     budgetBreakdown: [
       {

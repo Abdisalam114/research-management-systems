@@ -55,6 +55,15 @@ node src/scripts/verifySeedUsers.js
 
 Expected output: `19/19 users correct`.
 
+Verify all roles can log in and access their APIs:
+
+```bash
+cd backend
+npm run verify:stakeholders
+```
+
+Expected output: `19/19 users fully working`.
+
 ### Thesis coverage (90%+)
 
 Jamhuriya RMS targets **92%** coverage of the full 6-phase specification — thesis-ready for defense.

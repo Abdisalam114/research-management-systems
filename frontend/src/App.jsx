@@ -15,6 +15,7 @@ import { ProjectDetailsPage } from "./pages/ProjectDetails";
 import { ProjectProgressUpdatePage } from "./pages/ProjectProgressUpdate";
 import { GrantsPage } from "./pages/Grants";
 import { GrantDetailsPage } from "./pages/GrantDetails";
+import { GrantApplyPage } from "./pages/GrantApplyPage";
 import { BudgetsPage } from "./pages/Budgets";
 import { PaymentDetailsPage } from "./pages/PaymentDetails";
 import { PublicationsPage } from "./pages/Publications";
@@ -118,7 +119,10 @@ export default function App() {
             <Route path="/thesis-groups" element={<Navigate to="/thesis" replace />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "finance_officer", "leadership"]} />}>
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "finance_officer", "leadership", "procurement_officer", "donor_agency"]} />}>
+            <Route element={<ProtectedRoute roles={["researcher"]} />}>
+              <Route path="/grants/apply" element={<GrantApplyPage />} />
+            </Route>
             <Route path="/grants" element={<GrantsPage />} />
             <Route path="/grants/:id" element={<GrantDetailsPage />} />
             <Route path="/funding-calls" element={<FundingCallsPage />} />

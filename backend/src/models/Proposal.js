@@ -137,6 +137,7 @@ const proposalSchema = new mongoose.Schema(
         uploadedAt: { type: Date, default: null },
       },
     ],
+    fundingCallId: { type: mongoose.Schema.Types.ObjectId, ref: "FundingCall", default: null, index: true },
     ...programTierField,
   },
   { timestamps: true }

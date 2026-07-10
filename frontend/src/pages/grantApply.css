@@ -1,0 +1,80 @@
+.grantApplyPage {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.grantApplySteps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.grantApplyStep {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid var(--rms-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--rms-text-secondary);
+}
+
+.grantApplyStepActive {
+  border-color: rgba(14, 165, 233, 0.55);
+  background: rgba(14, 165, 233, 0.15);
+  color: #7dd3fc;
+}
+
+.grantApplyStepDone {
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #86efac;
+}
+
+.grantApplyReqList {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.grantApplyReqItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--rms-border);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.grantApplyReqItem input[type="checkbox"] {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.grantApplyProposalCard {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--rms-border);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  color: inherit;
+  font: inherit;
+}
+
+.grantApplyProposalCardSelected {
+  border-color: rgba(14, 165, 233, 0.55);
+  background: rgba(14, 165, 233, 0.1);
+}
+
+.grantApplyWorkflow {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--rms-text-secondary);
+}

@@ -2,9 +2,11 @@ const fs = require("fs");
 const path = require("path");
 const { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES } = require("../models/Proposal");
 const { Project } = require("../models/Project");
-const { User } = require("../models/User");
+const { User, ROLES } = require("../models/User");
 const { EthicsApplication } = require("../models/EthicsApplication");
+const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
 const { AppError } = require("../utils/AppError");
+const { assertEligibleForCall } = require("../utils/fundingCallEligibility");
 const { notifyUsersByRole } = require("../utils/notify");
 const {
   getEthicsForProposal,
@@ -45,6 +47,7 @@ function sanitizeProposal(p) {
     peerReviews: p.peerReviews || [],
     reviewPipeline: ensureReviewPipeline(p),
     currentReviewStage: getCurrentReviewStage(p),
+    fundingCallId: p.fundingCallId || null,
     submittedAt: p.submittedAt,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
@@ -172,13 +175,21 @@ function applyProposalDocuments(proposal, req) {
 }
 
 async function createProposal(req, res) {
-  const { title, abstract, department, researchArea, requiresEthics } = req.body;
+  const { title, abstract, department, researchArea, requiresEthics, fundingCallId } = req.body;
   if (!title || !abstract || !department || !researchArea) {
     throw new AppError("title, abstract, department, and researchArea are required", 400);
   }
 
   const document = req.files?.document?.[0] ? `/uploads/${req.files.document[0].filename}` : (req.file ? `/uploads/${req.file.filename}` : null);
   const needsEthics = requiresEthics !== "false" && requiresEthics !== false;
+
+  let linkedCallId = null;
+  if (fundingCallId) {
+    const call = await FundingCall.findOne(req.tierWhere({ _id: fundingCallId, status: CALL_STATUSES.OPEN }));
+    if (!call) throw new AppError("Funding call not found or not open", 404);
+    if (req.user.role === ROLES.RESEARCHER) assertEligibleForCall(req, call);
+    linkedCallId = call._id;
+  }
 
   const proposal = await Proposal.create(req.tierAssign({
     title,
@@ -194,6 +205,7 @@ async function createProposal(req, res) {
     version: 1,
     requiresEthics: needsEthics,
     ethicsStatus: needsEthics ? ETHICS_STATUSES.PENDING : ETHICS_STATUSES.NOT_REQUIRED,
+    fundingCallId: linkedCallId,
   }));
 
   applyProposalDocuments(proposal, req);

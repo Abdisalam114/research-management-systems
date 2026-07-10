@@ -18,6 +18,7 @@
     "docs:example-docx": "node src/scripts/generateRolesStagesDocx.js ../docs/FULL_SYSTEM_REAL_EXAMPLE.txt ../docs/FULL_SYSTEM_REAL_EXAMPLE.docx",
     "docs:pdf": "node src/scripts/generateDatabaseDocsPdf.js && node src/scripts/generateSystemDocsPdf.js",
     "verify:roles": "node ../scripts/verify-all-roles.cjs",
+    "verify:stakeholders": "node src/scripts/verifyAllStakeholders.js",
     "verify:thesis": "node src/scripts/verifyThesisCoverage.js",
     "test": "echo \"No tests yet\" && exit 0"
   },

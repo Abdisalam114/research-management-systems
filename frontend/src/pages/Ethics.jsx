@@ -15,6 +15,7 @@ import { isEthicsFormComplete } from "../utils/ethicsForm";
 import { getEthicsMissingFields } from "../utils/proposalSubmitValidation";
 import { ethicsApplicationToForm, emptyEthicsForm } from "../utils/ethicsFormState";
 import { buildStatusFilterStats, filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
+import { scrollElementIntoAppView } from "../utils/scrollContainer";
 
 const STATUS_BADGE = {
   draft: "#7dd3fc",
@@ -153,7 +154,7 @@ export function EthicsPage() {
 
   function scrollToEditor() {
     requestAnimationFrame(() => {
-      editorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      scrollElementIntoAppView(editorRef.current, { behavior: "smooth", block: "start", offset: 88 });
     });
   }
 
@@ -185,7 +186,7 @@ if (isDirector && a.proposalId) {
         const missing = getEthicsMissingFields(editing.form);
         if (missing.length) {
           setValidationIssues(missing);
-          document.getElementById("ethics-validation-errors")?.scrollIntoView({ behavior: "smooth" });
+          scrollElementIntoAppView(document.getElementById("ethics-validation-errors"), { behavior: "smooth", block: "start", offset: 88 });
           return;
         }
         if (linkedProposalId) {

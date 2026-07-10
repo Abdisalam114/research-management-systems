@@ -20,6 +20,7 @@ import { FacultyAnalyticsSection } from "./FacultyAnalyticsSection";
 import { ActiveProjectsPanel } from "./ActiveProjectsPanel";
 import { MetricProvenanceBar } from "./MetricProvenanceBar";
 import { SystemModulesGrid } from "./SystemModulesGrid";
+import { scrollElementIntoAppView } from "../utils/scrollContainer";
 import "../pages/dashboard.css";
 
 const PIE_COLORS = ["#0ea5e9", "#334155", "#f59e0b"];
@@ -55,7 +56,7 @@ export function DirectorDashboard() {
 
   useEffect(() => {
     if (!data || window.location.hash !== "#institutional-analytics") return;
-    document.getElementById("institutional-analytics")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    scrollElementIntoAppView(document.getElementById("institutional-analytics"), { behavior: "smooth", block: "start", offset: 88 });
   }, [data]);
 
 

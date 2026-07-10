@@ -1,5 +1,7 @@
 .authBg {
   min-height: 100svh;
+  max-height: 100svh;
+  overflow-y: auto;
   display: grid;
   place-items: center;
   padding: 28px 16px;

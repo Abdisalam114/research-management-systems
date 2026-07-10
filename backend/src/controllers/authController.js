@@ -49,10 +49,12 @@ async function register(_req, _res) {
 }
 
 async function login(req, res) {
-  const { email, password } = req.body;
+  const rawEmail = req.body?.email;
+  const password = req.body?.password;
+  const email = String(rawEmail || "").trim().toLowerCase();
   if (!email || !password) throw new AppError("Email and password are required", 400);
 
-  const user = await User.findOne({ email: email.toLowerCase() }).select("+password +refreshToken");
+  const user = await User.findOne({ email }).select("+password +refreshToken");
   if (!user) throw new AppError("Invalid credentials", 401);
 
   if (user.status !== USER_STATUSES.ACTIVE) {

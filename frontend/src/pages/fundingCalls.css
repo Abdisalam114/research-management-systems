@@ -1,0 +1,238 @@
+.fundingCallsPage {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.fundingCallsBanner {
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.fundingCallsBannerOk {
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  background: rgba(34, 197, 94, 0.1);
+  color: #86efac;
+}
+
+.fundingCallsBannerErr {
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(248, 113, 113, 0.1);
+  color: #fca5a5;
+}
+
+.fundingCallFormCard {
+  border-color: rgba(14, 165, 233, 0.28);
+  background: linear-gradient(180deg, rgba(14, 165, 233, 0.06), transparent 120px);
+}
+
+.fundingCallFormHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--rms-border);
+}
+
+.fundingCallFormTitle {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.fundingCallFormSub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 58ch;
+}
+
+.fundingCallFormSection {
+  margin-top: 18px;
+}
+
+.fundingCallFormSection:first-of-type {
+  margin-top: 0;
+}
+
+.fundingCallFormSectionTitle {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rms-accent-soft);
+}
+
+.fundingCallFormSectionHint {
+  margin: -6px 0 12px;
+  font-size: 12px;
+}
+
+.fundingCallFormGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.fundingCallFormGrid .field--full {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 720px) {
+  .fundingCallFormGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fundingCallFormActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--rms-border);
+}
+
+.fundingCallList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fundingCallCard {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fundingCallCard:hover {
+  border-color: rgba(14, 165, 233, 0.35);
+}
+
+.fundingCallCardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.fundingCallCardTitle {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.fundingCallMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.fundingCallMetaChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--rms-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--rms-text-secondary);
+}
+
+.fundingCallMetaChip strong {
+  color: var(--rms-text-primary);
+  font-weight: 700;
+}
+
+.fundingCallStatus {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fundingCallStatusDraft {
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  color: #fcd34d;
+}
+
+.fundingCallStatusOpen {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  color: #86efac;
+}
+
+.fundingCallStatusClosed {
+  background: rgba(148, 163, 184, 0.12);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #cbd5e1;
+}
+
+.fundingCallTypeInternal {
+  border-color: rgba(56, 189, 248, 0.35);
+  color: #7dd3fc;
+}
+
+.fundingCallTypeExternal {
+  border-color: rgba(168, 85, 247, 0.35);
+  color: #d8b4fe;
+}
+
+.fundingCallDescription {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--rms-text-secondary);
+}
+
+.fundingCallDocs {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--rms-border);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.fundingCallDocsLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--rms-accent-soft);
+  margin-bottom: 4px;
+}
+
+.fundingCallActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 148px;
+}
+
+.fundingCallEmpty {
+  text-align: center;
+  padding: 32px 20px;
+}
+
+.fundingCallEmptyIcon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}

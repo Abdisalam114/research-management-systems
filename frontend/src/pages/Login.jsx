@@ -5,6 +5,15 @@ import { useProgramTier } from "../hooks/useProgramTier";
 import "./auth.css";
 import logo from "../assets/jamhuriya-logo.png";
 
+const SEED_ACCOUNTS = [
+  { email: "director@rms.edu", password: "Director2024!", role: "Director" },
+  { email: "coordinator@rms.edu", password: "Coordinator2024!", role: "Coordinator" },
+  { email: "finance@rms.edu", password: "Finance2024!", role: "Finance" },
+  { email: "ethics@rms.edu", password: "Ethics2024!", role: "Ethics" },
+  { email: "asha@rms.edu", password: "Researcher2024!", role: "Researcher (UG)" },
+  { email: "mahad@rms.edu", password: "Researcher2024!", role: "Researcher (PG)" },
+];
+
 export function LoginPage() {
   const { signIn } = useAuth();
   const { clearProgramTier } = useProgramTier();
@@ -66,8 +75,10 @@ export function LoginPage() {
             onClick={async () => {
               setBusy(true);
               setError("");
+              const trimmedEmail = email.trim();
+              const trimmedPassword = password;
               try {
-                const res = await signIn(email, password);
+                const res = await signIn(trimmedEmail, trimmedPassword);
                 if (res.user?.role === "research_director") {
                   clearProgramTier();
                   navigate("/program-tier", { replace: true });
@@ -95,6 +106,33 @@ export function LoginPage() {
           <p className="authFooter muted" style={{ marginTop: 14, marginBottom: 0 }}>
             Need an account? Contact the Research Director — only they can create users.
           </p>
+
+          <details className="seedAccountsPanel" style={{ marginTop: 16 }}>
+            <summary style={{ cursor: "pointer", fontWeight: 600 }}>Institutional test accounts (after npm run seed)</summary>
+            <p className="muted" style={{ fontSize: 13, margin: "8px 0" }}>
+              Old accounts like <code>sahra@rms.edu</code> were removed. Use the accounts below.
+            </p>
+            <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+              {SEED_ACCOUNTS.map((a) => (
+                <li key={a.email} style={{ marginBottom: 6 }}>
+                  <button
+                    type="button"
+                    className="linkBtn"
+                    style={{ background: "none", border: "none", padding: 0, color: "inherit", cursor: "pointer", textDecoration: "underline" }}
+                    onClick={() => {
+                      setEmail(a.email);
+                      setPassword(a.password);
+                      setError("");
+                    }}
+                  >
+                    {a.role}
+                  </button>
+                  {" — "}
+                  <code>{a.email}</code> / <code>{a.password}</code>
+                </li>
+              ))}
+            </ul>
+          </details>
         </div>
       </div>
     </div>

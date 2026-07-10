@@ -1,14 +1,18 @@
-/** Dashboard overview module tiles (subset of sidebar — admin/comms items excluded). */
+/** Dashboard overview module tiles — includes all 10 stakeholder roles. */
 export const SYSTEM_MODULES = [
-  { key: "ethics", to: "/ethics", label: "Ethics (REC)", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { key: "ethics", to: "/ethics", label: "Ethics (REC)", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher", "ethics_committee"] },
   { key: "proposals", to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher"] },
-  { key: "projects", to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher"] },
-  { key: "grants", to: "/grants", label: "Grants", icon: "💰", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"] },
-  { key: "budgets", to: "/budgets", label: "Finance & Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher"] },
+  { key: "reviews", to: "/review-assignments", label: "Peer Reviews", icon: "✍️", roles: ["research_director", "faculty_coordinator", "researcher", "peer_reviewer"] },
+  { key: "projects", to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher", "hr_officer"] },
+  { key: "funding_calls", to: "/funding-calls", label: "Funding Calls", icon: "📢", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher", "leadership", "procurement_officer", "donor_agency"] },
+  { key: "grants", to: "/grants", label: "Grants", icon: "💰", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher", "leadership", "procurement_officer", "donor_agency"] },
+  { key: "budgets", to: "/budgets", label: "Finance & Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher", "procurement_officer"] },
   { key: "publications", to: "/publications", label: "Publications & Outputs", icon: "📚", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "workflow", to: "/research-workflow", label: "Research Workflow Status", icon: "🔄", roles: ["research_director", "faculty_coordinator", "researcher"] },
-  { key: "groups", to: "/groups", label: "Groups", icon: "🧑‍🤝‍🧑", roles: ["research_director", "faculty_coordinator", "researcher"] },
-  { key: "thesis", to: "/thesis", label: "Thesis", icon: "🎓", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { key: "groups", to: "/groups", label: "Groups", icon: "🧑‍🤝‍🧑", roles: ["research_director", "faculty_coordinator", "researcher", "hr_officer"] },
+  { key: "thesis", to: "/thesis", label: "Thesis", icon: "🎓", roles: ["research_director", "faculty_coordinator", "researcher", "hr_officer"] },
+  { key: "kpi", to: "/kpi-dashboard", label: "KPI Dashboard", icon: "📈", roles: ["research_director", "faculty_coordinator", "finance_officer", "leadership"] },
+  { key: "donor", to: "/donor-reports", label: "Donor Reports", icon: "🌍", roles: ["research_director", "finance_officer", "donor_agency"] },
 ];
 
 export function modulesForRole(role) {
@@ -23,8 +27,12 @@ export function countForModule(key, metrics = {}, overview = {}) {
       return m.ethics ?? o.ethics ?? metrics.ethics?.total ?? 0;
     case "proposals":
       return m.proposals ?? o.proposals ?? metrics.proposals?.total ?? 0;
+    case "reviews":
+      return m.reviews ?? o.reviews ?? metrics.reviewAssignments ?? 0;
     case "projects":
       return m.projects ?? o.projects ?? metrics.projects?.total ?? 0;
+    case "funding_calls":
+      return m.fundingCalls ?? o.fundingCalls ?? metrics.fundingCalls?.total ?? 0;
     case "grants":
       return m.grants ?? o.grants ?? metrics.grants?.total ?? 0;
     case "budgets":
@@ -41,6 +49,10 @@ export function countForModule(key, metrics = {}, overview = {}) {
       return m.groups ?? o.groups ?? metrics.groups?.total ?? 0;
     case "thesis":
       return m.thesis ?? o.thesis ?? 0;
+    case "kpi":
+      return m.kpi ?? o.kpi ?? "—";
+    case "donor":
+      return m.donor ?? o.donor ?? metrics.grants?.total ?? 0;
     default:
       return 0;
   }

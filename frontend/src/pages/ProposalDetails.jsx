@@ -5,6 +5,7 @@ import * as proposalApi from "../services/proposalApi";
 import { ProposalEthicsWorkflow } from "../components/ProposalEthicsWorkflow";
 import { SubmitValidationAlert, SubmitSuccessAlert } from "../components/SubmitValidationAlert";
 import { collectSubmitValidationIssues, SUBMIT_SUCCESS_MESSAGE } from "../utils/proposalSubmitValidation";
+import { scrollElementIntoAppView } from "../utils/scrollContainer";
 import { apiOrigin } from "../config/apiBase";
 
 export function ProposalDetailsPage() {
@@ -56,7 +57,7 @@ export function ProposalDetailsPage() {
     if (issues.length > 0) {
       setValidationIssues(issues);
       requestAnimationFrame(() => {
-        document.getElementById("validation-errors")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        scrollElementIntoAppView(document.getElementById("validation-errors"), { behavior: "smooth", block: "start", offset: 88 });
       });
       return;
     }

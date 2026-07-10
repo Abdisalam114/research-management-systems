@@ -3,28 +3,13 @@ import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { getPageTitle } from "../utils/navigation";
+import { logScrollProbe, scrollAppContainerToTop } from "../utils/scrollContainer";
 import "./layout.css";
 
-function scrollAppToTop(contentEl) {
-  const targets = [
-    contentEl,
-    document.querySelector(".appContent"),
-    document.querySelector(".appMain"),
-    document.documentElement,
-    document.body,
-  ].filter(Boolean);
-
-  for (const el of targets) {
-    el.scrollTop = 0;
-  }
-  window.scrollTo(0, 0);
-}
-
-function scrollAfterPaint(contentEl) {
-  scrollAppToTop(contentEl);
+function scrollAfterPaint() {
+  scrollAppContainerToTop();
   requestAnimationFrame(() => {
-    scrollAppToTop(contentEl);
-    requestAnimationFrame(() => scrollAppToTop(contentEl));
+    scrollAppContainerToTop();
   });
 }
 
@@ -35,15 +20,20 @@ export function AppLayout() {
 
   useEffect(() => {
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    document.body.classList.add("appShellActive");
+    return () => document.body.classList.remove("appShellActive");
   }, []);
 
   useLayoutEffect(() => {
-    scrollAfterPaint(contentRef.current);
+    scrollAfterPaint();
+    requestAnimationFrame(() => {
+      logScrollProbe(`${location.pathname}${location.search}`, "B");
+    });
   }, [location.pathname, location.search]);
 
   return (
     <div className="appShell">
-      <Sidebar onNavigate={() => scrollAfterPaint(contentRef.current)} />
+      <Sidebar onNavigate={scrollAfterPaint} />
       <div className="appContent" ref={contentRef}>
         <TopBar title={title} />
         <main className="appMain">

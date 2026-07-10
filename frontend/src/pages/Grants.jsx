@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
@@ -85,6 +85,7 @@ function GrantAmounts({ grant }) {
 
 export function GrantsPage() {
   const { accessToken, user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const projectIdFromUrl = searchParams.get("projectId") || "";
   const callIdFromUrl = searchParams.get("callId") || "";
@@ -130,6 +131,10 @@ export function GrantsPage() {
 
   useEffect(() => {
     if (!callIdFromUrl || !accessToken) return;
+    if (user?.role === "researcher") {
+      navigate(`/grants/apply?callId=${encodeURIComponent(callIdFromUrl)}`, { replace: true });
+      return;
+    }
     fundingCallApi.getFundingCall(accessToken, callIdFromUrl).then((res) => {
       const c = res.call;
       setLinkedCall(c);
@@ -145,7 +150,7 @@ export function GrantsPage() {
       setBudgetRows(defaultBudgetRows().map((r) => ({ ...r, currency: c.currency || "USD" })));
       setShowForm(true);
     }).catch(() => {});
-  }, [callIdFromUrl, accessToken]);
+  }, [callIdFromUrl, accessToken, user?.role, navigate]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
@@ -361,6 +366,11 @@ export function GrantsPage() {
                   {g.fundingCall?.title ? (
                     <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
                       Funding call: {g.fundingCall.title}
+                    </div>
+                  ) : null}
+                  {g.proposal?.title ? (
+                    <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+                      Proposal: {g.proposal.title} ({g.proposal.status})
                     </div>
                   ) : null}
                   <GrantAmounts grant={g} />

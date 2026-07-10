@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { SUBJECT_OPTS, INSTRUMENT_OPTS, CONSENT_ITEMS } from "../constants/ethicsFormOptions";
 import { getEthicsMissingFields } from "../utils/proposalSubmitValidation";
+import { scrollElementIntoAppView } from "../utils/scrollContainer";
 
 const REQUIRED_FIELD_IDS = {
   projectTitle: "ethics-req-projectTitle",
@@ -15,8 +16,9 @@ const REQUIRED_FIELD_IDS = {
 function scrollToEthicsField(fieldKey) {
   const id = REQUIRED_FIELD_IDS[fieldKey];
   if (!id) return;
-  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
-  document.getElementById(id)?.focus?.();
+  const el = document.getElementById(id);
+  scrollElementIntoAppView(el, { behavior: "smooth", block: "center", offset: 88 });
+  el?.focus?.();
 }
 
 function patchForm(prev, path, value) {

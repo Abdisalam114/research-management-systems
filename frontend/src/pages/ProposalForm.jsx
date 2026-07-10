@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as proposalApi from "../services/proposalApi";
 import { EthicsApplicationForm } from "../components/EthicsApplicationForm";
@@ -13,6 +13,7 @@ import {
   syncEthicsFromProposal,
 } from "../utils/ethicsFormState";
 import { isEthicsFormComplete } from "../utils/ethicsForm";
+import { scrollElementIntoAppView } from "../utils/scrollContainer";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { ProposalApplicationExtras } from "../components/ProposalApplicationExtras";
 import {
@@ -22,6 +23,8 @@ import {
 
 export function ProposalFormPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const fundingCallId = searchParams.get("callId") || "";
   const isEdit = Boolean(id);
   const navigate = useNavigate();
   const { accessToken, user } = useAuth();
@@ -134,8 +137,9 @@ export function ProposalFormPage() {
     if (proposal.requiresEthics) {
       base.ethics = prepareEthicsPayload(ethicsForm);
     }
+    if (fundingCallId && !savedId) base.fundingCallId = fundingCallId;
     return base;
-  }, [proposal, ethicsForm, complianceDocs, supportingDocs]);
+  }, [proposal, ethicsForm, complianceDocs, supportingDocs, fundingCallId, savedId]);
 
   const saveDraft = async () => {
     setBusy(true);
@@ -174,7 +178,7 @@ return res.proposal;
     if (issues.length > 0) {
       setValidationIssues(issues);
 requestAnimationFrame(() => {
-        document.getElementById("validation-errors")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        scrollElementIntoAppView(document.getElementById("validation-errors"), { behavior: "smooth", block: "start", offset: 88 });
       });
       return;
     }
@@ -219,6 +223,21 @@ requestAnimationFrame(() => {
         One page: complete the proposal and ethics form. Your name, email, title, abstract, and department are filled in automatically.
         When ready, one button submits both to the Director.
       </p>
+
+      {fundingCallId && !isEdit ? (
+        <div
+          className="card"
+          style={{
+            marginTop: 12,
+            borderColor: "rgba(34,197,94,0.4)",
+            background: "rgba(34,197,94,0.08)",
+            fontSize: 14,
+          }}
+        >
+          This proposal is for funding call application. After director approval, return to{" "}
+          <Link to={`/grants/apply?callId=${fundingCallId}`}>grant application</Link> to complete requirements and budget.
+        </div>
+      ) : null}
 
       <SubmitValidationAlert issues={validationIssues} />
 

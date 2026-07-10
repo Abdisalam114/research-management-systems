@@ -283,6 +283,40 @@ export function GrantDetailsPage() {
                 <div>{grant.fundingCall.title} ({grant.fundingCall.status})</div>
               </div>
             ) : null}
+
+            {grant.proposal ? (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontWeight: 800 }}>Research proposal (workflow)</div>
+                <div style={{ marginTop: 4 }}>
+                  <Link to={`/proposals/${grant.proposal.id}`} style={{ fontWeight: 700 }}>
+                    {grant.proposal.title}
+                  </Link>
+                  <span className="muted" style={{ marginLeft: 8, fontSize: 13 }}>
+                    Status: {grant.proposal.status}
+                    {grant.proposal.requiresEthics ? ` · Ethics: ${grant.proposal.ethicsStatus}` : ""}
+                  </span>
+                </div>
+                {isOwner && grant.status === "draft" && grant.proposal.status !== "approved" ? (
+                  <p style={{ fontSize: 13, marginTop: 8, color: "#fcd34d" }}>
+                    Complete proposal → ethics → director approval before submitting this grant.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {grant.requirementChecklist?.length ? (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontWeight: 800, marginBottom: 8 }}>Funding call requirements</div>
+                <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 6 }}>
+                  {grant.requirementChecklist.map((item) => (
+                    <li key={item.label} style={{ fontSize: 13 }}>
+                      {item.met ? "✓" : "○"} {item.label}
+                      {item.note ? <span className="muted"> — {item.note}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
 
           {researcher ? (

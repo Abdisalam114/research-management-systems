@@ -32,12 +32,63 @@ function RoleDashboard({ role, user }) {
   const roleHints = {
     faculty_coordinator: { title: "Department (Faculty Coordinator)", focus: "Support and approve internal department priority." },
     finance_officer: { title: "Finance Office", focus: "Approve budgets, track expenses, financial reports." },
-    researcher: { title: "Researcher / PI", focus: "Apply for grants, submit proposals, manage projects, reports." },
+    researcher: { title: "Researcher / PI", focus: "Apply for grants via funding calls, proposals, projects, reports." },
+    ethics_committee: { title: "Ethics Committee (REC)", focus: "Review and approve ethics applications." },
+    procurement_officer: { title: "Procurement Office", focus: "Purchase orders and budget-linked procurement." },
     peer_reviewer: { title: "Peer Reviewer", focus: "Evaluate proposal quality and scientific merit." },
     hr_officer: { title: "HR Office", focus: "Project teams, thesis groups, and staff coordination." },
-    leadership: { title: "University Leadership", focus: "Final approval of grant awards." },
+    leadership: { title: "University Leadership", focus: "Final approval of grant awards and KPI oversight." },
     donor_agency: { title: "Donor / External Agency", focus: "Monitor funded grants and periodic reports." },
   };
+
+  const quickLinksByRole = {
+    ethics_committee: [
+      { to: "/ethics", label: "Ethics applications", primary: true },
+      { to: "/notifications", label: "Notifications" },
+    ],
+    procurement_officer: [
+      { to: "/budgets", label: "Budgets & procurement", primary: true },
+      { to: "/grants", label: "Funded grants" },
+      { to: "/funding-calls", label: "Funding calls" },
+    ],
+    peer_reviewer: [
+      { to: "/review-assignments", label: "Peer review assignments", primary: true },
+      { to: "/notifications", label: "Notifications" },
+    ],
+    hr_officer: [
+      { to: "/projects", label: "Projects", primary: true },
+      { to: "/thesis", label: "Thesis supervision" },
+      { to: "/groups", label: "Research groups" },
+    ],
+    leadership: [
+      { to: "/grants", label: "Grant awards", primary: true },
+      { to: "/kpi-dashboard", label: "KPI dashboard" },
+      { to: "/funding-calls", label: "Funding calls" },
+    ],
+    donor_agency: [
+      { to: "/donor-reports", label: "Donor reports", primary: true },
+      { to: "/grants", label: "Funded grants" },
+      { to: "/funding-calls", label: "Funding calls" },
+    ],
+    researcher: [
+      { to: "/funding-calls", label: "Apply via Funding Calls", primary: true },
+      { to: "/proposals", label: "Proposals" },
+      { to: "/projects", label: "Projects" },
+      { to: "/grants", label: "My grants" },
+    ],
+    finance_officer: [
+      { to: "/budgets", label: "Finance & budgets", primary: true },
+      { to: "/grants", label: "Grants" },
+      { to: "/finance-reports", label: "Finance reports" },
+    ],
+  };
+
+  const quickLinks = quickLinksByRole[role] || [
+    { to: "/research-workflow", label: "Research Workflow Status", primary: true },
+    { to: "/proposals", label: "Proposals" },
+    { to: "/projects", label: "Projects" },
+    { to: "/publications", label: "Publications" },
+  ];
 
   const hint = roleHints[role] || { title: role, focus: "" };
 
@@ -74,26 +125,12 @@ function RoleDashboard({ role, user }) {
       )}
 
       <div className="dashboardQuickLinks">
-          <Link className="btn primary" to="/research-workflow">
-            Research Workflow Status
+        {quickLinks.map((link) => (
+          <Link key={link.to} className={link.primary ? "btn primary" : "btn"} to={link.to}>
+            {link.label}
           </Link>
-          <Link className="btn primary" to="/proposals">
-            Proposals
-          </Link>
-          <Link className="btn" to="/projects">
-            Projects
-          </Link>
-          {role === "finance_officer" ? (
-            <Link className="btn" to="/budgets">
-              Budgets
-            </Link>
-          ) : null}
-          {role !== "finance_officer" ? (
-            <Link className="btn" to="/publications">
-              Publications
-            </Link>
-          ) : null}
-        </div>
+        ))}
+      </div>
     </div>
   );
 }
