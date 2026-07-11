@@ -99,8 +99,40 @@ export function ProposalDetailsPage() {
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800, fontSize: 18 }}>{proposal.title}</div>
         <div className="muted" style={{ marginTop: 6 }}>
+          <span
+            style={{
+              display: "inline-block",
+              marginRight: 8,
+              padding: "2px 8px",
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 700,
+              background:
+                (proposal.proposalKind || (proposal.fundingCallId ? "grant_fund_call" : "voluntary")) === "voluntary"
+                  ? "rgba(56, 189, 248, 0.15)"
+                  : "rgba(250, 204, 21, 0.18)",
+              color:
+                (proposal.proposalKind || (proposal.fundingCallId ? "grant_fund_call" : "voluntary")) === "voluntary"
+                  ? "#7dd3fc"
+                  : "#fde047",
+            }}
+          >
+            {(proposal.proposalKind || (proposal.fundingCallId ? "grant_fund_call" : "voluntary")) === "voluntary"
+              ? "Voluntary (no funding)"
+              : "Grant Fund Call"}
+          </span>
           Status: {proposal.status} • Version: {proposal.version}
         </div>
+        {(proposal.proposalKind || (proposal.fundingCallId ? "grant_fund_call" : "voluntary")) === "voluntary" ? (
+          <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>
+            Research-only path: no grant money. Approval creates a project for academic research benefit.
+          </div>
+        ) : proposal.fundingCallId ? (
+          <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>
+            Linked to a funding call. Continue grant steps from{" "}
+            <Link to={`/grants/apply?callId=${proposal.fundingCallId}`}>Funding Call apply</Link>.
+          </div>
+        ) : null}
         {proposal.status === "submitted" ? (
           <div
             style={{
@@ -152,7 +184,7 @@ export function ProposalDetailsPage() {
           ) : null}
           {isOwner ? (
             <Link className="btn" to="/proposals/new">
-              New proposal
+              New voluntary proposal
             </Link>
           ) : null}
 

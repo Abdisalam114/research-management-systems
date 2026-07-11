@@ -44,23 +44,44 @@ export function ProposalsListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function kindLabel(p) {
+    const kind = p.proposalKind || (p.fundingCallId ? "grant_fund_call" : "voluntary");
+    return kind === "grant_fund_call" ? "Grant Fund Call" : "Voluntary";
+  }
+
   return (
     <div>
       <PageHeader
         title={title}
-        subtitle="Complete ethics form, then submit proposal + ethics together to the Director."
+        subtitle="Two paths: Voluntary (research only, no funding) from here — or Grant Fund Call only from Funding Calls."
         stats={stats}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
         actions={
           <>
             {canCreate ? (
-              <Link className="btn primary" to="/proposals/new">+ New Proposal</Link>
+              <>
+                <Link className="btn primary" to="/proposals/new">
+                  + New Voluntary Proposal
+                </Link>
+                <Link className="btn" to="/funding-calls">
+                  Grant via Funding Call
+                </Link>
+              </>
             ) : null}
             <Link className="btn" to="/projects">Go to Projects</Link>
           </>
         }
       />
+
+      {canCreate ? (
+        <div className="card" style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5 }}>
+          <strong>Voluntary</strong> — no money; research project only (create from <em>New Voluntary Proposal</em>).
+          <br />
+          <strong>Grant Fund Call</strong> — funded; researcher may enter only from{" "}
+          <Link to="/funding-calls">Funding Calls</Link> → Apply (not from this button).
+        </div>
+      ) : null}
 
       {statusFilter !== "all" ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
@@ -81,6 +102,23 @@ export function ProposalsListPage() {
                   <div>
                     <div style={{ fontWeight: 800 }}>{p.title}</div>
                     <div className="muted">
+                      <span
+                        style={{
+                          display: "inline-block",
+                          marginRight: 8,
+                          padding: "2px 8px",
+                          borderRadius: 6,
+                          fontSize: 12,
+                          fontWeight: 700,
+                          background:
+                            kindLabel(p) === "Voluntary"
+                              ? "rgba(56, 189, 248, 0.15)"
+                              : "rgba(250, 204, 21, 0.18)",
+                          color: kindLabel(p) === "Voluntary" ? "#7dd3fc" : "#fde047",
+                        }}
+                      >
+                        {kindLabel(p)}
+                      </span>
                       Status: {p.status} • v{p.version} • {p.department}
                       {p.researcherName ? ` • PI: ${p.researcherName}` : ""}
                     </div>

@@ -35,6 +35,7 @@ function patchForm(prev, path, value) {
 
 /**
  * Full REC ethics application fields. Used on proposal page and ethics module.
+ * @param {boolean} hideFundingFields — voluntary proposals: no funding / money fields
  */
 export function EthicsApplicationForm({
   form,
@@ -43,9 +44,16 @@ export function EthicsApplicationForm({
   formComplete = false,
   embeddedInProposal = false,
   autoFillHint = false,
+  hideFundingFields = false,
 }) {
   const set = (path, value) => setForm((prev) => patchForm(prev, path, value));
   const missing = getEthicsMissingFields(form);
+  const consentOptions = hideFundingFields
+    ? CONSENT_ITEMS.filter((v) => v !== "compensation" && v !== "cost_reimbursement").map((v) => ({
+        value: v,
+        label: v.replace(/_/g, " "),
+      }))
+    : CONSENT_ITEMS.map((v) => ({ value: v, label: v.replace(/_/g, " ") }));
 
   useEffect(() => {
 }, [missing.length, formComplete, embeddedInProposal]);
@@ -312,10 +320,16 @@ export function EthicsApplicationForm({
           onChange={(v) => set("dataHandling.retention", v)}
           readOnly={readOnly}
         />
-        <div className="field">
-          <label>13. Funding sources</label>
-          <input disabled={readOnly} value={form.fundingSource} onChange={(e) => set("fundingSource", e.target.value)} />
-        </div>
+        {hideFundingFields ? (
+          <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+            Funding sources are not applicable — this is a <strong>voluntary</strong> proposal (no funding).
+          </p>
+        ) : (
+          <div className="field">
+            <label>13. Funding sources</label>
+            <input disabled={readOnly} value={form.fundingSource} onChange={(e) => set("fundingSource", e.target.value)} />
+          </div>
+        )}
       </Section>
 
       <Section title="Part III — Consent, safety & data">
@@ -351,7 +365,7 @@ export function EthicsApplicationForm({
         <div className="field">
           <label>4. Consent includes</label>
           <CheckGroup
-            options={CONSENT_ITEMS.map((v) => ({ value: v, label: v.replace(/_/g, " ") }))}
+            options={consentOptions}
             values={form.consent.items}
             onToggle={(v) => toggleInArray("consent.items", v)}
             readOnly={readOnly}
@@ -412,23 +426,25 @@ export function EthicsApplicationForm({
             <input disabled={readOnly} value={form.conflictOfInterest.collaborationWith} onChange={(e) => set("conflictOfInterest.collaborationWith", e.target.value)} />
           </div>
         </div>
-        <div className="row">
-          <div className="field">
-            <label>4b. Financial conflict?</label>
-            <select
-              disabled={readOnly}
-              value={form.conflictOfInterest.financialHas ? "yes" : "no"}
-              onChange={(e) => set("conflictOfInterest.financialHas", e.target.value === "yes")}
-            >
-              <option value="no">No</option>
-              <option value="yes">Yes</option>
-            </select>
+        {hideFundingFields ? null : (
+          <div className="row">
+            <div className="field">
+              <label>4b. Financial conflict?</label>
+              <select
+                disabled={readOnly}
+                value={form.conflictOfInterest.financialHas ? "yes" : "no"}
+                onChange={(e) => set("conflictOfInterest.financialHas", e.target.value === "yes")}
+              >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            </div>
+            <div className="field">
+              <label>Description</label>
+              <input disabled={readOnly} value={form.conflictOfInterest.financialDescription} onChange={(e) => set("conflictOfInterest.financialDescription", e.target.value)} />
+            </div>
           </div>
-          <div className="field">
-            <label>Description</label>
-            <input disabled={readOnly} value={form.conflictOfInterest.financialDescription} onChange={(e) => set("conflictOfInterest.financialDescription", e.target.value)} />
-          </div>
-        </div>
+        )}
         <div className="row">
           <div className="field">
             <label>4c. Reviewed by another committee?</label>

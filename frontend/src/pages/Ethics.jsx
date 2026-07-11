@@ -81,15 +81,21 @@ export function EthicsPage() {
     if (!accessToken || !proposalIdFromUrl || proposalLoadedRef.current) return;
     (async () => {
       try {
-        const res = await proposalApi.getProposalEthicsApplication(accessToken, proposalIdFromUrl);
+        const [ethicsRes, propRes] = await Promise.all([
+          proposalApi.getProposalEthicsApplication(accessToken, proposalIdFromUrl),
+          proposalApi.getProposal(accessToken, proposalIdFromUrl).catch(() => null),
+        ]);
         proposalLoadedRef.current = true;
-        if (res.application) {
+        const p = propRes?.proposal;
+        const kind = p?.proposalKind || (p?.fundingCallId ? "grant_fund_call" : "voluntary");
+        if (ethicsRes.application) {
           setEditing({
-            id: res.application.id,
-            form: toForm(res.application),
-            approval: res.application.approval,
-            status: res.application.status,
-            proposalId: res.application.proposalId || proposalIdFromUrl,
+            id: ethicsRes.application.id,
+            form: toForm(ethicsRes.application),
+            approval: ethicsRes.application.approval,
+            status: ethicsRes.application.status,
+            proposalId: ethicsRes.application.proposalId || proposalIdFromUrl,
+            proposalKind: kind,
           });
         }
       } catch (_) {
@@ -149,7 +155,15 @@ export function EthicsPage() {
       approval: a.approval,
       status: a.status,
       proposalId: a.proposalId,
+      proposalKind: a.proposalKind || null,
     });
+    if (a.proposalId && accessToken) {
+      proposalApi.getProposal(accessToken, a.proposalId).then((res) => {
+        const p = res.proposal;
+        const kind = p?.proposalKind || (p?.fundingCallId ? "grant_fund_call" : "voluntary");
+        setEditing((s) => (s?.id === a.id ? { ...s, proposalKind: kind } : s));
+      }).catch(() => {});
+    }
   }
 
   function scrollToEditor() {
@@ -462,6 +476,10 @@ if (isDirector && a.proposalId) {
           canSubmit={isResearcher && !editing.proposalId && !proposalIdFromUrl}
           linkedToProposal={Boolean(editing.proposalId || proposalIdFromUrl)}
           linkedProposalId={editing.proposalId || proposalIdFromUrl}
+          hideFundingFields={
+            editing.proposalKind === "voluntary" ||
+            String(editing.form?.fundingSource || "").includes("voluntary")
+          }
           formComplete={isEthicsFormComplete(editing.form)}
           validationIssues={validationIssues}
           approval={editing.approval}
@@ -499,6 +517,7 @@ function EthicsEditor({
   canSubmit,
   linkedToProposal,
   linkedProposalId,
+  hideFundingFields = false,
   formComplete,
   validationIssues,
   approval,
@@ -526,6 +545,7 @@ function EthicsEditor({
         readOnly={readOnly || showDirectorActions}
         formComplete={formComplete}
         embeddedInProposal={linkedToProposal}
+        hideFundingFields={hideFundingFields}
       />
 
       {showDirectorActions ? (

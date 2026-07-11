@@ -70,7 +70,12 @@ export function GrantApplyPage() {
     setBudgetRows(defaultBudgetRows().map((r) => ({ ...r, currency: c.currency || "USD" })));
     const reqs = parseRequirements(c.requiredDocuments);
     setRequirementChecklist(reqs.map((label) => ({ label, met: false, note: "" })));
-    const mine = (propRes.proposals || []).filter((p) => String(p.researcherId) === String(user?.id));
+    const mine = (propRes.proposals || []).filter(
+      (p) =>
+        String(p.researcherId) === String(user?.id) &&
+        String(p.fundingCallId || "") === String(c.id) &&
+        (p.proposalKind === "grant_fund_call" || Boolean(p.fundingCallId))
+    );
     setProposals(mine);
     const linked = mine.find((p) => String(p.fundingCallId) === String(c.id));
     if (linked) setSelectedProposalId(linked.id);
@@ -247,13 +252,15 @@ export function GrantApplyPage() {
               </button>
             ))}
             {proposals.length === 0 ? (
-              <p className="muted">No proposals yet — create one for this funding call.</p>
+              <p className="muted">
+                No grant proposals for this call yet. Create one here only — voluntary proposals from Proposals menu cannot be used.
+              </p>
             ) : null}
           </div>
 
           <div className="fundingCallFormActions">
             <Link className="btn primary" to={`/proposals/new?callId=${call.id}`}>
-              + New proposal for this call
+              + New Grant Fund Call proposal
             </Link>
             {selectedProposalId ? (
               <Link className="btn" to={`/proposals/${selectedProposalId}/edit`}>

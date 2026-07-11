@@ -26,6 +26,9 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
   const isDirector = user?.role === "research_director";
   const isCoordinator = user?.role === "faculty_coordinator";
   const isFinance = user?.role === "finance_officer";
+  const isVoluntary =
+    proposal.proposalKind === "voluntary" ||
+    (!proposal.fundingCallId && proposal.proposalKind !== "grant_fund_call");
   const assigned = (proposal.assignedReviewers || []).some((r) => String(r.userId?.id || r.userId) === String(user?.id));
   const peerDone = (proposal.peerReviews || []).some((r) => String(r.userId) === String(user?.id));
 
@@ -53,7 +56,11 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         <div>1. Admin screening <StageBadge status={pipe.adminScreening?.status} /></div>
         <div>2. Peer review <StageBadge status={pipe.peerReview?.status} /> ({(proposal.peerReviews || []).length} reviews)</div>
         <div>3. Committee <StageBadge status={pipe.committeeReview?.status} /></div>
-        <div>4. Finance <StageBadge status={pipe.financeReview?.status} /></div>
+        {isVoluntary ? (
+          <div>4. Finance <StageBadge status="skipped" /> (N/A — voluntary, no funding)</div>
+        ) : (
+          <div>4. Finance <StageBadge status={pipe.financeReview?.status} /></div>
+        )}
       </div>
 
       {(isCoordinator || isDirector) && pipe.adminScreening?.status === "pending" ? (
@@ -91,7 +98,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         </div>
       ) : null}
 
-      {isFinance && pipe.committeeReview?.status === "passed" && pipe.financeReview?.status === "pending" ? (
+      {!isVoluntary && isFinance && pipe.committeeReview?.status === "passed" && pipe.financeReview?.status === "pending" ? (
         <div>
           <input placeholder="Finance review comment" value={comment} onChange={(e) => setComment(e.target.value)} />
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>

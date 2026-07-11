@@ -381,7 +381,7 @@ export function ResearchJourneyPanel() {
             <div style={{ marginTop: 12 }}>
               <div className="muted">No projects or proposals yet.</div>
               <Link className="btn primary" to="/proposals/new" style={{ marginTop: 10, display: "inline-block" }}>
-                New proposal
+                New voluntary proposal
               </Link>
             </div>
           ) : null}

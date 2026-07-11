@@ -25,6 +25,7 @@ export function ProposalFormPage() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const fundingCallId = searchParams.get("callId") || "";
+  const isGrantFundCall = Boolean(fundingCallId);
   const isEdit = Boolean(id);
   const navigate = useNavigate();
   const { accessToken, user } = useAuth();
@@ -48,14 +49,22 @@ export function ProposalFormPage() {
   const [status, setStatus] = useState("draft");
   const [complianceDocs, setComplianceDocs] = useState([]);
   const [supportingDocs, setSupportingDocs] = useState([]);
+  const [loadedKind, setLoadedKind] = useState(null);
 
   const formComplete = useMemo(() => isEthicsFormComplete(ethicsForm), [ethicsForm]);
   const readOnly = !["draft", "revision_requested"].includes(status);
+  const isVoluntary = isEdit
+    ? loadedKind !== "grant_fund_call" && !fundingCallId
+    : !isGrantFundCall;
 
-  const heading = useMemo(
-    () => (isEdit ? "Edit Proposal + Ethics" : "New Proposal + Ethics Form"),
-    [isEdit]
-  );
+  const heading = useMemo(() => {
+    if (isEdit) {
+      return isVoluntary ? "Edit Voluntary Proposal + Ethics" : "Edit Grant Fund Call Proposal + Ethics";
+    }
+    return isVoluntary
+      ? "New Voluntary Proposal + Ethics (no funding)"
+      : "New Grant Fund Call Proposal + Ethics";
+  }, [isEdit, isVoluntary]);
 
   useEffect(() => {
     if (!isEdit || !accessToken || !id) return;
@@ -82,6 +91,7 @@ export function ProposalFormPage() {
         );
         setSavedId(p.id);
         setStatus(p.status);
+        setLoadedKind(p.proposalKind || (p.fundingCallId ? "grant_fund_call" : "voluntary"));
         setComplianceDocs((p.complianceDocuments || []).map((d) => ({
           docType: d.docType || "data_protection",
           label: d.label || "",
@@ -135,11 +145,16 @@ export function ProposalFormPage() {
     };
     if (proposal.document instanceof File) base.document = proposal.document;
     if (proposal.requiresEthics) {
-      base.ethics = prepareEthicsPayload(ethicsForm);
+      base.ethics = prepareEthicsPayload(ethicsForm, { voluntary: isVoluntary });
     }
-    if (fundingCallId && !savedId) base.fundingCallId = fundingCallId;
+    if (isGrantFundCall && !savedId) {
+      base.fundingCallId = fundingCallId;
+      base.proposalKind = "grant_fund_call";
+    } else if (!savedId) {
+      base.proposalKind = "voluntary";
+    }
     return base;
-  }, [proposal, ethicsForm, complianceDocs, supportingDocs, fundingCallId, savedId]);
+  }, [proposal, ethicsForm, complianceDocs, supportingDocs, fundingCallId, savedId, isGrantFundCall, isVoluntary]);
 
   const saveDraft = async () => {
     setBusy(true);
@@ -220,22 +235,39 @@ requestAnimationFrame(() => {
     <div>
       <h2 style={{ marginTop: 0 }}>{heading}</h2>
       <p className="muted" style={{ marginTop: 0, maxWidth: 720 }}>
-        One page: complete the proposal and ethics form. Your name, email, title, abstract, and department are filled in automatically.
-        When ready, one button submits both to the Director.
+        {isVoluntary
+          ? "Voluntary path: research only — no grant money. After approval a project is created for academic research benefit."
+          : "Grant Fund Call path: this proposal is tied to a funding call. Enter only from Funding Calls → Apply."}{" "}
+        Complete the proposal and ethics form, then submit to the Director.
       </p>
 
-      {fundingCallId && !isEdit ? (
+      {isVoluntary && !isEdit ? (
         <div
           className="card"
           style={{
             marginTop: 12,
-            borderColor: "rgba(34,197,94,0.4)",
-            background: "rgba(34,197,94,0.08)",
+            borderColor: "rgba(56,189,248,0.45)",
+            background: "rgba(56,189,248,0.08)",
             fontSize: 14,
           }}
         >
-          This proposal is for funding call application. After director approval, return to{" "}
-          <Link to={`/grants/apply?callId=${fundingCallId}`}>grant application</Link> to complete requirements and budget.
+          <strong>Voluntary proposal</strong> — no funding. For a funded proposal, go to{" "}
+          <Link to="/funding-calls">Funding Calls</Link> and apply there (you cannot start a grant proposal from this page).
+        </div>
+      ) : null}
+
+      {isGrantFundCall && !isEdit ? (
+        <div
+          className="card"
+          style={{
+            marginTop: 12,
+            borderColor: "rgba(250,204,21,0.45)",
+            background: "rgba(250,204,21,0.08)",
+            fontSize: 14,
+          }}
+        >
+          <strong>Grant Fund Call proposal</strong> — linked to this funding call only. After director approval, return to{" "}
+          <Link to={`/grants/apply?callId=${fundingCallId}`}>grant application</Link> for requirements and budget.
         </div>
       ) : null}
 
@@ -334,6 +366,7 @@ requestAnimationFrame(() => {
             formComplete={formComplete}
             embeddedInProposal
             autoFillHint={!readOnly}
+            hideFundingFields={isVoluntary}
           />
         </div>
       ) : null}

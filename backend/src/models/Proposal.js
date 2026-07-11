@@ -18,6 +18,12 @@ const ETHICS_STATUSES = Object.freeze({
   REVISION_REQUESTED: "revision_requested",
 });
 
+/** Voluntary = research only, no funding. Grant fund call = must enter via an open Funding Call. */
+const PROPOSAL_KINDS = Object.freeze({
+  VOLUNTARY: "voluntary",
+  GRANT_FUND_CALL: "grant_fund_call",
+});
+
 const proposalSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true },
@@ -137,6 +143,12 @@ const proposalSchema = new mongoose.Schema(
         uploadedAt: { type: Date, default: null },
       },
     ],
+    proposalKind: {
+      type: String,
+      enum: Object.values(PROPOSAL_KINDS),
+      default: PROPOSAL_KINDS.VOLUNTARY,
+      index: true,
+    },
     fundingCallId: { type: mongoose.Schema.Types.ObjectId, ref: "FundingCall", default: null, index: true },
     ...programTierField,
   },
@@ -145,4 +157,4 @@ const proposalSchema = new mongoose.Schema(
 
 const Proposal = mongoose.model("Proposal", proposalSchema);
 
-module.exports = { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES };
+module.exports = { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES, PROPOSAL_KINDS };

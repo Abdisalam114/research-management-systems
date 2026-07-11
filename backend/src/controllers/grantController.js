@@ -99,7 +99,15 @@ async function resolveGrantProposalId(req, proposalId, researcherId, call) {
   if (!proposalId) throw new AppError("A research proposal is required for funding call applications", 400);
   const proposal = await Proposal.findOne(req.tierWhere({ _id: proposalId, researcherId }));
   if (!proposal) throw new AppError("Research proposal not found or does not belong to you", 404);
-  if (proposal.fundingCallId && call && String(proposal.fundingCallId) !== String(call._id)) {
+
+  const kind = proposal.proposalKind || (proposal.fundingCallId ? "grant_fund_call" : "voluntary");
+  if (kind === "voluntary" || !proposal.fundingCallId) {
+    throw new AppError(
+      "Voluntary proposals cannot be used for funding calls. Create a Grant Fund Call proposal from Funding Calls only.",
+      400
+    );
+  }
+  if (call && String(proposal.fundingCallId) !== String(call._id)) {
     throw new AppError("This proposal is linked to a different funding call", 400);
   }
   const project = await Project.findOne(req.tierWhere({ proposalId: proposal._id, researcherId }));
@@ -284,11 +292,6 @@ async function createGrant(req, res) {
     ...(budgetFields || { budgetBreakdown: [], budgetTotal: 0 }),
   }));
 
-  if (!proposal.fundingCallId) {
-    proposal.fundingCallId = call._id;
-    await proposal.save();
-  }
-
   await recordAudit({
     entityType: "grant",
     entityId: grant._id,
@@ -332,10 +335,6 @@ async function updateGrant(req, res) {
     const { proposal, projectId: autoProjectId } = await resolveGrantProposalId(req, proposalId, req.user.id, call);
     grant.proposalId = proposal._id;
     if (!projectId && autoProjectId) grant.projectId = autoProjectId;
-    if (!proposal.fundingCallId && call) {
-      proposal.fundingCallId = call._id;
-      await proposal.save();
-    }
   }
 
   if (projectId !== undefined) {

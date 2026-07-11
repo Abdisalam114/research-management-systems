@@ -13,18 +13,42 @@ const STAGE_STATUS = Object.freeze({
   SKIPPED: "skipped",
 });
 
-function defaultReviewPipeline() {
-  return {
+function defaultReviewPipeline(options = {}) {
+  const pipe = {
     adminScreening: { status: STAGE_STATUS.PENDING, completedAt: null, completedBy: null, comment: "" },
     peerReview: { status: STAGE_STATUS.PENDING, completedAt: null, reviews: [] },
     committeeReview: { status: STAGE_STATUS.PENDING, completedAt: null, completedBy: null, decision: "", comment: "" },
     financeReview: { status: STAGE_STATUS.PENDING, completedAt: null, completedBy: null, decision: "", comment: "" },
   };
+  if (options.skipFinance) {
+    pipe.financeReview = {
+      status: STAGE_STATUS.SKIPPED,
+      completedAt: new Date(),
+      completedBy: null,
+      decision: "skipped",
+      comment: "Not applicable — voluntary proposal (no funding)",
+    };
+  }
+  return pipe;
+}
+
+function isVoluntaryProposal(proposal) {
+  if (!proposal) return false;
+  if (proposal.proposalKind === "grant_fund_call" || proposal.fundingCallId) return false;
+  return proposal.proposalKind === "voluntary" || !proposal.fundingCallId;
 }
 
 function ensureReviewPipeline(proposal) {
   if (!proposal.reviewPipeline || !proposal.reviewPipeline.adminScreening) {
-    proposal.reviewPipeline = defaultReviewPipeline();
+    proposal.reviewPipeline = defaultReviewPipeline({ skipFinance: isVoluntaryProposal(proposal) });
+  } else if (isVoluntaryProposal(proposal) && proposal.reviewPipeline.financeReview?.status === STAGE_STATUS.PENDING) {
+    proposal.reviewPipeline.financeReview = {
+      status: STAGE_STATUS.SKIPPED,
+      completedAt: proposal.reviewPipeline.financeReview.completedAt || new Date(),
+      completedBy: null,
+      decision: "skipped",
+      comment: proposal.reviewPipeline.financeReview.comment || "Not applicable — voluntary proposal (no funding)",
+    };
   }
   return proposal.reviewPipeline;
 }
@@ -39,7 +63,7 @@ function assertStagesBeforeDirector(proposal) {
   if (!stagePassed(p.adminScreening)) missing.push("admin screening");
   if (!stagePassed(p.peerReview)) missing.push("peer review");
   if (!stagePassed(p.committeeReview)) missing.push("committee review");
-  if (!stagePassed(p.financeReview)) missing.push("finance review");
+  if (!isVoluntaryProposal(proposal) && !stagePassed(p.financeReview)) missing.push("finance review");
   if (missing.length) {
     const err = new Error(`Complete review stages before final approval: ${missing.join(", ")}`);
     err.statusCode = 400;
@@ -52,7 +76,7 @@ function getCurrentReviewStage(proposal) {
   if (!stagePassed(p.adminScreening)) return "admin_screening";
   if (!stagePassed(p.peerReview)) return "peer_review";
   if (!stagePassed(p.committeeReview)) return "committee_review";
-  if (!stagePassed(p.financeReview)) return "finance_review";
+  if (!isVoluntaryProposal(proposal) && !stagePassed(p.financeReview)) return "finance_review";
   return "ready_for_director";
 }
 

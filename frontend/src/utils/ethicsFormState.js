@@ -110,9 +110,21 @@ export function syncEthicsFromProposal(ethics, proposal, user, programTier) {
   };
 }
 
-export function prepareEthicsPayload(form) {
+export function prepareEthicsPayload(form, { voluntary = false } = {}) {
   const payload = { ...form };
   if (payload.startDate === "") payload.startDate = null;
   if (payload.endDate === "") payload.endDate = null;
+  if (voluntary) {
+    payload.fundingSource = "N/A — voluntary research (no funding)";
+    payload.conflictOfInterest = {
+      ...(payload.conflictOfInterest || {}),
+      financialHas: false,
+      financialDescription: "",
+    };
+    const items = (payload.consent?.items || []).filter(
+      (v) => v !== "compensation" && v !== "cost_reimbursement"
+    );
+    payload.consent = { ...(payload.consent || {}), items };
+  }
   return payload;
 }

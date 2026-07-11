@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES } = require("../models/Proposal");
+const { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES, PROPOSAL_KINDS } = require("../models/Proposal");
 const { Project } = require("../models/Project");
 const { User, ROLES } = require("../models/User");
 const { EthicsApplication } = require("../models/EthicsApplication");
@@ -18,6 +18,13 @@ const {
 const { applyEthicsPayload, parseEthicsJson } = require("../utils/ethicsFormMerge");
 const { ensureReviewPipeline, assertStagesBeforeDirector, getCurrentReviewStage, defaultReviewPipeline, STAGE_STATUS } = require("../utils/proposalReviewPipeline");
 const { recordAudit } = require("../utils/audit");
+
+function resolveProposalKind(doc) {
+  if (doc.proposalKind && Object.values(PROPOSAL_KINDS).includes(doc.proposalKind)) {
+    return doc.proposalKind;
+  }
+  return doc.fundingCallId ? PROPOSAL_KINDS.GRANT_FUND_CALL : PROPOSAL_KINDS.VOLUNTARY;
+}
 
 function sanitizeProposal(p) {
   const researcher = p.researcherId;
@@ -47,6 +54,7 @@ function sanitizeProposal(p) {
     peerReviews: p.peerReviews || [],
     reviewPipeline: ensureReviewPipeline(p),
     currentReviewStage: getCurrentReviewStage(p),
+    proposalKind: resolveProposalKind(p),
     fundingCallId: p.fundingCallId || null,
     submittedAt: p.submittedAt,
     createdAt: p.createdAt,
@@ -129,6 +137,22 @@ async function persistProposalEthics(proposal, user, reqBody) {
     ethics.projectTitle = proposal.title;
     if (proposal.department) ethics.principal = { ...(ethics.principal || {}), department: proposal.department };
   }
+  const voluntary =
+    proposal.proposalKind === PROPOSAL_KINDS.VOLUNTARY ||
+    (!proposal.fundingCallId && proposal.proposalKind !== PROPOSAL_KINDS.GRANT_FUND_CALL);
+  if (voluntary) {
+    ethics.fundingSource = "N/A — voluntary research (no funding)";
+    ethics.conflictOfInterest = {
+      ...(ethics.conflictOfInterest || {}),
+      financialHas: false,
+      financialDescription: "",
+    };
+    if (ethics.consent?.items) {
+      ethics.consent.items = ethics.consent.items.filter(
+        (v) => v !== "compensation" && v !== "cost_reimbursement"
+      );
+    }
+  }
   await ethics.save();
 }
 
@@ -175,7 +199,7 @@ function applyProposalDocuments(proposal, req) {
 }
 
 async function createProposal(req, res) {
-  const { title, abstract, department, researchArea, requiresEthics, fundingCallId } = req.body;
+  const { title, abstract, department, researchArea, requiresEthics, fundingCallId, proposalKind } = req.body;
   if (!title || !abstract || !department || !researchArea) {
     throw new AppError("title, abstract, department, and researchArea are required", 400);
   }
@@ -183,12 +207,30 @@ async function createProposal(req, res) {
   const document = req.files?.document?.[0] ? `/uploads/${req.files.document[0].filename}` : (req.file ? `/uploads/${req.file.filename}` : null);
   const needsEthics = requiresEthics !== "false" && requiresEthics !== false;
 
+  const requestedKind = String(proposalKind || "").trim();
+  const wantsGrantCall = Boolean(fundingCallId) || requestedKind === PROPOSAL_KINDS.GRANT_FUND_CALL;
+
   let linkedCallId = null;
-  if (fundingCallId) {
+  let kind = PROPOSAL_KINDS.VOLUNTARY;
+
+  if (wantsGrantCall) {
+    if (!fundingCallId) {
+      throw new AppError(
+        "Grant fund call proposals can only be created from an open Funding Call. Open Funding Calls and apply there.",
+        400
+      );
+    }
     const call = await FundingCall.findOne(req.tierWhere({ _id: fundingCallId, status: CALL_STATUSES.OPEN }));
     if (!call) throw new AppError("Funding call not found or not open", 404);
     if (req.user.role === ROLES.RESEARCHER) assertEligibleForCall(req, call);
     linkedCallId = call._id;
+    kind = PROPOSAL_KINDS.GRANT_FUND_CALL;
+  } else {
+    // Voluntary path: research only, no funding — must not carry a funding call id
+    if (fundingCallId) {
+      throw new AppError("Voluntary proposals cannot be linked to a funding call", 400);
+    }
+    kind = PROPOSAL_KINDS.VOLUNTARY;
   }
 
   const proposal = await Proposal.create(req.tierAssign({
@@ -205,7 +247,9 @@ async function createProposal(req, res) {
     version: 1,
     requiresEthics: needsEthics,
     ethicsStatus: needsEthics ? ETHICS_STATUSES.PENDING : ETHICS_STATUSES.NOT_REQUIRED,
+    proposalKind: kind,
     fundingCallId: linkedCallId,
+    reviewPipeline: defaultReviewPipeline({ skipFinance: kind === PROPOSAL_KINDS.VOLUNTARY }),
   }));
 
   applyProposalDocuments(proposal, req);
@@ -353,7 +397,11 @@ async function submitProposal(req, res) {
 
   proposal.status = PROPOSAL_STATUSES.SUBMITTED;
   proposal.submittedAt = new Date();
-  proposal.reviewPipeline = defaultReviewPipeline();
+  proposal.reviewPipeline = defaultReviewPipeline({
+    skipFinance:
+      proposal.proposalKind === PROPOSAL_KINDS.VOLUNTARY ||
+      (!proposal.fundingCallId && proposal.proposalKind !== PROPOSAL_KINDS.GRANT_FUND_CALL),
+  });
   await proposal.save();
 
   try {
