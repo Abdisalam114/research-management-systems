@@ -368,7 +368,8 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
       detail: repo ? repo.title : pubSubmittedOrBetter ? "Archive output files for this project" : "Not archived yet",
     })
   );
-const gatedSteps = enforceSequentialWorkflow(steps);
+
+  const gatedSteps = enforceSequentialWorkflow(steps);
   const current =
     gatedSteps.find((s) => s.status === "current") ||
     gatedSteps.find((s) => s.status === "blocked") ||
