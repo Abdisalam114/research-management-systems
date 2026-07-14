@@ -5,8 +5,10 @@ const {
   LEGACY_PUBLICATION_TYPE_MAP,
   WORKFLOW_STAGES,
 } = require("../models/Publication");
+const { Project } = require("../models/Project");
+const { User } = require("../models/User");
 const { AppError } = require("../utils/AppError");
-const { notifyUser, notifyUsersByRole } = require("../utils/notify");
+const { notifyUser } = require("../utils/notify");
 const { resolveOwnedProjectId, requireOwnedProjectId, validateProjectQuery } = require("../utils/projectScopedRecords");
 const {
   resolveWorkflowStage,
@@ -14,6 +16,49 @@ const {
   countByWorkflowStage,
   STAGE_ORDER,
 } = require("../utils/publicationWorkflow");
+const { resolvePrincipalInvestigatorName } = require("../utils/projectPrincipalInvestigator");
+const { userDisplayName } = require("../utils/userDisplay");
+const { afterPublicationSubmitted } = require("../utils/publicationSideEffects");
+
+async function authorsFromProject(projectId, researcherId) {
+  const project = await Project.findById(projectId)
+    .populate("researcherId", "fullName name email")
+    .populate("teamMembers.userId", "fullName name");
+  if (!project) return [];
+
+  const names = [];
+  const pi =
+    resolvePrincipalInvestigatorName(project) ||
+    userDisplayName(project.researcherId) ||
+    "";
+  if (pi && pi !== "—") names.push(pi);
+
+  for (const m of project.teamMembers || []) {
+    const n =
+      (m.userId && userDisplayName(m.userId)) ||
+      (m.name && String(m.name).trim()) ||
+      "";
+    if (n && n !== "—" && !names.some((x) => x.toLowerCase() === n.toLowerCase())) {
+      names.push(n);
+    }
+  }
+
+  if (!names.length && researcherId) {
+    const u = await User.findById(researcherId).select("fullName name");
+    const self = userDisplayName(u);
+    if (self && self !== "—") names.push(self);
+  }
+  return names;
+}
+
+async function projectDefaults(projectId, researcherId) {
+  const project = await Project.findById(projectId).select("title");
+  const authors = await authorsFromProject(projectId, researcherId);
+  return {
+    title: project?.title ? String(project.title).trim() : "",
+    authors,
+  };
+}
 
 function sanitizePublication(p) {
   const workflowStage = resolveWorkflowStage(p);
@@ -127,8 +172,8 @@ function normalizeType(value) {
 }
 
 async function createPublication(req, res) {
-  const { title, type, year, venue, doi, orcid, url, authors, communityImpact, projectId } = req.body || {};
-  if (!title) throw new AppError("title is required", 400);
+  const { title, type, year, venue, doi, orcid, url, authors, communityImpact, projectId, submit } = req.body || {};
+  if (!title && !projectId) throw new AppError("title is required", 400);
 
   const normalizedType = normalizeType(type);
   const impactText = communityImpact ? String(communityImpact).trim() : "";
@@ -137,22 +182,42 @@ async function createPublication(req, res) {
   }
 
   const linkedProjectId = await requireOwnedProjectId(req, projectId, req.user.id);
+  const defaults = await projectDefaults(linkedProjectId, req.user.id);
+
+  let authorList = Array.isArray(authors) ? authors.map((a) => String(a).trim()).filter(Boolean) : [];
+  if (!authorList.length) authorList = defaults.authors;
+
+  const finalTitle = String(title || "").trim() || defaults.title;
+  if (!finalTitle) throw new AppError("title is required", 400);
 const pub = await Publication.create(req.tierAssign({
-    title: String(title).trim(),
+    title: finalTitle,
     type: normalizedType,
-    year,
+    year: year || new Date().getFullYear(),
     venue: venue ? String(venue).trim() : "",
     doi: doi ? String(doi).trim() : "",
     orcid: orcid ? String(orcid).trim() : "",
     url: url ? String(url).trim() : "",
-    authors: Array.isArray(authors) ? authors.map((a) => String(a).trim()).filter(Boolean) : [],
+    authors: authorList,
     communityImpact: impactText,
     researcherId: req.user.id,
     projectId: linkedProjectId,
     status: PUBLICATION_STATUSES.DRAFT,
   }));
 
-  res.status(201).json({ publication: sanitizePublication(pub) });
+  const wantSubmit = submit === true || submit === "true";
+  let sideEffects = null;
+  if (wantSubmit) {
+    pub.status = PUBLICATION_STATUSES.SUBMITTED;
+    pub.workflowStage = WORKFLOW_STAGES.SUBMITTED;
+    await pub.save();
+    sideEffects = await afterPublicationSubmitted(req, pub);
+  }
+
+  res.status(201).json({
+    message: wantSubmit ? "Publication created and submitted" : "Publication created",
+    publication: sanitizePublication(pub),
+    sideEffects,
+  });
 }
 
 async function updatePublication(req, res) {
@@ -199,22 +264,29 @@ async function submitPublication(req, res) {
     throw new AppError("Link this output to a research project before submitting", 400);
   }
 
+  // Auto-complete related fields from the linked project before submit
+  if (!pub.authors?.length) {
+    pub.authors = await authorsFromProject(pub.projectId, req.user.id);
+  }
+  if (!(pub.title || "").trim()) {
+    const project = await Project.findById(pub.projectId).select("title");
+    if (project?.title) pub.title = project.title;
+  }
+  if (!(pub.title || "").trim()) {
+    throw new AppError("Publication title is required before submit", 400);
+  }
+
   pub.status = PUBLICATION_STATUSES.SUBMITTED;
   pub.workflowStage = WORKFLOW_STAGES.SUBMITTED;
   await pub.save();
 
-  try {
-    await notifyUsersByRole("faculty_coordinator", {
-      type: "publication",
-      title: "Publication submitted for validation",
-      body: pub.title,
-      link: "/publications",
-    });
-  } catch {
-    /* notifications are best-effort */
-  }
+  const sideEffects = await afterPublicationSubmitted(req, pub);
 
-  res.json({ message: "Publication submitted", publication: sanitizePublication(pub) });
+  res.json({
+    message: "Publication submitted",
+    publication: sanitizePublication(pub),
+    sideEffects,
+  });
 }
 
 async function validatePublication(req, res) {

@@ -71,10 +71,18 @@ async function submitLinkedEthics(ethics) {
 
 async function assertEthicsApprovedForDirectorApproval(proposal) {
   const ethics = await getEthicsForProposal(proposal._id);
-  if (!ethics || ethics.status !== ETHICS_STATUSES.APPROVED) {
-    throw new Error("Approve the linked ethics application (REC) before approving this proposal.");
+  if (ethics && ethics.status === ETHICS_STATUSES.APPROVED) {
+    // Keep proposal flag in sync (committee may have cleared ethics already)
+    if (proposal.ethicsStatus !== PROPOSAL_ETHICS.APPROVED) {
+      proposal.ethicsStatus = PROPOSAL_ETHICS.APPROVED;
+      await Proposal.updateOne({ _id: proposal._id }, { ethicsStatus: PROPOSAL_ETHICS.APPROVED });
+    }
+    return ethics;
   }
-  return ethics;
+  if (proposal.ethicsStatus === PROPOSAL_ETHICS.APPROVED) {
+    return ethics;
+  }
+  throw new Error("Approve the linked ethics application (REC) before approving this proposal.");
 }
 
 module.exports = {

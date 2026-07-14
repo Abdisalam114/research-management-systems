@@ -4,7 +4,8 @@ import * as analyticsApi from "../services/analyticsApi";
 import { PageHeader } from "../components/PageHeader";
 
 export function DonorReportsPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
+  const isDonor = user?.role === "donor_agency";
   const [report, setReport] = useState(null);
   const [error, setError] = useState("");
 
@@ -37,7 +38,11 @@ export function DonorReportsPage() {
     <div>
       <PageHeader
         title="Donor reports"
-        subtitle={`Generated ${new Date(report.generatedAt).toLocaleString()} · ${report.donors?.length || 0} donor references`}
+        subtitle={
+          isDonor
+            ? "Your agency accountability view — grants, awards, and funding calls (read-only)."
+            : `Generated ${new Date(report.generatedAt).toLocaleString()} · ${report.donors?.length || 0} donor references`
+        }
       />
 
       <div className="overviewGrid" style={{ marginTop: 12 }}>

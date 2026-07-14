@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
@@ -24,27 +24,49 @@ const EMPTY_FORM = {
   venue: "",
   doi: "",
   orcid: "",
+  authors: "",
   communityImpact: "",
   projectId: "",
 };
 
+function authorsFromProject(project, user) {
+  const names = [];
+  const pi =
+    project?.principalInvestigator?.fullName ||
+    project?.principalInvestigatorName ||
+    user?.fullName ||
+    "";
+  if (pi) names.push(pi);
+  for (const m of project?.teamMembers || []) {
+    const n = (m.name || m.fullName || "").trim();
+    if (n && !names.some((x) => x.toLowerCase() === n.toLowerCase())) names.push(n);
+  }
+  return names.join(", ");
+}
+
 export function PublicationsPage() {
   const { accessToken, user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const projectIdFromUrl = searchParams.get("projectId") || "";
   const [publications, setPublications] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(Boolean(projectIdFromUrl));
   const [form, setForm] = useState({ ...EMPTY_FORM, projectId: projectIdFromUrl });
+  const [linkedProject, setLinkedProject] = useState(null);
+  const [autoFilled, setAutoFilled] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
 
   const canCreate = user?.role === "researcher";
   const canValidate = ["faculty_coordinator", "research_director"].includes(user?.role);
+  const projectLocked = Boolean(projectIdFromUrl);
 
   useEffect(() => {
     if (projectIdFromUrl) {
       setForm((f) => ({ ...f, projectId: projectIdFromUrl }));
+      setShowForm(true);
     }
   }, [projectIdFromUrl]);
 
@@ -59,11 +81,64 @@ export function PublicationsPage() {
     projectApi.listProjects(accessToken).then((res) => {
       const list = res.projects || [];
       setProjects(list);
-      if (list.length === 1) {
+      if (list.length === 1 && !projectIdFromUrl) {
         setForm((f) => (f.projectId ? f : { ...f, projectId: list[0].id }));
       }
     }).catch(() => setProjects([]));
-  }, [accessToken, canCreate]);
+  }, [accessToken, canCreate, projectIdFromUrl]);
+
+  // When project is selected, auto-fill title + authors from that project
+  useEffect(() => {
+    if (!form.projectId || !accessToken || !canCreate) {
+      setLinkedProject(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await projectApi.getProject(accessToken, form.projectId);
+        if (cancelled) return;
+        const p = res.project;
+        setLinkedProject(p);
+        setForm((f) => {
+          const next = { ...f };
+          if (!f.title.trim() || f.projectId !== form.projectId) {
+            // Prefer project title when empty or when switching project with empty title
+            if (!f.title.trim()) next.title = p.title || "";
+          }
+          if (!f.authors.trim()) {
+            next.authors = authorsFromProject(p, user);
+          }
+          return next;
+        });
+        setAutoFilled(true);
+        // #region agent log
+        fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+          body: JSON.stringify({
+            sessionId: "f558f7",
+            hypothesisId: "M",
+            location: "Publications.jsx:autoFill",
+            message: "publication form auto-filled from project",
+            data: {
+              projectId: form.projectId,
+              hasTitle: Boolean(p?.title),
+              authorPreview: authorsFromProject(p, user).slice(0, 80),
+            },
+            timestamp: Date.now(),
+            runId: "pre-fix",
+          }),
+        }).catch(() => {});
+        // #endregion
+      } catch {
+        if (!cancelled) setLinkedProject(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [form.projectId, accessToken, canCreate, user]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
@@ -95,6 +170,54 @@ export function PublicationsPage() {
 
   const isCommunityType = form.type === "community_research_impact";
 
+  function resetForm() {
+    setForm({
+      ...EMPTY_FORM,
+      projectId: projects.length === 1 ? projects[0].id : projectIdFromUrl || "",
+    });
+    setAutoFilled(false);
+  }
+
+  async function saveOutput({ submitNow }) {
+    setBusy(true);
+    setError("");
+    try {
+      if (isCommunityType && !form.communityImpact.trim()) {
+        setError("Community research impact description is required for this output type.");
+        return;
+      }
+      if (!form.projectId) {
+        setError("Select the research project this output belongs to.");
+        return;
+      }
+      const authors = form.authors
+        .split(",")
+        .map((a) => a.trim())
+        .filter(Boolean);
+      const payload = {
+        ...form,
+        authors,
+        submit: submitNow,
+      };
+      const created = await publicationApi.createPublication(accessToken, payload);
+      resetForm();
+      if (!projectLocked) setShowForm(false);
+      await reload();
+      const linkedId = projectIdFromUrl || form.projectId || created?.publication?.projectId;
+      // Return to project so Research workflow / awards / activity refresh
+      if (submitNow && linkedId) {
+        navigate(`/projects/${linkedId}`, {
+          replace: true,
+          state: { workflowHint: "publication_submitted" },
+        });
+      }
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to save publication");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -121,7 +244,7 @@ export function PublicationsPage() {
 
       {projectIdFromUrl ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          Filtered to one project —{" "}
+          Linked to project — title & authors auto-fill from the project.{" "}
           <Link to="/publications">show all outputs</Link>
         </p>
       ) : null}
@@ -169,13 +292,30 @@ export function PublicationsPage() {
       {canCreate && showForm ? (
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ fontWeight: 800 }}>Register research output</div>
+          {autoFilled && linkedProject ? (
+            <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+              Auto-filled from project <strong>{linkedProject.title}</strong> (title, authors). You can edit before
+              submit.
+            </p>
+          ) : null}
           <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
             <div className="field">
               <label>Research project (required)</label>
               <select
                 value={form.projectId}
-                onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setForm((f) => ({
+                    ...f,
+                    projectId: id,
+                    // Clear so new project can re-fill
+                    title: "",
+                    authors: "",
+                  }));
+                  setAutoFilled(false);
+                }}
                 required
+                disabled={projectLocked}
               >
                 <option value="">Select project…</option>
                 {projects.map((p) => (
@@ -188,6 +328,14 @@ export function PublicationsPage() {
             <div className="field">
               <label>Title</label>
               <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+            </div>
+            <div className="field">
+              <label>Authors (auto from project team — comma separated)</label>
+              <input
+                value={form.authors}
+                onChange={(e) => setForm((f) => ({ ...f, authors: e.target.value }))}
+                placeholder="PI and team members"
+              />
             </div>
             <div className="row">
               <div className="field">
@@ -246,31 +394,14 @@ export function PublicationsPage() {
                 }
               />
             </div>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={async () => {
-                try {
-                  setError("");
-                  if (isCommunityType && !form.communityImpact.trim()) {
-                    setError("Community research impact description is required for this output type.");
-                    return;
-                  }
-                  if (!form.projectId) {
-                    setError("Select the research project this output belongs to.");
-                    return;
-                  }
-                  await publicationApi.createPublication(accessToken, form);
-                  setForm({ ...EMPTY_FORM, projectId: projects.length === 1 ? projects[0].id : projectIdFromUrl || "" });
-                  setShowForm(false);
-                  await reload();
-                } catch (e) {
-                  setError(e?.response?.data?.message || "Failed to create publication");
-                }
-              }}
-            >
-              Create
-            </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" className="btn" disabled={busy} onClick={() => saveOutput({ submitNow: false })}>
+                {busy ? "Saving…" : "Save draft"}
+              </button>
+              <button type="button" className="btn primary" disabled={busy} onClick={() => saveOutput({ submitNow: true })}>
+                {busy ? "Submitting…" : "Create & submit"}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -290,6 +421,11 @@ export function PublicationsPage() {
                     {p.venue ? ` • ${p.venue}` : ""}
                     {p.projectTitle ? ` • Project: ${p.projectTitle}` : p.projectId ? ` • Project linked` : ""}
                   </div>
+                  {Array.isArray(p.authors) && p.authors.length ? (
+                    <div className="muted" style={{ fontSize: 13 }}>
+                      Authors: {p.authors.join(", ")}
+                    </div>
+                  ) : null}
                   {p.workflowStage ? (
                     <div style={{ fontSize: 12, marginTop: 4, color: workflowStageMeta(p.workflowStage).accent }}>
                       {workflowStageMeta(p.workflowStage).icon}{" "}
@@ -334,12 +470,18 @@ export function PublicationsPage() {
                   {canCreate && p.status === "draft" ? (
                     <button
                       type="button"
-                      className="btn"
+                      className="btn primary"
                       onClick={async () => {
                         try {
                           setError("");
                           await publicationApi.submitPublication(accessToken, p.id);
                           await reload();
+                          if (p.projectId) {
+                            navigate(`/projects/${p.projectId}`, {
+                              replace: true,
+                              state: { workflowHint: "publication_submitted" },
+                            });
+                          }
                         } catch (e) {
                           setError(e?.response?.data?.message || "Failed to submit");
                         }
@@ -399,7 +541,7 @@ export function PublicationsPage() {
           {filtered.length === 0 ? (
             <div className="muted">
               {publications.length === 0
-                ? "No outputs yet. Use + New output to register journal articles, conferences, books, patents, or community impact."
+                ? "No outputs yet. Use + New output (or Project → Research output) — project fields auto-fill."
                 : "No outputs in this category."}
             </div>
           ) : null}

@@ -14,9 +14,11 @@ export function ProposalsListPage() {
 
   const canCreate = user?.role === "researcher";
   const isReviewer = ["faculty_coordinator", "research_director"].includes(user?.role);
+  const isPeerReviewer = user?.role === "peer_reviewer";
 
   const title = useMemo(() => {
     if (user?.role === "researcher") return "My Proposals";
+    if (user?.role === "peer_reviewer") return "Assigned proposals (peer review)";
     return "Proposals (Review Queue)";
   }, [user?.role]);
 
@@ -53,7 +55,7 @@ export function ProposalsListPage() {
     <div>
       <PageHeader
         title={title}
-        subtitle="Two paths: Voluntary (research only, no funding) from here — or Grant Fund Call only from Funding Calls."
+        subtitle="Voluntary research proposals from here. Funded applications start from Funding Calls."
         stats={stats}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
@@ -76,10 +78,10 @@ export function ProposalsListPage() {
 
       {canCreate ? (
         <div className="card" style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5 }}>
-          <strong>Voluntary</strong> — no money; research project only (create from <em>New Voluntary Proposal</em>).
+          <strong>Voluntary</strong> — research proposal + ethics (create with <em>New Voluntary Proposal</em>).
           <br />
-          <strong>Grant Fund Call</strong> — funded; researcher may enter only from{" "}
-          <Link to="/funding-calls">Funding Calls</Link> → Apply (not from this button).
+          <strong>Grant Fund Call</strong> — start only from{" "}
+          <Link to="/funding-calls">Funding Calls</Link> → Apply.
         </div>
       ) : null}
 
@@ -130,6 +132,11 @@ export function ProposalsListPage() {
                     {isReviewer ? (
                       <Link className="btn primary" to={`/proposals/${p.id}/review`}>
                         Review
+                      </Link>
+                    ) : null}
+                    {isPeerReviewer ? (
+                      <Link className="btn primary" to={`/proposals/${p.id}/review`}>
+                        Peer review
                       </Link>
                     ) : null}
                   </div>

@@ -8,6 +8,12 @@ const defaultAcademicYear = () => {
   return `${y}/${y + 1}`;
 };
 
+/** Fallback if API preview fails — must match backend JUREC_CHAIRPERSON_OPTIONS */
+const FALLBACK_CHAIRPERSONS = [
+  { key: "kasim", name: "Kasim Abdi Jimale", title: "Chairperson", line: "Kasim Abdi Jimale" },
+  { key: "nur", name: "Dr. Nur Rashid Ahmed", title: "Chairperson", line: "Dr. Nur Rashid Ahmed" },
+];
+
 const EMPTY_CERT = {
   refNumber: "",
   serialNumber: "",
@@ -40,7 +46,7 @@ export function EthicsDirectorDecisionModal({
   const [signatoryKey, setSignatoryKey] = useState("kasim");
   const [includeSignature, setIncludeSignature] = useState(true);
   const [includeStamp, setIncludeStamp] = useState(true);
-  const [signatories, setSignatories] = useState([]);
+  const [signatories, setSignatories] = useState(FALLBACK_CHAIRPERSONS);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [localError, setLocalError] = useState("");
 
@@ -48,13 +54,17 @@ export function EthicsDirectorDecisionModal({
     if (!open) return;
     setAcademicYear(defaultAcademicYear());
     setYear(String(new Date().getFullYear()));
-    setCert(EMPTY_CERT);
     setRejectionReason("");
     setSignatoryKey("kasim");
     setIncludeSignature(true);
     setIncludeStamp(true);
-    setSignatories([]);
+    setSignatories(FALLBACK_CHAIRPERSONS);
     setLocalError("");
+    setCert({
+      ...EMPTY_CERT,
+      chairpersonLine: FALLBACK_CHAIRPERSONS[0].line,
+      signatoryTitle: "Chairperson",
+    });
   }, [open, mode]);
 
   useEffect(() => {
@@ -66,8 +76,12 @@ export function EthicsDirectorDecisionModal({
         const res = await ethicsApi.previewCertificate(accessToken, applicationId);
         if (cancelled) return;
         const p = res.preview || {};
-        const options = res.signatories || [];
-        const defaultKey = p.signatoryKey || options[0]?.key || "kasim";
+        const options =
+          Array.isArray(res.signatories) && res.signatories.length > 0
+            ? res.signatories.filter((s) => s.key === "kasim" || s.key === "nur")
+            : FALLBACK_CHAIRPERSONS;
+        const defaultKey =
+          options.some((s) => s.key === p.signatoryKey) ? p.signatoryKey : options[0]?.key || "kasim";
         const defaultSignatory = options.find((s) => s.key === defaultKey) || options[0];
         setSignatories(options);
         setSignatoryKey(defaultKey);
@@ -84,8 +98,47 @@ export function EthicsDirectorDecisionModal({
           chairpersonLine: defaultSignatory?.line || defaultSignatory?.name || "",
           signatoryTitle: defaultSignatory?.title || "Chairperson",
         });
+        // #region agent log
+        fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+          body: JSON.stringify({
+            sessionId: "f558f7",
+            hypothesisId: "E",
+            location: "EthicsDirectorDecisionModal.jsx:preview",
+            message: "loaded chairperson options",
+            data: { count: options.length, keys: options.map((s) => s.key), defaultKey },
+            timestamp: Date.now(),
+            runId: "pre-fix",
+          }),
+        }).catch(() => {});
+        // #endregion
       } catch (e) {
-        if (!cancelled) setLocalError(e?.response?.data?.message || "Could not load certificate preview");
+        if (!cancelled) {
+          setSignatories(FALLBACK_CHAIRPERSONS);
+          setSignatoryKey("kasim");
+          setCert((prev) => ({
+            ...prev,
+            chairpersonLine: FALLBACK_CHAIRPERSONS[0].line,
+            signatoryTitle: "Chairperson",
+          }));
+          setLocalError(e?.response?.data?.message || "Could not load certificate preview");
+          // #region agent log
+          fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+            body: JSON.stringify({
+              sessionId: "f558f7",
+              hypothesisId: "E",
+              location: "EthicsDirectorDecisionModal.jsx:previewError",
+              message: "preview failed — using fallback chairpersons",
+              data: { status: e?.response?.status || null, msg: e?.response?.data?.message || String(e?.message || "") },
+              timestamp: Date.now(),
+              runId: "pre-fix",
+            }),
+          }).catch(() => {});
+          // #endregion
+        }
       } finally {
         if (!cancelled) setPreviewLoading(false);
       }
@@ -111,7 +164,8 @@ export function EthicsDirectorDecisionModal({
 
   function handleSignatoryChange(key) {
     setSignatoryKey(key);
-    const found = signatories.find((s) => s.key === key);
+    const list = signatories.length ? signatories : FALLBACK_CHAIRPERSONS;
+    const found = list.find((s) => s.key === key);
     if (found) {
       setCert((prev) => ({
         ...prev,
@@ -119,6 +173,21 @@ export function EthicsDirectorDecisionModal({
         signatoryTitle: found.title || "Chairperson",
       }));
     }
+    // #region agent log
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify({
+        sessionId: "f558f7",
+        hypothesisId: "F",
+        location: "EthicsDirectorDecisionModal.jsx:handleSignatoryChange",
+        message: "chairperson selected",
+        data: { key, line: found?.line || null },
+        timestamp: Date.now(),
+        runId: "pre-fix",
+      }),
+    }).catch(() => {});
+    // #endregion
   }
 
   if (!open) return null;
@@ -134,8 +203,8 @@ export function EthicsDirectorDecisionModal({
         setLocalError("Ref number iyo certificate number waa in Director-ku geliyo (labadaba waa qasab).");
         return;
       }
-      if (!signatoryKey || !signatories.some((s) => s.key === signatoryKey)) {
-        setLocalError("Dooro chairperson — Kasim ama Dr. Nur.");
+      if (!signatoryKey || !(signatories.length ? signatories : FALLBACK_CHAIRPERSONS).some((s) => s.key === signatoryKey)) {
+        setLocalError("Dooro chairperson — Kasim Abdi Jimale ama Dr. Nur Rashid Ahmed.");
         return;
       }
       onConfirm({
@@ -143,7 +212,7 @@ export function EthicsDirectorDecisionModal({
         academicYear: academicYear.trim() || defaultAcademicYear(),
         year: year.trim() || String(new Date().getFullYear()),
         refNumber: cert.refNumber.trim(),
-        serialNumber: cert.serialNumber.trim(),
+        // Serial Number is always system-generated on the server
         certificateNumber: cert.certificateNumber.trim(),
         signedAt: cert.signedAt || undefined,
         receivedAt: cert.receivedAt || undefined,
@@ -235,8 +304,17 @@ export function EthicsDirectorDecisionModal({
                 </div>
 
                 <div className="field">
-                  <label>Serial Number</label>
-                  <input value={cert.serialNumber} onChange={(e) => updateCert("serialNumber", e.target.value)} disabled={busy} />
+                  <label>Serial Number (automatic)</label>
+                  <input
+                    value={cert.serialNumber}
+                    readOnly
+                    disabled
+                    title="Generated automatically by the system"
+                    style={{ opacity: 0.85, cursor: "not-allowed" }}
+                  />
+                  <p className="muted" style={{ margin: "4px 0 0", fontSize: 11 }}>
+                    System ayaa otomaatig u sameeya — lama beddeli karo.
+                  </p>
                 </div>
 
                 <div style={{ marginTop: 4 }}>
@@ -268,13 +346,52 @@ export function EthicsDirectorDecisionModal({
 
                 <div className="field">
                   <label>Chairperson (doorasho) *</label>
-                  <select value={signatoryKey} onChange={(e) => handleSignatoryChange(e.target.value)} disabled={busy}>
-                    {signatories.map((s) => (
-                      <option key={s.key} value={s.key}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
+                  <p className="muted" style={{ margin: "0 0 8px", fontSize: 11 }}>
+                    Dooro mid: Kasim Abdi Jimale ama Dr. Nur Rashid Ahmed — magaca ayaa ka muuqan doona shahaadada.
+                  </p>
+                  <div
+                    role="radiogroup"
+                    aria-label="Chairperson"
+                    style={{ display: "grid", gap: 8 }}
+                  >
+                    {(signatories.length ? signatories : FALLBACK_CHAIRPERSONS).map((s) => {
+                      const selected = signatoryKey === s.key;
+                      return (
+                        <label
+                          key={s.key}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            padding: "10px 12px",
+                            borderRadius: 8,
+                            border: selected
+                              ? "2px solid rgba(14,165,233,0.75)"
+                              : "1px solid rgba(148,163,184,0.45)",
+                            background: selected ? "rgba(14,165,233,0.08)" : "transparent",
+                            cursor: busy ? "not-allowed" : "pointer",
+                            fontSize: 13,
+                            fontWeight: selected ? 700 : 500,
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name="jurec-chairperson"
+                            value={s.key}
+                            checked={selected}
+                            disabled={busy}
+                            onChange={() => handleSignatoryChange(s.key)}
+                          />
+                          <span>
+                            {s.name}
+                            <span className="muted" style={{ display: "block", fontSize: 11, fontWeight: 500 }}>
+                              {s.title || "Chairperson"}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as projectApi from "../services/projectApi";
 import * as analyticsApi from "../services/analyticsApi";
@@ -12,6 +12,7 @@ const emptyMember = { name: "", role: "member" };
 export function ProjectDetailsPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { accessToken, user } = useAuth();
   const [project, setProject] = useState(null);
   const [milestones, setMilestones] = useState([emptyMilestone]);
@@ -56,6 +57,37 @@ export function ProjectDetailsPage() {
     setTeamMembers(p.teamMembers?.length ? p.teamMembers : [emptyMember]);
     setStartDate(p.startDate ? p.startDate.slice(0, 10) : "");
     setEndDate(p.endDate ? p.endDate.slice(0, 10) : "");
+    // #region agent log
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify({
+        sessionId: "f558f7",
+        hypothesisId: "P2",
+        location: "ProjectDetails.jsx:load",
+        message: "project page sections payload",
+        data: {
+          projectId: id,
+          isVoluntary: Boolean(p.isVoluntary || p.proposalKind === "voluntary"),
+          proposalKind: p.proposalKind || null,
+          status: p.status,
+          linkedGrantsCount: p.linkedGrants?.length || 0,
+          awardsVisible: p.awardsVisible,
+          grantsVisible: p.grantsVisible,
+          workflowStepKeys: (p.workflow?.steps || []).map((s) => s.key),
+          workflowStatuses: (p.workflow?.steps || []).map((s) => `${s.key}:${s.status}`),
+          currentStep: p.workflow?.currentStepKey || null,
+          hasMilestones: (p.milestones || []).length,
+          hasTeam: (p.teamMembers || []).length,
+          hasProgress: (p.progressReports || []).length,
+          hasWorkPlan: (p.workPlan || []).length,
+          closureStatus: p.closure?.status || "none",
+        },
+        timestamp: Date.now(),
+        runId: "post-fix",
+      }),
+    }).catch(() => {});
+    // #endregion
   }
 
   useEffect(() => {
@@ -63,10 +95,25 @@ export function ProjectDetailsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  useEffect(() => {
+    if (location.state?.workflowHint === "publication_submitted") {
+      setMessage(
+        "Publication submitted — workflow, awards visibility, notifications, audit & project activity updated."
+      );
+      load().catch(() => {});
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state?.workflowHint]);
+
   if (!project) return <div>{error || "Loading..."}</div>;
 
   const isOwner = String(project.researcherId) === String(user?.id);
   const canEdit = isOwner || user?.role === "research_director";
+  const isVoluntary = Boolean(project.isVoluntary || project.proposalKind === "voluntary");
+  const closureItems = isVoluntary
+    ? CLOSURE_CHECKLIST_ITEMS.filter((item) => item.key !== "financialCleared")
+    : CLOSURE_CHECKLIST_ITEMS;
 
   return (
     <div>
@@ -148,9 +195,13 @@ export function ProjectDetailsPage() {
               ))}
             </div>
           </div>
-        ) : project.awardsVisible === false ? null : (
+        ) : project.isVoluntary || project.proposalKind === "voluntary" ? null : project.grantsVisible ? (
           <div className="muted" style={{ marginTop: 14, fontSize: 13 }}>
-            No grants linked to this project yet.
+            No funding-call grants linked to this project yet.
+          </div>
+        ) : (
+          <div className="muted" style={{ marginTop: 14, fontSize: 13 }}>
+            Funding-call grants appear here after the project is Completed.
           </div>
         )}
 
@@ -183,6 +234,7 @@ export function ProjectDetailsPage() {
           ...(project.workflow || {}),
           projectStatus: project.status,
           awardsVisible: project.awardsVisible,
+          isVoluntary: project.isVoluntary || project.proposalKind === "voluntary",
         }}
       />
 
@@ -197,9 +249,11 @@ export function ProjectDetailsPage() {
           <Link className="btn" to={`/repository?projectId=${id}`}>
             + Repository file
           </Link>
-          <Link className="btn" to={`/grants?projectId=${id}`}>
-            + Grant request
-          </Link>
+          {!(project.isVoluntary || project.proposalKind === "voluntary") ? (
+            <Link className="btn" to="/funding-calls">
+              Funding Calls
+            </Link>
+          ) : null}
         </div>
       ) : null}
 
@@ -374,7 +428,7 @@ export function ProjectDetailsPage() {
           <>
             <div style={{ fontWeight: 700, marginBottom: 6 }}>Closure checklist</div>
             <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
-              {CLOSURE_CHECKLIST_ITEMS.map((item) => (
+              {closureItems.map((item) => (
                 <label key={item.key} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>
                   <input
                     type="checkbox"

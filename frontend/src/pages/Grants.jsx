@@ -4,10 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as grantApi from "../services/grantApi";
-import * as projectApi from "../services/projectApi";
-import * as fundingCallApi from "../services/fundingCallApi";
 import { PageHeader } from "../components/PageHeader";
-import { GrantBudgetLines, defaultBudgetRows, budgetRowsTotal } from "../components/GrantBudgetLines";
 import { filterByStatKey, isAwardedItem, statFilterLabel } from "../utils/pageHeaderFilters";
 
 const GRANT_STATUS_STYLES = {
@@ -89,68 +86,33 @@ export function GrantsPage() {
   const [searchParams] = useSearchParams();
   const projectIdFromUrl = searchParams.get("projectId") || "";
   const callIdFromUrl = searchParams.get("callId") || "";
-  const [linkedCall, setLinkedCall] = useState(null);
   const [grants, setGrants] = useState([]);
-  const [projects, setProjects] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({
-    title: "",
-    fundingSource: "",
-    donorRef: "",
-    amountRequested: 0,
-    currency: "USD",
-    projectId: "",
-    callId: "",
-  });
-  const [budgetRows, setBudgetRows] = useState(defaultBudgetRows);
   const [donorFilter, setDonorFilter] = useState(false);
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
 
   const canCreate = user?.role === "researcher";
   const isDirector = user?.role === "research_director";
   const isLeadership = user?.role === "leadership";
-  const canViewAll = ["research_director", "finance_officer", "faculty_coordinator", "leadership"].includes(user?.role);
+  const isDonor = user?.role === "donor_agency";
+  const canViewAll = ["research_director", "finance_officer", "faculty_coordinator", "leadership", "donor_agency"].includes(
+    user?.role
+  );
+
+  useEffect(() => {
+    if (isDonor) setDonorFilter(true);
+  }, [isDonor]);
 
   const load = useCallback(async () => {
-    const isResearcher = user?.role === "researcher";
     const grantParams = projectIdFromUrl ? { projectId: projectIdFromUrl } : {};
-    const [res, projRes] = await Promise.all([
-      grantApi.listGrants(accessToken, grantParams),
-      isResearcher
-        ? projectApi.listProjects(accessToken).catch(() => ({ projects: [] }))
-        : Promise.resolve({ projects: [] }),
-    ]);
-    const list = res.grants || [];
-    const projectList = projRes.projects || [];
-    setGrants(list);
-    setProjects(projectList);
-    if (isResearcher && projectList.length === 1) {
-      setForm((f) => (f.projectId ? f : { ...f, projectId: projectList[0].id }));
-    }
-  }, [accessToken, user?.role, projectIdFromUrl]);
+    const res = await grantApi.listGrants(accessToken, grantParams);
+    // Funding-call applications only
+    setGrants((res.grants || []).filter((g) => Boolean(g.callId)));
+  }, [accessToken, projectIdFromUrl]);
 
   useEffect(() => {
     if (!callIdFromUrl || !accessToken) return;
-    if (user?.role === "researcher") {
-      navigate(`/grants/apply?callId=${encodeURIComponent(callIdFromUrl)}`, { replace: true });
-      return;
-    }
-    fundingCallApi.getFundingCall(accessToken, callIdFromUrl).then((res) => {
-      const c = res.call;
-      setLinkedCall(c);
-      setForm((f) => ({
-        ...f,
-        callId: c.id,
-        title: f.title || c.title,
-        fundingSource: c.fundingSource,
-        donorRef: c.donorRef || "",
-        currency: c.currency || "USD",
-        amountRequested: c.amountCap || f.amountRequested,
-      }));
-      setBudgetRows(defaultBudgetRows().map((r) => ({ ...r, currency: c.currency || "USD" })));
-      setShowForm(true);
-    }).catch(() => {});
-  }, [callIdFromUrl, accessToken, user?.role, navigate]);
+    navigate(`/grants/apply?callId=${encodeURIComponent(callIdFromUrl)}`, { replace: true });
+  }, [callIdFromUrl, accessToken, navigate]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
@@ -162,7 +124,7 @@ export function GrantsPage() {
       { label: "Total", value: grants.length, filterKey: "all" },
       { label: "Draft", value: by("draft"), filterKey: "draft" },
       { label: "Submitted", value: by("submitted"), filterKey: "submitted" },
-      { label: "Awarded", value: awardedCount, filterKey: "awarded", accent: "#1d4ed8", sub: "Grants with funding" },
+      { label: "Awarded", value: awardedCount, filterKey: "awarded", accent: "#1d4ed8", sub: "From funding calls" },
       { label: "Awarded $", value: `$${totalAwarded.toLocaleString()}`, accent: "#38bdf8", sub: "Total awarded amount" },
       { label: "Active", value: by("active"), filterKey: "active", accent: "#6366f1" },
     ];
@@ -174,15 +136,15 @@ export function GrantsPage() {
     return list;
   }, [grants, statusFilter, donorFilter]);
 
-  useEffect(() => {
-    if (loading) return;
-  }, [statusFilter, filteredGrants.length, grants.length, loading]);
-
   return (
     <div>
       <PageHeader
         title="Grants & Funding"
-        subtitle="Apply via Funding Calls — budget and optional project link on call applications only."
+        subtitle={
+          isDonor
+            ? "Donor monitor view — funding-call applications only (read-only)."
+            : "Only applications from Funding Calls appear here. Start from an open call."
+        }
         stats={stats}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
@@ -193,7 +155,12 @@ export function GrantsPage() {
                 Apply via Funding Calls
               </Link>
             ) : null}
-            {isDirector ? (
+            {isDonor ? (
+              <Link className="btn primary" to="/donor-reports">
+                Donor reports
+              </Link>
+            ) : null}
+            {isDirector || isDonor ? (
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
                 <input type="checkbox" checked={donorFilter} onChange={(e) => setDonorFilter(e.target.checked)} />
                 Donor-funded only
@@ -202,10 +169,10 @@ export function GrantsPage() {
           </>
         }
       />
+
       {projectIdFromUrl ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          Filtered to one project —{" "}
-          <Link to="/grants">show all grants</Link>
+          Filtered to one project — <Link to="/grants">show all funding-call grants</Link>
         </p>
       ) : null}
       {statusFilter !== "all" ? (
@@ -219,125 +186,14 @@ export function GrantsPage() {
         </div>
       ) : null}
 
-      {canCreate && !callIdFromUrl && !showForm ? (
+      {canCreate ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
           Grant applications are only created from an open <Link to="/funding-calls">Funding Call</Link>.
         </p>
       ) : null}
 
-      {canCreate && showForm && (linkedCall || form.callId) ? (
-        <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800 }}>Apply to funding call</div>
-          {linkedCall ? (
-            <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-              Call: <strong>{linkedCall.title}</strong> — budget required; project link optional.
-            </p>
-          ) : null}
-          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-            <div className="row">
-              <div className="field">
-                <label>Title</label>
-                <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
-              </div>
-              <div className="field">
-                <label>Funding source</label>
-                <input value={form.fundingSource} disabled />
-              </div>
-            </div>
-            <div className="row">
-              <div className="field" style={{ flex: 2 }}>
-                <label>Research project (optional — funding call only)</label>
-                <select
-                  value={form.projectId}
-                  onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))}
-                >
-                  <option value="">— No project (voluntary) —</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.title} ({p.status})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <GrantBudgetLines
-              budgetRows={budgetRows}
-              setBudgetRows={setBudgetRows}
-              currency={form.currency || "USD"}
-            />
-            <div className="row">
-              <div className="field">
-                <label>Donor reference (external donor)</label>
-                <input
-                  value={form.donorRef}
-                  onChange={(e) => setForm((f) => ({ ...f, donorRef: e.target.value }))}
-                  placeholder="e.g. UNESCO-12345"
-                />
-              </div>
-              <div className="field">
-                <label>Total requested (from budget lines)</label>
-                <input type="number" value={budgetRowsTotal(budgetRows)} readOnly />
-              </div>
-              <div className="field">
-                <label>Currency</label>
-                <input value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} />
-              </div>
-            </div>
-            <button
-              type="button"
-              className="btn primary"
-              onClick={async () => {
-                try {
-                  setError("");
-                  if (!form.callId) {
-                    setError("Funding call is required");
-                    return;
-                  }
-                  const lines = budgetRows
-                    .filter((r) => r.category || r.description || Number(r.amount) > 0)
-                    .map((r) => ({
-                      category: r.category,
-                      description: r.description,
-                      amount: Number(r.amount) || 0,
-                      currency: r.currency || form.currency || "USD",
-                    }));
-                  const payload = {
-                    ...form,
-                    projectId: form.projectId || undefined,
-                    amountRequested: budgetRowsTotal(budgetRows),
-                    budgetBreakdown: lines,
-                  };
-                  if (!payload.title?.trim()) {
-                    setError("Title is required");
-                    return;
-                  }
-                  await grantApi.createGrant(accessToken, payload);
-                  setForm({
-                    title: "",
-                    fundingSource: "",
-                    donorRef: "",
-                    amountRequested: 0,
-                    currency: "USD",
-                    projectId: "",
-                    callId: "",
-                  });
-                  setBudgetRows(defaultBudgetRows());
-                  setLinkedCall(null);
-                  setShowForm(false);
-                  await reload();
-                } catch (e) {
-                  setError(e?.response?.data?.message || "Failed to create grant");
-                }
-              }}
-            >
-              Create draft application
-            </button>
-          </div>
-        </div>
-      ) : null}
-
       <div className="card" style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800 }}>Grants</div>
+        <div style={{ fontWeight: 800 }}>Funding-call grants</div>
         <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
           {filteredGrants.map((g) => (
             <div key={g.id} className="card">
@@ -351,6 +207,11 @@ export function GrantsPage() {
                     {g.fundingSource}
                     {g.donorRef ? ` • Donor ref: ${g.donorRef}` : ""}
                   </div>
+                  {g.fundingCall?.title ? (
+                    <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+                      Funding call: {g.fundingCall.title}
+                    </div>
+                  ) : null}
                   {g.project?.title ? (
                     <div style={{ marginTop: 6, fontSize: 13 }}>
                       <span className="muted">Linked project: </span>
@@ -358,16 +219,11 @@ export function GrantsPage() {
                         {g.project.title}
                       </Link>
                     </div>
-                  ) : g.callId ? (
+                  ) : (
                     <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
-                      No project linked (optional)
+                      No project linked yet
                     </div>
-                  ) : null}
-                  {g.fundingCall?.title ? (
-                    <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
-                      Funding call: {g.fundingCall.title}
-                    </div>
-                  ) : null}
+                  )}
                   {g.proposal?.title ? (
                     <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
                       Proposal: {g.proposal.title} ({g.proposal.status})
@@ -388,14 +244,14 @@ export function GrantsPage() {
                   {canCreate && g.status === "draft" && g.callId ? (
                     <button
                       type="button"
-                      className="btn"
+                      className="btn primary"
                       onClick={async () => {
                         try {
                           setError("");
                           await grantApi.submitGrant(accessToken, g.id);
                           await reload();
                         } catch (e) {
-                          setError(e?.response?.data?.message || "Failed to submit");
+                          setError(e?.response?.data?.message || "Submit failed");
                         }
                       }}
                     >
@@ -406,8 +262,21 @@ export function GrantsPage() {
               </div>
             </div>
           ))}
-          {filteredGrants.length === 0 ? (
-            <div className="muted">{grants.length === 0 ? "No grants yet." : "No grants match this filter."}</div>
+          {!loading && filteredGrants.length === 0 ? (
+            <div className="muted">
+              {grants.length === 0 ? (
+                <>
+                  No funding-call grant applications yet.{" "}
+                  {canCreate ? (
+                    <>
+                      Open <Link to="/funding-calls">Funding Calls</Link> to apply.
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                "No grants match this filter."
+              )}
+            </div>
           ) : null}
         </div>
       </div>

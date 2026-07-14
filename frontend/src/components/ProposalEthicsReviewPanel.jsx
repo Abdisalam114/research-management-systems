@@ -15,7 +15,15 @@ function personLabel(p) {
   return `${name}${p.department ? ` • ${p.department}` : ""}${p.email ? ` • ${p.email}` : ""}`;
 }
 
-export function ProposalEthicsReviewPanel({ ethics, isDirector, onApproveEthics, onRejectEthics, busy }) {
+export function ProposalEthicsReviewPanel({
+  ethics,
+  isDirector,
+  isEthicsCommittee,
+  onApproveEthics,
+  onRejectEthics,
+  onIssueCertificate,
+  busy,
+}) {
   if (!ethics) {
     return (
       <div className="card" style={{ marginTop: 12, borderColor: "rgba(255,99,132,0.4)" }}>
@@ -26,6 +34,11 @@ export function ProposalEthicsReviewPanel({ ethics, isDirector, onApproveEthics,
   }
 
   const approved = ethics.status === "approved";
+  const hasCert = Boolean(ethics.approval?.certificateNumber || ethics.approval?.certificateId);
+  const canCommitteeAct = isEthicsCommittee && ethics.status === "submitted";
+  const canDirectorIssueCert =
+    isDirector &&
+    (ethics.status === "submitted" || (ethics.status === "approved" && !hasCert));
 
   return (
     <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.35)" }}>
@@ -34,6 +47,7 @@ export function ProposalEthicsReviewPanel({ ethics, isDirector, onApproveEthics,
         <span style={{ fontSize: 13 }}>
           Status: <strong>{ethics.status}</strong>
           {ethics.formComplete ? " • form complete" : " • incomplete"}
+          {approved && !hasCert ? " • awaiting Director certificate" : null}
         </span>
       </div>
 
@@ -60,10 +74,10 @@ export function ProposalEthicsReviewPanel({ ethics, isDirector, onApproveEthics,
         {ethics.approval?.refNumber ? <Row label="JUREC Ref" value={ethics.approval.refNumber} /> : null}
       </div>
 
-      {isDirector && ethics.status === "submitted" ? (
+      {canCommitteeAct ? (
         <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
           <button type="button" className="btn primary" disabled={busy} onClick={onApproveEthics}>
-            Approve ethics & issue certificate
+            Clear ethics (notify Director)
           </button>
           <button type="button" className="btn" disabled={busy} onClick={onRejectEthics}>
             Reject ethics
@@ -71,12 +85,34 @@ export function ProposalEthicsReviewPanel({ ethics, isDirector, onApproveEthics,
         </div>
       ) : null}
 
-      {approved ? (
-        <div className="muted" style={{ marginTop: 12, color: "#1d4ed8" }}>
-          ✓ Ethics approved — you may now approve the proposal to create the project.
+      {canDirectorIssueCert ? (
+        <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+          <button type="button" className="btn primary" disabled={busy} onClick={onIssueCertificate || onApproveEthics}>
+            {ethics.status === "approved" ? "Issue JUREC certificate" : "Approve ethics & issue certificate"}
+          </button>
+          {ethics.status === "submitted" ? (
+            <button type="button" className="btn" disabled={busy} onClick={onRejectEthics}>
+              Reject ethics
+            </button>
+          ) : null}
         </div>
-      ) : ethics.status === "submitted" && !isDirector ? (
-        <div className="muted" style={{ marginTop: 12 }}>Awaiting Director ethics approval.</div>
+      ) : null}
+
+      {approved && hasCert ? (
+        <div className="muted" style={{ marginTop: 12, color: "#1d4ed8" }}>
+          ✓ Ethics approved with certificate — Director may approve the proposal to create the project.
+        </div>
+      ) : approved && !hasCert && isDirector ? (
+        <div className="muted" style={{ marginTop: 12, color: "#0369a1" }}>
+          ✓ Ethics Committee cleared this application. Issue the certificate (optional) then approve the proposal
+          below to create the project.
+        </div>
+      ) : approved && isEthicsCommittee ? (
+        <div className="muted" style={{ marginTop: 12, color: "#0369a1" }}>
+          ✓ Cleared — Research Director has been notified for final proposal approval (project creation).
+        </div>
+      ) : ethics.status === "submitted" && !isDirector && !isEthicsCommittee ? (
+        <div className="muted" style={{ marginTop: 12 }}>Awaiting Ethics Committee review.</div>
       ) : null}
     </div>
   );

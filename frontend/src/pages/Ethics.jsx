@@ -50,7 +50,9 @@ export function EthicsPage() {
   const [searchParams] = useSearchParams();
   const proposalIdFromUrl = searchParams.get("proposalId");
   const isResearcher = user?.role === "researcher";
-  const isDirector = user?.role === "research_director" || user?.role === "ethics_committee";
+  const isDirector = user?.role === "research_director";
+  const isEthicsCommittee = user?.role === "ethics_committee";
+  const canDecideEthics = isDirector || isEthicsCommittee;
   const isStaff = ["research_director", "faculty_coordinator", "ethics_committee"].includes(user?.role);
 
   const [applications, setApplications] = useState([]);
@@ -122,7 +124,7 @@ export function EthicsPage() {
 
   const directorQueue = applications.filter((a) => a.status === "submitted");
   const showDirectorQueue =
-    isDirector && directorQueue.length > 0 && (statusFilter === "all" || statusFilter === "submitted");
+    canDecideEthics && directorQueue.length > 0 && (statusFilter === "all" || statusFilter === "submitted");
 
   function openNew() {
     setValidationIssues([]);
@@ -172,9 +174,9 @@ export function EthicsPage() {
     });
   }
 
-  /** Director/staff: View → proposal review if linked, otherwise scroll to form below. */
+  /** Director: linked apps open on proposal review. Ethics committee stays on /ethics to decide. */
   function openViewApplication(a) {
-if (isDirector && a.proposalId) {
+    if (isDirector && a.proposalId) {
       navigate(`/proposals/${a.proposalId}/review`);
       return;
     }
@@ -250,6 +252,30 @@ if (isDirector && a.proposalId) {
   }
 
   function openDecideModal(a, mode) {
+    // Ethics Committee: approve = clear only (no certificate modal)
+    if (isEthicsCommittee && mode === "approve") {
+      (async () => {
+        if (
+          !window.confirm(
+            "Clear this ethics application? Research Director will be notified for final proposal approval (project creation)."
+          )
+        ) {
+          return;
+        }
+        setDecisionBusy(true);
+        setError("");
+        try {
+await ethicsApi.directorDecision(accessToken, a.id, { decision: "approve" });
+          await reload();
+          setInfoMsg("Ethics cleared — Research Director has been notified.");
+        } catch (e) {
+          setError(e?.response?.data?.message || "Clearance failed");
+        } finally {
+          setDecisionBusy(false);
+        }
+      })();
+      return;
+    }
     setDecisionModal({ app: a, mode });
   }
 
@@ -273,7 +299,13 @@ if (isDirector && a.proposalId) {
           });
         }
       }
-      setInfoMsg(payload.decision === "approve" ? "Approved — certificate is ready." : "Rejected.");
+      setInfoMsg(
+        payload.decision === "approve"
+          ? isDirector
+            ? "Certificate issued. Approve the linked proposal to create the project."
+            : "Approved."
+          : "Rejected."
+      );
     } catch (e) {
       setError(e?.response?.data?.message || "Decision failed");
     } finally {
@@ -319,8 +351,12 @@ if (isDirector && a.proposalId) {
         title="Research Ethical Clearance"
         subtitle={
           proposalIdFromUrl
-            ? "Complete this ethics form for your proposal — then submit to the Director before submitting the proposal."
-            : "Researcher applies → Director (REC chair) reviews & signs the ethics certificate."
+            ? "Complete this ethics form for your proposal — then submit before submitting the proposal."
+            : isEthicsCommittee
+              ? "Ethics Committee (REC): review submitted applications, approve & issue JUREC certificate, or reject."
+              : isDirector
+                ? "Researcher applies → Director / Ethics Committee reviews & signs the ethics certificate."
+                : "Researcher applies → REC reviews & signs the ethics certificate."
         }
         stats={stats}
         activeFilter={statusFilter}
@@ -382,7 +418,7 @@ if (isDirector && a.proposalId) {
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <AppButton onClick={() => openViewApplication(a)}>View</AppButton>
                   <AppButton variant="primary" onClick={() => openDecideModal(a, "approve")}>
-                    Approve & certificate
+                    {isEthicsCommittee ? "Clear ethics (notify Director)" : "Approve & certificate"}
                   </AppButton>
                   <AppButton onClick={() => openDecideModal(a, "reject")}>Reject</AppButton>
                 </div>
@@ -415,10 +451,10 @@ if (isDirector && a.proposalId) {
                       {isResearcher && a.status !== "approved" ? "Edit" : "View"}
                     </AppButton>
                   ) : null}
-                  {isDirector && a.status === "submitted" ? (
+                  {canDecideEthics && a.status === "submitted" ? (
                     <>
                       <AppButton variant="primary" onClick={() => openDecideModal(a, "approve")}>
-                        Approve
+                        {isEthicsCommittee ? "Clear ethics" : "Approve"}
                       </AppButton>
                       <AppButton onClick={() => openDecideModal(a, "reject")}>Reject</AppButton>
                     </>
@@ -428,9 +464,14 @@ if (isDirector && a.proposalId) {
                       Proposal
                     </Link>
                   ) : null}
-                  {a.status === "approved" ? (
+                  {a.status === "approved" && (a.approval?.certificateNumber || a.approval?.certificateId || a.approval?.refNumber) ? (
                     <AppButton variant="primary" onClick={() => downloadCert(a)}>
                       📄 Download certificate
+                    </AppButton>
+                  ) : null}
+                  {isDirector && a.status === "approved" && !(a.approval?.certificateNumber || a.approval?.certificateId) ? (
+                    <AppButton variant="primary" onClick={() => openDecideModal(a, "approve")}>
+                      Issue certificate
                     </AppButton>
                   ) : null}
                 </div>
@@ -458,19 +499,10 @@ if (isDirector && a.proposalId) {
               ? ["approved", "submitted"].includes(editing.status)
               : true
           }
-          isDirector={isDirector}
-          onDirectorApprove={() =>
-            setDecisionModal({
-              app: { id: editing.id, projectTitle: editing.form?.projectTitle },
-              mode: "approve",
-            })
-          }
-          onDirectorReject={() =>
-            setDecisionModal({
-              app: { id: editing.id, projectTitle: editing.form?.projectTitle },
-              mode: "reject",
-            })
-          }
+          isDirector={canDecideEthics}
+          isEthicsCommittee={isEthicsCommittee}
+          onDirectorApprove={() => openDecideModal({ id: editing.id, projectTitle: editing.form?.projectTitle }, "approve")}
+          onDirectorReject={() => openDecideModal({ id: editing.id, projectTitle: editing.form?.projectTitle }, "reject")}
           decisionBusy={decisionBusy}
           saveBusy={saveBusy}
           canSubmit={isResearcher && !editing.proposalId && !proposalIdFromUrl}
@@ -510,6 +542,7 @@ function EthicsEditor({
   onClose,
   readOnly,
   isDirector,
+  isEthicsCommittee = false,
   onDirectorApprove,
   onDirectorReject,
   decisionBusy,
@@ -551,7 +584,7 @@ function EthicsEditor({
       {showDirectorActions ? (
         <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
           <AppButton variant="primary" loading={decisionBusy} onClick={onDirectorApprove}>
-            Approve & certificate
+            {isEthicsCommittee ? "Clear ethics (notify Director)" : "Approve & certificate"}
           </AppButton>
           <AppButton loading={decisionBusy} onClick={onDirectorReject}>
             Reject

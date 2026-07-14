@@ -7,7 +7,7 @@ const { EthicsApplication } = require("../models/EthicsApplication");
 const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
 const { AppError } = require("../utils/AppError");
 const { assertEligibleForCall } = require("../utils/fundingCallEligibility");
-const { notifyUsersByRole } = require("../utils/notify");
+const { notifyUsersByRole, notifyUser } = require("../utils/notify");
 const {
   getEthicsForProposal,
   assertEthicsReadyForProposalSubmit,
@@ -24,6 +24,22 @@ function resolveProposalKind(doc) {
     return doc.proposalKind;
   }
   return doc.fundingCallId ? PROPOSAL_KINDS.GRANT_FUND_CALL : PROPOSAL_KINDS.VOLUNTARY;
+}
+
+function refId(ref) {
+  if (ref == null) return null;
+  if (typeof ref === "object") return String(ref._id || ref.id || "");
+  return String(ref);
+}
+
+function sanitizeAssignedReviewers(list = []) {
+  return (list || []).map((r) => ({
+    userId: refId(r.userId),
+    fullName: r.userId?.fullName || r.fullName || null,
+    email: r.userId?.email || r.email || null,
+    assignedBy: refId(r.assignedBy),
+    assignedAt: r.assignedAt,
+  }));
 }
 
 function sanitizeProposal(p) {
@@ -49,9 +65,14 @@ function sanitizeProposal(p) {
     ethicsStatus: p.ethicsStatus,
     ethicsComments: p.ethicsComments || [],
     ethicsApplicationId: p.ethicsApplicationId,
-    assignedReviewers: p.assignedReviewers || [],
+    assignedReviewers: sanitizeAssignedReviewers(p.assignedReviewers),
     reviewerComments: p.reviewerComments,
-    peerReviews: p.peerReviews || [],
+    peerReviews: (p.peerReviews || []).map((r) => ({
+      userId: refId(r.userId),
+      score: r.score,
+      comment: r.comment || "",
+      at: r.at,
+    })),
     reviewPipeline: ensureReviewPipeline(p),
     currentReviewStage: getCurrentReviewStage(p),
     proposalKind: resolveProposalKind(p),
@@ -141,7 +162,7 @@ async function persistProposalEthics(proposal, user, reqBody) {
     proposal.proposalKind === PROPOSAL_KINDS.VOLUNTARY ||
     (!proposal.fundingCallId && proposal.proposalKind !== PROPOSAL_KINDS.GRANT_FUND_CALL);
   if (voluntary) {
-    ethics.fundingSource = "N/A — voluntary research (no funding)";
+    ethics.fundingSource = "";
     ethics.conflictOfInterest = {
       ...(ethics.conflictOfInterest || {}),
       financialHas: false,
@@ -318,8 +339,11 @@ async function getProposalEthicsApplication(req, res) {
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const isOwner = String(proposal.researcherId) === String(req.user.id);
-  const isStaff = ["faculty_coordinator", "research_director"].includes(req.user.role);
-  if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+  const isStaff = ["faculty_coordinator", "research_director", "ethics_committee"].includes(req.user.role);
+  const isAssignedReviewer = (proposal.assignedReviewers || []).some(
+    (r) => refId(r.userId) === String(req.user.id)
+  );
+if (!isOwner && !isStaff && !isAssignedReviewer) throw new AppError("Forbidden", 403);
 
   let ethics = await getEthicsForProposal(proposal._id);
   if (!ethics && isOwner && proposal.requiresEthics) {
@@ -413,7 +437,17 @@ async function submitProposal(req, res) {
       body: proposal.title,
       link: `/proposals/${proposal._id}/review`,
     }, req.programTier);
-  } catch {
+    if (proposal.requiresEthics) {
+      await notifyUsersByRole("ethics_committee", {
+        type: "ethics",
+        title: "Proposal ethics ready for REC review",
+        body: proposal.title,
+        link: proposal.ethicsApplicationId
+          ? `/ethics?applicationId=${proposal.ethicsApplicationId}`
+          : "/ethics",
+      }, req.programTier);
+    }
+} catch {
     /* notifications best-effort */
   }
 
@@ -433,6 +467,26 @@ async function listProposals(req, res) {
     const proposals = await Proposal.find(req.tierWhere({ researcherId: req.user.id }))
       .populate("researcherId", "fullName email department")
       .sort({ createdAt: -1 });
+    res.json({ proposals: proposals.map(sanitizeProposal) });
+    return;
+  }
+
+  if (role === "peer_reviewer") {
+    const proposals = await Proposal.find(
+      req.tierWhere({
+        "assignedReviewers.userId": req.user.id,
+        status: {
+          $in: [
+            PROPOSAL_STATUSES.SUBMITTED,
+            PROPOSAL_STATUSES.UNDER_REVIEW,
+            PROPOSAL_STATUSES.REVISION_REQUESTED,
+            PROPOSAL_STATUSES.APPROVED,
+          ],
+        },
+      })
+    )
+      .populate("researcherId", "fullName email department")
+      .sort({ submittedAt: -1, createdAt: -1 });
     res.json({ proposals: proposals.map(sanitizeProposal) });
     return;
   }
@@ -460,9 +514,9 @@ async function getProposal(req, res) {
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const isOwner = String(proposal.researcherId) === String(req.user.id);
-  const isStaff = ["faculty_coordinator", "research_director"].includes(req.user.role);
+  const isStaff = ["faculty_coordinator", "research_director", "ethics_committee"].includes(req.user.role);
   const isAssignedReviewer = (proposal.assignedReviewers || []).some(
-    (r) => String(r.userId?._id || r.userId) === String(req.user.id)
+    (r) => refId(r.userId) === String(req.user.id)
   );
   if (!isOwner && !isStaff && !isAssignedReviewer) throw new AppError("Forbidden", 403);
 
@@ -509,10 +563,22 @@ async function directorDecision(req, res) {
 
   const proposal = await Proposal.findOne(req.tierWhere({ _id: id }));
   if (!proposal) throw new AppError("Proposal not found", 404);
-  if (![PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW].includes(proposal.status)) {
-    throw new AppError("Proposal is not decision-ready in its current status", 400);
+if (![PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW, PROPOSAL_STATUSES.REVISION_REQUESTED].includes(proposal.status)) {
+throw new AppError("Proposal is not decision-ready in its current status", 400);
   }
 
+  if (decision === PROPOSAL_STATUSES.APPROVED && proposal.requiresEthics) {
+    try {
+      await assertEthicsApprovedForDirectorApproval(proposal);
+    } catch (e) {
+throw new AppError(e.message, 400);
+    }
+  } else if (decision === PROPOSAL_STATUSES.APPROVED && ethicsBlocksSubmission(proposal)) {
+    throw new AppError("Ethics must be approved before final proposal decision", 400);
+  }
+
+  // Multi-stage reviews are tracked for oversight, but after Ethics Committee clearance
+  // the Director must be able to approve and create the project without being blocked.
   if (decision === PROPOSAL_STATUSES.APPROVED) {
     const pipe = ensureReviewPipeline(proposal);
     const pipelineStarted = [pipe.adminScreening, pipe.peerReview, pipe.committeeReview, pipe.financeReview].some(
@@ -522,23 +588,20 @@ async function directorDecision(req, res) {
       try {
         assertStagesBeforeDirector(proposal);
       } catch (e) {
-        throw new AppError(e.message, e.statusCode || 400);
+// Soft-pass: do not block project creation when ethics is cleared (or not required).
       }
     }
   }
 
-  if (decision === PROPOSAL_STATUSES.APPROVED && proposal.requiresEthics) {
-    try {
-      await assertEthicsApprovedForDirectorApproval(proposal);
-    } catch (e) {
-      throw new AppError(e.message, 400);
-    }
-  } else if (decision === PROPOSAL_STATUSES.APPROVED && ethicsBlocksSubmission(proposal)) {
-    throw new AppError("Ethics must be approved before final proposal decision", 400);
-  }
-
   proposal.status = decision;
   proposal.reviewerComments.push({ role: "research_director", comment });
+  // Keep proposal.ethicsStatus in sync if ethics app is approved
+  if (decision === PROPOSAL_STATUSES.APPROVED && proposal.requiresEthics) {
+    const ethicsDoc = await getEthicsForProposal(proposal._id);
+    if (ethicsDoc?.status === "approved") {
+      proposal.ethicsStatus = ETHICS_STATUSES.APPROVED;
+    }
+  }
   await proposal.save();
 
   await recordAudit({
@@ -555,7 +618,7 @@ async function directorDecision(req, res) {
   if (decision === PROPOSAL_STATUSES.APPROVED) {
     const existing = await Project.findOne(req.tierWhere({ proposalId: proposal._id }));
     if (!existing) {
-      await Project.create(req.tierAssign({
+      const project = await Project.create(req.tierAssign({
         proposalId: proposal._id,
         title: proposal.title,
         researcherId: proposal.researcherId,
@@ -568,6 +631,15 @@ async function directorDecision(req, res) {
         status: "active",
         progressReports: [],
       }));
+try {
+        await notifyUser(proposal.researcherId, {
+          type: "proposal",
+          title: "Proposal approved — project created",
+          body: proposal.title,
+          link: `/projects/${project._id}`,
+          programTier: proposal.programTier,
+        });
+      } catch { /* best-effort */ }
     }
   }
 
@@ -596,7 +668,7 @@ async function ethicsDecision(req, res) {
 async function assignReviewers(req, res) {
   const { id } = req.params;
   const { reviewerIds } = req.body;
-  if (!Array.isArray(reviewerIds) || reviewerIds.length === 0) {
+if (!Array.isArray(reviewerIds) || reviewerIds.length === 0) {
     throw new AppError("reviewerIds array is required", 400);
   }
 
@@ -606,15 +678,45 @@ async function assignReviewers(req, res) {
   const users = await User.find(req.tierWhere({ _id: { $in: reviewerIds }, status: "active" }));
   if (users.length !== reviewerIds.length) throw new AppError("One or more reviewers not found", 400);
 
+  const prevIds = new Set((proposal.assignedReviewers || []).map((r) => String(r.userId)));
   proposal.assignedReviewers = reviewerIds.map((userId) => ({
     userId,
     assignedBy: req.user.id,
     assignedAt: new Date(),
   }));
-  ensureReviewPipeline(proposal);
+  const pipe = ensureReviewPipeline(proposal);
+  // Unlock peer review for assignees: advance screening if still pending
+  if (pipe.adminScreening?.status === "pending" || pipe.adminScreening?.status === "in_progress") {
+    pipe.adminScreening = {
+      status: STAGE_STATUS.PASSED,
+      completedAt: new Date(),
+      completedBy: req.user.id,
+      comment: pipe.adminScreening?.comment || "Passed when peer reviewers were assigned",
+    };
+  }
+  if ([PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.REVISION_REQUESTED].includes(proposal.status)) {
+    proposal.status = PROPOSAL_STATUSES.UNDER_REVIEW;
+  }
   await proposal.save();
 
-  res.json({ message: "Reviewers assigned", proposal: sanitizeProposal(proposal) });
+  const newlyAssigned = users.filter((u) => !prevIds.has(String(u._id)));
+  const toNotify = newlyAssigned.length ? newlyAssigned : users;
+  let notified = 0;
+  for (const u of toNotify) {
+    try {
+      await notifyUser(u._id, {
+        type: "proposal",
+        title: "Peer review assignment",
+        body: `You were assigned to review: ${proposal.title}`,
+        link: `/review-assignments`,
+        programTier: req.programTier,
+      });
+      notified += 1;
+    } catch (_) {
+      /* best-effort */
+    }
+  }
+res.json({ message: "Reviewers assigned", proposal: sanitizeProposal(proposal) });
 }
 
 module.exports = {

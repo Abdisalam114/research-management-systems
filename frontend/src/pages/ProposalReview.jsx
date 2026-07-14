@@ -20,6 +20,8 @@ export function ProposalReviewPage() {
 
   const isCoordinator = user?.role === "faculty_coordinator";
   const isDirector = user?.role === "research_director";
+  const isPeerReviewer = user?.role === "peer_reviewer";
+  const isEthicsCommittee = user?.role === "ethics_committee";
 
   const actions = useMemo(() => {
     if (isCoordinator) {
@@ -76,16 +78,62 @@ export function ProposalReviewPage() {
     }
   }
 
+  async function clearEthicsAsCommittee() {
+    if (!ethics?.id) return;
+    if (
+      !window.confirm(
+        "Clear this ethics application? Research Director will be notified to approve the proposal and create the project."
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      // #region agent log
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+        body: JSON.stringify({
+          sessionId: "f558f7",
+          hypothesisId: "G",
+          location: "ProposalReview.jsx:clearEthicsAsCommittee",
+          message: "committee clearing ethics",
+          data: { ethicsId: ethics.id, proposalId: id },
+          timestamp: Date.now(),
+          runId: "pre-fix",
+        }),
+      }).catch(() => {});
+      // #endregion
+      await ethicsApi.directorDecision(accessToken, ethics.id, { decision: "approve" });
+      await load();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Ethics clearance failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!proposal) return <div style={{ padding: 8 }}>{error ? error : "Loading..."}</div>;
 
-  const ethicsApproved = !proposal.requiresEthics || proposal.ethicsStatus === "approved" || ethics?.status === "approved";
+  const ethicsApproved =
+    !proposal.requiresEthics || proposal.ethicsStatus === "approved" || ethics?.status === "approved";
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <h2 style={{ marginTop: 0 }}>Director review — Proposal + Ethics</h2>
-        <Link className="btn" to={`/proposals/${id}`}>
-          Back to details
+        <h2 style={{ marginTop: 0 }}>
+          {isPeerReviewer
+            ? "Peer review — Proposal"
+            : isEthicsCommittee
+              ? "Ethics Committee review — Proposal + Ethics"
+              : "Director review — Proposal + Ethics"}
+        </h2>
+        <Link
+          className="btn"
+          to={isPeerReviewer ? "/review-assignments" : isEthicsCommittee ? "/ethics" : `/proposals/${id}`}
+        >
+          {isPeerReviewer ? "Back to assignments" : isEthicsCommittee ? "Back to Ethics" : "Back to details"}
         </Link>
       </div>
 
@@ -131,22 +179,32 @@ export function ProposalReviewPage() {
         <ProposalEthicsReviewPanel
           ethics={ethics}
           isDirector={isDirector}
-          onApproveEthics={() => setEthicsDecisionModal("approve")}
+          isEthicsCommittee={isEthicsCommittee}
+          onApproveEthics={isEthicsCommittee ? clearEthicsAsCommittee : () => setEthicsDecisionModal("approve")}
+          onIssueCertificate={() => setEthicsDecisionModal("approve")}
           onRejectEthics={() => setEthicsDecisionModal("reject")}
           busy={busy}
         />
       ) : null}
 
-      <ProposalMultiStageReview proposal={proposal} onReload={load} />
+      {!isEthicsCommittee && !isPeerReviewer ? (
+        <ProposalMultiStageReview proposal={proposal} onReload={load} />
+      ) : null}
 
-      {(isCoordinator || isDirector) && ["submitted", "under_review", "revision_requested"].includes(proposal.status) ? (
+      {(isCoordinator || isDirector) &&
+      ["submitted", "under_review", "revision_requested"].includes(proposal.status) ? (
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ fontWeight: 800, marginBottom: 8 }}>
             {isDirector ? "Proposal decision" : "Coordinator recommendation"}
           </div>
           {isDirector && proposal.requiresEthics && !ethicsApproved ? (
             <div className="muted" style={{ marginBottom: 10, fontSize: 13 }}>
-              Approve the ethics application above first, then approve the proposal to create the project.
+              Ethics Committee must clear ethics first. Then you can approve the proposal to create the project.
+            </div>
+          ) : null}
+          {isDirector && proposal.requiresEthics && ethicsApproved ? (
+            <div className="muted" style={{ marginBottom: 10, fontSize: 13, color: "#0369a1" }}>
+              Ethics is cleared — approve the proposal below to create the project (it will appear under Projects).
             </div>
           ) : null}
 
@@ -177,13 +235,35 @@ export function ProposalReviewPage() {
             }
             title={
               isDirector && selected === "approved" && !ethicsApproved
-                ? "Approve ethics first"
+                ? "Wait for Ethics Committee clearance first"
                 : undefined
             }
             onClick={async () => {
               setBusy(true);
               setError("");
               try {
+                // #region agent log
+                fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+                  body: JSON.stringify({
+                    sessionId: "f558f7",
+                    hypothesisId: "I",
+                    location: "ProposalReview.jsx:submitDecision",
+                    message: "director submitting proposal decision",
+                    data: {
+                      proposalId: id,
+                      selected,
+                      ethicsApproved,
+                      proposalStatus: proposal.status,
+                      proposalEthicsStatus: proposal.ethicsStatus,
+                      ethicsAppStatus: ethics?.status || null,
+                    },
+                    timestamp: Date.now(),
+                    runId: "pre-fix",
+                  }),
+                }).catch(() => {});
+                // #endregion
                 if (isCoordinator) {
                   await proposalApi.coordinatorReview(accessToken, id, selected, comment.trim());
                 } else if (isDirector) {
@@ -192,6 +272,21 @@ export function ProposalReviewPage() {
                 setComment("");
                 await load();
               } catch (e) {
+                // #region agent log
+                fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+                  body: JSON.stringify({
+                    sessionId: "f558f7",
+                    hypothesisId: "I",
+                    location: "ProposalReview.jsx:submitDecision:error",
+                    message: "director decision failed",
+                    data: { err: e?.response?.data?.message || String(e?.message || "") },
+                    timestamp: Date.now(),
+                    runId: "pre-fix",
+                  }),
+                }).catch(() => {});
+                // #endregion
                 setError(e?.response?.data?.message || "Action failed");
               } finally {
                 setBusy(false);

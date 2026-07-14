@@ -30,6 +30,7 @@ import { EthicsPage } from "./pages/Ethics";
 import { ThesisGroupsPage } from "./pages/ThesisGroups";
 import { ResearchWorkflowPage } from "./pages/ResearchWorkflowPage";
 import { FundingCallsPage } from "./pages/FundingCalls";
+import { PoliciesPage } from "./pages/Policies";
 import { ReviewAssignmentsPage } from "./pages/ReviewAssignments";
 import { ProgramTierSelectPage } from "./pages/ProgramTierSelect";
 import { AuditTrailPage } from "./pages/AuditTrailPage";
@@ -70,8 +71,10 @@ export default function App() {
             <Route path="/faculty-dashboard" element={<CoordinatorDashboardPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={["research_director", "finance_officer", "donor_agency"]} />}>
+          <Route element={<ProtectedRoute roles={["research_director", "finance_officer"]} />}>
             <Route path="/finance-reports" element={<FinanceReportsPage />} />
+          </Route>
+          <Route element={<ProtectedRoute roles={["research_director", "finance_officer", "donor_agency"]} />}>
             <Route path="/donor-reports" element={<DonorReportsPage />} />
           </Route>
 
@@ -87,9 +90,26 @@ export default function App() {
 
           <Route path="/payments" element={<Navigate to="/budgets" replace />} />
           <Route path="/procurement" element={<Navigate to="/budgets" replace />} />
-          <Route path="/policies" element={<Navigate to="/dashboard" replace />} />
 
-          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director"]} />}>
+          <Route
+            element={
+              <ProtectedRoute
+                roles={[
+                  "leadership",
+                  "research_director",
+                  "faculty_coordinator",
+                  "finance_officer",
+                  "researcher",
+                  "donor_agency",
+                  "ethics_committee",
+                ]}
+              />
+            }
+          >
+            <Route path="/policies" element={<PoliciesPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "peer_reviewer"]} />}>
             <Route path="/proposals" element={<ProposalsListPage />} />
             <Route element={<ProtectedRoute roles={["researcher"]} />}>
               <Route path="/proposals/new" element={<ProposalFormPage />} />
@@ -132,7 +152,7 @@ export default function App() {
             <Route path="/review-assignments" element={<ReviewAssignmentsPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={["peer_reviewer", "faculty_coordinator", "research_director", "finance_officer"]} />}>
+          <Route element={<ProtectedRoute roles={["peer_reviewer", "faculty_coordinator", "research_director", "finance_officer", "ethics_committee"]} />}>
             <Route path="/proposals/:id/review" element={<ProposalReviewPage />} />
           </Route>
 

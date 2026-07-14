@@ -34,7 +34,7 @@ router.get(
   "/:id/certificate.pdf",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("researcher", "faculty_coordinator", "research_director"),
+  authorizeRoles("researcher", "faculty_coordinator", "research_director", "ethics_committee"),
   asyncHandler(ethicsController.downloadCertificate)
 );
 

@@ -45,6 +45,7 @@ export function GrantDetailsPage() {
 
   const isDirector = user?.role === "research_director";
   const isLeadership = user?.role === "leadership";
+  const isDonor = user?.role === "donor_agency";
   const isOwner = grant && String(grant.researcherId) === String(user?.id);
   const canEditLink = isOwner && ["draft", "rejected"].includes(grant?.status || "");
   const canDecide = (isDirector || isLeadership) && grant?.status === "submitted";
@@ -151,7 +152,9 @@ export function GrantDetailsPage() {
       <PageHeader
         title="Grant — Review details"
         subtitle={
-          canDecide
+          isDonor
+            ? "Donor monitor view — grant details (read-only)."
+            : canDecide
             ? "Review all information below before approving or rejecting."
             : "Full details for this grant / award request."
         }

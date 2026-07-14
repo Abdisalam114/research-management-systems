@@ -118,14 +118,14 @@ export function ProposalDetailsPage() {
             }}
           >
             {(proposal.proposalKind || (proposal.fundingCallId ? "grant_fund_call" : "voluntary")) === "voluntary"
-              ? "Voluntary (no funding)"
+              ? "Voluntary"
               : "Grant Fund Call"}
           </span>
           Status: {proposal.status} • Version: {proposal.version}
         </div>
         {(proposal.proposalKind || (proposal.fundingCallId ? "grant_fund_call" : "voluntary")) === "voluntary" ? (
           <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>
-            Research-only path: no grant money. Approval creates a project for academic research benefit.
+            Research proposal path. After approval a project is created for academic research.
           </div>
         ) : proposal.fundingCallId ? (
           <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>

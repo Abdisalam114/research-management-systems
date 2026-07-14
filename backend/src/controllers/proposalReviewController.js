@@ -57,6 +57,48 @@ async function adminScreening(req, res) {
     programTier: req.programTier,
   });
 
+  if (decision === "pass" && (proposal.assignedReviewers || []).length) {
+    for (const r of proposal.assignedReviewers) {
+      try {
+        await notifyUser(r.userId, {
+          type: "proposal",
+          title: "Proposal ready for peer review",
+          body: `Admin screening passed: ${proposal.title}`,
+          link: `/review-assignments`,
+          programTier: req.programTier,
+        });
+      } catch (_) {
+        /* best-effort */
+      }
+    }
+  }
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const line = JSON.stringify({
+      sessionId: "f558f7",
+      hypothesisId: "E",
+      location: "proposalReviewController.js:adminScreening",
+      message: "Admin screening done",
+      data: {
+        decision,
+        assignedCount: (proposal.assignedReviewers || []).length,
+        peerReviewerNotified: decision === "pass" && (proposal.assignedReviewers || []).length > 0,
+      },
+      timestamp: Date.now(),
+      runId: "post-fix",
+    });
+    fs.appendFileSync(path.join(process.cwd(), "..", "debug-f558f7.log"), `${line}\n`);
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: line,
+    }).catch(() => {});
+  } catch (_) { /* ignore */ }
+  // #endregion
+
   res.json({ message: "Admin screening saved", proposal: sanitizeProposalBrief(proposal) });
 }
 
@@ -70,7 +112,7 @@ async function submitPeerReview(req, res) {
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const assigned = (proposal.assignedReviewers || []).some(
-    (r) => String(r.userId) === String(req.user.id)
+    (r) => String(r.userId?.id || r.userId?._id || r.userId) === String(req.user.id)
   );
   const isDirector = req.user.role === "research_director";
   if (!assigned && !isDirector) throw new AppError("You are not assigned as reviewer", 403);

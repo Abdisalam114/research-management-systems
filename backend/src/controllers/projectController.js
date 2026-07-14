@@ -93,18 +93,42 @@ async function getProject(req, res) {
   const isStaff = ["faculty_coordinator", "research_director", "finance_officer", "procurement_officer", "ethics_committee", "hr_officer"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
-  const grantDocs = await Grant.find(req.tierWhere({ projectId: id })).sort({ createdAt: -1 }).select("title status amountRequested amountAwarded currency fundingSource");
+  const grantDocs = await Grant.find(req.tierWhere({
+    projectId: id,
+    callId: { $ne: null, $exists: true },
+  })).sort({ createdAt: -1 }).select("title status amountRequested amountAwarded currency fundingSource callId");
   const tierFilter = req.tierWhere({});
-  const hasPublication = await Publication.exists({ ...tierFilter, projectId: project._id, status: { $ne: PUBLICATION_STATUSES.DRAFT } });
+  const hasPublication = await Publication.exists({
+    ...tierFilter,
+    projectId: project._id,
+    status: { $in: [PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.VALIDATED] },
+  });
   const canViewAwards = canViewProjectAwards({ role: req.user.role, hasProjectPublication: Boolean(hasPublication) });
 
+  let proposalKind = "voluntary";
+  let fundingCallId = null;
+  if (project.proposalId) {
+    const linkedProposal = await Proposal.findOne(req.tierWhere({ _id: project.proposalId })).select("proposalKind fundingCallId");
+    if (linkedProposal) {
+      fundingCallId = linkedProposal.fundingCallId || null;
+      proposalKind =
+        linkedProposal.proposalKind ||
+        (linkedProposal.fundingCallId ? "grant_fund_call" : "voluntary");
+    }
+  }
+  const isVoluntary = proposalKind === "voluntary" || (!fundingCallId && proposalKind !== "grant_fund_call");
+
   const out = sanitizeProject(project);
-  out.grantsVisible = project.status === PROJECT_STATUSES.COMPLETED || project.status === PROJECT_STATUSES.CLOSED;
-  out.awardsVisible = canViewAwards;
-  out.linkedGrants = sanitizeLinkedGrantsForViewer(grantDocs.map((g) => ({
-    id: g._id, title: g.title, status: g.status, amountRequested: g.amountRequested,
-    amountAwarded: g.amountAwarded, currency: g.currency, fundingSource: g.fundingSource,
-  })), canViewAwards, project);
+  out.proposalKind = proposalKind;
+  out.isVoluntary = isVoluntary;
+  out.grantsVisible = !isVoluntary && (project.status === PROJECT_STATUSES.COMPLETED || project.status === PROJECT_STATUSES.CLOSED);
+  out.awardsVisible = !isVoluntary && canViewAwards;
+  out.linkedGrants = isVoluntary
+    ? []
+    : sanitizeLinkedGrantsForViewer(grantDocs.map((g) => ({
+      id: g._id, title: g.title, status: g.status, amountRequested: g.amountRequested,
+      amountAwarded: g.amountAwarded, currency: g.currency, fundingSource: g.fundingSource,
+    })), canViewAwards, project);
   out.workflow = await buildWorkflowForProject(id, tierFilter, req.user.role);
   res.json({ project: out });
 }

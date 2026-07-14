@@ -24,7 +24,15 @@ function pickPublicationForProject(publications, project) {
   const linked = publications.filter(
     (p) => p.projectId && String(p.projectId) === String(project._id)
   );
-  return pickLatestByDate(linked, "updatedAt");
+  if (!linked.length) return null;
+
+  // Prefer validated/submitted over draft so workflow & awards stay correct
+  const rank = { validated: 4, submitted: 3, rejected: 2, draft: 1 };
+  return [...linked].sort((a, b) => {
+    const rankDiff = (rank[b.status] || 0) - (rank[a.status] || 0);
+    if (rankDiff !== 0) return rankDiff;
+    return new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt);
+  })[0];
 }
 
 function pickRepositoryForProject(repositoryItems, project) {

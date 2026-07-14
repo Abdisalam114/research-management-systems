@@ -12,28 +12,28 @@ router.post(
   "/",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("research_director"),
+  authorizeRoles("research_director", "donor_agency"),
   asyncHandler(fundingCallController.createFundingCall)
 );
 router.put(
   "/:id",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("research_director"),
+  authorizeRoles("research_director", "donor_agency", "leadership"),
   asyncHandler(fundingCallController.updateFundingCall)
 );
 router.post(
   "/:id/publish",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("research_director"),
+  authorizeRoles("leadership", "research_director"),
   asyncHandler(fundingCallController.publishFundingCall)
 );
 router.post(
   "/:id/close",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("research_director"),
+  authorizeRoles("leadership", "research_director", "donor_agency"),
   asyncHandler(fundingCallController.closeFundingCall)
 );
 

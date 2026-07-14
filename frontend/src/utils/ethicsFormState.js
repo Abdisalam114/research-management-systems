@@ -115,7 +115,7 @@ export function prepareEthicsPayload(form, { voluntary = false } = {}) {
   if (payload.startDate === "") payload.startDate = null;
   if (payload.endDate === "") payload.endDate = null;
   if (voluntary) {
-    payload.fundingSource = "N/A — voluntary research (no funding)";
+    payload.fundingSource = "";
     payload.conflictOfInterest = {
       ...(payload.conflictOfInterest || {}),
       financialHas: false,

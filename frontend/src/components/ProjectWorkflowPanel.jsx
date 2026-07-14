@@ -195,11 +195,13 @@ export function ProjectWorkflowPanel({ workflow }) {
     <div className="card" style={{ marginTop: 16, borderColor: "rgba(56,189,248,0.35)" }}>
       <div style={{ fontWeight: 800, fontSize: 16 }}>Research workflow — this project</div>
       <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-        {workflow?.projectStatus !== "completed"
-          ? "Proposal → ethics → review → project progress → budget → project completed → grants (pending) → publication → repository."
-          : workflow?.awardsVisible === false
-            ? "Proposal → ethics → review → project progress → budget → project completed → publication → repository."
-            : "Proposal → ethics → review → project progress → budget → project completed → grant awarded → publication → repository."}
+        {workflow?.isVoluntary
+          ? "Proposal → ethics → review → project → publication → repository (no grants/budget)."
+          : workflow?.projectStatus !== "completed"
+            ? "Proposal → ethics → review → project → publication → repository · Funding-call grants after Completed."
+            : workflow?.awardsVisible === false
+              ? "Proposal → ethics → review → project → publication → repository · Grant amounts after publication."
+              : "Proposal → ethics → review → project → funding-call grant → budget → publication → repository."}
       </div>
       <StatusLegend />
 
@@ -248,7 +250,12 @@ export function ProjectWorkflowPanel({ workflow }) {
       </div>
 
       <div style={{ marginTop: 14 }}>
-        {(workflow.steps || []).map((step, idx) => (
+        {(workflow.steps || [])
+        .filter((step) => {
+          if (!workflow?.isVoluntary) return true;
+          return !["grant_apply", "grant_award", "budget"].includes(step.key);
+        })
+        .map((step, idx) => (
           <StepRow key={step.key} step={step} index={idx} />
         ))}
       </div>

@@ -5,6 +5,7 @@ export const SYSTEM_MODULES = [
   { key: "reviews", to: "/review-assignments", label: "Peer Reviews", icon: "✍️", roles: ["research_director", "faculty_coordinator", "researcher", "peer_reviewer"] },
   { key: "projects", to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher", "hr_officer"] },
   { key: "funding_calls", to: "/funding-calls", label: "Funding Calls", icon: "📢", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher", "leadership", "procurement_officer", "donor_agency"] },
+  { key: "policies", to: "/policies", label: "Policies", icon: "📜", roles: ["leadership", "research_director", "faculty_coordinator", "finance_officer", "researcher", "donor_agency", "ethics_committee"] },
   { key: "grants", to: "/grants", label: "Grants", icon: "💰", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher", "leadership", "procurement_officer", "donor_agency"] },
   { key: "budgets", to: "/budgets", label: "Finance & Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher", "procurement_officer"] },
   { key: "publications", to: "/publications", label: "Publications & Outputs", icon: "📚", roles: ["research_director", "faculty_coordinator", "researcher"] },
@@ -33,6 +34,8 @@ export function countForModule(key, metrics = {}, overview = {}) {
       return m.projects ?? o.projects ?? metrics.projects?.total ?? 0;
     case "funding_calls":
       return m.fundingCalls ?? o.fundingCalls ?? metrics.fundingCalls?.total ?? 0;
+    case "policies":
+      return m.policies ?? o.policies ?? "—";
     case "grants":
       return m.grants ?? o.grants ?? metrics.grants?.total ?? 0;
     case "budgets":

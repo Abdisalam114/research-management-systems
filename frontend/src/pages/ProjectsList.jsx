@@ -49,8 +49,8 @@ export function ProjectsListPage() {
         actions={
           <>
             <Link className="btn primary" to="/proposals">+ Start from Proposal</Link>
-            <Link className="btn" to="/budgets">Budgets</Link>
             <Link className="btn" to="/publications">Publications</Link>
+            <Link className="btn" to="/funding-calls">Funding Calls</Link>
           </>
         }
       />

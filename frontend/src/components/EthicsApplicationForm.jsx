@@ -320,11 +320,7 @@ export function EthicsApplicationForm({
           onChange={(v) => set("dataHandling.retention", v)}
           readOnly={readOnly}
         />
-        {hideFundingFields ? (
-          <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-            Funding sources are not applicable — this is a <strong>voluntary</strong> proposal (no funding).
-          </p>
-        ) : (
+        {hideFundingFields ? null : (
           <div className="field">
             <label>13. Funding sources</label>
             <input disabled={readOnly} value={form.fundingSource} onChange={(e) => set("fundingSource", e.target.value)} />

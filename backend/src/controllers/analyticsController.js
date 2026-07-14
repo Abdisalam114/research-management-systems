@@ -756,7 +756,9 @@ async function getResearchJourney(req, res) {
 
 async function getDonorReport(req, res) {
   const [grants, calls] = await Promise.all([
-    Grant.find(req.tierWhere({})).select("title donorRef fundingSource amountAwarded amountRequested status"),
+    Grant.find(req.tierWhere({ callId: { $ne: null, $exists: true } })).select(
+      "title donorRef fundingSource amountAwarded amountRequested status"
+    ),
     FundingCall.find(req.tierWhere({})).select("title donorRef fundingSource amountCap status"),
   ]);
 

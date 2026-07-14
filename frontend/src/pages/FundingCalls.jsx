@@ -6,7 +6,7 @@ import * as fundingCallApi from "../services/fundingCallApi";
 import { PageHeader } from "../components/PageHeader";
 import "./fundingCalls.css";
 
-const EMPTY = {
+const EMPTY_INTERNAL = {
   title: "",
   description: "",
   fundingSource: "",
@@ -17,6 +17,11 @@ const EMPTY = {
   deadline: "",
   eligibilityTier: "all",
   requiredDocuments: "",
+};
+
+const EMPTY_EXTERNAL = {
+  ...EMPTY_INTERNAL,
+  callType: "external",
 };
 
 const ELIGIBILITY_OPTIONS = [
@@ -50,8 +55,12 @@ function formatMoney(amount, currency) {
 export function FundingCallsPage() {
   const { accessToken, user } = useAuth();
   const isDirector = user?.role === "research_director";
+  const isDonor = user?.role === "donor_agency";
+  const isLeadership = user?.role === "leadership";
+  const isResearcher = user?.role === "researcher";
+  const canCreate = isDirector || isDonor;
   const [calls, setCalls] = useState([]);
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm] = useState(isDonor ? EMPTY_EXTERNAL : EMPTY_INTERNAL);
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -65,13 +74,13 @@ export function FundingCallsPage() {
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load, []);
 
   function resetForm() {
-    setForm(EMPTY);
+    setForm(isDonor ? EMPTY_EXTERNAL : EMPTY_INTERNAL);
     setEditingId(null);
     setShowForm(false);
   }
 
   function startCreate() {
-    setForm(EMPTY);
+    setForm(isDonor ? EMPTY_EXTERNAL : EMPTY_INTERNAL);
     setEditingId(null);
     setShowForm(true);
     setMessage("");
@@ -83,7 +92,7 @@ export function FundingCallsPage() {
       title: call.title,
       description: call.description || "",
       fundingSource: call.fundingSource,
-      callType: call.callType || "internal",
+      callType: isDonor ? "external" : isDirector ? "internal" : call.callType || "internal",
       donorRef: call.donorRef || "",
       amountCap: call.amountCap || "",
       currency: call.currency || "USD",
@@ -93,6 +102,27 @@ export function FundingCallsPage() {
     });
     setShowForm(true);
     setMessage("");
+  }
+
+  function canEditCall(call) {
+    if (call.status !== "draft") return false;
+    if (isDirector && call.callType !== "external") return true;
+    if (isDonor && call.callType === "external" && String(call.createdBy) === String(user?.id)) return true;
+    return false;
+  }
+
+  function canPublishCall(call) {
+    if (call.status !== "draft") return false;
+    if (isLeadership) return true;
+    if (isDirector && call.callType !== "external") return true;
+    return false;
+  }
+
+  function canCloseCall(call) {
+    if (call.status !== "open") return false;
+    if (isLeadership || isDirector) return true;
+    if (isDonor && call.callType === "external" && String(call.createdBy) === String(user?.id)) return true;
+    return false;
   }
 
   async function handleSave(e) {
@@ -105,6 +135,10 @@ export function FundingCallsPage() {
       setError("Funding source is required.");
       return;
     }
+    if (isDonor && !form.donorRef.trim()) {
+      setError("Donor / agency reference is required for external calls.");
+      return;
+    }
 
     setBusy(true);
     setError("");
@@ -112,6 +146,7 @@ export function FundingCallsPage() {
     try {
       const payload = {
         ...form,
+        callType: isDonor ? "external" : "internal",
         title: form.title.trim(),
         fundingSource: form.fundingSource.trim(),
         description: form.description.trim(),
@@ -120,12 +155,31 @@ export function FundingCallsPage() {
         amountCap: Number(form.amountCap) || 0,
         deadline: form.deadline || null,
       };
+      // #region agent log
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+        body: JSON.stringify({
+          sessionId: "f558f7",
+          hypothesisId: "B",
+          location: "FundingCalls.jsx:handleSave",
+          message: "client save funding call",
+          data: { role: user?.role, callType: payload.callType, editing: Boolean(editingId) },
+          timestamp: Date.now(),
+          runId: "pre-fix",
+        }),
+      }).catch(() => {});
+      // #endregion
       if (editingId) {
         await fundingCallApi.updateFundingCall(accessToken, editingId, payload);
         setMessage("Funding call updated successfully.");
       } else {
         await fundingCallApi.createFundingCall(accessToken, payload);
-        setMessage("Draft funding call saved. Review and publish when ready.");
+        setMessage(
+          isDonor
+            ? "External funding call draft saved. Leadership must approve before it opens to researchers."
+            : "Internal funding call draft saved. Publish or wait for Leadership approval."
+        );
       }
       resetForm();
       await reload();
@@ -140,8 +194,27 @@ export function FundingCallsPage() {
     setBusy(true);
     setError("");
     try {
+      // #region agent log
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+        body: JSON.stringify({
+          sessionId: "f558f7",
+          hypothesisId: "C",
+          location: "FundingCalls.jsx:publish",
+          message: "client publish funding call",
+          data: { role: user?.role, callId: id },
+          timestamp: Date.now(),
+          runId: "pre-fix",
+        }),
+      }).catch(() => {});
+      // #endregion
       await fundingCallApi.publishFundingCall(accessToken, id);
-      setMessage("Funding call published — eligible researchers have been notified.");
+      setMessage(
+        isLeadership
+          ? "Funding call approved and published — eligible researchers have been notified."
+          : "Funding call published — eligible researchers have been notified."
+      );
       await reload();
     } catch (err) {
       setError(err?.response?.data?.message || "Publish failed.");
@@ -167,21 +240,33 @@ export function FundingCallsPage() {
   const openCount = calls.filter((c) => c.status === "open").length;
   const draftCount = calls.filter((c) => c.status === "draft").length;
 
+  const subtitle = isDonor
+    ? "Create external (donor) funding calls only. Leadership approves before researchers can apply."
+    : isLeadership
+      ? "Approve draft funding calls for publication, and close open calls when needed."
+      : isDirector
+        ? "Create internal institutional seed grants. External calls are created by the Donor Agency."
+        : "Publish institutional grant opportunities. Researchers apply only through an open call (Phase 1).";
+
   return (
     <div className="fundingCallsPage">
       <PageHeader
         title="Funding Calls"
-        subtitle="Publish institutional grant opportunities. Researchers apply only through an open call (Phase 1)."
+        subtitle={subtitle}
         stats={[
           { label: "Total calls", value: calls.length, filterKey: "all" },
           { label: "Open", value: openCount, filterKey: "open", accent: "#86efac" },
           { label: "Drafts", value: draftCount, filterKey: "draft", accent: "#fcd34d" },
         ]}
         actions={
-          isDirector ? (
+          canCreate ? (
             <button type="button" className="btn primary" onClick={showForm ? resetForm : startCreate}>
-              {showForm ? "Close form" : "+ New funding call"}
+              {showForm ? "Close form" : isDonor ? "+ New external call" : "+ New funding call"}
             </button>
+          ) : isLeadership ? (
+            <Link className="btn" to="/policies">
+              Institutional policies
+            </Link>
           ) : null
         }
       />
@@ -189,16 +274,21 @@ export function FundingCallsPage() {
       {message ? <div className="fundingCallsBanner fundingCallsBannerOk">{message}</div> : null}
       {error ? <div className="fundingCallsBanner fundingCallsBannerErr">{error}</div> : null}
 
-      {isDirector && showForm ? (
+      {canCreate && showForm ? (
         <form className="card fundingCallFormCard" onSubmit={handleSave}>
           <div className="fundingCallFormHeader">
             <div>
               <h3 className="fundingCallFormTitle">
-                {editingId ? "Edit draft funding call" : "Create funding call"}
+                {editingId
+                  ? "Edit draft funding call"
+                  : isDonor
+                    ? "Create external funding call"
+                    : "Create internal funding call"}
               </h3>
               <p className="fundingCallFormSub muted">
-                Complete all sections below. Calls are saved as <strong>draft</strong> until you publish them to
-                researchers.
+                {isDonor
+                  ? "External calls are saved as draft until Leadership approves and publishes them."
+                  : "Internal calls are saved as draft until published (Director or Leadership)."}
               </p>
             </div>
             <span className="fundingCallStatus fundingCallStatusDraft">Draft</span>
@@ -212,7 +302,11 @@ export function FundingCallsPage() {
                 <input
                   id="fc-title"
                   required
-                  placeholder="e.g. JUST Internal Seed Grant 2026 — Faculty of Science"
+                  placeholder={
+                    isDonor
+                      ? "e.g. UNESCO External Research Grant 2026"
+                      : "e.g. JUST Internal Seed Grant 2026 — Faculty of Science"
+                  }
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
                 />
@@ -233,7 +327,9 @@ export function FundingCallsPage() {
           <section className="fundingCallFormSection">
             <h4 className="fundingCallFormSectionTitle">2. Funding details</h4>
             <p className="fundingCallFormSectionHint muted">
-              Internal calls are university-funded seed grants. External calls reference outside donors or agencies.
+              {isDonor
+                ? "Donor Agency creates external / agency-funded calls only. Call type is locked to External."
+                : "Research Director creates internal university-funded seed grants only."}
             </p>
             <div className="fundingCallFormGrid">
               <div className="field">
@@ -241,23 +337,29 @@ export function FundingCallsPage() {
                 <input
                   id="fc-source"
                   required
-                  placeholder="e.g. Jamhuriya University Research Office"
+                  placeholder={
+                    isDonor ? "e.g. UNESCO / World Bank" : "e.g. Jamhuriya University Research Office"
+                  }
                   value={form.fundingSource}
                   onChange={(e) => setForm({ ...form, fundingSource: e.target.value })}
                 />
               </div>
               <div className="field">
                 <label htmlFor="fc-type">Call type</label>
-                <select id="fc-type" value={form.callType} onChange={(e) => setForm({ ...form, callType: e.target.value })}>
-                  <option value="internal">Internal seed grant</option>
-                  <option value="external">External / donor-funded grant</option>
+                <select id="fc-type" value={isDonor ? "external" : "internal"} disabled>
+                  {isDonor ? (
+                    <option value="external">External / donor-funded grant</option>
+                  ) : (
+                    <option value="internal">Internal seed grant</option>
+                  )}
                 </select>
               </div>
-              {form.callType === "external" ? (
+              {isDonor ? (
                 <div className="field">
-                  <label htmlFor="fc-donor">Donor / agency reference</label>
+                  <label htmlFor="fc-donor">Donor / agency reference *</label>
                   <input
                     id="fc-donor"
+                    required
                     placeholder="e.g. UNESCO-2026-UG-01"
                     value={form.donorRef}
                     onChange={(e) => setForm({ ...form, donorRef: e.target.value })}
@@ -342,7 +444,9 @@ export function FundingCallsPage() {
               Cancel
             </button>
             <span className="muted" style={{ fontSize: 12 }}>
-              Publishing notifies eligible researchers in this portal.
+              {isDonor
+                ? "Leadership will be notified to approve this external call."
+                : "Publishing notifies eligible researchers in this portal."}
             </span>
           </div>
         </form>
@@ -367,6 +471,11 @@ export function FundingCallsPage() {
                   <span className="fundingCallMetaChip">
                     Source: <strong>{c.fundingSource}</strong>
                   </span>
+                  {c.donorRef ? (
+                    <span className="fundingCallMetaChip">
+                      Ref: <strong>{c.donorRef}</strong>
+                    </span>
+                  ) : null}
                   <span className="fundingCallMetaChip">
                     Cap: <strong>{formatMoney(c.amountCap, c.currency)}</strong>
                   </span>
@@ -393,22 +502,22 @@ export function FundingCallsPage() {
               </div>
 
               <div className="fundingCallActions">
-                {user?.role === "researcher" && c.status === "open" ? (
+                {isResearcher && c.status === "open" ? (
                   <Link className="btn primary" to={`/grants/apply?callId=${c.id}`}>
                     Apply via this call
                   </Link>
                 ) : null}
-                {isDirector && c.status === "draft" ? (
-                  <>
-                    <button type="button" className="btn" onClick={() => startEdit(c)}>
-                      Edit draft
-                    </button>
-                    <button type="button" className="btn primary" disabled={busy} onClick={() => publish(c.id)}>
-                      Publish call
-                    </button>
-                  </>
+                {canEditCall(c) ? (
+                  <button type="button" className="btn" onClick={() => startEdit(c)}>
+                    Edit draft
+                  </button>
                 ) : null}
-                {isDirector && c.status === "open" ? (
+                {canPublishCall(c) ? (
+                  <button type="button" className="btn primary" disabled={busy} onClick={() => publish(c.id)}>
+                    {isLeadership ? "Approve & publish" : "Publish call"}
+                  </button>
+                ) : null}
+                {canCloseCall(c) ? (
                   <button type="button" className="btn" disabled={busy} onClick={() => closeCall(c.id)}>
                     Close call
                   </button>
@@ -426,12 +535,16 @@ export function FundingCallsPage() {
             <div style={{ fontWeight: 800 }}>No funding calls yet</div>
             <p className="muted" style={{ marginTop: 8, fontSize: 14 }}>
               {isDirector
-                ? "Create your first call to open the grant application window for researchers."
-                : "When the Research Office publishes a call, it will appear here for application."}
+                ? "Create your first internal call for researchers."
+                : isDonor
+                  ? "Create an external funding call draft for Leadership to approve."
+                  : isLeadership
+                    ? "When Director or Donor saves a draft, approve it here to open applications."
+                    : "When the Research Office publishes a call, it will appear here for application."}
             </p>
-            {isDirector ? (
+            {canCreate ? (
               <button type="button" className="btn primary" style={{ marginTop: 14 }} onClick={startCreate}>
-                + Create funding call
+                {isDonor ? "+ Create external call" : "+ Create funding call"}
               </button>
             ) : null}
           </div>

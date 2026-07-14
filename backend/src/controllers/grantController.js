@@ -216,7 +216,10 @@ function sanitizeGrantDetail(g) {
 async function listGrants(req, res) {
   const { role } = req.user;
   const { status, projectId, callId } = req.query || {};
-  const filter = {};
+  const filter = {
+    // Only funding-call applications — legacy grants without a call are excluded
+    callId: { $ne: null, $exists: true },
+  };
   if (status && Object.values(GRANT_STATUSES).includes(status)) filter.status = status;
   if (projectId) {
     const { validateProjectQuery } = require("../utils/projectScopedRecords");
@@ -225,6 +228,29 @@ async function listGrants(req, res) {
   }
   if (callId) filter.callId = callId;
   if (role === "researcher") filter.researcherId = req.user.id;
+  // Donor agency: monitor funded / submitted grants (no drafts)
+  if (role === "donor_agency") {
+    filter.status = { $nin: ["draft"] };
+  }
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(process.cwd(), "..", "debug-f558f7.log"),
+      `${JSON.stringify({
+        sessionId: "f558f7",
+        hypothesisId: "L",
+        location: "grantController.js:listGrants",
+        message: "list grants funding-call only filter",
+        data: { role, hasCallIdFilter: true, callIdQuery: callId || null, projectId: projectId || null },
+        timestamp: Date.now(),
+        runId: "pre-fix",
+      })}\n`
+    );
+  } catch { /* ignore */ }
+  // #endregion
 
   const grants = await Grant.find(req.tierWhere(filter))
     .sort({ createdAt: -1 })
@@ -241,9 +267,19 @@ async function getGrant(req, res) {
     .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId submittedAt")
     .populate("callId", "title status fundingSource amountCap deadline requiredDocuments callType eligibilityTier currency");
   if (!grant) throw new AppError("Grant not found", 404);
+  if (!grant.callId) {
+    throw new AppError("Grant not found — only funding-call applications are available", 404);
+  }
 
   const isOwner = String(grant.researcherId?._id || grant.researcherId) === String(req.user.id);
-  const isStaff = ["research_director", "finance_officer", "faculty_coordinator", "leadership"].includes(req.user.role);
+  const isStaff = [
+    "research_director",
+    "finance_officer",
+    "faculty_coordinator",
+    "leadership",
+    "donor_agency",
+    "procurement_officer",
+  ].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
   res.json({ grant: sanitizeGrantDetail(grant) });

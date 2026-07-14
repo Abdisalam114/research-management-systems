@@ -26,7 +26,7 @@ function defaultReviewPipeline(options = {}) {
       completedAt: new Date(),
       completedBy: null,
       decision: "skipped",
-      comment: "Not applicable — voluntary proposal (no funding)",
+      comment: "Not applicable — voluntary research proposal",
     };
   }
   return pipe;
@@ -47,7 +47,7 @@ function ensureReviewPipeline(proposal) {
       completedAt: proposal.reviewPipeline.financeReview.completedAt || new Date(),
       completedBy: null,
       decision: "skipped",
-      comment: proposal.reviewPipeline.financeReview.comment || "Not applicable — voluntary proposal (no funding)",
+      comment: proposal.reviewPipeline.financeReview.comment || "Not applicable — voluntary research proposal",
     };
   }
   return proposal.reviewPipeline;

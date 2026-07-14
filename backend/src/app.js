@@ -23,6 +23,7 @@ const { purchaseOrderRoutes } = require("./routes/purchaseOrderRoutes");
 const { ethicsRoutes } = require("./routes/ethicsRoutes");
 const { thesisGroupRoutes } = require("./routes/thesisGroupRoutes");
 const { fundingCallRoutes } = require("./routes/fundingCallRoutes");
+const { policyRoutes } = require("./routes/policyRoutes");
 const { searchRoutes } = require("./routes/searchRoutes");
 const { auditRoutes } = require("./routes/auditRoutes");
 
@@ -72,6 +73,7 @@ function createApp() {
   app.use("/api/ethics", ethicsRoutes);
   app.use("/api/thesis-groups", thesisGroupRoutes);
   app.use("/api/funding-calls", fundingCallRoutes);
+  app.use("/api/policies", policyRoutes);
   app.use("/api/search", searchRoutes);
   app.use("/api/audit", auditRoutes);
 

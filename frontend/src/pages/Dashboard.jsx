@@ -33,12 +33,13 @@ function RoleDashboard({ role, user }) {
     faculty_coordinator: { title: "Department (Faculty Coordinator)", focus: "Support and approve internal department priority." },
     finance_officer: { title: "Finance Office", focus: "Approve budgets, track expenses, financial reports." },
     researcher: { title: "Researcher / PI", focus: "Apply for grants via funding calls, proposals, projects, reports." },
-    ethics_committee: { title: "Ethics Committee (REC)", focus: "Review and approve ethics applications." },
+    ethics_committee: { title: "Ethics Committee (REC)", focus: "Clear ethics applications and notify the Research Director." },
+    research_director: { title: "Research Director", focus: "Issue certificates, approve proposals (creates projects), oversee the system." },
     procurement_officer: { title: "Procurement Office", focus: "Purchase orders and budget-linked procurement." },
     peer_reviewer: { title: "Peer Reviewer", focus: "Evaluate proposal quality and scientific merit." },
     hr_officer: { title: "HR Office", focus: "Project teams, thesis groups, and staff coordination." },
-    leadership: { title: "University Leadership", focus: "Final approval of grant awards and KPI oversight." },
-    donor_agency: { title: "Donor / External Agency", focus: "Monitor funded grants and periodic reports." },
+    leadership: { title: "University Leadership", focus: "Approve funding calls, grant awards, KPIs, and institutional policy (siyaasada guud)." },
+    donor_agency: { title: "Donor / External Agency", focus: "Create external funding calls and monitor funded grants." },
   };
 
   const quickLinksByRole = {
@@ -61,14 +62,15 @@ function RoleDashboard({ role, user }) {
       { to: "/groups", label: "Research groups" },
     ],
     leadership: [
-      { to: "/grants", label: "Grant awards", primary: true },
+      { to: "/funding-calls", label: "Approve funding calls", primary: true },
+      { to: "/policies", label: "Institutional policies" },
+      { to: "/grants", label: "Grant awards" },
       { to: "/kpi-dashboard", label: "KPI dashboard" },
-      { to: "/funding-calls", label: "Funding calls" },
     ],
     donor_agency: [
-      { to: "/donor-reports", label: "Donor reports", primary: true },
+      { to: "/funding-calls", label: "Create external funding calls", primary: true },
+      { to: "/donor-reports", label: "Donor reports" },
       { to: "/grants", label: "Funded grants" },
-      { to: "/funding-calls", label: "Funding calls" },
     ],
     researcher: [
       { to: "/funding-calls", label: "Apply via Funding Calls", primary: true },

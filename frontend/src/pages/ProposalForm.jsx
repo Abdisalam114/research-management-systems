@@ -61,9 +61,7 @@ export function ProposalFormPage() {
     if (isEdit) {
       return isVoluntary ? "Edit Voluntary Proposal + Ethics" : "Edit Grant Fund Call Proposal + Ethics";
     }
-    return isVoluntary
-      ? "New Voluntary Proposal + Ethics (no funding)"
-      : "New Grant Fund Call Proposal + Ethics";
+    return isVoluntary ? "New Voluntary Proposal + Ethics" : "New Grant Fund Call Proposal + Ethics";
   }, [isEdit, isVoluntary]);
 
   useEffect(() => {
@@ -236,9 +234,8 @@ requestAnimationFrame(() => {
       <h2 style={{ marginTop: 0 }}>{heading}</h2>
       <p className="muted" style={{ marginTop: 0, maxWidth: 720 }}>
         {isVoluntary
-          ? "Voluntary path: research only — no grant money. After approval a project is created for academic research benefit."
-          : "Grant Fund Call path: this proposal is tied to a funding call. Enter only from Funding Calls → Apply."}{" "}
-        Complete the proposal and ethics form, then submit to the Director.
+          ? "Voluntary research proposal — complete the proposal and ethics form, then submit for review. After approval a research project is created."
+          : "Grant Fund Call path: this proposal is tied to a funding call. Enter only from Funding Calls → Apply. Complete the proposal and ethics form, then submit to the Director."}
       </p>
 
       {isVoluntary && !isEdit ? (
@@ -251,8 +248,7 @@ requestAnimationFrame(() => {
             fontSize: 14,
           }}
         >
-          <strong>Voluntary proposal</strong> — no funding. For a funded proposal, go to{" "}
-          <Link to="/funding-calls">Funding Calls</Link> and apply there (you cannot start a grant proposal from this page).
+          <strong>Voluntary proposal</strong> — research and ethics only. Submit when the form is complete.
         </div>
       ) : null}
 
