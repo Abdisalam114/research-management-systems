@@ -563,15 +563,15 @@ async function directorDecision(req, res) {
 
   const proposal = await Proposal.findOne(req.tierWhere({ _id: id }));
   if (!proposal) throw new AppError("Proposal not found", 404);
-if (![PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW, PROPOSAL_STATUSES.REVISION_REQUESTED].includes(proposal.status)) {
-throw new AppError("Proposal is not decision-ready in its current status", 400);
+  if (![PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW, PROPOSAL_STATUSES.REVISION_REQUESTED].includes(proposal.status)) {
+    throw new AppError("Proposal is not decision-ready in its current status", 400);
   }
 
   if (decision === PROPOSAL_STATUSES.APPROVED && proposal.requiresEthics) {
     try {
       await assertEthicsApprovedForDirectorApproval(proposal);
     } catch (e) {
-throw new AppError(e.message, 400);
+      throw new AppError(e.message, 400);
     }
   } else if (decision === PROPOSAL_STATUSES.APPROVED && ethicsBlocksSubmission(proposal)) {
     throw new AppError("Ethics must be approved before final proposal decision", 400);

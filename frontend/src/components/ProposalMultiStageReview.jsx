@@ -46,11 +46,10 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
   const peerDone = (proposal.peerReviews || []).some(
     (r) => reviewerRefId(r.userId) === String(user?.id)
   );
-  const screeningPassed = pipe.adminScreening?.status === "passed";
   // Peer reviewer power: assigned → can score immediately (no screening wait)
   const canSubmitPeerReview = (assigned || isDirector) && !peerDone;
   const canAssignReviewers = isDirector;
-useEffect(() => {
+  useEffect(() => {
     if (!canAssignReviewers || !accessToken) return;
     let cancelled = false;
     (async () => {
@@ -60,7 +59,7 @@ useEffect(() => {
         setPeerReviewers(res.users || []);
         const current = (proposal.assignedReviewers || []).map((r) => reviewerRefId(r.userId));
         setSelectedReviewerIds(current.filter(Boolean));
-      } catch (_) {
+      } catch {
         if (!cancelled) setPeerReviewers([]);
       }
     })();
@@ -68,7 +67,7 @@ useEffect(() => {
       cancelled = true;
     };
   }, [canAssignReviewers, accessToken, proposal.id, proposal.assignedReviewers]);
-async function run(fn) {
+  async function run(fn) {
     setBusy(true);
     setErr("");
     setAssignMsg("");

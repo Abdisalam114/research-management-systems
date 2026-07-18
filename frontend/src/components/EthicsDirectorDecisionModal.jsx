@@ -98,7 +98,7 @@ export function EthicsDirectorDecisionModal({
           chairpersonLine: defaultSignatory?.line || defaultSignatory?.name || "",
           signatoryTitle: defaultSignatory?.title || "Chairperson",
         });
-} catch (e) {
+      } catch (e) {
         if (!cancelled) {
           setSignatories(FALLBACK_CHAIRPERSONS);
           setSignatoryKey("kasim");
@@ -108,7 +108,7 @@ export function EthicsDirectorDecisionModal({
             signatoryTitle: "Chairperson",
           }));
           setLocalError(e?.response?.data?.message || "Could not load certificate preview");
-}
+        }
       } finally {
         if (!cancelled) setPreviewLoading(false);
       }

@@ -244,7 +244,7 @@ export function EthicsPage() {
         setInfoMsg("Submitted to REC — await the Director's response.");
         closeEditor();
       }
-} catch (e) {
+    } catch (e) {
       setError(e?.response?.data?.message || "Failed to save");
     } finally {
       setSaveBusy(false);

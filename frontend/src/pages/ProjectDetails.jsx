@@ -455,7 +455,7 @@ export function ProjectDetailsPage() {
             await load();
           }}>Director approve closure</button>
         ) : null}
-        {useruser?.role === "finance_officer" &&
+        {user?.role === "finance_officer" &&
         !isVoluntary &&
         project.closure?.status === "director_approved" ? (
           <button type="button" className="btn primary" style={{ marginTop: 8 }} onClick={async () => {
