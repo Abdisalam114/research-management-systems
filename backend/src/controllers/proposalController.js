@@ -76,7 +76,16 @@ function sanitizeProposal(p) {
     reviewPipeline: ensureReviewPipeline(p),
     currentReviewStage: getCurrentReviewStage(p),
     proposalKind: resolveProposalKind(p),
-    fundingCallId: p.fundingCallId || null,
+    fundingCallId: p.fundingCallId?._id
+      ? String(p.fundingCallId._id)
+      : p.fundingCallId || null,
+    fundingCall: p.fundingCallId?._id
+      ? {
+          id: String(p.fundingCallId._id),
+          title: p.fundingCallId.title || "",
+          status: p.fundingCallId.status || null,
+        }
+      : null,
     submittedAt: p.submittedAt,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
@@ -220,7 +229,8 @@ function applyProposalDocuments(proposal, req) {
 }
 
 async function createProposal(req, res) {
-  const { title, abstract, department, researchArea, requiresEthics, fundingCallId, proposalKind } = req.body;
+  const { title, abstract, researchArea, requiresEthics, fundingCallId, proposalKind } = req.body;
+  const department = String(req.body.department || req.user.department || "").trim();
   if (!title || !abstract || !department || !researchArea) {
     throw new AppError("title, abstract, department, and researchArea are required", 400);
   }
@@ -339,11 +349,11 @@ async function getProposalEthicsApplication(req, res) {
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const isOwner = String(proposal.researcherId) === String(req.user.id);
-  const isStaff = ["faculty_coordinator", "research_director", "ethics_committee"].includes(req.user.role);
+  const isStaff = ["faculty_coordinator", "research_director", "ethics_committee", "finance_officer"].includes(req.user.role);
   const isAssignedReviewer = (proposal.assignedReviewers || []).some(
     (r) => refId(r.userId) === String(req.user.id)
   );
-if (!isOwner && !isStaff && !isAssignedReviewer) throw new AppError("Forbidden", 403);
+  if (!isOwner && !isStaff && !isAssignedReviewer) throw new AppError("Forbidden", 403);
 
   let ethics = await getEthicsForProposal(proposal._id);
   if (!ethics && isOwner && proposal.requiresEthics) {
@@ -461,11 +471,69 @@ async function submitProposal(req, res) {
 
 async function listProposals(req, res) {
   const { role } = req.user;
-  const { scope } = req.query || {};
+  const { scope, grantFundCall } = req.query || {};
+
+  // Funding-call proposals (all statuses) — used by Funding Calls page so accepted ones stay visible
+  if (grantFundCall === "1" || grantFundCall === "true") {
+    const filter = {
+      $or: [
+        { fundingCallId: { $ne: null } },
+        { proposalKind: PROPOSAL_KINDS.GRANT_FUND_CALL },
+      ],
+    };
+    if (role === "researcher") filter.researcherId = req.user.id;
+    else if (
+      ![
+        "research_director",
+        "faculty_coordinator",
+        "finance_officer",
+        "leadership",
+        "donor_agency",
+      ].includes(role)
+    ) {
+      throw new AppError("Forbidden", 403);
+    }
+
+    const proposals = await Proposal.find(req.tierWhere(filter))
+      .populate("researcherId", "fullName email department")
+      .populate("fundingCallId", "title status deadline")
+      .sort({ updatedAt: -1 });
+
+    // #region agent log
+    try {
+      const line = `${JSON.stringify({
+        sessionId: "f558f7",
+        runId: "accepted-visibility",
+        hypothesisId: "H4",
+        location: "proposalController.listProposals",
+        message: "grant fund call proposals listed",
+        data: {
+          role,
+          count: proposals.length,
+          approved: proposals.filter((p) => p.status === "approved").length,
+          sample: proposals.slice(0, 5).map((p) => ({
+            id: String(p._id),
+            title: p.title,
+            status: p.status,
+            callId: p.fundingCallId?._id ? String(p.fundingCallId._id) : p.fundingCallId,
+          })),
+        },
+        timestamp: Date.now(),
+      })}\n`;
+      fs.appendFileSync(path.join(__dirname, "../../../debug-f558f7.log"), line);
+    } catch {
+      /* ignore */
+    }
+    // #endregion
+
+    res.json({ proposals: proposals.map(sanitizeProposal) });
+    return;
+  }
 
   if (role === "researcher") {
     const proposals = await Proposal.find(req.tierWhere({ researcherId: req.user.id }))
       .populate("researcherId", "fullName email department")
+      .populate("fundingCallId", "title status deadline")
       .sort({ createdAt: -1 });
     res.json({ proposals: proposals.map(sanitizeProposal) });
     return;
@@ -486,6 +554,7 @@ async function listProposals(req, res) {
       })
     )
       .populate("researcherId", "fullName email department")
+      .populate("fundingCallId", "title status deadline")
       .sort({ submittedAt: -1, createdAt: -1 });
     res.json({ proposals: proposals.map(sanitizeProposal) });
     return;
@@ -494,6 +563,7 @@ async function listProposals(req, res) {
   if (scope === "all" && role === "research_director") {
     const proposals = await Proposal.find(req.tierWhere({}))
       .populate("researcherId", "fullName email department")
+      .populate("fundingCallId", "title status deadline")
       .sort({ updatedAt: -1 });
     res.json({ proposals: proposals.map(sanitizeProposal) });
     return;
@@ -503,6 +573,7 @@ async function listProposals(req, res) {
     status: { $in: [PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW, PROPOSAL_STATUSES.REVISION_REQUESTED] },
   }))
     .populate("researcherId", "fullName email department")
+    .populate("fundingCallId", "title status deadline")
     .sort({ submittedAt: -1, createdAt: -1 });
 
   res.json({ proposals: proposals.map(sanitizeProposal) });
@@ -514,11 +585,21 @@ async function getProposal(req, res) {
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const isOwner = String(proposal.researcherId) === String(req.user.id);
-  const isStaff = ["faculty_coordinator", "research_director", "ethics_committee"].includes(req.user.role);
+  const isStaff = ["faculty_coordinator", "research_director", "ethics_committee", "finance_officer"].includes(req.user.role);
   const isAssignedReviewer = (proposal.assignedReviewers || []).some(
     (r) => refId(r.userId) === String(req.user.id)
   );
   if (!isOwner && !isStaff && !isAssignedReviewer) throw new AppError("Forbidden", 403);
+
+  // #region agent log
+  try {
+    const p = require("path");
+    const fs = require("fs");
+    const line = `${JSON.stringify({ sessionId: "f558f7", hypothesisId: "H1", location: "proposalController.getProposal", message: "proposal access ok", data: { role: req.user.role, proposalId: String(id) }, timestamp: Date.now() })}\n`;
+    fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
+    fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
+  } catch (_) { /* debug */ }
+  // #endregion
 
   res.json({ proposal: await attachEthicsSummary(proposal) });
 }
@@ -652,7 +733,7 @@ async function directorDecision(req, res) {
         status: "active",
         progressReports: [],
       }));
-try {
+      try {
         await notifyUser(proposal.researcherId, {
           type: "proposal",
           title: "Proposal approved — project created",
@@ -662,9 +743,27 @@ try {
         });
       } catch { /* best-effort */ }
     }
+
+    // Fund-call proposal accepted → queue money for Finance + close the call
+    if (proposal.fundingCallId) {
+      try {
+        const { ensurePendingFinanceGrantFromProposal } = require("../utils/ensurePendingFinanceGrantFromProposal");
+        await ensurePendingFinanceGrantFromProposal(proposal, { notify: true });
+      } catch { /* best-effort */ }
+      try {
+        const { closeCallAfterGrantAccepted } = require("../utils/fundingCallAutoClose");
+        await closeCallAfterGrantAccepted(proposal.fundingCallId, {
+          actorId: req.user.id,
+          actorRole: req.user.role,
+          programTier: req.programTier,
+          grantTitle: proposal.title,
+        });
+      } catch { /* best-effort */ }
+    }
   }
 
-  res.json({ message: "Decision saved", proposal: sanitizeProposal(proposal) });
+  const populated = await Proposal.findById(proposal._id).populate("fundingCallId", "title status deadline");
+  res.json({ message: "Decision saved", proposal: sanitizeProposal(populated || proposal) });
 }
 
 async function ethicsDecision(req, res) {

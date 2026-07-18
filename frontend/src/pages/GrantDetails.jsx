@@ -46,10 +46,11 @@ export function GrantDetailsPage() {
   const isDirector = user?.role === "research_director";
   const isLeadership = user?.role === "leadership";
   const isDonor = user?.role === "donor_agency";
+  const isFinance = user?.role === "finance_officer";
   const isOwner = grant && String(grant.researcherId) === String(user?.id);
   const canEditLink = isOwner && ["draft", "rejected"].includes(grant?.status || "");
   const canDecide = (isDirector || isLeadership) && grant?.status === "submitted";
-  const canFinanceDecide = user?.role === "finance_officer" && grant?.status === "pending_finance";
+  const canFinanceDecide = isFinance && grant?.status === "pending_finance";
 
   const load = useCallback(async () => {
     const res = await grantApi.getGrant(accessToken, id);
@@ -74,9 +75,11 @@ export function GrantDetailsPage() {
         amountAwarded,
       });
       setAwardOpen(false);
-      if (res?.budget?.created) {
-        setMessage("Grant approved. A budget was created for the researcher — see Budgets.");
-      }
+      setMessage(
+        res?.budget?.created
+          ? "Grant approved and budget created."
+          : "Grant awarded — pending finance approval before budget activation."
+      );
       await reload();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to approve grant");
@@ -116,12 +119,23 @@ export function GrantDetailsPage() {
   }
 
   async function handleFinanceApprove() {
-    if (!grant) return;
-    const comment = window.prompt("Finance approval comment (optional):") || "";
+    if (!grant || awardBusy || rejectBusy) return;
+    if (
+      !window.confirm(
+        "Authorize this award budget?\n\nCreates/updates Allocated amount only.\nDoes NOT pay out money — use Finance & Budgets for payments later."
+      )
+    ) {
+      return;
+    }
+    const comment = window.prompt("Finance authorization comment (optional):") || "";
     try {
       setAwardBusy(true);
+      setError("");
       const res = await grantApi.financeDecision(accessToken, grant.id, { decision: "approve", comment });
-      if (res?.budget?.created) setMessage("Finance approved — budget created.");
+      setMessage(
+        res?.message ||
+          "Budget authorized (allocated). Paid remains 0 until you disburse under Finance & Budgets."
+      );
       await reload();
     } catch (e) {
       setError(e?.response?.data?.message || "Finance approval failed");
@@ -131,11 +145,15 @@ export function GrantDetailsPage() {
   }
 
   async function handleFinanceReject() {
-    if (!grant) return;
-    const comment = window.prompt("Rejection reason:") || "Rejected";
+    if (!grant || awardBusy || rejectBusy) return;
+    const comment = window.prompt("Rejection reason:")?.trim();
+    if (!comment) return;
+    if (!window.confirm("Reject this grant at the finance gate?")) return;
     try {
       setRejectBusy(true);
+      setError("");
       await grantApi.financeDecision(accessToken, grant.id, { decision: "reject", comment });
+      setMessage("Grant rejected by finance.");
       await reload();
     } catch (e) {
       setError(e?.response?.data?.message || "Finance rejection failed");
@@ -214,10 +232,15 @@ export function GrantDetailsPage() {
 
           {canFinanceDecide ? (
             <div className="card" style={{ marginTop: 12, borderColor: "rgba(45,212,191,0.35)" }}>
-              <div style={{ fontWeight: 800 }}>Finance approval gate</div>
-              <p className="muted" style={{ fontSize: 13 }}>Director approved — finance must approve before budget activation.</p>
+              <div style={{ fontWeight: 800 }}>Finance authorization (not a payment)</div>
+              <p className="muted" style={{ fontSize: 13 }}>
+                Director accepted the award. Authorize the budget allocation here. Paying out money is a separate step
+                under Finance &amp; Budgets.
+              </p>
               <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                <button type="button" className="btn primary" onClick={handleFinanceApprove} disabled={awardBusy || rejectBusy}>Approve & activate</button>
+                <button type="button" className="btn primary" onClick={handleFinanceApprove} disabled={awardBusy || rejectBusy}>
+                  Authorize budget
+                </button>
                 <button type="button" className="btn" onClick={handleFinanceReject} disabled={awardBusy || rejectBusy}>Reject</button>
               </div>
             </div>
@@ -287,7 +310,7 @@ export function GrantDetailsPage() {
               </div>
             ) : null}
 
-            {grant.proposal ? (
+            {!isFinance && grant.proposal ? (
               <div style={{ marginTop: 14 }}>
                 <div style={{ fontWeight: 800 }}>Research proposal (workflow)</div>
                 <div style={{ marginTop: 4 }}>
@@ -379,7 +402,7 @@ export function GrantDetailsPage() {
             </div>
           ) : null}
 
-          {grant.project ? (
+          {!isFinance && grant.project ? (
             <div className="card" style={{ marginTop: 12 }}>
               <div style={{ fontWeight: 900, marginBottom: 10 }}>Linked project</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
@@ -404,7 +427,7 @@ export function GrantDetailsPage() {
                 Open project
               </Link>
             </div>
-          ) : canEditLink && grant.callId ? (
+          ) : !isFinance && canEditLink && grant.callId ? (
             <div className="card" style={{ marginTop: 12 }}>
               <div style={{ fontWeight: 900, marginBottom: 10 }}>Link research project (optional)</div>
               <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
@@ -427,7 +450,7 @@ export function GrantDetailsPage() {
                 {linkBusy ? "Saving…" : "Save project link"}
               </button>
             </div>
-          ) : grant.callId && !grant.project ? (
+          ) : !isFinance && grant.callId && !grant.project ? (
             <div className="card" style={{ marginTop: 12, fontSize: 13 }}>
               <div style={{ fontWeight: 800 }}>No linked project</div>
               <p className="muted" style={{ margin: "6px 0 0" }}>

@@ -35,6 +35,8 @@ const budgetSchema = new mongoose.Schema(
     ownerResearcherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
 
     totalAllocated: { type: Number, min: 0, default: 0 },
+    /** Sum of amounts marked paid (payments, POs, budget line items). Remaining = allocated − disbursed. */
+    totalDisbursed: { type: Number, min: 0, default: 0 },
     currency: { type: String, default: "USD", trim: true, uppercase: true },
     financeNotes: { type: String, default: "" },
 

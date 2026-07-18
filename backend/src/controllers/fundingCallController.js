@@ -1,8 +1,35 @@
 const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
+const { Grant } = require("../models/Grant");
+const { Proposal } = require("../models/Proposal");
 const { AppError } = require("../utils/AppError");
 const { notifyUsersByRole, notifyUser } = require("../utils/notify");
 const { recordAudit } = require("../utils/audit");
 const { tierMatchesCall } = require("../utils/fundingCallEligibility");
+const { closeExpiredOpenCalls } = require("../utils/fundingCallAutoClose");
+const fs = require("fs");
+const path = require("path");
+const DEBUG_LOG = path.join(__dirname, "../../../debug-f558f7.log");
+
+function debugLog(hypothesisId, location, message, data) {
+  // #region agent log
+  try {
+    fs.appendFileSync(
+      DEBUG_LOG,
+      `${JSON.stringify({
+        sessionId: "f558f7",
+        runId: "accepted-visibility",
+        hypothesisId,
+        location,
+        message,
+        data,
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+}
 
 function sanitizeCall(c) {
   return {
@@ -32,12 +59,65 @@ function isCallOwner(call, userId) {
 }
 
 async function listFundingCalls(req, res) {
+  await closeExpiredOpenCalls({
+    actorId: req.user.id,
+    actorRole: req.user.role,
+    programTier: req.programTier,
+  });
+
   const { status } = req.query || {};
   const filter = {};
   if (status && Object.values(CALL_STATUSES).includes(status)) filter.status = status;
 
-  if (req.user.role === "researcher") {
-    filter.status = CALL_STATUSES.OPEN;
+  // Researcher: open calls + any calls they already applied to via Grant or Proposal
+  let appliedCallIds = [];
+  if (req.user.role === "researcher" && !status) {
+    const [myApps, myProps] = await Promise.all([
+      Grant.find(req.tierWhere({ researcherId: req.user.id, callId: { $ne: null } })).select(
+        "callId status amountAwarded"
+      ),
+      Proposal.find(
+        req.tierWhere({ researcherId: req.user.id, fundingCallId: { $ne: null } })
+      ).select("fundingCallId status"),
+    ]);
+    appliedCallIds = [
+      ...new Set([
+        ...myApps.map((g) => String(g.callId)).filter(Boolean),
+        ...myProps.map((p) => String(p.fundingCallId)).filter(Boolean),
+      ]),
+    ];
+    filter.$or = [
+      { status: CALL_STATUSES.OPEN },
+      ...(appliedCallIds.length ? [{ _id: { $in: appliedCallIds } }] : []),
+    ];
+    debugLog("H3", "fundingCallController.listFundingCalls", "researcher call visibility", {
+      appliedCallIds,
+      acceptedGrants: myApps
+        .filter((g) => Number(g.amountAwarded || 0) > 0 || ["pending_finance", "active", "approved"].includes(g.status))
+        .map((g) => ({ callId: String(g.callId), status: g.status })),
+      acceptedProposals: myProps
+        .filter((p) => p.status === "approved")
+        .map((p) => ({ callId: String(p.fundingCallId), status: p.status })),
+    });
+  } else if (req.user.role === "researcher") {
+    // Explicit status filter (e.g. closed) — still only their applied calls when not open
+    if (status === CALL_STATUSES.OPEN) {
+      filter.status = CALL_STATUSES.OPEN;
+    } else {
+      const [myApps, myProps] = await Promise.all([
+        Grant.find(req.tierWhere({ researcherId: req.user.id, callId: { $ne: null } })).select("callId"),
+        Proposal.find(
+          req.tierWhere({ researcherId: req.user.id, fundingCallId: { $ne: null } })
+        ).select("fundingCallId"),
+      ]);
+      appliedCallIds = [
+        ...new Set([
+          ...myApps.map((g) => String(g.callId)).filter(Boolean),
+          ...myProps.map((p) => String(p.fundingCallId)).filter(Boolean),
+        ]),
+      ];
+      filter._id = { $in: appliedCallIds.length ? appliedCallIds : ["000000000000000000000000"] };
+    }
   }
 
   // Donor sees external calls (all statuses) + open internal for awareness
@@ -50,18 +130,41 @@ async function listFundingCalls(req, res) {
 
   const calls = await FundingCall.find(req.tierWhere(filter)).sort({ deadline: 1, createdAt: -1 });
   const visible = req.user.role === "researcher"
-    ? calls.filter((c) => tierMatchesCall(req, c) && (!c.deadline || new Date(c.deadline) >= new Date()))
+    ? calls.filter((c) => tierMatchesCall(req, c) || appliedCallIds.includes(String(c._id)))
     : calls;
+
+  debugLog("H3", "fundingCallController.listFundingCalls", "list result", {
+    role: req.user.role,
+    total: visible.length,
+    byStatus: {
+      open: visible.filter((c) => c.status === "open").length,
+      closed: visible.filter((c) => c.status === "closed").length,
+      draft: visible.filter((c) => c.status === "draft").length,
+    },
+  });
 
   res.json({ calls: visible.map(sanitizeCall) });
 }
 
 async function getFundingCall(req, res) {
+  await closeExpiredOpenCalls({
+    actorId: req.user.id,
+    actorRole: req.user.role,
+    programTier: req.programTier,
+  });
+
   const call = await FundingCall.findOne(req.tierWhere({ _id: req.params.id }));
   if (!call) throw new AppError("Funding call not found", 404);
   if (req.user.role === "researcher") {
-    if (call.status !== CALL_STATUSES.OPEN) throw new AppError("Funding call not available", 404);
-    if (!tierMatchesCall(req, call)) throw new AppError("Not eligible for this call", 403);
+    const applied = await Grant.exists(
+      req.tierWhere({ researcherId: req.user.id, callId: call._id })
+    );
+    if (call.status !== CALL_STATUSES.OPEN && !applied) {
+      throw new AppError("Funding call not available", 404);
+    }
+    if (call.status === CALL_STATUSES.OPEN && !tierMatchesCall(req, call) && !applied) {
+      throw new AppError("Not eligible for this call", 403);
+    }
   }
   if (req.user.role === "donor_agency" && call.callType !== "external" && call.status !== CALL_STATUSES.OPEN) {
     throw new AppError("Forbidden", 403);

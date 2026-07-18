@@ -20,6 +20,7 @@ import {
   collectSubmitValidationIssues,
   SUBMIT_SUCCESS_MESSAGE,
 } from "../utils/proposalSubmitValidation";
+import * as fundingCallApi from "../services/fundingCallApi";
 
 export function ProposalFormPage() {
   const { id } = useParams();
@@ -31,6 +32,7 @@ export function ProposalFormPage() {
   const { accessToken, user } = useAuth();
   const { programTier } = useProgramTier();
 
+  const [callTitle, setCallTitle] = useState("");
   const [proposal, setProposal] = useState({
     title: "",
     abstract: "",
@@ -63,6 +65,34 @@ export function ProposalFormPage() {
     }
     return isVoluntary ? "New Voluntary Proposal + Ethics" : "New Grant Fund Call Proposal + Ethics";
   }, [isEdit, isVoluntary]);
+
+  // New grant-fund-call proposal: auto applicant + department only.
+  // Do NOT copy funding-call title into the research proposal title (that caused wrong titles end-to-end).
+  useEffect(() => {
+    if (isEdit || !isGrantFundCall || !accessToken || !fundingCallId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fundingCallApi.getFundingCall(accessToken, fundingCallId);
+        if (cancelled) return;
+        setCallTitle(res.call?.title || "");
+        setProposal((prev) => ({
+          ...prev,
+          department: prev.department || user?.department || "",
+        }));
+      } catch {
+        if (!cancelled) {
+          setProposal((prev) => ({
+            ...prev,
+            department: prev.department || user?.department || "",
+          }));
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isEdit, isGrantFundCall, accessToken, fundingCallId, user?.department]);
 
   useEffect(() => {
     if (!isEdit || !accessToken || !id) return;
@@ -297,12 +327,35 @@ requestAnimationFrame(() => {
 
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800, marginBottom: 10 }}>1. Proposal</div>
+        {isGrantFundCall ? (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: 10,
+              borderRadius: 8,
+              border: "1px solid rgba(56,189,248,0.35)",
+              background: "rgba(14,165,233,0.08)",
+              fontSize: 13,
+            }}
+          >
+            <div>
+              Applicant (auto): <strong>{user?.fullName || user?.email}</strong>
+              {user?.department ? ` · ${user.department}` : ""}
+            </div>
+            {callTitle ? (
+              <div className="muted" style={{ marginTop: 4 }}>
+                Funding call: {callTitle}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         <div className="field">
-          <label>Title *</label>
+          <label>Research proposal title *</label>
           <input
             disabled={readOnly}
             value={proposal.title}
             onChange={(e) => setProposal({ ...proposal, title: e.target.value })}
+            placeholder={isGrantFundCall ? "Your research title (not the funding call name)" : ""}
           />
         </div>
         <div className="field">
@@ -318,7 +371,7 @@ requestAnimationFrame(() => {
           <div className="field">
             <label>Department *</label>
             <input
-              disabled={readOnly}
+              disabled={readOnly || (isGrantFundCall && Boolean(user?.department))}
               value={proposal.department}
               onChange={(e) => setProposal({ ...proposal, department: e.target.value })}
             />

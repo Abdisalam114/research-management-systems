@@ -3,6 +3,7 @@ const { Grant } = require("../models/Grant");
 const { Project } = require("../models/Project");
 const { AppError } = require("../utils/AppError");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
+const { remainingOf } = require("../utils/budgetDisbursement");
 
 function refId(ref) {
   if (!ref) return null;
@@ -18,6 +19,8 @@ function sanitizeBudget(b) {
     projectId: refId(projectRef),
     ownerResearcherId: refId(b.ownerResearcherId),
     totalAllocated: b.totalAllocated,
+    totalDisbursed: b.totalDisbursed || 0,
+    remainingBalance: remainingOf(b),
     currency: b.currency,
     financeNotes: b.financeNotes,
     items: b.items,
@@ -43,6 +46,42 @@ function sanitizeBudget(b) {
   return out;
 }
 
+async function reconcileDisbursedFromPaid(req, budgets) {
+  if (!budgets.length) return;
+  const { Payment, PAYMENT_STATUSES } = require("../models/Payment");
+  const { PurchaseOrder, PO_STATUSES } = require("../models/PurchaseOrder");
+  const ids = budgets.map((b) => b._id);
+  const [payGroups, poGroups] = await Promise.all([
+    Payment.aggregate([
+      { $match: { ...req.tierWhere({ budgetId: { $in: ids } }), status: PAYMENT_STATUSES.PAID } },
+      { $group: { _id: "$budgetId", total: { $sum: "$amount" } } },
+    ]),
+    PurchaseOrder.aggregate([
+      { $match: { ...req.tierWhere({ budgetId: { $in: ids } }), status: PO_STATUSES.PAID } },
+      { $group: { _id: "$budgetId", total: { $sum: "$totalAmount" } } },
+    ]),
+  ]);
+  const paidMap = new Map();
+  for (const g of payGroups) paidMap.set(String(g._id), Number(g.total || 0));
+  for (const g of poGroups) {
+    const k = String(g._id);
+    paidMap.set(k, (paidMap.get(k) || 0) + Number(g.total || 0));
+  }
+  // Also count paid budget line items
+  for (const b of budgets) {
+    const itemPaid = (b.items || [])
+      .filter((i) => i.status === BUDGET_ITEM_STATUSES.PAID)
+      .reduce((a, i) => a + Number(i.amount || 0), 0);
+    const computed = (paidMap.get(String(b._id)) || 0) + itemPaid;
+    const stored = Number(b.totalDisbursed || 0);
+    // Prefer the higher figure so we never under-report spent after this feature ships
+    if (computed > stored + 1e-9) {
+      b.totalDisbursed = computed;
+      await b.save();
+    }
+  }
+}
+
 async function listBudgets(req, res) {
   const { role } = req.user;
   const filter = {};
@@ -52,6 +91,11 @@ async function listBudgets(req, res) {
     .sort({ createdAt: -1 })
     .populate({ path: "grantId", select: "title fundingSource amountAwarded status" })
     .populate({ path: "projectId", select: "title status" });
+  try {
+    await reconcileDisbursedFromPaid(req, budgets);
+  } catch {
+    /* best-effort backfill */
+  }
   res.json({ budgets: budgets.map(sanitizeBudget) });
 }
 
@@ -155,8 +199,28 @@ async function financeUpdateItemStatus(req, res) {
     item.rejectedReason = "";
   } else if (status === BUDGET_ITEM_STATUSES.PAID) {
     if (item.status !== BUDGET_ITEM_STATUSES.APPROVED) throw new AppError("Item must be approved before payment", 400);
-    item.status = status;
-    item.paidAt = new Date();
+    const { deductFromBudget } = require("../utils/budgetDisbursement");
+    await deductFromBudget(budget._id, item.amount, { tierWhere: req.tierWhere });
+    // reload after deduct (budget doc may be stale)
+    const fresh = await Budget.findOne(req.tierWhere({ _id: id }));
+    if (!fresh) throw new AppError("Budget not found", 404);
+    const freshItem = fresh.items.id(itemId);
+    if (!freshItem) throw new AppError("Budget item not found", 404);
+    freshItem.status = status;
+    freshItem.paidAt = new Date();
+    await fresh.save();
+    try {
+      await notifyUser(fresh.ownerResearcherId, {
+        type: "budget",
+        title: `Budget item ${status}`,
+        body: freshItem.description,
+        link: "/budgets",
+        programTier: req.programTier,
+      });
+    } catch {
+      /* notifications are best-effort */
+    }
+    return res.json({ message: "Item updated", budget: sanitizeBudget(fresh) });
   } else if (status === BUDGET_ITEM_STATUSES.REJECTED) {
     item.status = status;
     item.rejectedReason = rejectedReason ? String(rejectedReason) : "Rejected";

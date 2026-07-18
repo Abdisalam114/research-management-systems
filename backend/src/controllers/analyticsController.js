@@ -2,6 +2,8 @@ const { Proposal, PROPOSAL_STATUSES } = require("../models/Proposal");
 const { Project, PROJECT_STATUSES } = require("../models/Project");
 const { Grant, GRANT_STATUSES } = require("../models/Grant");
 const { Budget, BUDGET_ITEM_STATUSES } = require("../models/Budget");
+const { Payment, PAYMENT_STATUSES } = require("../models/Payment");
+const { PurchaseOrder, PO_STATUSES } = require("../models/PurchaseOrder");
 const { Publication, PUBLICATION_STATUSES, PUBLICATION_TYPES } = require("../models/Publication");
 const { RepositoryItem } = require("../models/RepositoryItem");
 const { ResearchGroup, GROUP_KINDS } = require("../models/ResearchGroup");
@@ -679,14 +681,16 @@ async function exportAnnualReportPdf(req, res) {
 }
 
 async function getFinanceReport(req, res) {
-  const [budgets, grants] = await Promise.all([
-    Budget.find(req.tierWhere({})).select("title totalAllocated items grantId projectId"),
+  const [budgets, grants, payments, purchaseOrders] = await Promise.all([
+    Budget.find(req.tierWhere({})).select("title totalAllocated items grantId projectId currency"),
     Grant.find(req.tierWhere({})).select("title amountAwarded amountRequested status fundingSource"),
+    Payment.find(req.tierWhere({})).select("amount status budgetId"),
+    PurchaseOrder.find(req.tierWhere({})).select("totalAmount status budgetId"),
   ]);
 
   const allItems = budgets.flatMap((b) =>
     (b.items || []).map((i) => ({
-      budgetTitle: b.title,
+      budgetTitle: b.title || `Budget ${String(b._id).slice(-6)}`,
       description: i.description,
       amount: i.amount,
       status: i.status,
@@ -695,17 +699,55 @@ async function getFinanceReport(req, res) {
   );
 
   const totalAllocated = budgets.reduce((a, b) => a + (b.totalAllocated || 0), 0);
-  const totalExpenses = allItems.filter((i) => i.status === BUDGET_ITEM_STATUSES.PAID).reduce((a, i) => a + (i.amount || 0), 0);
+  const paidBudgetItems = allItems
+    .filter((i) => i.status === BUDGET_ITEM_STATUSES.PAID)
+    .reduce((a, i) => a + (i.amount || 0), 0);
+  const paidPayments = payments
+    .filter((p) => p.status === PAYMENT_STATUSES.PAID)
+    .reduce((a, p) => a + (p.amount || 0), 0);
+  const paidPOs = purchaseOrders
+    .filter((p) => p.status === PO_STATUSES.PAID)
+    .reduce((a, p) => a + (p.totalAmount || 0), 0);
+  const disbursedStored = budgets.reduce((a, b) => a + Number(b.totalDisbursed || 0), 0);
+  // Three spend channels are disjoint: payments, POs, and budget line items.
+  // Also respect stored totalDisbursed when it is higher (post-deduction path).
+  const totalPaid = Math.max(paidPayments + paidPOs + paidBudgetItems, disbursedStored);
+
+  // #region agent log
+  try {
+    const p = require("path");
+    const fs = require("fs");
+    const line = `${JSON.stringify({
+      sessionId: "f558f7",
+      hypothesisId: "H2",
+      location: "analyticsController.getFinanceReport",
+      message: "finance report paid totals",
+      data: { totalAllocated, paidPayments, paidPOs, paidBudgetItems, totalPaid, budgets: budgets.length },
+      timestamp: Date.now(),
+    })}\n`;
+    fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
+    fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
+  } catch (_) { /* debug */ }
+  // #endregion
 
   res.json({
     generatedAt: new Date().toISOString(),
     summary: {
       budgets: budgets.length,
       totalAllocated,
-      totalPaid: totalExpenses,
-      utilizationPercent: totalAllocated ? Math.round((totalExpenses / totalAllocated) * 100) : 0,
+      totalPaid,
+      paidPayments,
+      paidPurchaseOrders: paidPOs,
+      paidBudgetItems,
+      utilizationPercent: totalAllocated ? Math.round((totalPaid / totalAllocated) * 100) : 0,
       activeGrants: grants.filter(isAwardedGrant).length,
       awardedTotal: sumAwardedAmount(grants),
+      pendingPayments: payments.filter((p) =>
+        [PAYMENT_STATUSES.REQUESTED, PAYMENT_STATUSES.DIRECTOR_APPROVED].includes(p.status)
+      ).length,
+      pendingPurchaseOrders: purchaseOrders.filter((p) =>
+        [PO_STATUSES.REQUESTED, PO_STATUSES.PROCUREMENT_APPROVED, PO_STATUSES.DIRECTOR_APPROVED].includes(p.status)
+      ).length,
     },
     grantSummary: grants.map((g) => ({
       title: g.title,

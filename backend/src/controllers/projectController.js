@@ -84,9 +84,57 @@ function sanitizeProject(p) {
 
 const PROJECT_POPULATE = { path: "researcherId", select: "fullName name email department" };
 
+function sanitizeProjectForFinanceClosure(p, { isVoluntary = false, proposalKind = "voluntary", budgetSummary = null } = {}) {
+  const researcher = p.researcherId;
+  return {
+    id: p._id,
+    title: p.title,
+    status: p.status,
+    closure: p.closure || { status: CLOSURE_STATUSES.NONE },
+    isVoluntary,
+    proposalKind,
+    financeView: true,
+    principalInvestigator: researcher?._id
+      ? {
+          fullName: researcher.fullName || researcher.name || null,
+          department: researcher.department || null,
+        }
+      : null,
+    budgetSummary,
+  };
+}
+
 async function listProjects(req, res) {
   const { role } = req.user;
   const tierFilter = req.tierWhere(role === "researcher" ? { researcherId: req.user.id } : {});
+
+  // Finance officers only see closure-related projects — not the general project catalogue.
+  if (role === "finance_officer") {
+    const projects = await Project.find({
+      ...tierFilter,
+      "closure.status": { $in: [CLOSURE_STATUSES.DIRECTOR_APPROVED, CLOSURE_STATUSES.FINANCE_APPROVED, CLOSURE_STATUSES.ARCHIVED] },
+    })
+      .sort({ updatedAt: -1 })
+      .populate(PROJECT_POPULATE);
+
+    const out = await Promise.all(
+      projects.map(async (p) => {
+        let proposalKind = "voluntary";
+        let fundingCallId = null;
+        if (p.proposalId) {
+          const linked = await Proposal.findOne(req.tierWhere({ _id: p.proposalId })).select("proposalKind fundingCallId");
+          if (linked) {
+            fundingCallId = linked.fundingCallId || null;
+            proposalKind = linked.proposalKind || (linked.fundingCallId ? "grant_fund_call" : "voluntary");
+          }
+        }
+        const isVoluntary = proposalKind === "voluntary" || (!fundingCallId && proposalKind !== "grant_fund_call");
+        return sanitizeProjectForFinanceClosure(p, { isVoluntary, proposalKind });
+      })
+    );
+    return res.json({ projects: out });
+  }
+
   const projects = await Project.find(tierFilter).sort({ createdAt: -1 }).populate(PROJECT_POPULATE);
   const sanitized = await Promise.all(
     projects.map(async (p) => {
@@ -109,6 +157,74 @@ async function getProject(req, res) {
   const isOwner = String(project.researcherId?._id || project.researcherId) === String(req.user.id);
   const isStaff = ["faculty_coordinator", "research_director", "finance_officer", "procurement_officer", "ethics_committee", "hr_officer"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+
+  // Finance: return closure/finance payload only — never general project dossier.
+  if (req.user.role === "finance_officer") {
+    let proposalKind = "voluntary";
+    let fundingCallId = null;
+    if (project.proposalId) {
+      const linkedProposal = await Proposal.findOne(req.tierWhere({ _id: project.proposalId })).select("proposalKind fundingCallId");
+      if (linkedProposal) {
+        fundingCallId = linkedProposal.fundingCallId || null;
+        proposalKind =
+          linkedProposal.proposalKind ||
+          (linkedProposal.fundingCallId ? "grant_fund_call" : "voluntary");
+      }
+    }
+    const isVoluntary = proposalKind === "voluntary" || (!fundingCallId && proposalKind !== "grant_fund_call");
+    let budgetSummary = null;
+    try {
+      const { Budget } = require("../models/Budget");
+      const { remainingOf } = require("../utils/budgetDisbursement");
+      const budget = await Budget.findOne(req.tierWhere({ projectId: project._id })).select("totalAllocated totalDisbursed currency");
+      if (budget) {
+        budgetSummary = {
+          totalAllocated: budget.totalAllocated,
+          totalDisbursed: budget.totalDisbursed || 0,
+          remainingBalance: remainingOf(budget),
+          currency: budget.currency || "USD",
+        };
+      }
+    } catch (_) { /* optional */ }
+
+    // #region agent log
+    try {
+      const p = require("path");
+      const fs = require("fs");
+      const line = `${JSON.stringify({
+        sessionId: "f558f7",
+        hypothesisId: "H7",
+        location: "projectController.getProject",
+        message: "finance closure view only",
+        data: { projectId: String(id), closureStatus: project.closure?.status || null, financeView: true },
+        timestamp: Date.now(),
+      })}\n`;
+      fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
+      fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
+    } catch (_) { /* debug */ }
+    // #endregion
+
+    return res.json({
+      project: sanitizeProjectForFinanceClosure(project, { isVoluntary, proposalKind, budgetSummary }),
+    });
+  }
+
+  // #region agent log
+  try {
+    const p = require("path");
+    const fs = require("fs");
+    const line = `${JSON.stringify({
+      sessionId: "f558f7",
+      hypothesisId: "H1",
+      location: "projectController.getProject",
+      message: "project access ok",
+      data: { role: req.user.role, projectId: String(id), closureStatus: project.closure?.status || null },
+      timestamp: Date.now(),
+    })}\n`;
+    fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
+    fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
+  } catch (_) { /* debug */ }
+  // #endregion
 
   const grantDocs = await Grant.find(req.tierWhere({
     projectId: id,

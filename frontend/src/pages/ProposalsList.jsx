@@ -14,11 +14,13 @@ export function ProposalsListPage() {
 
   const canCreate = user?.role === "researcher";
   const isReviewer = ["faculty_coordinator", "research_director"].includes(user?.role);
+  const isFinance = user?.role === "finance_officer";
   const isPeerReviewer = user?.role === "peer_reviewer";
 
   const title = useMemo(() => {
     if (user?.role === "researcher") return "My Proposals";
     if (user?.role === "peer_reviewer") return "Assigned proposals (peer review)";
+    if (user?.role === "finance_officer") return "Proposals (Finance review)";
     return "Proposals (Review Queue)";
   }, [user?.role]);
 
@@ -132,6 +134,11 @@ export function ProposalsListPage() {
                     {isReviewer ? (
                       <Link className="btn primary" to={`/proposals/${p.id}/review`}>
                         Review
+                      </Link>
+                    ) : null}
+                    {isFinance ? (
+                      <Link className="btn primary" to={`/proposals/${p.id}/review`}>
+                        Finance review
                       </Link>
                     ) : null}
                     {isPeerReviewer ? (

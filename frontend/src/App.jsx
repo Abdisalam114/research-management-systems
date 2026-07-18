@@ -38,6 +38,10 @@ import { FinanceReportsPage } from "./pages/FinanceReports";
 import { DonorReportsPage } from "./pages/DonorReportsPage";
 import { KpiDashboardPage } from "./pages/KpiDashboardPage";
 import { GlobalSearchPage } from "./pages/GlobalSearchPage";
+import { FinanceProposalReviewsPage } from "./pages/FinanceProposalReviewsPage";
+import { FinanceProposalReviewDetailPage } from "./pages/FinanceProposalReviewDetailPage";
+import { FinanceGrantApprovalsPage } from "./pages/FinanceGrantApprovalsPage";
+import { FinanceProjectClosuresPage } from "./pages/FinanceProjectClosuresPage";
 
 export default function App() {
   return (
@@ -53,12 +57,15 @@ export default function App() {
           <Route path="/analytics" element={<Navigate to="/dashboard#institutional-analytics" replace />} />
           <Route path="/profile" element={<ProfilePage />} />
 
-          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "finance_officer", "hr_officer"]} />}>
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "hr_officer"]} />}>
             <Route path="/messages" element={<MessagesPage />} />
           </Route>
 
           <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "finance_officer", "ethics_committee", "procurement_officer", "peer_reviewer", "hr_officer", "leadership", "donor_agency"]} />}>
             <Route path="/notifications" element={<NotificationsPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director"]} />}>
             <Route path="/collaboration" element={<CollaborationPage />} />
           </Route>
 
@@ -82,11 +89,13 @@ export default function App() {
             <Route path="/audit-trail" element={<AuditTrailPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={["research_director", "faculty_coordinator", "finance_officer", "leadership"]} />}>
+          <Route element={<ProtectedRoute roles={["research_director", "faculty_coordinator", "leadership"]} />}>
             <Route path="/kpi-dashboard" element={<KpiDashboardPage />} />
           </Route>
 
-          <Route path="/search" element={<GlobalSearchPage />} />
+          <Route element={<ProtectedRoute roles={["research_director", "faculty_coordinator", "researcher", "leadership", "hr_officer"]} />}>
+            <Route path="/search" element={<GlobalSearchPage />} />
+          </Route>
 
           <Route path="/payments" element={<Navigate to="/budgets" replace />} />
           <Route path="/procurement" element={<Navigate to="/budgets" replace />} />
@@ -98,7 +107,6 @@ export default function App() {
                   "leadership",
                   "research_director",
                   "faculty_coordinator",
-                  "finance_officer",
                   "researcher",
                   "donor_agency",
                   "ethics_committee",
@@ -107,6 +115,14 @@ export default function App() {
             }
           >
             <Route path="/policies" element={<PoliciesPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute roles={["finance_officer"]} />}>
+            <Route path="/finance/reviews" element={<FinanceProposalReviewsPage />} />
+            <Route path="/finance/reviews/:id" element={<FinanceProposalReviewDetailPage />} />
+            <Route path="/finance/grant-approvals" element={<FinanceGrantApprovalsPage />} />
+            <Route path="/finance/closures" element={<FinanceProjectClosuresPage />} />
+            <Route path="/finance/closures/:id" element={<FinanceProjectClosuresPage />} />
           </Route>
 
           <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "peer_reviewer"]} />}>
@@ -152,7 +168,7 @@ export default function App() {
             <Route path="/review-assignments" element={<ReviewAssignmentsPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={["peer_reviewer", "faculty_coordinator", "research_director", "finance_officer", "ethics_committee"]} />}>
+          <Route element={<ProtectedRoute roles={["peer_reviewer", "faculty_coordinator", "research_director", "ethics_committee"]} />}>
             <Route path="/proposals/:id/review" element={<ProposalReviewPage />} />
           </Route>
 

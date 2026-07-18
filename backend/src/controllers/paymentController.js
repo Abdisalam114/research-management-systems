@@ -2,6 +2,7 @@ const { Payment, PAYMENT_CATEGORIES, PAYMENT_STATUSES, PAYMENT_METHODS } = requi
 const { Budget } = require("../models/Budget");
 const { AppError } = require("../utils/AppError");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
+const { deductFromBudget, assertAffordable, remainingOf } = require("../utils/budgetDisbursement");
 
 function sanitizePayment(p) {
   const requestedByRef = p.requestedBy;
@@ -52,6 +53,8 @@ function sanitizeBudgetSummary(budget) {
   return {
     id: budget._id,
     totalAllocated: budget.totalAllocated,
+    totalDisbursed: budget.totalDisbursed || 0,
+    remainingBalance: remainingOf(budget),
     currency: budget.currency,
     financeNotes: budget.financeNotes || "",
     owner: sanitizeUserProfile(owner?._id ? owner : null),
@@ -96,7 +99,7 @@ async function getPayment(req, res) {
     .populate("requestedBy", "fullName email department rank")
     .populate({
       path: "budgetId",
-      select: "totalAllocated currency financeNotes ownerResearcherId",
+      select: "totalAllocated totalDisbursed currency financeNotes ownerResearcherId",
       populate: { path: "ownerResearcherId", select: "fullName email department rank" },
     })
     .populate("projectId", "title status")
@@ -132,6 +135,7 @@ async function createPayment(req, res) {
   if (req.user.role === "researcher" && String(budget.ownerResearcherId) !== String(req.user.id)) {
     throw new AppError("Forbidden: budget does not belong to you", 403);
   }
+  assertAffordable(budget, amount);
 
   const payment = await Payment.create(req.tierAssign({
     category,
@@ -220,6 +224,11 @@ async function financePay(req, res) {
     throw new AppError("Payment must be approved by the director before payment", 400);
   }
 
+  // Pre-check remaining before marking paid
+  const budgetCheck = await Budget.findOne(req.tierWhere({ _id: payment.budgetId }));
+  if (!budgetCheck) throw new AppError("Budget not found", 404);
+  assertAffordable(budgetCheck, payment.amount);
+
   payment.status = PAYMENT_STATUSES.PAID;
   payment.paidBy = req.user.id;
   payment.paidAt = new Date();
@@ -227,7 +236,45 @@ async function financePay(req, res) {
   payment.paymentMethodDetails = paymentMethodDetails ? String(paymentMethodDetails) : "";
   if (referenceNumber) payment.referenceNumber = String(referenceNumber).trim();
   await payment.save();
-try {
+
+  let budgetAfter;
+  try {
+    budgetAfter = await deductFromBudget(payment.budgetId, payment.amount, { tierWhere: req.tierWhere });
+  } catch (err) {
+    payment.status = PAYMENT_STATUSES.DIRECTOR_APPROVED;
+    payment.paidBy = null;
+    payment.paidAt = null;
+    payment.paymentMethod = undefined;
+    payment.paymentMethodDetails = "";
+    await payment.save();
+    throw err;
+  }
+
+  // #region agent log
+  try {
+    const p = require("path");
+    const fs = require("fs");
+    const line = `${JSON.stringify({
+      sessionId: "f558f7",
+      hypothesisId: "H5",
+      location: "paymentController.financePay",
+      message: "payment paid — budget deducted",
+      data: {
+        paymentId: String(payment._id),
+        amount: payment.amount,
+        budgetId: String(payment.budgetId),
+        totalAllocated: budgetAfter.totalAllocated,
+        totalDisbursed: budgetAfter.totalDisbursed,
+        remainingBalance: remainingOf(budgetAfter),
+      },
+      timestamp: Date.now(),
+    })}\n`;
+    fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
+    fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
+  } catch (_) { /* debug */ }
+  // #endregion
+
+  try {
     await notifyUser(payment.requestedBy, {
       type: "payment",
       title: "Payment disbursed by finance",
@@ -238,7 +285,17 @@ try {
     /* best-effort */
   }
 
-  res.json({ message: "Payment disbursed", payment: sanitizePayment(payment) });
+  res.json({
+    message: "Payment disbursed",
+    payment: sanitizePayment(payment),
+    budget: {
+      id: budgetAfter._id,
+      totalAllocated: budgetAfter.totalAllocated,
+      totalDisbursed: budgetAfter.totalDisbursed || 0,
+      remainingBalance: remainingOf(budgetAfter),
+      currency: budgetAfter.currency,
+    },
+  });
 }
 
 async function financeReject(req, res) {

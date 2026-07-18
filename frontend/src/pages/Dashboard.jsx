@@ -79,8 +79,9 @@ function RoleDashboard({ role, user }) {
       { to: "/grants", label: "My grants" },
     ],
     finance_officer: [
-      { to: "/budgets", label: "Finance & budgets", primary: true },
-      { to: "/grants", label: "Grants" },
+      { to: "/finance/grant-approvals", label: "Grant funding approval", primary: true },
+      { to: "/budgets", label: "Finance & budgets" },
+      { to: "/grants?filter=pending_finance", label: "Grants pending finance" },
       { to: "/finance-reports", label: "Finance reports" },
     ],
   };

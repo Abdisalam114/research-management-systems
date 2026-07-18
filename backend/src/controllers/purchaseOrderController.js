@@ -2,6 +2,7 @@ const { PurchaseOrder, PO_STATUSES, PO_PAYMENT_METHODS } = require("../models/Pu
 const { Budget } = require("../models/Budget");
 const { AppError } = require("../utils/AppError");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
+const { deductFromBudget, assertAffordable, remainingOf } = require("../utils/budgetDisbursement");
 
 function sanitizePO(po) {
   return {
@@ -92,6 +93,11 @@ async function createPurchaseOrder(req, res) {
       unitPrice: it.unitPrice,
     };
   });
+  const estimatedTotal = cleanItems.reduce(
+    (acc, it) => acc + Number(it.unitPrice || 0) * Number(it.quantity || 0),
+    0
+  );
+  assertAffordable(budget, estimatedTotal);
 
   const po = await PurchaseOrder.create(req.tierAssign({
     budgetId,
@@ -187,6 +193,10 @@ async function financePay(req, res) {
     throw new AppError("PO must be approved by the director before payment", 400);
   }
 
+  const budgetCheck = await Budget.findOne(req.tierWhere({ _id: po.budgetId }));
+  if (!budgetCheck) throw new AppError("Budget not found", 404);
+  assertAffordable(budgetCheck, po.totalAmount);
+
   po.status = PO_STATUSES.PAID;
   po.paidBy = req.user.id;
   po.paidAt = new Date();
@@ -194,6 +204,42 @@ async function financePay(req, res) {
   po.paymentMethodDetails = paymentMethodDetails ? String(paymentMethodDetails) : "";
   if (poNumber) po.poNumber = String(poNumber).trim();
   await po.save();
+
+  let budgetAfter;
+  try {
+    budgetAfter = await deductFromBudget(po.budgetId, po.totalAmount, { tierWhere: req.tierWhere });
+  } catch (err) {
+    po.status = PO_STATUSES.DIRECTOR_APPROVED;
+    po.paidBy = null;
+    po.paidAt = null;
+    po.paymentMethod = undefined;
+    po.paymentMethodDetails = "";
+    await po.save();
+    throw err;
+  }
+
+  // #region agent log
+  try {
+    const p = require("path");
+    const fs = require("fs");
+    const line = `${JSON.stringify({
+      sessionId: "f558f7",
+      hypothesisId: "H5",
+      location: "purchaseOrderController.financePay",
+      message: "PO paid — budget deducted",
+      data: {
+        poId: String(po._id),
+        amount: po.totalAmount,
+        budgetId: String(po.budgetId),
+        totalDisbursed: budgetAfter.totalDisbursed,
+        remainingBalance: remainingOf(budgetAfter),
+      },
+      timestamp: Date.now(),
+    })}\n`;
+    fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
+    fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
+  } catch (_) { /* debug */ }
+  // #endregion
 
   try {
     await notifyUser(po.requestedBy, {
@@ -206,7 +252,17 @@ async function financePay(req, res) {
     /* best-effort */
   }
 
-  res.json({ message: "PO paid", purchaseOrder: sanitizePO(po) });
+  res.json({
+    message: "PO paid",
+    purchaseOrder: sanitizePO(po),
+    budget: {
+      id: budgetAfter._id,
+      totalAllocated: budgetAfter.totalAllocated,
+      totalDisbursed: budgetAfter.totalDisbursed || 0,
+      remainingBalance: remainingOf(budgetAfter),
+      currency: budgetAfter.currency,
+    },
+  });
 }
 
 async function financeReject(req, res) {

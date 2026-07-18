@@ -105,8 +105,35 @@ export function GrantsPage() {
   const load = useCallback(async () => {
     const grantParams = projectIdFromUrl ? { projectId: projectIdFromUrl } : {};
     const res = await grantApi.listGrants(accessToken, grantParams);
+    const all = res.grants || [];
     // Funding-call applications only
-    setGrants((res.grants || []).filter((g) => Boolean(g.callId)));
+    const withCall = all.filter((g) => Boolean(g.callId));
+    // #region agent log
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify({
+        sessionId: "f558f7",
+        runId: "visibility",
+        hypothesisId: "B",
+        location: "Grants.jsx:load",
+        message: "grants list for visibility",
+        data: {
+          totalFromApi: all.length,
+          withCallId: withCall.length,
+          drafts: withCall.filter((g) => g.status === "draft").length,
+          sample: withCall.slice(0, 3).map((g) => ({
+            id: g.id,
+            title: g.title,
+            status: g.status,
+            callId: g.callId,
+          })),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+    setGrants(withCall);
   }, [accessToken, projectIdFromUrl]);
 
   useEffect(() => {
@@ -124,6 +151,14 @@ export function GrantsPage() {
       { label: "Total", value: grants.length, filterKey: "all" },
       { label: "Draft", value: by("draft"), filterKey: "draft" },
       { label: "Submitted", value: by("submitted"), filterKey: "submitted" },
+      {
+        label: "Accepted",
+        value: by("pending_finance") + by("active") + by("approved"),
+        filterKey: "awarded",
+        accent: "#22c55e",
+        sub: "Director accepted",
+      },
+      { label: "Pending finance", value: by("pending_finance"), filterKey: "pending_finance", accent: "#fcd34d" },
       { label: "Awarded", value: awardedCount, filterKey: "awarded", accent: "#1d4ed8", sub: "From funding calls" },
       { label: "Awarded $", value: `$${totalAwarded.toLocaleString()}`, accent: "#38bdf8", sub: "Total awarded amount" },
       { label: "Active", value: by("active"), filterKey: "active", accent: "#6366f1" },
@@ -143,7 +178,9 @@ export function GrantsPage() {
         subtitle={
           isDonor
             ? "Donor monitor view — funding-call applications only (read-only)."
-            : "Only applications from Funding Calls appear here. Start from an open call."
+            : canCreate
+              ? "Your Funding Call applications appear here (Draft → Submit → Awarded). Start from an open call."
+              : "Only applications from Funding Calls appear here. Start from an open call."
         }
         stats={stats}
         activeFilter={statusFilter}

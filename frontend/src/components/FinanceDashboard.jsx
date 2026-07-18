@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import { useAuth } from "../hooks/useAuth";
 import * as analyticsApi from "../services/analyticsApi";
+import * as grantApi from "../services/grantApi";
 import { SystemModulesGrid } from "./SystemModulesGrid";
 import "../pages/dashboard.css";
 
@@ -29,6 +30,7 @@ export function FinanceDashboard() {
   const { accessToken, user } = useAuth();
   const [report, setReport] = useState(null);
   const [metrics, setMetrics] = useState(null);
+  const [pendingFinanceCount, setPendingFinanceCount] = useState(0);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -36,13 +38,31 @@ export function FinanceDashboard() {
     async function load() {
       try {
         setError("");
-        const [res, m] = await Promise.all([
+        const [res, m, grantsRes] = await Promise.all([
           analyticsApi.financeReport(accessToken),
           analyticsApi.dashboardMetrics(accessToken).catch(() => null),
+          grantApi.listGrants(accessToken).catch(() => ({ grants: [] })),
         ]);
         if (!cancelled) {
           setReport(res);
           if (m?.metrics) setMetrics(m.metrics);
+          const pending = (grantsRes.grants || []).filter((g) => g.status === "pending_finance").length;
+          setPendingFinanceCount(pending);
+          // #region agent log
+          fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+            body: JSON.stringify({
+              sessionId: "f558f7",
+              runId: "finance-grant-queue",
+              hypothesisId: "F1",
+              location: "FinanceDashboard.jsx:load",
+              message: "finance dashboard pending funding count",
+              data: { pendingFinanceCount: pending },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {});
+          // #endregion
         }
       } catch (e) {
         if (!cancelled) setError(e?.response?.data?.message || "Failed to load finance report");
@@ -103,11 +123,40 @@ export function FinanceDashboard() {
 
       {metrics ? (
         <section className="dashboardSection">
-          <SystemModulesGrid role="finance_officer" metrics={metrics} title="System modules" />
+          <SystemModulesGrid role="finance_officer" metrics={metrics} title="Finance modules" />
         </section>
       ) : null}
 
+      <div
+        className="card"
+        style={{
+          marginBottom: 16,
+          borderColor: pendingFinanceCount ? "rgba(251,191,36,0.55)" : "rgba(148,163,184,0.25)",
+          background: pendingFinanceCount ? "rgba(251,191,36,0.08)" : undefined,
+        }}
+      >
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontWeight: 800 }}>Grant funding approval (Funding Calls)</div>
+            <p className="muted" style={{ margin: "6px 0 0", fontSize: 13 }}>
+              {pendingFinanceCount
+                ? `${pendingFinanceCount} award(s) waiting for budget authorization (allocation only — not a payment).`
+                : "No funding-call awards waiting. New ones appear here after Director acceptance."}
+            </p>
+          </div>
+          <Link className="btn primary" to="/finance/grant-approvals">
+            {pendingFinanceCount ? `Authorize budgets (${pendingFinanceCount})` : "Open funding approvals"}
+          </Link>
+        </div>
+      </div>
+
       <div className="overviewGrid">
+        <Link to="/finance/grant-approvals" className="overviewTile" style={{ textDecoration: "none" }}>
+          <div className="label">Awaiting finance</div>
+          <div className="value" style={{ color: pendingFinanceCount ? "#fcd34d" : undefined }}>
+            {pendingFinanceCount}
+          </div>
+        </Link>
         <Link to="/budgets" className="overviewTile" style={{ textDecoration: "none" }}>
           <div className="label">Budgets</div>
           <div className="value">{s.budgets ?? 0}</div>
@@ -119,6 +168,12 @@ export function FinanceDashboard() {
         <Link to="/budgets?filter=disbursed" className="overviewTile" style={{ textDecoration: "none" }}>
           <div className="label">Total paid</div>
           <div className="value">{formatMoney(s.totalPaid)}</div>
+        </Link>
+        <Link to="/budgets" className="overviewTile" style={{ textDecoration: "none" }}>
+          <div className="label">Remaining</div>
+          <div className="value">
+            {formatMoney(Math.max(0, Number(s.totalAllocated || 0) - Number(s.totalPaid || 0)))}
+          </div>
         </Link>
         <Link to="/budgets" className="overviewTile" style={{ textDecoration: "none" }}>
           <div className="label">Utilization</div>
@@ -259,7 +314,15 @@ export function FinanceDashboard() {
       </section>
 
       <div className="dashboardQuickLinks">
-        <Link className="btn primary" to="/budgets">Open Finance &amp; Budgets</Link>
+        <Link className="btn primary" to="/finance/grant-approvals">
+          Grant funding approval
+        </Link>
+        <Link className="btn" to="/budgets">
+          Open Finance &amp; Budgets
+        </Link>
+        <Link className="btn" to="/grants?filter=pending_finance">
+          Grants pending finance
+        </Link>
       </div>
     </div>
   );

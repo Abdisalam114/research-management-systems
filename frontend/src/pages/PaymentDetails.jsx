@@ -84,16 +84,45 @@ export function PaymentDetailsPage() {
   }
 
   async function handleFinancePay() {
-    if (!payment) return;
-    if (!window.confirm("Record disbursement for this payment?")) return;
+    if (!payment || payBusy) return;
+    if (!payForm.paymentMethod) {
+      setError("Choose a payment method");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Record payment of ${formatMoney(payment.amount, payment.currency)}? This amount will be deducted from the budget remaining balance.`
+      )
+    ) {
+      return;
+    }
     try {
       setPayBusy(true);
       setError("");
-      await paymentApi.financePay(accessToken, payment.id, {
+      const res = await paymentApi.financePay(accessToken, payment.id, {
         paymentMethod: payForm.paymentMethod,
         paymentMethodDetails: payForm.paymentMethodDetails,
         referenceNumber: payForm.referenceNumber || payForm.paymentMethodDetails,
       });
+      // #region agent log
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+        body: JSON.stringify({
+          sessionId: "f558f7",
+          hypothesisId: "H5",
+          location: "PaymentDetails.jsx:financePay",
+          message: "FE payment paid response",
+          data: {
+            paymentId: payment.id,
+            amount: payment.amount,
+            budgetRemaining: res?.budget?.remainingBalance ?? null,
+            budgetDisbursed: res?.budget?.totalDisbursed ?? null,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       await reload();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to pay");
@@ -268,6 +297,21 @@ export function PaymentDetailsPage() {
                 <div>
                   <div className="muted" style={{ fontSize: 12, fontWeight: 800 }}>Total allocated</div>
                   <div style={{ fontWeight: 700 }}>{formatMoney(budget.totalAllocated, budget.currency)}</div>
+                </div>
+                <div>
+                  <div className="muted" style={{ fontSize: 12, fontWeight: 800 }}>Paid (disbursed)</div>
+                  <div style={{ fontWeight: 700 }}>{formatMoney(budget.totalDisbursed || 0, budget.currency)}</div>
+                </div>
+                <div>
+                  <div className="muted" style={{ fontSize: 12, fontWeight: 800 }}>Remaining</div>
+                  <div style={{ fontWeight: 900, color: "#38bdf8" }}>
+                    {formatMoney(
+                      budget.remainingBalance != null
+                        ? budget.remainingBalance
+                        : Math.max(0, Number(budget.totalAllocated || 0) - Number(budget.totalDisbursed || 0)),
+                      budget.currency
+                    )}
+                  </div>
                 </div>
                 {budget.owner ? (
                   <div>

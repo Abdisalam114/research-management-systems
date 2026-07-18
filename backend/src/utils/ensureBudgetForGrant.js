@@ -4,8 +4,9 @@ const { Grant, GRANT_STATUSES } = require("../models/Grant");
 const AWARDED_STATUSES = [GRANT_STATUSES.ACTIVE, GRANT_STATUSES.APPROVED];
 
 /**
- * Create or refresh a budget row when a grant is awarded.
- * One budget per grant; totalAllocated tracks amountAwarded.
+ * Create or refresh a budget when finance authorizes a grant award.
+ * Sets totalAllocated only — does NOT mark funds as paid (totalDisbursed stays 0).
+ * Actual payments happen later via budget items / payments / POs.
  */
 async function ensureBudgetForGrant(grant) {
   if (!grant?._id) return { budget: null, created: false, updated: false };
@@ -30,6 +31,11 @@ async function ensureBudgetForGrant(grant) {
       existing.currency = grant.currency;
       changed = true;
     }
+    // Never treat finance authorization as a disbursement
+    if (existing.totalDisbursed == null) {
+      existing.totalDisbursed = 0;
+      changed = true;
+    }
     if (changed) await existing.save();
     return { budget: existing, created: false, updated: changed };
   }
@@ -40,6 +46,7 @@ async function ensureBudgetForGrant(grant) {
     ownerResearcherId: grant.researcherId,
     programTier: grant.programTier,
     totalAllocated: awarded,
+    totalDisbursed: 0,
     currency: grant.currency || "USD",
     items: [],
   });

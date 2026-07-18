@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
@@ -37,6 +37,10 @@ function proposalStatusLabel(status) {
   return map[status] || status;
 }
 
+function sameId(a, b) {
+  return String(a?._id || a?.id || a || "") === String(b?._id || b?.id || b || "");
+}
+
 export function GrantApplyPage() {
   const { accessToken, user } = useAuth();
   const navigate = useNavigate();
@@ -48,38 +52,54 @@ export function GrantApplyPage() {
   const [step, setStep] = useState(1);
   const [selectedProposalId, setSelectedProposalId] = useState("");
   const [requirementChecklist, setRequirementChecklist] = useState([]);
-  const [form, setForm] = useState({ title: "", donorRef: "", currency: "USD" });
+  const [form, setForm] = useState({ donorRef: "", currency: "USD" });
   const [budgetRows, setBudgetRows] = useState(defaultBudgetRows);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const budgetInitRef = useRef(false);
+
+  const syncProposalsForCall = useCallback(
+    async (c) => {
+      const propRes = await proposalApi.listProposals(accessToken);
+      const mine = (propRes.proposals || []).filter(
+        (p) =>
+          sameId(p.researcherId, user?.id) &&
+          sameId(p.fundingCallId, c.id) &&
+          (p.proposalKind === "grant_fund_call" || Boolean(p.fundingCallId))
+      );
+      setProposals(mine);
+      setSelectedProposalId((prev) => {
+        if (prev && mine.some((p) => sameId(p.id, prev))) return prev;
+        return mine[0]?.id || "";
+      });
+      return mine;
+    },
+    [accessToken, user?.id]
+  );
 
   const load = useCallback(async () => {
     if (!callId) return;
-    const [callRes, propRes] = await Promise.all([
-      fundingCallApi.getFundingCall(accessToken, callId),
-      proposalApi.listProposals(accessToken),
-    ]);
+    const callRes = await fundingCallApi.getFundingCall(accessToken, callId);
     const c = callRes.call;
     setCall(c);
-    setForm((f) => ({
-      ...f,
-      title: f.title || c.title,
+    setForm({
       donorRef: c.donorRef || "",
       currency: c.currency || "USD",
-    }));
-    setBudgetRows(defaultBudgetRows().map((r) => ({ ...r, currency: c.currency || "USD" })));
+    });
+    if (!budgetInitRef.current) {
+      setBudgetRows(defaultBudgetRows().map((r) => ({ ...r, currency: c.currency || "USD" })));
+      budgetInitRef.current = true;
+    }
     const reqs = parseRequirements(c.requiredDocuments);
-    setRequirementChecklist(reqs.map((label) => ({ label, met: false, note: "" })));
-    const mine = (propRes.proposals || []).filter(
-      (p) =>
-        String(p.researcherId) === String(user?.id) &&
-        String(p.fundingCallId || "") === String(c.id) &&
-        (p.proposalKind === "grant_fund_call" || Boolean(p.fundingCallId))
-    );
-    setProposals(mine);
-    const linked = mine.find((p) => String(p.fundingCallId) === String(c.id));
-    if (linked) setSelectedProposalId(linked.id);
-  }, [accessToken, callId, user?.id]);
+    setRequirementChecklist((prev) => {
+      if (prev.length && prev.every((item) => reqs.includes(item.label))) return prev;
+      return reqs.map((label) => {
+        const old = prev.find((x) => x.label === label);
+        return { label, met: Boolean(old?.met), note: old?.note || "" };
+      });
+    });
+    await syncProposalsForCall(c);
+  }, [accessToken, callId, syncProposalsForCall]);
 
   const { loading, error, setError } = useModuleLoad(accessToken, load, [callId]);
 
@@ -87,16 +107,37 @@ export function GrantApplyPage() {
     if (!loading && !callId) setError("Funding call is required. Open an open call from Funding Calls.");
   }, [loading, callId, setError]);
 
+  // Refresh proposal list when entering step 2 (after creating a new proposal).
+  useEffect(() => {
+    if (step !== 2 || !call) return;
+    syncProposalsForCall(call).catch(() => {});
+  }, [step, call, syncProposalsForCall]);
+
   const selectedProposal = useMemo(
-    () => proposals.find((p) => String(p.id) === String(selectedProposalId)),
+    () => proposals.find((p) => sameId(p.id, selectedProposalId)),
     [proposals, selectedProposalId]
   );
 
   const canSubmitGrant = selectedProposal?.status === "approved";
+  // Grant application title = funding call title (automatic). Proposal title stays on the proposal.
+  const autoTitle = String(call?.title || "").trim();
+  const proposalTitle = String(selectedProposal?.title || "").trim();
+  const applicantName =
+    selectedProposal?.researcherName || user?.fullName || user?.email || "Current researcher";
 
   async function handleCreateGrant() {
     if (!call || !selectedProposalId) {
       setError("Select a research proposal before saving the grant application.");
+      setStep(2);
+      return;
+    }
+    if (!autoTitle) {
+      setError("This funding call has no title. Ask Research Office / donor to set the call title.");
+      return;
+    }
+    if (!proposalTitle) {
+      setError("Proposal research title is missing — open the proposal and set it first.");
+      setStep(2);
       return;
     }
     const unmet = requirementChecklist.filter((r) => !r.met);
@@ -105,13 +146,14 @@ export function GrantApplyPage() {
       setStep(3);
       return;
     }
+    const currency = form.currency || call.currency || "USD";
     const lines = budgetRows
       .filter((r) => r.category || r.description || Number(r.amount) > 0)
       .map((r) => ({
         category: r.category,
         description: r.description,
         amount: Number(r.amount) || 0,
-        currency: r.currency || form.currency || "USD",
+        currency: r.currency || currency,
       }));
     const total = budgetRowsTotal(budgetRows);
     if (total <= 0) {
@@ -124,18 +166,62 @@ export function GrantApplyPage() {
     setMessage("");
     try {
       const res = await grantApi.createGrant(accessToken, {
-        title: form.title.trim(),
+        // Backend also forces proposal.title — send it for clarity.
+        title: autoTitle,
         callId: call.id,
         proposalId: selectedProposalId,
-        donorRef: form.donorRef,
-        currency: form.currency,
+        donorRef: form.donorRef || call.donorRef || "",
+        currency,
         amountRequested: total,
         budgetBreakdown: lines,
         requirementChecklist,
       });
-      setMessage("Grant application saved as draft.");
-      navigate(`/grants/${res.grant?.id || ""}`, { replace: true });
+      // #region agent log
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+        body: JSON.stringify({
+          sessionId: "f558f7",
+          runId: "visibility",
+          hypothesisId: "A",
+          location: "GrantApplyPage.jsx:create",
+          message: "grant draft saved — check callId for Grants list visibility",
+          data: {
+            grantId: res.grant?.id || null,
+            callIdSent: call?.id || null,
+            callIdOnGrant: res.grant?.callId || null,
+            status: res.grant?.status || null,
+            title: res.grant?.title || null,
+            navigateTo: res.grant?.id ? `/grants/${res.grant.id}` : "/grants",
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      const grantId = res.grant?.id;
+      if (!grantId) {
+        setError("Grant saved but id missing — open Grants list.");
+        navigate("/grants", { replace: true });
+        return;
+      }
+      setMessage("Grant application saved as draft. Find it under Grants or Funding Calls.");
+      navigate(`/grants/${grantId}`, { replace: true });
     } catch (e) {
+      // #region agent log
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+        body: JSON.stringify({
+          sessionId: "f558f7",
+          runId: "visibility",
+          hypothesisId: "D",
+          location: "GrantApplyPage.jsx:createError",
+          message: "grant create failed",
+          data: { err: e?.response?.data?.message || String(e?.message || e) },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       setError(e?.response?.data?.message || "Could not save grant application.");
     } finally {
       setBusy(false);
@@ -356,14 +442,47 @@ export function GrantApplyPage() {
             </p>
           ) : null}
 
+          <div
+            className="card"
+            style={{
+              marginTop: 12,
+              padding: 12,
+              borderColor: autoTitle ? "rgba(56,189,248,0.35)" : "rgba(248,113,113,0.45)",
+              background: autoTitle ? "rgba(14,165,233,0.08)" : "rgba(248,113,113,0.08)",
+            }}
+          >
+            <div style={{ fontWeight: 800, marginBottom: 8 }}>Auto-filled (read-only)</div>
+            <div className="muted" style={{ fontSize: 13, display: "grid", gap: 6 }}>
+              <div>
+                Grant / funding call title:{" "}
+                <strong style={{ color: "inherit" }}>{autoTitle || "— funding call has no title —"}</strong>
+              </div>
+              <div>
+                Research proposal:{" "}
+                <strong style={{ color: "inherit" }}>{proposalTitle || "— missing —"}</strong>
+              </div>
+              <div>
+                Researcher / applicant: <strong style={{ color: "inherit" }}>{applicantName}</strong>
+                {user?.department ? ` · ${user.department}` : ""}
+              </div>
+            </div>
+            <p className="muted" style={{ fontSize: 12, marginTop: 8, marginBottom: 0 }}>
+              Grant title is taken from the funding call. Researcher is your login. Proposal keeps its own research title.
+            </p>
+            {!proposalTitle && selectedProposalId ? (
+              <Link className="btn" style={{ marginTop: 10 }} to={`/proposals/${selectedProposalId}/edit`}>
+                Open proposal — set research title
+              </Link>
+            ) : null}
+          </div>
+
           <div className="row" style={{ marginTop: 12 }}>
             <div className="field">
-              <label>Application title</label>
-              <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
-            </div>
-            <div className="field">
               <label>Currency</label>
-              <input value={form.currency} onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value }))} />
+              <input
+                value={form.currency || "USD"}
+                onChange={(e) => setForm((f) => ({ ...f, currency: e.target.value || "USD" }))}
+              />
             </div>
           </div>
 

@@ -100,6 +100,15 @@ export async function listProposalsAll(accessToken) {
   return data;
 }
 
+/** Proposals linked to funding calls (includes approved — for Funding Calls visibility). */
+export async function listGrantFundCallProposals(accessToken) {
+  const { data } = await api.get("/api/proposals", {
+    params: { grantFundCall: "1" },
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
 export async function ethicsDecision(accessToken, id, decision, comment) {
   const { data } = await api.post(
     `/api/proposals/${id}/ethics-decision`,

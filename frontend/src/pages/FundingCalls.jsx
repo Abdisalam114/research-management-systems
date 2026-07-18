@@ -1,10 +1,45 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
+import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import * as fundingCallApi from "../services/fundingCallApi";
+import * as grantApi from "../services/grantApi";
+import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
+import { filterByStatKey, isAwardedItem, statFilterLabel } from "../utils/pageHeaderFilters";
 import "./fundingCalls.css";
+
+function isAcceptedGrant(g) {
+  return (
+    isAwardedItem(g) ||
+    ["pending_finance", "active", "approved"].includes(g?.status)
+  );
+}
+
+function isAcceptedProposal(p) {
+  return p?.status === "approved";
+}
+
+function grantStatusLabel(status) {
+  if (status === "pending_finance") return "Accepted — pending finance";
+  if (status === "active") return "Accepted — active / awarded";
+  if (status === "approved") return "Accepted";
+  if (status === "submitted") return "Submitted";
+  if (status === "draft") return "Draft";
+  if (status === "rejected") return "Rejected";
+  return status || "—";
+}
+
+function proposalStatusLabel(status) {
+  if (status === "approved") return "Accepted (proposal)";
+  if (status === "under_review") return "Under review";
+  if (status === "revision_requested") return "Revision requested";
+  if (status === "submitted") return "Submitted";
+  if (status === "draft") return "Draft";
+  if (status === "rejected") return "Rejected";
+  return status || "—";
+}
 
 const EMPTY_INTERNAL = {
   title: "",
@@ -59,19 +94,98 @@ export function FundingCallsPage() {
   const isLeadership = user?.role === "leadership";
   const isResearcher = user?.role === "researcher";
   const canCreate = isDirector || isDonor;
+  const canSeeAllApps = isDirector || isLeadership || isDonor || user?.role === "finance_officer";
   const [calls, setCalls] = useState([]);
+  const [linkedGrants, setLinkedGrants] = useState([]);
+  const [linkedProposals, setLinkedProposals] = useState([]);
   const [form, setForm] = useState(isDonor ? EMPTY_EXTERNAL : EMPTY_INTERNAL);
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
 
   const load = useCallback(async () => {
     const res = await fundingCallApi.listFundingCalls(accessToken);
-    setCalls(res.calls || []);
-  }, [accessToken]);
+    const nextCalls = res.calls || [];
+    setCalls(nextCalls);
+    if (isResearcher || canSeeAllApps) {
+      const [gRes, pRes] = await Promise.all([
+        grantApi.listGrants(accessToken).catch(() => ({ grants: [] })),
+        proposalApi.listGrantFundCallProposals(accessToken).catch(() => ({ proposals: [] })),
+      ]);
+      const apps = (gRes.grants || []).filter((g) => g.callId);
+      const props = (pRes.proposals || []).filter((p) => p.fundingCallId);
+      setLinkedGrants(apps);
+      setLinkedProposals(props);
+      // #region agent log
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+        body: JSON.stringify({
+          sessionId: "f558f7",
+          runId: "accepted-visibility",
+          hypothesisId: "H4",
+          location: "FundingCalls.jsx:load",
+          message: "funding call grants + proposals visibility",
+          data: {
+            role: user?.role,
+            callsTotal: nextCalls.length,
+            closedCalls: nextCalls.filter((c) => c.status === "closed").length,
+            appsTotal: apps.length,
+            proposalsTotal: props.length,
+            acceptedGrants: apps.filter(isAcceptedGrant).length,
+            acceptedProposals: props.filter(isAcceptedProposal).map((p) => ({
+              id: p.id,
+              title: p.title,
+              status: p.status,
+              callId: p.fundingCallId,
+            })),
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+    } else {
+      setLinkedGrants([]);
+      setLinkedProposals([]);
+    }
+  }, [accessToken, isResearcher, canSeeAllApps, user?.role]);
 
-  const { loading, error, setError, reload } = useModuleLoad(accessToken, load, []);
+  const { loading, error, setError, reload } = useModuleLoad(accessToken, load, [isResearcher, canSeeAllApps]);
+
+  const grantsByCallId = useMemo(() => {
+    const map = {};
+    linkedGrants.forEach((g) => {
+      const key = String(g.callId);
+      if (!map[key]) map[key] = [];
+      map[key].push(g);
+    });
+    return map;
+  }, [linkedGrants]);
+
+  const proposalsByCallId = useMemo(() => {
+    const map = {};
+    linkedProposals.forEach((p) => {
+      const key = String(p.fundingCallId);
+      if (!map[key]) map[key] = [];
+      map[key].push(p);
+    });
+    return map;
+  }, [linkedProposals]);
+
+  const acceptedGrants = useMemo(() => linkedGrants.filter(isAcceptedGrant), [linkedGrants]);
+  const acceptedProposals = useMemo(() => linkedProposals.filter(isAcceptedProposal), [linkedProposals]);
+  const acceptedTotal = acceptedGrants.length + acceptedProposals.length;
+
+  const openCount = calls.filter((c) => c.status === "open").length;
+  const draftCount = calls.filter((c) => c.status === "draft").length;
+  const closedCount = calls.filter((c) => c.status === "closed").length;
+
+  const filteredCalls = useMemo(
+    () => filterByStatKey(calls, statusFilter),
+    [calls, statusFilter]
+  );
 
   function resetForm() {
     setForm(isDonor ? EMPTY_EXTERNAL : EMPTY_INTERNAL);
@@ -207,16 +321,15 @@ await fundingCallApi.publishFundingCall(accessToken, id);
     }
   }
 
-  const openCount = calls.filter((c) => c.status === "open").length;
-  const draftCount = calls.filter((c) => c.status === "draft").length;
-
   const subtitle = isDonor
     ? "Create external (donor) funding calls only. Leadership approves before researchers can apply."
     : isLeadership
       ? "Approve draft funding calls for publication, and close open calls when needed."
       : isDirector
         ? "Create internal institutional seed grants. External calls are created by the Donor Agency."
-        : "Publish institutional grant opportunities. Researchers apply only through an open call (Phase 1).";
+        : isResearcher
+          ? "Open calls to apply. Accepted applications stay visible here (and under Grants → Awarded)."
+          : "Publish institutional grant opportunities. Researchers apply only through an open call (Phase 1).";
 
   return (
     <div className="fundingCallsPage">
@@ -227,22 +340,113 @@ await fundingCallApi.publishFundingCall(accessToken, id);
           { label: "Total calls", value: calls.length, filterKey: "all" },
           { label: "Open", value: openCount, filterKey: "open", accent: "#86efac" },
           { label: "Drafts", value: draftCount, filterKey: "draft", accent: "#fcd34d" },
+          { label: "Closed", value: closedCount, filterKey: "closed", accent: "#94a3b8" },
+          {
+            label: "Accepted",
+            value: acceptedTotal,
+            filterKey: "all",
+            accent: "#38bdf8",
+            sub: "Proposals + grants",
+          },
         ]}
+        activeFilter={statusFilter}
+        onFilterChange={setStatusFilter}
         actions={
-          canCreate ? (
-            <button type="button" className="btn primary" onClick={showForm ? resetForm : startCreate}>
-              {showForm ? "Close form" : isDonor ? "+ New external call" : "+ New funding call"}
-            </button>
-          ) : isLeadership ? (
-            <Link className="btn" to="/policies">
-              Institutional policies
-            </Link>
-          ) : null
+          <>
+            {(isResearcher || canSeeAllApps) && acceptedTotal ? (
+              <Link className="btn primary" to={acceptedProposals.length ? "/proposals" : "/grants?filter=awarded"}>
+                {acceptedProposals.length ? "View proposals" : "View accepted in Grants"}
+              </Link>
+            ) : null}
+            {canCreate ? (
+              <button type="button" className="btn primary" onClick={showForm ? resetForm : startCreate}>
+                {showForm ? "Close form" : isDonor ? "+ New external call" : "+ New funding call"}
+              </button>
+            ) : isLeadership ? (
+              <Link className="btn" to="/policies">
+                Institutional policies
+              </Link>
+            ) : null}
+          </>
         }
       />
 
       {message ? <div className="fundingCallsBanner fundingCallsBannerOk">{message}</div> : null}
       {error ? <div className="fundingCallsBanner fundingCallsBannerErr">{error}</div> : null}
+
+      {statusFilter !== "all" ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Showing: <strong>{statFilterLabel(
+            [
+              { label: "Total calls", filterKey: "all" },
+              { label: "Open", filterKey: "open" },
+              { label: "Drafts", filterKey: "draft" },
+              { label: "Closed", filterKey: "closed" },
+            ],
+            statusFilter
+          )}</strong>{" "}
+          ({filteredCalls.length})
+        </p>
+      ) : null}
+
+      {(isResearcher || canSeeAllApps) && acceptedTotal ? (
+        <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.45)" }}>
+          <div style={{ fontWeight: 800 }}>Accepted funding-call applications</div>
+          <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+            Proposals accepted under a funding call appear here (and under Projects when a project was created).
+            Grant awards also appear under <Link to="/grants?filter=awarded">Grants → Awarded</Link>.
+          </p>
+          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+            {acceptedProposals.map((p) => (
+              <div
+                key={`p-${p.id}`}
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 10,
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700 }}>{p.title}</div>
+                  <div className="muted" style={{ fontSize: 13 }}>
+                    {proposalStatusLabel(p.status)}
+                    {p.fundingCall?.title ? ` · Call: ${p.fundingCall.title}` : ""}
+                    {p.researcherName ? ` · ${p.researcherName}` : ""}
+                  </div>
+                </div>
+                <Link className="btn primary" to={`/proposals/${p.id}`}>
+                  Open proposal
+                </Link>
+              </div>
+            ))}
+            {acceptedGrants.map((g) => (
+              <div
+                key={`g-${g.id}`}
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 10,
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700 }}>{g.title}</div>
+                  <div className="muted" style={{ fontSize: 13 }}>
+                    {grantStatusLabel(g.status)}
+                    {g.fundingCall?.title ? ` · Call: ${g.fundingCall.title}` : ""}
+                  </div>
+                </div>
+                <Link className="btn primary" to={`/grants/${g.id}`}>
+                  Open grant
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {canCreate && showForm ? (
         <form className="card fundingCallFormCard" onSubmit={handleSave}>
@@ -425,7 +629,7 @@ await fundingCallApi.publishFundingCall(accessToken, id);
       {loading ? <p className="muted">Loading funding calls…</p> : null}
 
       <div className="fundingCallList">
-        {calls.map((c) => (
+        {filteredCalls.map((c) => (
           <article key={c.id} className="card fundingCallCard">
             <div className="fundingCallCardTop">
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -472,9 +676,17 @@ await fundingCallApi.publishFundingCall(accessToken, id);
               </div>
 
               <div className="fundingCallActions">
-                {isResearcher && c.status === "open" ? (
+                {isResearcher && c.status === "open" && !(grantsByCallId[String(c.id)] || []).length ? (
                   <Link className="btn primary" to={`/grants/apply?callId=${c.id}`}>
                     Apply via this call
+                  </Link>
+                ) : null}
+                {isResearcher && (grantsByCallId[String(c.id)] || []).length ? (
+                  <Link
+                    className="btn primary"
+                    to={`/grants/${grantsByCallId[String(c.id)][0].id}`}
+                  >
+                    Open my application
                   </Link>
                 ) : null}
                 {canEditCall(c) ? (
@@ -494,10 +706,71 @@ await fundingCallApi.publishFundingCall(accessToken, id);
                 ) : null}
               </div>
             </div>
+
+            {(grantsByCallId[String(c.id)] || []).length ||
+            (proposalsByCallId[String(c.id)] || []).length ? (
+              <div
+                style={{
+                  marginTop: 12,
+                  paddingTop: 12,
+                  borderTop: "1px solid rgba(148,163,184,0.25)",
+                }}
+              >
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
+                  {isResearcher ? "My applications" : "Applications on this call"}
+                </div>
+                {(proposalsByCallId[String(c.id)] || []).map((p) => (
+                  <div
+                    key={`p-${p.id}`}
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                      alignItems: "center",
+                      fontSize: 13,
+                      marginBottom: 4,
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>{p.title}</span>
+                    <span className={statusClass(isAcceptedProposal(p) ? "open" : p.status === "draft" ? "draft" : "closed")}>
+                      {proposalStatusLabel(p.status)}
+                    </span>
+                    <Link to={`/proposals/${p.id}`} style={{ fontWeight: 700 }}>
+                      View proposal →
+                    </Link>
+                  </div>
+                ))}
+                {(grantsByCallId[String(c.id)] || []).map((g) => (
+                  <div
+                    key={`g-${g.id}`}
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                      alignItems: "center",
+                      fontSize: 13,
+                      marginBottom: 4,
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>{g.title}</span>
+                    <span
+                      className={statusClass(
+                        isAcceptedGrant(g) ? "open" : g.status === "draft" ? "draft" : g.status === "submitted" ? "open" : "closed"
+                      )}
+                    >
+                      {grantStatusLabel(g.status)}
+                    </span>
+                    <Link to={`/grants/${g.id}`} style={{ fontWeight: 700 }}>
+                      View in Grants →
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </article>
         ))}
 
-        {!loading && calls.length === 0 ? (
+        {!loading && filteredCalls.length === 0 ? (
           <div className="card fundingCallEmpty">
             <div className="fundingCallEmptyIcon" aria-hidden="true">
               📢

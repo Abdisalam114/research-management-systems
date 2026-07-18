@@ -11,6 +11,7 @@ const { recordAudit } = require("../utils/audit");
 const { normalizeBudgetBreakdown } = require("../utils/budgetBreakdown");
 const { assertEligibleForCall } = require("../utils/fundingCallEligibility");
 const { buildRequirementChecklist, assertRequirementsMet } = require("../utils/fundingCallRequirements");
+const { closeExpiredOpenCalls, closeCallAfterGrantAccepted } = require("../utils/fundingCallAutoClose");
 const { ROLES } = require("../models/User");
 const { canViewProjectAwards } = require("../utils/researchJourney");
 
@@ -203,6 +204,11 @@ async function assertGrantReadyForSubmit(grant, req) {
 
 async function resolveOpenCall(req, callId) {
   if (!callId) return null;
+  await closeExpiredOpenCalls({
+    actorId: req.user.id,
+    actorRole: req.user.role,
+    programTier: req.programTier,
+  });
   const call = await FundingCall.findOne(req.tierWhere({ _id: callId, status: CALL_STATUSES.OPEN }));
   if (!call) throw new AppError("Funding call not found or not open", 404);
   if (call.deadline && new Date(call.deadline) < new Date()) {
@@ -246,10 +252,25 @@ function sanitizeGrantDetail(g) {
 async function listGrants(req, res) {
   const { role } = req.user;
   const { status, projectId, callId } = req.query || {};
-  const filter = {
-    // Only funding-call applications — legacy grants without a call are excluded
-    callId: { $ne: null, $exists: true },
-  };
+  // Prefer linking legacy grants to calls (seed data often missing callId)
+  try {
+    const { linkGrantsMissingCallId } = require("../utils/linkGrantsToFundingCalls");
+    await linkGrantsMissingCallId();
+  } catch {
+    /* best-effort */
+  }
+
+  // Finance / staff: ensure accepted fund-call proposals have a pending_finance grant to approve
+  if (["finance_officer", "research_director", "leadership"].includes(role)) {
+    try {
+      const { backfillPendingFinanceGrantsFromProposals } = require("../utils/ensurePendingFinanceGrantFromProposal");
+      await backfillPendingFinanceGrantsFromProposals(req.tierWhere({}));
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  const filter = {};
   if (status && Object.values(GRANT_STATUSES).includes(status)) filter.status = status;
   if (projectId) {
     const { validateProjectQuery } = require("../utils/projectScopedRecords");
@@ -262,12 +283,38 @@ async function listGrants(req, res) {
   if (role === "donor_agency") {
     filter.status = { $nin: ["draft"] };
   }
-const grants = await Grant.find(req.tierWhere(filter))
+  const grants = await Grant.find(req.tierWhere(filter))
     .sort({ createdAt: -1 })
     .populate("projectId", "title status")
     .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId")
     .populate("callId", "title status fundingSource requiredDocuments deadline amountCap currency callType eligibilityTier");
   const sanitized = await Promise.all(grants.map(async (g) => redactGrantAwardsIfNeeded(sanitizeGrant(g), req)));
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(__dirname, "../../../debug-f558f7.log"),
+      `${JSON.stringify({
+        sessionId: "f558f7",
+        runId: "accepted-visibility",
+        hypothesisId: "H4",
+        location: "grantController.listGrants",
+        message: "grants list result",
+        data: {
+          role,
+          total: sanitized.length,
+          withCallId: sanitized.filter((g) => g.callId).length,
+        },
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+
   res.json({ grants: sanitized });
 }
 
@@ -300,7 +347,6 @@ async function getGrant(req, res) {
 
 async function createGrant(req, res) {
   const { title, amountRequested, currency, donorRef, complianceNotes, projectId, callId, proposalId } = req.body || {};
-  if (!title) throw new AppError("title is required", 400);
   if (!callId) {
     throw new AppError("Grant applications must be created through an open funding call", 400);
   }
@@ -317,6 +363,13 @@ async function createGrant(req, res) {
     call
   );
 
+  // Grant application title = funding call title (required). Researcher = logged-in applicant.
+  // Research proposal keeps its own title via proposalId.
+  const resolvedTitle = String(call.title || title || proposal.title || "").trim();
+  if (!resolvedTitle) {
+    throw new AppError("Funding call has no title. Publish/edit the call with a title first.", 400);
+  }
+
   const budgetFields = parseBudgetField(req.body);
   let requested = typeof amountRequested === "number" ? amountRequested : Number(amountRequested) || 0;
   if (budgetFields?.budgetTotal > 0) requested = budgetFields.budgetTotal;
@@ -325,8 +378,30 @@ async function createGrant(req, res) {
   const explicitProjectId = projectId ? await resolveGrantProjectId(req, projectId, req.user.id) : null;
   const linkedProjectId = explicitProjectId || linkedProjectFromProposal;
 
+  // #region agent log
+  try {
+    const p = require("path");
+    const fs = require("fs");
+    const line = `${JSON.stringify({
+      sessionId: "f558f7",
+      hypothesisId: "H8",
+      location: "grantController.createGrant",
+      message: "auto title + researcher on grant create",
+      data: {
+        resolvedTitle,
+        proposalId: String(proposal._id),
+        researcherId: String(req.user.id),
+        callId: String(call._id),
+      },
+      timestamp: Date.now(),
+    })}\n`;
+    fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
+    fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
+  } catch (_) { /* debug */ }
+  // #endregion
+
   const grant = await Grant.create(req.tierAssign({
-    title: String(title).trim(),
+    title: resolvedTitle,
     fundingSource: String(call.fundingSource).trim(),
     amountRequested: requested,
     currency: currency ? String(currency).trim().toUpperCase() : budgetFields?.budgetCurrency || call.currency || "USD",
@@ -488,6 +563,16 @@ async function directorDecision(req, res) {
   if (complianceNotes !== undefined) grant.complianceNotes = String(complianceNotes);
   await grant.save();
 
+  // When a grant under a funding call is accepted, close the call (no further applications)
+  if (decision === GRANT_STATUSES.APPROVED && grant.callId) {
+    await closeCallAfterGrantAccepted(grant.callId, {
+      actorId: req.user.id,
+      actorRole: req.user.role,
+      programTier: req.programTier,
+      grantTitle: grant.title,
+    });
+  }
+
   try {
     await notifyUser(grant.researcherId, {
       type: "grant",
@@ -501,7 +586,7 @@ async function directorDecision(req, res) {
         type: "grant",
         title: "Grant pending finance approval",
         body: grant.title,
-        link: "/grants",
+        link: "/finance/grant-approvals",
       }, req.programTier);
     }
   } catch { /* best-effort */ }
@@ -537,13 +622,78 @@ async function financeDecision(req, res) {
   let budgetResult = null;
   if (decision === "approve") {
     grant.status = GRANT_STATUSES.ACTIVE;
+    if (/awaiting finance approval/i.test(grant.complianceNotes || "")) {
+      grant.complianceNotes = "Funding-call award authorized by finance — budget allocated (not paid).";
+    }
     await grant.save();
     budgetResult = await ensureBudgetForGrant(grant);
+
+    // Keep related proposal / call data consistent
+    if (grant.callId) {
+      try {
+        const { closeCallAfterGrantAccepted } = require("../utils/fundingCallAutoClose");
+        await closeCallAfterGrantAccepted(grant.callId, {
+          actorId: req.user.id,
+          actorRole: req.user.role,
+          programTier: req.programTier,
+          grantTitle: grant.title,
+        });
+      } catch { /* best-effort */ }
+    }
+    if (grant.proposalId) {
+      try {
+        const { STAGE_STATUS } = require("../utils/proposalReviewPipeline");
+        const proposal = await Proposal.findById(grant.proposalId);
+        if (proposal?.reviewPipeline?.financeReview) {
+          const fr = proposal.reviewPipeline.financeReview;
+          if (fr.status !== STAGE_STATUS.PASSED && fr.status !== STAGE_STATUS.FAILED) {
+            proposal.reviewPipeline.financeReview = {
+              status: STAGE_STATUS.PASSED,
+              completedAt: new Date(),
+              completedBy: req.user.id,
+              decision: "budget_authorized",
+              comment: comment ? String(comment) : "Budget authorized (allocation only — not paid)",
+            };
+            proposal.markModified("reviewPipeline");
+            await proposal.save();
+          }
+        }
+      } catch { /* best-effort */ }
+    }
+
+    // #region agent log
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const b = budgetResult?.budget;
+      fs.appendFileSync(
+        path.join(__dirname, "../../../debug-f558f7.log"),
+        `${JSON.stringify({
+          sessionId: "f558f7",
+          runId: "finance-approve-not-paid",
+          hypothesisId: "F2",
+          location: "grantController.financeDecision",
+          message: "finance authorize award — allocation only, not paid",
+          data: {
+            grantId: String(grant._id),
+            amountAwarded: grant.amountAwarded,
+            budgetId: b?._id ? String(b._id) : null,
+            totalAllocated: b ? Number(b.totalAllocated || 0) : null,
+            totalDisbursed: b ? Number(b.totalDisbursed || 0) : null,
+            isPaidIncorrectly: b ? Number(b.totalDisbursed || 0) > 0 : null,
+          },
+          timestamp: Date.now(),
+        })}\n`
+      );
+    } catch {
+      /* ignore */
+    }
+    // #endregion
     try {
       await notifyUser(grant.researcherId, {
         type: "grant",
-        title: "Grant activated — budget ready",
-        body: grant.title,
+        title: "Grant budget authorized — not paid yet",
+        body: `${grant.title} — funds are allocated; payments are separate.`,
         link: "/budgets",
         programTier: req.programTier,
       });
@@ -574,9 +724,19 @@ async function financeDecision(req, res) {
   });
 
   res.json({
-    message: "Finance decision saved",
+    message:
+      decision === "approve"
+        ? "Budget authorized (allocated). This is not a payment — disburse later via Budgets."
+        : "Finance decision saved",
     grant: sanitizeGrant(grant),
-    budget: budgetResult?.budget ? { id: budgetResult.budget._id, created: budgetResult.created } : null,
+    budget: budgetResult?.budget
+      ? {
+          id: budgetResult.budget._id,
+          created: budgetResult.created,
+          totalAllocated: budgetResult.budget.totalAllocated,
+          totalDisbursed: budgetResult.budget.totalDisbursed || 0,
+        }
+      : null,
   });
 }
 

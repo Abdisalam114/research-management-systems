@@ -29,9 +29,17 @@ const PAYMENT_METHODS = [
 const STATUS_BADGE = {
   requested: "#38bdf8",
   director_approved: "#0ea5e9",
+  procurement_approved: "#0284c7",
+  pending: "#38bdf8",
+  approved: "#0ea5e9",
   paid: "#1d4ed8",
   rejected: "#1e3a8a",
 };
+
+const BUDGET_ITEM_TYPES = [
+  { value: "expense", label: "Expense" },
+  { value: "procurement", label: "Procurement" },
+];
 
 function Badge({ status }) {
   return (
@@ -64,6 +72,8 @@ export function BudgetsPage() {
   const [showTopPayment, setShowTopPayment] = useState(false);
   const [showTopPO, setShowTopPO] = useState(false);
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
+  const [actionBusy, setActionBusy] = useState("");
+  const [payPoTarget, setPayPoTarget] = useState(null);
 
   const isResearcher = user?.role === "researcher";
   const isDirector = user?.role === "research_director";
@@ -84,7 +94,28 @@ export function BudgetsPage() {
     setPayments(p.payments || []);
     setPOs(po.purchaseOrders || []);
     setFinanceReport(fr);
-  }, [accessToken, canSeeFinanceReport]);
+    // #region agent log
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify({
+        sessionId: "f558f7",
+        hypothesisId: "H3",
+        location: "Budgets.jsx:load",
+        message: "finance budgets page loaded",
+        data: {
+          role: user?.role,
+          budgets: (b.budgets || []).length,
+          payments: (p.payments || []).length,
+          pos: (po.purchaseOrders || []).length,
+          reportPaid: fr?.summary?.totalPaid ?? null,
+          itemCount: (b.budgets || []).reduce((n, x) => n + (x.items?.length || 0), 0),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [accessToken, canSeeFinanceReport, user?.role]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
@@ -110,14 +141,24 @@ export function BudgetsPage() {
 
   const totals = useMemo(() => {
     const allocated = budgets.reduce((acc, b) => acc + Number(b.totalAllocated || 0), 0);
+    const remaining = budgets.reduce(
+      (acc, b) => acc + Number(b.remainingBalance != null ? b.remainingBalance : Math.max(0, Number(b.totalAllocated || 0) - Number(b.totalDisbursed || 0))),
+      0
+    );
+    const disbursedFromBudgets = budgets.reduce((acc, b) => acc + Number(b.totalDisbursed || 0), 0);
     const disbursedPay = payments.filter((p) => p.status === "paid").reduce((acc, p) => acc + Number(p.amount || 0), 0);
     const disbursedPO = pos.filter((p) => p.status === "paid").reduce((acc, p) => acc + Number(p.totalAmount || 0), 0);
+    const itemPaid = budgets.reduce(
+      (acc, b) => acc + (b.items || []).filter((i) => i.status === "paid").reduce((a, i) => a + Number(i.amount || 0), 0),
+      0
+    );
     const pendingPay = payments.filter((p) => ["requested", "director_approved"].includes(p.status)).length;
-    const pendingPO = pos.filter((p) => ["requested", "director_approved"].includes(p.status)).length;
+    const pendingPO = pos.filter((p) => ["requested", "procurement_approved", "director_approved"].includes(p.status)).length;
     const currency = budgets[0]?.currency || "USD";
-    const disbursed = disbursedPay + disbursedPO;
+    const disbursed = Math.max(disbursedFromBudgets, disbursedPay + disbursedPO + itemPaid);
     return {
       allocated,
+      remaining,
       disbursed,
       disbursedPayments: disbursedPay,
       disbursedPOs: disbursedPO,
@@ -143,59 +184,85 @@ export function BudgetsPage() {
 
   const directorQueuePayments = payments.filter((p) => p.status === "requested");
   const procurementQueuePOs = pos.filter((p) => p.status === "requested");
-  const directorQueuePOs = pos.filter((p) => p.status === "requested" || p.status === "procurement_approved");
+  const directorQueuePOs = pos.filter((p) => p.status === "procurement_approved" || p.status === "requested");
   const financeQueuePayments = payments.filter((p) => p.status === "director_approved");
   const financeQueuePOs = pos.filter((p) => p.status === "director_approved");
 
   async function decideProcurementPO(id, decision) {
+    if (actionBusy) return;
     let rejectedReason;
-    if (decision === "reject") rejectedReason = window.prompt("Reason for rejection?") || "Rejected";
+    if (decision === "reject") {
+      rejectedReason = window.prompt("Reason for rejection?")?.trim();
+      if (!rejectedReason) return;
+    } else if (!window.confirm("Approve this purchase order for director review?")) {
+      return;
+    }
+    setActionBusy(`po-proc-${id}`);
+    setError("");
     try {
       await procurementApi.procurementDecision(accessToken, id, { decision, rejectedReason });
       await reload();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to record procurement decision");
+    } finally {
+      setActionBusy("");
     }
   }
 
   async function decideDirectorPO(id, decision) {
+    if (actionBusy) return;
     let rejectedReason;
-    if (decision === "reject") rejectedReason = window.prompt("Reason for rejection?") || "Rejected";
+    if (decision === "reject") {
+      rejectedReason = window.prompt("Reason for rejection?")?.trim();
+      if (!rejectedReason) return;
+    } else if (!window.confirm("Approve this purchase order for finance payment?")) {
+      return;
+    }
+    setActionBusy(`po-dir-${id}`);
+    setError("");
     try {
       await procurementApi.directorDecision(accessToken, id, { decision, rejectedReason });
       await reload();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to record decision");
+    } finally {
+      setActionBusy("");
     }
   }
 
-  async function payPO(p) {
-    const method = window.prompt(
-      `Payment method? One of: ${PAYMENT_METHODS.map((m) => m.value).join(", ")}`,
-      "bank_transfer"
-    );
-    if (!method) return;
-    const details = window.prompt("Reference / account / transaction details (optional):") || "";
-    const poNumber = window.prompt("Assign PO number (optional):") || "";
+  async function submitPayPO({ paymentMethod, paymentMethodDetails, poNumber }) {
+    if (!payPoTarget || actionBusy) return;
+    setActionBusy(`po-pay-${payPoTarget.id}`);
+    setError("");
     try {
-      await procurementApi.financePay(accessToken, p.id, {
-        paymentMethod: method,
-        paymentMethodDetails: details,
+      await procurementApi.financePay(accessToken, payPoTarget.id, {
+        paymentMethod,
+        paymentMethodDetails,
         poNumber,
       });
+      setPayPoTarget(null);
       await reload();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to pay PO");
+    } finally {
+      setActionBusy("");
     }
   }
 
   async function rejectFinancePO(id) {
-    const reason = window.prompt("Reason for finance rejection?") || "Rejected";
+    if (actionBusy) return;
+    const reason = window.prompt("Reason for finance rejection?")?.trim();
+    if (!reason) return;
+    if (!window.confirm("Reject this purchase order?")) return;
+    setActionBusy(`po-rej-${id}`);
+    setError("");
     try {
       await procurementApi.financeReject(accessToken, id, { rejectedReason: reason });
       await reload();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to reject");
+    } finally {
+      setActionBusy("");
     }
   }
 
@@ -237,6 +304,13 @@ export function BudgetsPage() {
       sub: `Payments ${formatMoney(totals.disbursedPayments, totals.currency)} • POs ${formatMoney(totals.disbursedPOs, totals.currency)}`,
       accent: "#1d4ed8",
       filterKey: "disbursed",
+    },
+    {
+      label: "Remaining budget",
+      value: formatMoney(totals.remaining, totals.currency),
+      sub: "Allocated − paid (auto-deducted)",
+      accent: "#38bdf8",
+      filterKey: "all",
     },
     {
       label: "Utilization",
@@ -290,6 +364,15 @@ export function BudgetsPage() {
       {loading ? <p className="muted">Loading budgets…</p> : null}
       {error ? <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)", marginTop: 8 }}>{error}</div> : null}
 
+      {payPoTarget ? (
+        <PayPOModal
+          po={payPoTarget}
+          busy={Boolean(actionBusy)}
+          onClose={() => !actionBusy && setPayPoTarget(null)}
+          onConfirm={submitPayPO}
+        />
+      ) : null}
+
       {isResearcher && showTopPayment ? (
         <TopPaymentForm
           budgets={budgets}
@@ -320,8 +403,12 @@ export function BudgetsPage() {
                   <div className="muted">{p.currency} {p.totalAmount} • {p.items?.length || 0} item(s)</div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button type="button" className="btn primary" onClick={() => decideProcurementPO(p.id, "approve")}>Approve</button>
-                  <button type="button" className="btn" onClick={() => decideProcurementPO(p.id, "reject")}>Reject</button>
+                  <button type="button" className="btn primary" disabled={Boolean(actionBusy)} onClick={() => decideProcurementPO(p.id, "approve")}>
+                    {actionBusy === `po-proc-${p.id}` ? "…" : "Approve"}
+                  </button>
+                  <button type="button" className="btn" disabled={Boolean(actionBusy)} onClick={() => decideProcurementPO(p.id, "reject")}>
+                    Reject
+                  </button>
                 </div>
               </div>
             ))}
@@ -355,8 +442,12 @@ export function BudgetsPage() {
                   <div className="muted">{p.currency} {p.totalAmount} • {p.items?.length || 0} item(s)</div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button type="button" className="btn primary" onClick={() => decideDirectorPO(p.id, "approve")}>Approve</button>
-                  <button type="button" className="btn" onClick={() => decideDirectorPO(p.id, "reject")}>Reject</button>
+                  <button type="button" className="btn primary" disabled={Boolean(actionBusy)} onClick={() => decideDirectorPO(p.id, "approve")}>
+                    {actionBusy === `po-dir-${p.id}` ? "…" : "Approve"}
+                  </button>
+                  <button type="button" className="btn" disabled={Boolean(actionBusy)} onClick={() => decideDirectorPO(p.id, "reject")}>
+                    Reject
+                  </button>
                 </div>
               </div>
             ))}
@@ -367,6 +458,9 @@ export function BudgetsPage() {
       {isFinance && (financeQueuePayments.length || financeQueuePOs.length) ? (
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ fontWeight: 800 }}>Finance disbursement queue (director-approved)</div>
+          <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+            Marking paid automatically deducts the amount from the linked budget remaining balance.
+          </p>
           <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
             {financeQueuePayments.map((p) => (
               <div key={p.id} className="card" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
@@ -378,7 +472,7 @@ export function BudgetsPage() {
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <Link className="btn primary" to={`/payments/${p.id}`} title="View payment details before disbursement">
-                    View details
+                    Review & pay
                   </Link>
                 </div>
               </div>
@@ -390,8 +484,12 @@ export function BudgetsPage() {
                   <div className="muted">{p.currency} {p.totalAmount} • {p.items?.length || 0} item(s)</div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button type="button" className="btn primary" onClick={() => payPO(p)}>Pay (record method)</button>
-                  <button type="button" className="btn" onClick={() => rejectFinancePO(p.id)}>Reject</button>
+                  <button type="button" className="btn primary" disabled={Boolean(actionBusy)} onClick={() => setPayPoTarget(p)}>
+                    Pay
+                  </button>
+                  <button type="button" className="btn" disabled={Boolean(actionBusy)} onClick={() => rejectFinancePO(p.id)}>
+                    Reject
+                  </button>
                 </div>
               </div>
             ))}
@@ -535,6 +633,11 @@ export function BudgetsPage() {
               payments={paymentsByBudget[String(b.id)] || []}
               pos={posByBudget[String(b.id)] || []}
               isDirector={isDirector}
+              isFinance={isFinance}
+              isResearcher={isResearcher}
+              accessToken={accessToken}
+              onReload={reload}
+              setError={setError}
             />
           ))}
           {filteredBudgets.length === 0 ? (
@@ -546,23 +649,115 @@ export function BudgetsPage() {
   );
 }
 
+function budgetOptionLabel(b) {
+  const title = b.grant?.title || b.project?.title || String(b.id).slice(-6);
+  const remaining =
+    b.remainingBalance != null
+      ? Number(b.remainingBalance)
+      : Math.max(0, Number(b.totalAllocated || 0) - Number(b.totalDisbursed || 0));
+  return `${title} • remaining ${b.currency} ${remaining.toLocaleString()}`;
+}
+
+function PayPOModal({ po, busy, onClose, onConfirm }) {
+  const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
+  const [paymentMethodDetails, setPaymentMethodDetails] = useState("");
+  const [poNumber, setPoNumber] = useState(po?.poNumber || "");
+
+  if (!po) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
+        background: "rgba(0,0,0,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <div className="card" style={{ width: "min(480px, 100%)", margin: 0 }}>
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>Pay purchase order</div>
+        <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+          {po.vendorName} — {po.currency} {Number(po.totalAmount || 0).toLocaleString()}. This amount will be deducted from the budget remaining balance.
+        </p>
+        <div className="field">
+          <label>Payment method</label>
+          <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} disabled={busy}>
+            {PAYMENT_METHODS.map((m) => (
+              <option key={m.value} value={m.value}>{m.label}</option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label>Reference / transaction details</label>
+          <input value={paymentMethodDetails} onChange={(e) => setPaymentMethodDetails(e.target.value)} disabled={busy} />
+        </div>
+        <div className="field">
+          <label>PO number (optional)</label>
+          <input value={poNumber} onChange={(e) => setPoNumber(e.target.value)} disabled={busy} />
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <button
+            type="button"
+            className="btn primary"
+            disabled={busy}
+            onClick={() => {
+              if (!window.confirm(`Confirm payment of ${po.currency} ${Number(po.totalAmount || 0).toLocaleString()}?`)) return;
+              onConfirm({ paymentMethod, paymentMethodDetails, poNumber });
+            }}
+          >
+            {busy ? "Paying…" : "Confirm pay"}
+          </button>
+          <button type="button" className="btn" disabled={busy} onClick={onClose}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TopPaymentForm({ budgets, accessToken, onClose, onChange, setError }) {
   const [budgetId, setBudgetId] = useState(budgets[0]?.id || "");
   const [form, setForm] = useState({ category: "equipment", payee: "", purpose: "", amount: 0, notes: "" });
+  const [busy, setBusy] = useState(false);
   const budget = budgets.find((b) => b.id === budgetId);
+  const remaining =
+    budget?.remainingBalance != null
+      ? Number(budget.remainingBalance)
+      : Math.max(0, Number(budget?.totalAllocated || 0) - Number(budget?.totalDisbursed || 0));
 
   async function submit() {
+    if (busy) return;
     if (!budgetId) {
       setError("Please choose a budget");
       return;
     }
+    if (!form.payee.trim() || !form.purpose.trim()) {
+      setError("Payee and purpose are required");
+      return;
+    }
+    const amount = Number(form.amount || 0);
+    if (!(amount > 0)) {
+      setError("Amount must be greater than zero");
+      return;
+    }
+    if (amount > remaining + 1e-9) {
+      setError(`Amount exceeds remaining budget (${budget.currency} ${remaining.toLocaleString()})`);
+      return;
+    }
+    setBusy(true);
+    setError("");
     try {
       await paymentApi.createPayment(accessToken, {
         budgetId,
         category: form.category,
-        payee: form.payee,
-        purpose: form.purpose,
-        amount: Number(form.amount || 0),
+        payee: form.payee.trim(),
+        purpose: form.purpose.trim(),
+        amount,
         currency: budget?.currency || "USD",
         notes: form.notes,
       });
@@ -570,27 +765,32 @@ function TopPaymentForm({ budgets, accessToken, onClose, onChange, setError }) {
       await onChange();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to create payment request");
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div style={{ fontWeight: 800, marginBottom: 8 }}>💳 New payment request</div>
+      {budget ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+          Remaining on selected budget: <strong>{budget.currency} {remaining.toLocaleString()}</strong>
+        </p>
+      ) : null}
       <div className="row">
         <div className="field">
           <label>Budget</label>
-          <select value={budgetId} onChange={(e) => setBudgetId(e.target.value)}>
+          <select value={budgetId} onChange={(e) => setBudgetId(e.target.value)} disabled={busy}>
             <option value="">— select —</option>
             {budgets.map((b) => (
-              <option key={b.id} value={b.id}>
-                {(b.grant?.title || b.project?.title || b.id.slice(-6))} • {b.currency} {Number(b.totalAllocated || 0).toLocaleString()}
-              </option>
+              <option key={b.id} value={b.id}>{budgetOptionLabel(b)}</option>
             ))}
           </select>
         </div>
         <div className="field">
           <label>Category</label>
-          <select value={form.category} onChange={(e) => setForm((s) => ({ ...s, category: e.target.value }))}>
+          <select value={form.category} onChange={(e) => setForm((s) => ({ ...s, category: e.target.value }))} disabled={busy}>
             {PAYMENT_CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>{c.label}</option>
             ))}
@@ -598,26 +798,26 @@ function TopPaymentForm({ budgets, accessToken, onClose, onChange, setError }) {
         </div>
         <div className="field">
           <label>Amount ({budget?.currency || "USD"})</label>
-          <input type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm((s) => ({ ...s, amount: e.target.value }))} />
+          <input type="number" min="0" step="0.01" value={form.amount} onChange={(e) => setForm((s) => ({ ...s, amount: e.target.value }))} disabled={busy} />
         </div>
       </div>
       <div className="row">
         <div className="field">
           <label>Payee</label>
-          <input value={form.payee} onChange={(e) => setForm((s) => ({ ...s, payee: e.target.value }))} />
+          <input value={form.payee} onChange={(e) => setForm((s) => ({ ...s, payee: e.target.value }))} disabled={busy} />
         </div>
         <div className="field">
           <label>Purpose</label>
-          <input value={form.purpose} onChange={(e) => setForm((s) => ({ ...s, purpose: e.target.value }))} />
+          <input value={form.purpose} onChange={(e) => setForm((s) => ({ ...s, purpose: e.target.value }))} disabled={busy} />
         </div>
       </div>
       <div className="field">
         <label>Notes</label>
-        <input value={form.notes} onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))} />
+        <input value={form.notes} onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))} disabled={busy} />
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <button type="button" className="btn primary" onClick={submit}>Submit for director approval</button>
-        <button type="button" className="btn" onClick={onClose}>Cancel</button>
+        <button type="button" className="btn primary" onClick={submit} disabled={busy}>{busy ? "Submitting…" : "Submit for director approval"}</button>
+        <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
       </div>
     </div>
   );
@@ -626,15 +826,25 @@ function TopPaymentForm({ budgets, accessToken, onClose, onChange, setError }) {
 function TopPOForm({ budgets, accessToken, onClose, onChange, setError }) {
   const [budgetId, setBudgetId] = useState(budgets[0]?.id || "");
   const [form, setForm] = useState({ vendorName: "", vendorContact: "", notes: "", items: [{ description: "", quantity: 1, unitPrice: 0 }] });
+  const [busy, setBusy] = useState(false);
   const budget = budgets.find((b) => b.id === budgetId);
+  const remaining =
+    budget?.remainingBalance != null
+      ? Number(budget.remainingBalance)
+      : Math.max(0, Number(budget?.totalAllocated || 0) - Number(budget?.totalDisbursed || 0));
 
   function updateItem(idx, field, value) {
     setForm((s) => ({ ...s, items: s.items.map((it, i) => (i === idx ? { ...it, [field]: value } : it)) }));
   }
 
   async function submit() {
+    if (busy) return;
     if (!budgetId) {
       setError("Please choose a budget");
+      return;
+    }
+    if (!form.vendorName.trim()) {
+      setError("Vendor name is required");
       return;
     }
     const items = form.items
@@ -644,10 +854,21 @@ function TopPOForm({ budgets, accessToken, onClose, onChange, setError }) {
       setError("At least one PO item is required");
       return;
     }
+    const total = items.reduce((a, it) => a + it.quantity * it.unitPrice, 0);
+    if (!(total > 0)) {
+      setError("PO total must be greater than zero");
+      return;
+    }
+    if (total > remaining + 1e-9) {
+      setError(`PO total exceeds remaining budget (${budget.currency} ${remaining.toLocaleString()})`);
+      return;
+    }
+    setBusy(true);
+    setError("");
     try {
       await procurementApi.createPurchaseOrder(accessToken, {
         budgetId,
-        vendorName: form.vendorName,
+        vendorName: form.vendorName.trim(),
         vendorContact: form.vendorContact,
         currency: budget?.currency || "USD",
         notes: form.notes,
@@ -657,31 +878,36 @@ function TopPOForm({ budgets, accessToken, onClose, onChange, setError }) {
       await onChange();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to create PO");
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div style={{ fontWeight: 800, marginBottom: 8 }}>🛒 New purchase order</div>
+      {budget ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+          Remaining on selected budget: <strong>{budget.currency} {remaining.toLocaleString()}</strong>
+        </p>
+      ) : null}
       <div className="row">
         <div className="field">
           <label>Budget</label>
-          <select value={budgetId} onChange={(e) => setBudgetId(e.target.value)}>
+          <select value={budgetId} onChange={(e) => setBudgetId(e.target.value)} disabled={busy}>
             <option value="">— select —</option>
             {budgets.map((b) => (
-              <option key={b.id} value={b.id}>
-                {(b.grant?.title || b.project?.title || b.id.slice(-6))} • {b.currency} {Number(b.totalAllocated || 0).toLocaleString()}
-              </option>
+              <option key={b.id} value={b.id}>{budgetOptionLabel(b)}</option>
             ))}
           </select>
         </div>
         <div className="field">
           <label>Vendor name</label>
-          <input value={form.vendorName} onChange={(e) => setForm((s) => ({ ...s, vendorName: e.target.value }))} />
+          <input value={form.vendorName} onChange={(e) => setForm((s) => ({ ...s, vendorName: e.target.value }))} disabled={busy} />
         </div>
         <div className="field">
           <label>Vendor contact</label>
-          <input value={form.vendorContact} onChange={(e) => setForm((s) => ({ ...s, vendorContact: e.target.value }))} />
+          <input value={form.vendorContact} onChange={(e) => setForm((s) => ({ ...s, vendorContact: e.target.value }))} disabled={busy} />
         </div>
       </div>
       <div style={{ fontWeight: 700, marginTop: 8 }}>Items</div>
@@ -714,26 +940,173 @@ function TopPOForm({ budgets, accessToken, onClose, onChange, setError }) {
         <input value={form.notes} onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))} />
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <button type="button" className="btn primary" onClick={submit}>Submit PO for director approval</button>
-        <button type="button" className="btn" onClick={onClose}>Cancel</button>
+        <button type="button" className="btn primary" onClick={submit} disabled={busy}>{busy ? "Submitting…" : "Submit PO for approval"}</button>
+        <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
       </div>
     </div>
   );
 }
 
-function BudgetCard({ budget, payments, pos, isDirector }) {
+function BudgetCard({
+  budget,
+  payments,
+  pos,
+  isDirector,
+  isFinance,
+  isResearcher,
+  accessToken,
+  onReload,
+  setError,
+}) {
   const label = budget.grant?.title || budget.project?.title || `Budget ${budget.id?.slice(-6)}`;
+  const [itemForm, setItemForm] = useState({ type: "expense", description: "", amount: 0 });
+  const [itemBusy, setItemBusy] = useState(false);
+  const items = budget.items || [];
+  const allocated = Number(budget.totalAllocated || 0);
+  const disbursed = Number(
+    budget.totalDisbursed != null
+      ? budget.totalDisbursed
+      : [...payments, ...pos].filter((x) => x.status === "paid").reduce((a, x) => a + Number(x.amount ?? x.totalAmount ?? 0), 0)
+  );
+  const remaining =
+    budget.remainingBalance != null ? Number(budget.remainingBalance) : Math.max(0, allocated - disbursed);
+
+  async function addItem(e) {
+    e.preventDefault();
+    setItemBusy(true);
+    try {
+      await budgetApi.addBudgetItem(accessToken, budget.id, {
+        type: itemForm.type,
+        description: itemForm.description.trim(),
+        amount: Number(itemForm.amount) || 0,
+      });
+      setItemForm({ type: "expense", description: "", amount: 0 });
+      await onReload();
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to add budget item");
+    } finally {
+      setItemBusy(false);
+    }
+  }
+
+  async function updateItem(itemId, status) {
+    if (itemBusy) return;
+    let rejectedReason;
+    if (status === "rejected") {
+      rejectedReason = window.prompt("Reason for rejection?")?.trim();
+      if (!rejectedReason) return;
+    } else if (status === "approved") {
+      if (!window.confirm("Approve this budget line item?")) return;
+    } else if (status === "paid") {
+      if (!window.confirm("Mark as paid? Amount will be deducted from budget remaining.")) return;
+    }
+    setItemBusy(true);
+    setError("");
+    try {
+      await budgetApi.financeUpdateItem(accessToken, budget.id, itemId, { status, rejectedReason });
+      await onReload();
+    } catch (err) {
+      setError(err?.response?.data?.message || "Failed to update budget item");
+    } finally {
+      setItemBusy(false);
+    }
+  }
+
   return (
     <div className="card">
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontWeight: 800 }}>{label}</div>
           <div className="muted">
-            {budget.currency} {Number(budget.totalAllocated || 0).toLocaleString()} allocated
+            Allocated: {budget.currency} {allocated.toLocaleString()}
+            {" · "}
+            Paid: {budget.currency} {disbursed.toLocaleString()}
+            {" · "}
+            <span style={{ color: remaining > 0 ? "#38bdf8" : "#f87171", fontWeight: 700 }}>
+              Remaining: {budget.currency} {remaining.toLocaleString()}
+            </span>
+            {Number(disbursed) === 0 && Number(allocated) > 0 ? (
+              <span style={{ color: "#fcd34d", fontWeight: 700 }}> · Authorized only — nothing paid yet</span>
+            ) : null}
             {budget.grant?.fundingSource ? ` • ${budget.grant.fundingSource}` : ""}
-            {budget.project?.title ? ` • Project: ${budget.project.title}` : ""}
+            {!isFinance && budget.project?.title ? ` • Project: ${budget.project.title}` : ""}
+            {!isFinance && budget.projectId ? (
+              <>
+                {" "}
+                • <Link to={`/projects/${budget.projectId}`}>Open project</Link>
+              </>
+            ) : null}
           </div>
         </div>
+      </div>
+
+      <div style={{ marginTop: 10 }}>
+        <div style={{ fontWeight: 700 }}>📋 Budget line items ({items.length})</div>
+        {items.length === 0 ? <div className="muted" style={{ marginTop: 6 }}>No line items yet.</div> : null}
+        {items.map((it) => {
+          const itemId = it._id || it.id;
+          return (
+            <div key={String(itemId)} className="card" style={{ marginTop: 6 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <div>
+                  <strong>{it.description}</strong>
+                  <div className="muted">
+                    {String(it.type || "").replace(/_/g, " ")} • {budget.currency} {Number(it.amount || 0).toLocaleString()}
+                  </div>
+                  {it.rejectedReason ? <div className="muted" style={{ color: "#ef4444" }}>{it.rejectedReason}</div> : null}
+                </div>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <Badge status={it.status} />
+                  {isFinance && it.status === "pending" ? (
+                    <>
+                      <button type="button" className="btn primary" disabled={itemBusy} onClick={() => updateItem(itemId, "approved")}>
+                        Approve
+                      </button>
+                      <button type="button" className="btn" disabled={itemBusy} onClick={() => updateItem(itemId, "rejected")}>
+                        Reject
+                      </button>
+                    </>
+                  ) : null}
+                  {isFinance && it.status === "approved" ? (
+                    <button type="button" className="btn primary" disabled={itemBusy} onClick={() => updateItem(itemId, "paid")}>
+                      Mark paid
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {isResearcher ? (
+          <form onSubmit={addItem} style={{ marginTop: 10, display: "grid", gap: 8 }}>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>Add line item</div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <select value={itemForm.type} onChange={(e) => setItemForm((s) => ({ ...s, type: e.target.value }))}>
+                {BUDGET_ITEM_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+              <input
+                placeholder="Description"
+                value={itemForm.description}
+                onChange={(e) => setItemForm((s) => ({ ...s, description: e.target.value }))}
+                required
+                style={{ flex: 1, minWidth: 160 }}
+              />
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                placeholder="Amount"
+                value={itemForm.amount}
+                onChange={(e) => setItemForm((s) => ({ ...s, amount: e.target.value }))}
+                required
+                style={{ width: 120 }}
+              />
+              <button type="submit" className="btn primary" disabled={itemBusy}>Add item</button>
+            </div>
+          </form>
+        ) : null}
       </div>
 
       {payments.length ? (
