@@ -197,8 +197,8 @@ export function ProjectWorkflowPanel({ workflow }) {
       <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
         {workflow?.isVoluntary
           ? "Proposal → ethics → review → project → publication → repository (no grants/budget)."
-          : workflow?.projectStatus !== "completed"
-            ? "Proposal → ethics → review → project → publication → repository · Funding-call grants after Completed."
+          : workflow?.projectStatus !== "completed" && workflow?.projectStatus !== "closed"
+            ? "Proposal → ethics → review → project → publication → repository · Funding-call grants after Completed/Closed."
             : workflow?.awardsVisible === false
               ? "Proposal → ethics → review → project → publication → repository · Grant amounts after publication."
               : "Proposal → ethics → review → project → funding-call grant → budget → publication → repository."}

@@ -448,7 +448,7 @@ export function PublicationsPage() {
                       Refresh citations
                     </button>
                   ) : null}
-                  {canCreate && p.status === "draft" ? (
+                  {canCreate && (p.status === "draft" || p.status === "rejected") ? (
                     <button
                       type="button"
                       className="btn primary"
@@ -468,7 +468,7 @@ export function PublicationsPage() {
                         }
                       }}
                     >
-                      Submit
+                      {p.status === "rejected" ? "Resubmit" : "Submit"}
                     </button>
                   ) : null}
                   {canValidate && p.status === "submitted" ? (

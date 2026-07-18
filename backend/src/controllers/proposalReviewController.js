@@ -7,6 +7,7 @@ const {
   STAGE_STATUS,
   ensureReviewPipeline,
   getCurrentReviewStage,
+  isVoluntaryProposal,
 } = require("../utils/proposalReviewPipeline");
 
 function sanitizeProposalBrief(p) {
@@ -147,13 +148,22 @@ async function committeeReview(req, res) {
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const pipe = ensureReviewPipeline(proposal);
+  let committeeStatus = STAGE_STATUS.PASSED;
+  if (decision === "reject") committeeStatus = STAGE_STATUS.FAILED;
+  else if (decision === "recommend_revision") committeeStatus = STAGE_STATUS.IN_PROGRESS;
+
   pipe.committeeReview = {
-    status: decision === "reject" ? STAGE_STATUS.FAILED : STAGE_STATUS.PASSED,
-    completedAt: new Date(),
+    status: committeeStatus,
+    completedAt: decision === "recommend_revision" ? null : new Date(),
     completedBy: req.user.id,
     decision,
     comment: String(comment),
   };
+  if (decision === "recommend_revision") {
+    proposal.status = PROPOSAL_STATUSES.REVISION_REQUESTED;
+  } else if (decision === "reject") {
+    proposal.status = PROPOSAL_STATUSES.REJECTED;
+  }
   proposal.reviewerComments.push({ role: req.user.role, comment: `[Committee: ${decision}] ${comment}` });
   await proposal.save();
 
@@ -178,6 +188,9 @@ async function financeProposalReview(req, res) {
 
   const proposal = await Proposal.findOne(req.tierWhere({ _id: req.params.id }));
   if (!proposal) throw new AppError("Proposal not found", 404);
+  if (isVoluntaryProposal(proposal)) {
+    throw new AppError("Finance review is not required for voluntary research proposals", 400);
+  }
 
   const pipe = ensureReviewPipeline(proposal);
   pipe.financeReview = {

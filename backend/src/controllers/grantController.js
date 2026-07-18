@@ -2,6 +2,7 @@ const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
 const { Grant, GRANT_STATUSES } = require("../models/Grant");
 const { Project } = require("../models/Project");
 const { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES } = require("../models/Proposal");
+const { Publication, PUBLICATION_STATUSES } = require("../models/Publication");
 const { AppError } = require("../utils/AppError");
 const { ensureBudgetForGrant } = require("../utils/ensureBudgetForGrant");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
@@ -11,6 +12,35 @@ const { normalizeBudgetBreakdown } = require("../utils/budgetBreakdown");
 const { assertEligibleForCall } = require("../utils/fundingCallEligibility");
 const { buildRequirementChecklist, assertRequirementsMet } = require("../utils/fundingCallRequirements");
 const { ROLES } = require("../models/User");
+const { canViewProjectAwards } = require("../utils/researchJourney");
+
+async function redactGrantAwardsIfNeeded(out, req) {
+  if (!out?.amountAwarded) return out;
+  if (["research_director", "finance_officer", "donor_agency", "leadership"].includes(req.user.role)) {
+    return out;
+  }
+  const projectId = out.projectId;
+  if (!projectId) {
+    out.amountAwarded = null;
+    out.awardsHidden = true;
+    return out;
+  }
+  const hasPub = await Publication.exists(
+    req.tierWhere({
+      projectId,
+      status: { $in: [PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.VALIDATED] },
+    })
+  );
+  const canView = canViewProjectAwards({
+    role: req.user.role,
+    hasProjectPublication: Boolean(hasPub),
+  });
+  if (!canView) {
+    out.amountAwarded = null;
+    out.awardsHidden = true;
+  }
+  return out;
+}
 
 function parseBudgetField(body) {
   if (!body?.budgetBreakdown) return null;
@@ -237,7 +267,8 @@ const grants = await Grant.find(req.tierWhere(filter))
     .populate("projectId", "title status")
     .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId")
     .populate("callId", "title status fundingSource requiredDocuments deadline amountCap currency callType eligibilityTier");
-  res.json({ grants: grants.map(sanitizeGrant) });
+  const sanitized = await Promise.all(grants.map(async (g) => redactGrantAwardsIfNeeded(sanitizeGrant(g), req)));
+  res.json({ grants: sanitized });
 }
 
 async function getGrant(req, res) {
@@ -262,7 +293,9 @@ async function getGrant(req, res) {
   ].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
-  res.json({ grant: sanitizeGrantDetail(grant) });
+  const detail = sanitizeGrantDetail(grant);
+  await redactGrantAwardsIfNeeded(detail, req);
+  res.json({ grant: detail });
 }
 
 async function createGrant(req, res) {

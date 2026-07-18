@@ -16,7 +16,7 @@ const {
   submitLinkedEthics,
 } = require("../utils/proposalEthicsLink");
 const { applyEthicsPayload, parseEthicsJson } = require("../utils/ethicsFormMerge");
-const { ensureReviewPipeline, assertStagesBeforeDirector, getCurrentReviewStage, defaultReviewPipeline, STAGE_STATUS } = require("../utils/proposalReviewPipeline");
+const { ensureReviewPipeline, getCurrentReviewStage, defaultReviewPipeline, STAGE_STATUS, isVoluntaryProposal } = require("../utils/proposalReviewPipeline");
 const { recordAudit } = require("../utils/audit");
 
 function resolveProposalKind(doc) {
@@ -577,20 +577,41 @@ throw new AppError(e.message, 400);
     throw new AppError("Ethics must be approved before final proposal decision", 400);
   }
 
-  // Multi-stage reviews are tracked for oversight, but after Ethics Committee clearance
-  // the Director must be able to approve and create the project without being blocked.
+  // Soft-pass incomplete oversight stages after ethics clearance so Director can create the project.
+  // Never soft-pass a FAILED stage.
   if (decision === PROPOSAL_STATUSES.APPROVED) {
     const pipe = ensureReviewPipeline(proposal);
-    const pipelineStarted = [pipe.adminScreening, pipe.peerReview, pipe.committeeReview, pipe.financeReview].some(
-      (s) => s.status !== STAGE_STATUS.PENDING
-    );
-    if (pipelineStarted) {
-      try {
-        assertStagesBeforeDirector(proposal);
-      } catch (e) {
-// Soft-pass: do not block project creation when ethics is cleared (or not required).
-      }
+    const criticalStages = [pipe.adminScreening, pipe.peerReview, pipe.committeeReview];
+    if (!isVoluntaryProposal(proposal)) criticalStages.push(pipe.financeReview);
+    const failed = criticalStages.filter((s) => s?.status === STAGE_STATUS.FAILED);
+    if (failed.length) {
+      throw new AppError(
+        "Cannot approve: a review stage failed. Request revision or reject the proposal.",
+        400
+      );
     }
+    // #region agent log
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      fs.appendFileSync(
+        path.join(process.cwd(), "..", ".cursor", "debug-f558f7.log"),
+        `${JSON.stringify({
+          sessionId: "f558f7",
+          hypothesisId: "L1",
+          location: "proposalController.js:directorDecision",
+          message: "soft-pass check",
+          data: {
+            voluntary: isVoluntaryProposal(proposal),
+            stageStatuses: criticalStages.map((s) => s?.status),
+            blockedFailed: false,
+          },
+          timestamp: Date.now(),
+          runId: "post-fix",
+        })}\n`
+      );
+    } catch { /* ignore */ }
+    // #endregion
   }
 
   proposal.status = decision;

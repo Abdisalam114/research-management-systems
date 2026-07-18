@@ -727,7 +727,7 @@ async function getResearchJourney(req, res) {
 
   if (!researcherIdQuery) {
     if (role === "researcher") {
-      const journey = await buildResearchJourneyForResearcher(userId, tierFilter);
+      const journey = await buildResearchJourneyForResearcher(userId, tierFilter, role);
       if (!journey) throw new AppError("Researcher not found", 404);
       return res.json({ mode: "journey", ...journey });
     }
@@ -741,7 +741,7 @@ async function getResearchJourney(req, res) {
     throw new AppError("Forbidden", 403);
   }
 
-  const journey = await buildResearchJourneyForResearcher(researcherIdQuery, tierFilter);
+  const journey = await buildResearchJourneyForResearcher(researcherIdQuery, tierFilter, role);
   if (!journey) throw new AppError("Researcher not found", 404);
 
   if (role === "faculty_coordinator") {

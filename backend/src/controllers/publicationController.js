@@ -250,6 +250,15 @@ async function updatePublication(req, res) {
     pub.projectId = await requireOwnedProjectId(req, projectId, req.user.id);
   }
 
+  // Editing a rejected output returns it to draft so it can be resubmitted
+  if (pub.status === PUBLICATION_STATUSES.REJECTED) {
+    pub.status = PUBLICATION_STATUSES.DRAFT;
+    pub.validatedBy = undefined;
+    pub.validatedAt = undefined;
+    pub.validationComment = "";
+    pub.workflowStage = null;
+  }
+
   await pub.save();
   res.json({ publication: sanitizePublication(pub) });
 }
@@ -259,7 +268,9 @@ async function submitPublication(req, res) {
   const pub = await Publication.findOne(req.tierWhere({ _id: id }));
   if (!pub) throw new AppError("Publication not found", 404);
   if (String(pub.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
-  if (pub.status !== PUBLICATION_STATUSES.DRAFT) throw new AppError("Only draft publications can be submitted", 400);
+  if (![PUBLICATION_STATUSES.DRAFT, PUBLICATION_STATUSES.REJECTED].includes(pub.status)) {
+    throw new AppError("Only draft or rejected publications can be submitted", 400);
+  }
   if (!pub.projectId) {
     throw new AppError("Link this output to a research project before submitting", 400);
   }

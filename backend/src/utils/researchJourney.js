@@ -284,16 +284,23 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
     (!proposal.fundingCallId && proposal.proposalKind !== "grant_fund_call");
 
   if (!isVoluntary) {
+    const projectDone = isProjectCompleted(project);
     if (grant) {
+      const grantApplyDone = grant.status !== GRANT_STATUSES.DRAFT;
+      const awardInFlight = [
+        GRANT_STATUSES.SUBMITTED,
+        GRANT_STATUSES.PENDING_FINANCE,
+        GRANT_STATUSES.APPROVED,
+      ].includes(grant.status);
       steps.push(
-        step("grant_apply", "Grant / funding request", grant.status !== GRANT_STATUSES.DRAFT ? "completed" : "current", {
+        step("grant_apply", "Grant / funding request", grantApplyDone ? "completed" : "current", {
           at: ts(grant.submittedAt || grant.createdAt),
           link: `/grants/${grant._id}`,
           detail: grant.status,
         })
       );
       steps.push(
-        step("grant_award", "Grant awarded", grantAwarded ? "completed" : grant.status === GRANT_STATUSES.SUBMITTED ? "current" : "pending", {
+        step("grant_award", "Grant awarded", grantAwarded ? "completed" : awardInFlight ? "current" : "pending", {
           at: ts(grant.decidedAt),
           link: `/grants/${grant._id}`,
           detail: grantAwarded ? `${grant.currency || "USD"} ${grant.amountAwarded}` : grant.status,
@@ -301,9 +308,11 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
       );
     } else if (project) {
       steps.push(
-        step("grant_apply", "Grant / funding request", "pending", {
+        step("grant_apply", "Grant / funding request", projectDone ? "current" : "pending", {
           link: "/funding-calls",
-          detail: "Apply only through a Funding Call",
+          detail: projectDone
+            ? "Apply through a Funding Call"
+            : "Available after project is Completed/Closed — via Funding Calls only",
         })
       );
       steps.push(step("grant_award", "Grant awarded", "pending", { link: "/funding-calls" }));
@@ -339,10 +348,12 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
     pub &&
     [PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.VALIDATED].includes(pub.status);
   const pubDraft = pub && pub.status === PUBLICATION_STATUSES.DRAFT;
+  const pubRejected = pub && pub.status === PUBLICATION_STATUSES.REJECTED;
 
   let pubStatus = "pending";
   if (pubSubmittedOrBetter) pubStatus = "completed";
-  else if (pubDraft) pubStatus = "current";
+  else if (pubDraft || pubRejected) pubStatus = "current";
+  else if (project && isProjectCompleted(project)) pubStatus = "current";
   else if (project) pubStatus = "pending";
 
   if (pub || project) {
@@ -431,7 +442,7 @@ function buildTimelineEvents({ proposals, projects, grants, publications }) {
   return events.sort((a, b) => new Date(b.at) - new Date(a.at)).slice(0, 20);
 }
 
-async function buildResearchJourneyForResearcher(researcherId, tierFilter) {
+async function buildResearchJourneyForResearcher(researcherId, tierFilter, viewerRole = null) {
   const researcher = await User.findOne({ _id: researcherId, ...tierFilter }).select("fullName email department role");
   if (!researcher) return null;
 
@@ -439,7 +450,7 @@ async function buildResearchJourneyForResearcher(researcherId, tierFilter) {
   const [proposals, projects, grants, budgets, publications, repositoryItems] = await Promise.all([
     Proposal.find(base).sort({ updatedAt: -1 }),
     Project.find(base).sort({ updatedAt: -1 }),
-    Grant.find(base).sort({ updatedAt: -1 }),
+    Grant.find({ ...base, callId: { $ne: null, $exists: true } }).sort({ updatedAt: -1 }),
     Budget.find({ ownerResearcherId: researcherId, ...tierFilter }).sort({ updatedAt: -1 }),
     Publication.find(base).sort({ updatedAt: -1 }),
     RepositoryItem.find({ uploadedBy: researcherId, ...tierFilter }).sort({ updatedAt: -1 }),
@@ -481,18 +492,29 @@ async function buildResearchJourneyForResearcher(researcherId, tierFilter) {
       publication,
       repositoryItem,
     });
+    const canViewAwards = canViewProjectAwards({
+      role: viewerRole,
+      hasProjectPublication: publicationUnlocksAwards(publication),
+    });
+    let steps = maskGrantStepsUntilComplete(track.steps, project);
+    steps = redactAwardStepDetails(steps, canViewAwards);
+    const current =
+      steps.find((s) => s.status === "current") ||
+      steps.find((s) => s.status === "blocked") ||
+      steps.filter((s) => s.status === "completed").pop();
     const latestProgress = project?.progressReports?.[0];
     let progressPercent = null;
     if (project) {
       progressPercent =
         latestProgress?.progressPercent ??
-        (project.status === PROJECT_STATUSES.COMPLETED ? 100 : 0);
+        (isProjectCompleted(project) ? 100 : 0);
     }
     return {
-      currentStepKey: track.currentStepKey,
-      currentStepLabel: track.currentStepLabel,
-      steps: track.steps,
+      currentStepKey: current?.key || track.currentStepKey,
+      currentStepLabel: current?.label || track.currentStepLabel,
+      steps,
       progressPercent,
+      awardsVisible: canViewAwards,
     };
   }
 

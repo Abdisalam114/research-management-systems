@@ -460,7 +460,7 @@ async function exportTechnicalReportPdf(req, res) {
     "",
     "Progress reports:",
     ...(reports.length
-      ? reports.map((r, i) => `${i + 1}. ${r.reportDate ? new Date(r.reportDate).toLocaleDateString() : "—"} — ${r.summary || r.narrative || "—"} (${r.progressPercent ?? "—"}%)`)
+      ? reports.map((r, i) => `${i + 1}. ${r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"} — ${r.note || "—"} (${r.progressPercent ?? "—"}%)`)
       : ["No progress reports submitted yet."]),
     "",
     `Generated: ${new Date().toISOString()}`,
