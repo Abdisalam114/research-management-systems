@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as analyticsApi from "../services/analyticsApi";
@@ -189,9 +189,12 @@ function StepRow({ step, index }) {
   );
 }
 
-function PipelineCard({ item, kind = "project" }) {
+function PipelineCard({ item, kind = "project", onOpen }) {
   const isProject = kind === "project";
   const progress = item.progressPercent;
+  const projectHref = isProject && item.projectId ? `/projects/${item.projectId}#workflow` : null;
+  const proposalHref = !isProject && item.proposalId ? `/proposals/${item.proposalId}` : null;
+  const href = projectHref || proposalHref;
 
   return (
     <div
@@ -200,6 +203,21 @@ function PipelineCard({ item, kind = "project" }) {
         marginTop: 14,
         borderColor: isProject ? "rgba(56,189,248,0.45)" : "rgba(148,163,184,0.35)",
         borderStyle: isProject ? "solid" : "dashed",
+        cursor: href ? "pointer" : "default",
+      }}
+      role={href ? "link" : undefined}
+      tabIndex={href ? 0 : undefined}
+      onClick={(e) => {
+        if (!href || !onOpen) return;
+        if (e.target.closest("a,button")) return;
+        onOpen(href);
+      }}
+      onKeyDown={(e) => {
+        if (!href || !onOpen) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen(href);
+        }
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
@@ -207,7 +225,15 @@ function PipelineCard({ item, kind = "project" }) {
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: isProject ? "#0ea5e9" : "#64748b" }}>
             {isProject ? "Project" : "Proposal (before project)"}
           </div>
-          <div style={{ fontWeight: 900, fontSize: 17, marginTop: 4 }}>{item.title}</div>
+          <div style={{ fontWeight: 900, fontSize: 17, marginTop: 4 }}>
+            {href ? (
+              <Link to={href} style={{ color: "inherit", textDecoration: "none" }}>
+                {item.title}
+              </Link>
+            ) : (
+              item.title
+            )}
+          </div>
           <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
             {isProject ? (
               <>
@@ -217,13 +243,23 @@ function PipelineCard({ item, kind = "project" }) {
             ) : (
               <>Proposal status: <strong>{item.proposalStatus}</strong></>
             )}
-            {item.currentStepLabel ? (
-              <>
-                {" "}
-                • Current: <strong style={{ color: "#0369a1" }}>{item.currentStepLabel}</strong>
-              </>
-            ) : null}
           </div>
+          {item.currentStepLabel ? (
+            <div
+              style={{
+                marginTop: 8,
+                padding: "8px 10px",
+                borderRadius: 8,
+                background: "rgba(14,165,233,0.12)",
+                border: "1px solid rgba(14,165,233,0.35)",
+                fontSize: 13,
+              }}
+            >
+              <span style={{ fontWeight: 700, color: "#0369a1" }}>Hadda waa joogtaa:</span>{" "}
+              <strong style={{ color: "#0c4a6e" }}>{item.currentStepLabel}</strong>
+              {progress != null ? <span className="muted"> · {progress}%</span> : null}
+            </div>
+          ) : null}
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           {isProject && progress != null ? (
@@ -249,13 +285,13 @@ function PipelineCard({ item, kind = "project" }) {
               </div>
             </div>
           ) : null}
-          {isProject && item.projectId ? (
-            <Link className="btn primary" to={`/projects/${item.projectId}`} style={{ fontSize: 12 }}>
-              Open project
+          {projectHref ? (
+            <Link className="btn primary" to={projectHref} style={{ fontSize: 12 }}>
+              Open project workflow
             </Link>
           ) : null}
-          {!isProject && item.proposalId ? (
-            <Link className="btn" to={`/proposals/${item.proposalId}`} style={{ fontSize: 12 }}>
+          {proposalHref ? (
+            <Link className="btn" to={proposalHref} style={{ fontSize: 12 }}>
               Open proposal
             </Link>
           ) : null}
@@ -277,10 +313,19 @@ function PipelineCard({ item, kind = "project" }) {
 /** Projects with embedded workflow steps (Research Workflow Status page). */
 export function ResearchJourneyPanel() {
   const { accessToken, user } = useAuth();
+  const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [selectedResearcherId, setSelectedResearcherId] = useState("");
 
   const isStaff = ["research_director", "faculty_coordinator"].includes(user?.role);
+
+  const openHref = useCallback(
+    (href) => {
+      const [path, hash] = href.split("#");
+      navigate(hash ? { pathname: path, hash } : path);
+    },
+    [navigate]
+  );
 
   const load = useCallback(async () => {
     const res = await analyticsApi.researchJourney(
@@ -307,7 +352,7 @@ export function ResearchJourneyPanel() {
     <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.35)" }}>
       <div style={{ fontWeight: 800, fontSize: 16 }}>Projects & workflow progress</div>
       <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-        Each project shows the full workflow — proposal, ethics, project stages, grant, publication, and repository.
+        Guji project-ka — waxaad aadi doontaa project details oo aad arki doontaa meesha workflow-ku joogo (current step).
       </div>
       <StatusLegend />
 
@@ -360,7 +405,7 @@ export function ResearchJourneyPanel() {
             <div style={{ marginTop: 8 }}>
               <div style={{ fontWeight: 800, marginTop: 8 }}>Active projects ({projectItems.length})</div>
               {projectItems.map((item) => (
-                <PipelineCard key={item.projectId} item={item} kind="project" />
+                <PipelineCard key={item.projectId} item={item} kind="project" onOpen={openHref} />
               ))}
             </div>
           ) : null}
@@ -372,7 +417,7 @@ export function ResearchJourneyPanel() {
                 These are still in the proposal / ethics / review stage.
               </p>
               {pendingItems.map((item) => (
-                <PipelineCard key={item.proposalId} item={item} kind="proposal" />
+                <PipelineCard key={item.proposalId} item={item} kind="proposal" onOpen={openHref} />
               ))}
             </div>
           ) : null}

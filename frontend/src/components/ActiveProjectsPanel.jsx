@@ -38,7 +38,7 @@ export function ActiveProjectsPanel({ projects, totalActive, title = "Active Pro
               <th className="dashColTitle">Title</th>
               {showPi ? <th className="dashColPi">Principal Investigator</th> : null}
               <th className="dashColProgress">Progress</th>
-              <th className="dashColStatus">Status</th>
+              <th className="dashColStatus">Workflow / Status</th>
             </tr>
           </thead>
           <tbody>
@@ -49,7 +49,7 @@ export function ActiveProjectsPanel({ projects, totalActive, title = "Active Pro
                 <td className="dashColId">{p.id}</td>
                 <td className="dashColTitle" title={p.title}>
                   {p.projectId ? (
-                    <Link to={`/projects/${p.projectId}`} className="dashProjectLink">
+                    <Link to={`/projects/${p.projectId}#workflow`} className="dashProjectLink">
                       {p.title}
                     </Link>
                   ) : (
@@ -69,7 +69,18 @@ export function ActiveProjectsPanel({ projects, totalActive, title = "Active Pro
                     <span className="dashProgressPercent">{p.progressPercent ?? 0}%</span>
                   </div>
                 </td>
-                <td className="dashColStatus">{p.status}</td>
+                <td className="dashColStatus">
+                  {p.currentStepLabel || p.workflow?.currentStepLabel ? (
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 12, color: "#0369a1" }}>
+                        {p.currentStepLabel || p.workflow?.currentStepLabel}
+                      </div>
+                      <div className="muted" style={{ fontSize: 11 }}>{p.status}</div>
+                    </div>
+                  ) : (
+                    p.status
+                  )}
+                </td>
               </tr>
             );})}
             {list.length === 0 ? (

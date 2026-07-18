@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { useEffect, useRef } from "react";
+import { Link, useLocation } from "react-router-dom";
 
 const STATUS_STYLE = {
   completed: {
@@ -117,17 +118,20 @@ function StatusLegend() {
   );
 }
 
-function StepRow({ step, index }) {
+function StepRow({ step, index, highlighted }) {
   const style = STATUS_STYLE[step.status] || STATUS_STYLE.pending;
+  const isCurrent = step.status === "current";
   return (
     <div
+      id={isCurrent ? "workflow-current-step" : undefined}
       className="card"
       style={{
         marginTop: index === 0 ? 0 : 8,
         background: style.bg,
-        borderColor: style.border,
+        borderColor: highlighted || isCurrent ? "rgba(14,165,233,0.85)" : style.border,
         borderLeftWidth: 4,
         borderLeftColor: style.iconBg,
+        boxShadow: highlighted || isCurrent ? "0 0 0 2px rgba(14,165,233,0.25)" : undefined,
         display: "grid",
         gridTemplateColumns: "auto 1fr auto",
         gap: 12,
@@ -187,12 +191,51 @@ function StepRow({ step, index }) {
 
 /** Full research workflow for one project (proposal → repository). */
 export function ProjectWorkflowPanel({ workflow }) {
+  const location = useLocation();
+  const panelRef = useRef(null);
+  const progress = workflow?.progressPercent;
+  const currentLabel = workflow?.currentStepLabel;
+  const focusWorkflow =
+    location.hash === "#workflow" || Boolean(location.state?.focusWorkflow);
+
+  useEffect(() => {
+    if (!focusWorkflow || !panelRef.current) return;
+    panelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    // #region agent log
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify({
+        sessionId: "f558f7",
+        hypothesisId: "W1",
+        location: "ProjectWorkflowPanel.jsx:focus",
+        message: "scrolled to project workflow panel",
+        data: { currentLabel: currentLabel || null, hash: location.hash || null },
+        timestamp: Date.now(),
+        runId: "post-fix",
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [focusWorkflow, currentLabel, location.hash]);
+
   if (!workflow) return null;
 
-  const progress = workflow.progressPercent;
+  const visibleSteps = (workflow.steps || []).filter((step) => {
+    if (!workflow?.isVoluntary) return true;
+    return !["grant_apply", "grant_award", "budget"].includes(step.key);
+  });
 
   return (
-    <div className="card" style={{ marginTop: 16, borderColor: "rgba(56,189,248,0.35)" }}>
+    <div
+      id="project-workflow"
+      ref={panelRef}
+      className="card"
+      style={{
+        marginTop: 16,
+        borderColor: focusWorkflow ? "rgba(14,165,233,0.7)" : "rgba(56,189,248,0.35)",
+        scrollMarginTop: 88,
+      }}
+    >
       <div style={{ fontWeight: 800, fontSize: 16 }}>Research workflow — this project</div>
       <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
         {workflow?.isVoluntary
@@ -203,6 +246,27 @@ export function ProjectWorkflowPanel({ workflow }) {
               ? "Proposal → ethics → review → project → publication → repository · Grant amounts after publication."
               : "Proposal → ethics → review → project → funding-call grant → budget → publication → repository."}
       </div>
+
+      {currentLabel ? (
+        <div
+          style={{
+            marginTop: 12,
+            padding: "12px 14px",
+            borderRadius: 10,
+            background: "rgba(14,165,233,0.12)",
+            border: "1px solid rgba(14,165,233,0.45)",
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", letterSpacing: 0.4 }}>
+            Hadda waxaad joogtaa · You are here
+          </div>
+          <div style={{ fontWeight: 900, fontSize: 18, marginTop: 4, color: "#0c4a6e" }}>{currentLabel}</div>
+          {progress != null ? (
+            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{progress}% project progress</div>
+          ) : null}
+        </div>
+      ) : null}
+
       <StatusLegend />
 
       <div
@@ -217,10 +281,10 @@ export function ProjectWorkflowPanel({ workflow }) {
       >
         <div className="muted" style={{ fontSize: 13 }}>
           Proposal: <strong>{workflow.proposalStatus || "—"}</strong>
-          {workflow.currentStepLabel ? (
+          {workflow.projectStatus ? (
             <>
               {" "}
-              • Current: <strong style={{ color: "#0369a1" }}>{workflow.currentStepLabel}</strong>
+              • Project: <strong>{workflow.projectStatus}</strong>
             </>
           ) : null}
         </div>
@@ -250,26 +314,49 @@ export function ProjectWorkflowPanel({ workflow }) {
       </div>
 
       <div style={{ marginTop: 14 }}>
-        {(workflow.steps || [])
-        .filter((step) => {
-          if (!workflow?.isVoluntary) return true;
-          return !["grant_apply", "grant_award", "budget"].includes(step.key);
-        })
-        .map((step, idx) => (
-          <StepRow key={step.key} step={step} index={idx} />
+        {visibleSteps.map((step, idx) => (
+          <StepRow
+            key={step.key}
+            step={step}
+            index={idx}
+            highlighted={focusWorkflow && step.status === "current"}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-/** Compact summary for project list rows. */
-export function ProjectWorkflowSummary({ workflow }) {
-  if (!workflow?.currentStepLabel) return null;
-  return (
-    <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>
-      Workflow: <strong style={{ color: "#0369a1" }}>{workflow.currentStepLabel}</strong>
-      {workflow.progressPercent != null ? ` • ${workflow.progressPercent}% progress` : null}
+/** Compact summary for project list rows and dashboards. */
+export function ProjectWorkflowSummary({ workflow, projectId }) {
+  if (!workflow?.currentStepLabel && workflow?.progressPercent == null) return null;
+  const to = projectId ? `/projects/${projectId}#workflow` : null;
+  const body = (
+    <div
+      style={{
+        marginTop: 8,
+        padding: "8px 10px",
+        borderRadius: 8,
+        background: "rgba(14,165,233,0.08)",
+        border: "1px solid rgba(14,165,233,0.28)",
+        fontSize: 13,
+      }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", letterSpacing: 0.4 }}>
+        Workflow · meesha uu joogo
+      </div>
+      {workflow.currentStepLabel ? (
+        <div style={{ marginTop: 2, fontWeight: 800, color: "#0c4a6e" }}>{workflow.currentStepLabel}</div>
+      ) : null}
+      {workflow.progressPercent != null ? (
+        <div className="muted" style={{ marginTop: 2 }}>{workflow.progressPercent}% progress</div>
+      ) : null}
     </div>
+  );
+  if (!to) return body;
+  return (
+    <Link to={to} style={{ textDecoration: "none", color: "inherit", display: "block" }}>
+      {body}
+    </Link>
   );
 }

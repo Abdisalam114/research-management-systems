@@ -42,7 +42,7 @@ export function ProjectsListPage() {
     <div>
       <PageHeader
         title={title}
-        subtitle="Track project progress, milestones, and outputs."
+        subtitle="Fur project — arag meesha workflow-ku joogo (current step) iyo progress."
         stats={stats}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
@@ -69,8 +69,13 @@ export function ProjectsListPage() {
             {filtered.map((p) => (
               <div key={p.id} className="card">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-                  <div>
-                    <div style={{ fontWeight: 800 }}>{p.title}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Link
+                      to={`/projects/${p.id}#workflow`}
+                      style={{ fontWeight: 800, fontSize: 16, color: "inherit", textDecoration: "none" }}
+                    >
+                      {p.title}
+                    </Link>
                     <div className="muted" style={{ marginTop: 4 }}>
                       Status: {p.status}
                       {p.principalInvestigatorName || p.principalInvestigator?.fullName ? (
@@ -82,10 +87,10 @@ export function ProjectsListPage() {
                         </>
                       ) : null}
                     </div>
-                    <ProjectWorkflowSummary workflow={p.workflow} />
+                    <ProjectWorkflowSummary workflow={p.workflow} projectId={p.id} />
                   </div>
-                  <Link className="btn" to={`/projects/${p.id}`}>
-                    Details
+                  <Link className="btn primary" to={`/projects/${p.id}#workflow`}>
+                    Open workflow
                   </Link>
                 </div>
               </div>
