@@ -72,34 +72,7 @@ async function adminScreening(req, res) {
       }
     }
   }
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    const line = JSON.stringify({
-      sessionId: "f558f7",
-      hypothesisId: "E",
-      location: "proposalReviewController.js:adminScreening",
-      message: "Admin screening done",
-      data: {
-        decision,
-        assignedCount: (proposal.assignedReviewers || []).length,
-        peerReviewerNotified: decision === "pass" && (proposal.assignedReviewers || []).length > 0,
-      },
-      timestamp: Date.now(),
-      runId: "post-fix",
-    });
-    fs.appendFileSync(path.join(process.cwd(), "..", "debug-f558f7.log"), `${line}\n`);
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: line,
-    }).catch(() => {});
-  } catch (_) { /* ignore */ }
-  // #endregion
-
-  res.json({ message: "Admin screening saved", proposal: sanitizeProposalBrief(proposal) });
+res.json({ message: "Admin screening saved", proposal: sanitizeProposalBrief(proposal) });
 }
 
 async function submitPeerReview(req, res) {

@@ -50,39 +50,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
   // Peer reviewer power: assigned → can score immediately (no screening wait)
   const canSubmitPeerReview = (assigned || isDirector) && !peerDone;
   const canAssignReviewers = isDirector;
-
-  // #region agent log
-  useEffect(() => {
-    if (typeof window === "undefined" || !isPeerReviewer) return;
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "G",
-        location: "ProposalMultiStageReview.jsx:peerPower",
-        message: "Peer reviewer power check",
-        data: {
-          userId: user?.id || null,
-          assigned,
-          peerDone,
-          screeningPassed,
-        canSubmitPeerReview,
-          screeningPassed,
-          note: "peer can submit when assigned without screening wait",
-          assignedRaw: (proposal.assignedReviewers || []).map((r) => ({
-            userId: r.userId,
-            resolved: reviewerRefId(r.userId),
-          })),
-        },
-        timestamp: Date.now(),
-        runId: "post-fix",
-      }),
-    }).catch(() => {});
-  }, [isPeerReviewer, user?.id, assigned, peerDone, screeningPassed, canSubmitPeerReview, proposal.assignedReviewers]);
-  // #endregion
-
-  useEffect(() => {
+useEffect(() => {
     if (!canAssignReviewers || !accessToken) return;
     let cancelled = false;
     (async () => {
@@ -100,32 +68,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
       cancelled = true;
     };
   }, [canAssignReviewers, accessToken, proposal.id, proposal.assignedReviewers]);
-
-  // #region agent log
-  useEffect(() => {
-    if (typeof window === "undefined" || !canAssignReviewers) return;
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "B",
-        location: "ProposalMultiStageReview.jsx:render",
-        message: "Review UI loaded — assign reviewers control present?",
-        data: {
-          proposalId: proposal?.id || null,
-          assignedCount: (proposal?.assignedReviewers || []).length,
-          hasAssignUiInThisComponent: true,
-          peerReviewerOptions: peerReviewers.length,
-        },
-        timestamp: Date.now(),
-        runId: "post-fix",
-      }),
-    }).catch(() => {});
-  }, [canAssignReviewers, proposal?.id, proposal?.assignedReviewers, peerReviewers.length]);
-  // #endregion
-
-  async function run(fn) {
+async function run(fn) {
     setBusy(true);
     setErr("");
     setAssignMsg("");
@@ -158,22 +101,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
     try {
       await proposalApi.assignReviewers(accessToken, proposal.id, selectedReviewerIds);
       setAssignMsg("Reviewers assigned — they will get a notification.");
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          hypothesisId: "A",
-          location: "ProposalMultiStageReview.jsx:assignSelected",
-          message: "Frontend called assignReviewers API",
-          data: { proposalId: proposal.id, reviewerIds: selectedReviewerIds },
-          timestamp: Date.now(),
-          runId: "post-fix",
-        }),
-      }).catch(() => {});
-      // #endregion
-      await onReload();
+await onReload();
     } catch (e) {
       setErr(e?.response?.data?.message || "Assign reviewers failed");
     } finally {

@@ -90,22 +90,7 @@ export function ProposalReviewPage() {
     setBusy(true);
     setError("");
     try {
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          hypothesisId: "G",
-          location: "ProposalReview.jsx:clearEthicsAsCommittee",
-          message: "committee clearing ethics",
-          data: { ethicsId: ethics.id, proposalId: id },
-          timestamp: Date.now(),
-          runId: "pre-fix",
-        }),
-      }).catch(() => {});
-      // #endregion
-      await ethicsApi.directorDecision(accessToken, ethics.id, { decision: "approve" });
+await ethicsApi.directorDecision(accessToken, ethics.id, { decision: "approve" });
       await load();
     } catch (e) {
       setError(e?.response?.data?.message || "Ethics clearance failed");
@@ -242,29 +227,7 @@ export function ProposalReviewPage() {
               setBusy(true);
               setError("");
               try {
-                // #region agent log
-                fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-                  body: JSON.stringify({
-                    sessionId: "f558f7",
-                    hypothesisId: "I",
-                    location: "ProposalReview.jsx:submitDecision",
-                    message: "director submitting proposal decision",
-                    data: {
-                      proposalId: id,
-                      selected,
-                      ethicsApproved,
-                      proposalStatus: proposal.status,
-                      proposalEthicsStatus: proposal.ethicsStatus,
-                      ethicsAppStatus: ethics?.status || null,
-                    },
-                    timestamp: Date.now(),
-                    runId: "pre-fix",
-                  }),
-                }).catch(() => {});
-                // #endregion
-                if (isCoordinator) {
+if (isCoordinator) {
                   await proposalApi.coordinatorReview(accessToken, id, selected, comment.trim());
                 } else if (isDirector) {
                   await proposalApi.directorDecision(accessToken, id, selected, comment.trim());
@@ -272,22 +235,7 @@ export function ProposalReviewPage() {
                 setComment("");
                 await load();
               } catch (e) {
-                // #region agent log
-                fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-                  body: JSON.stringify({
-                    sessionId: "f558f7",
-                    hypothesisId: "I",
-                    location: "ProposalReview.jsx:submitDecision:error",
-                    message: "director decision failed",
-                    data: { err: e?.response?.data?.message || String(e?.message || "") },
-                    timestamp: Date.now(),
-                    runId: "pre-fix",
-                  }),
-                }).catch(() => {});
-                // #endregion
-                setError(e?.response?.data?.message || "Action failed");
+setError(e?.response?.data?.message || "Action failed");
               } finally {
                 setBusy(false);
               }

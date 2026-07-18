@@ -98,22 +98,7 @@ export function EthicsDirectorDecisionModal({
           chairpersonLine: defaultSignatory?.line || defaultSignatory?.name || "",
           signatoryTitle: defaultSignatory?.title || "Chairperson",
         });
-        // #region agent log
-        fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-          body: JSON.stringify({
-            sessionId: "f558f7",
-            hypothesisId: "E",
-            location: "EthicsDirectorDecisionModal.jsx:preview",
-            message: "loaded chairperson options",
-            data: { count: options.length, keys: options.map((s) => s.key), defaultKey },
-            timestamp: Date.now(),
-            runId: "pre-fix",
-          }),
-        }).catch(() => {});
-        // #endregion
-      } catch (e) {
+} catch (e) {
         if (!cancelled) {
           setSignatories(FALLBACK_CHAIRPERSONS);
           setSignatoryKey("kasim");
@@ -123,22 +108,7 @@ export function EthicsDirectorDecisionModal({
             signatoryTitle: "Chairperson",
           }));
           setLocalError(e?.response?.data?.message || "Could not load certificate preview");
-          // #region agent log
-          fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-            body: JSON.stringify({
-              sessionId: "f558f7",
-              hypothesisId: "E",
-              location: "EthicsDirectorDecisionModal.jsx:previewError",
-              message: "preview failed — using fallback chairpersons",
-              data: { status: e?.response?.status || null, msg: e?.response?.data?.message || String(e?.message || "") },
-              timestamp: Date.now(),
-              runId: "pre-fix",
-            }),
-          }).catch(() => {});
-          // #endregion
-        }
+}
       } finally {
         if (!cancelled) setPreviewLoading(false);
       }
@@ -173,22 +143,7 @@ export function EthicsDirectorDecisionModal({
         signatoryTitle: found.title || "Chairperson",
       }));
     }
-    // #region agent log
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "F",
-        location: "EthicsDirectorDecisionModal.jsx:handleSignatoryChange",
-        message: "chairperson selected",
-        data: { key, line: found?.line || null },
-        timestamp: Date.now(),
-        runId: "pre-fix",
-      }),
-    }).catch(() => {});
-    // #endregion
-  }
+}
 
   if (!open) return null;
 

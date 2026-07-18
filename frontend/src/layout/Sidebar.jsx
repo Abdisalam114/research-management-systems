@@ -43,30 +43,7 @@ export function Sidebar({ onNavigate }) {
     if (!nav) return;
     const active = nav.querySelector(".navItem.active");
     active?.scrollIntoView({ block: "nearest", behavior: "instant" });
-
-    // #region agent log
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "15a9cf" },
-      body: JSON.stringify({
-        sessionId: "15a9cf",
-        location: "Sidebar.jsx:useEffect",
-        message: "sidebar nav scroll state",
-        data: {
-          path: location.pathname,
-          navScrollHeight: nav.scrollHeight,
-          navClientHeight: nav.clientHeight,
-          navScrollTop: nav.scrollTop,
-          navCanScroll: nav.scrollHeight > nav.clientHeight + 1,
-          activeLabel: active?.querySelector(".navLabel")?.textContent || null,
-        },
-        timestamp: Date.now(),
-        hypothesisId: "A",
-        runId: "pre-fix",
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [location.pathname]);
+}, [location.pathname]);
 
   function handleNavClick() {
     onNavigate?.();

@@ -61,11 +61,14 @@ const GRANT_AWARD_KEY = "grant_award";
 const GRANT_APPLY_KEY = "grant_apply";
 
 function isProjectCompleted(project) {
-  return project?.status === PROJECT_STATUSES.COMPLETED;
+  return (
+    project?.status === PROJECT_STATUSES.COMPLETED ||
+    project?.status === PROJECT_STATUSES.CLOSED
+  );
 }
 
 const GRANTS_LOCKED_DETAIL =
-  "Ma muuqdaan ilaa project-ku noqdo Completed · Hidden until project is Completed";
+  "Ma muuqdaan ilaa project-ku noqdo Completed/Closed · Hidden until project is Completed or Closed";
 
 /** Until project is completed, keep grant steps visible but non-actionable.
  *  Do not erase real completed grant work (call-linked awards already done).
@@ -175,7 +178,9 @@ function buildProjectCompletedStep(project) {
   const link = `/projects/${project._id}`;
   const hasProgress = (project.progressReports?.length || 0) > 0;
   const latestProgress = project.progressReports?.[0];
-  const isCompleted = project.status === PROJECT_STATUSES.COMPLETED;
+  const isCompleted =
+    project.status === PROJECT_STATUSES.COMPLETED ||
+    project.status === PROJECT_STATUSES.CLOSED;
   const isOnHold = project.status === PROJECT_STATUSES.ON_HOLD;
 
   let completeStatus = "pending";

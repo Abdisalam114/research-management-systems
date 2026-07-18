@@ -112,26 +112,7 @@ export function PublicationsPage() {
           return next;
         });
         setAutoFilled(true);
-        // #region agent log
-        fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-          body: JSON.stringify({
-            sessionId: "f558f7",
-            hypothesisId: "M",
-            location: "Publications.jsx:autoFill",
-            message: "publication form auto-filled from project",
-            data: {
-              projectId: form.projectId,
-              hasTitle: Boolean(p?.title),
-              authorPreview: authorsFromProject(p, user).slice(0, 80),
-            },
-            timestamp: Date.now(),
-            runId: "pre-fix",
-          }),
-        }).catch(() => {});
-        // #endregion
-      } catch {
+} catch {
         if (!cancelled) setLinkedProject(null);
       }
     })();

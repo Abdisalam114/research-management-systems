@@ -95,29 +95,7 @@ async function afterPublicationSubmitted(req, pub) {
   } catch {
     /* best-effort */
   }
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(process.cwd(), "..", ".cursor", "debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "Q1",
-        location: "publicationSideEffects.js:afterPublicationSubmitted",
-        message: "publication cascade side effects",
-        data: effects,
-        timestamp: Date.now(),
-        runId: "post-fix",
-      })}\n`
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-
-  return effects;
+return effects;
 }
 
 module.exports = {

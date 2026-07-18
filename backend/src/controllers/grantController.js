@@ -232,27 +232,7 @@ async function listGrants(req, res) {
   if (role === "donor_agency") {
     filter.status = { $nin: ["draft"] };
   }
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(process.cwd(), "..", "debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "L",
-        location: "grantController.js:listGrants",
-        message: "list grants funding-call only filter",
-        data: { role, hasCallIdFilter: true, callIdQuery: callId || null, projectId: projectId || null },
-        timestamp: Date.now(),
-        runId: "pre-fix",
-      })}\n`
-    );
-  } catch { /* ignore */ }
-  // #endregion
-
-  const grants = await Grant.find(req.tierWhere(filter))
+const grants = await Grant.find(req.tierWhere(filter))
     .sort({ createdAt: -1 })
     .populate("projectId", "title status")
     .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId")

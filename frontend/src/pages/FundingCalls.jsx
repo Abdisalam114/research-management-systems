@@ -155,22 +155,7 @@ export function FundingCallsPage() {
         amountCap: Number(form.amountCap) || 0,
         deadline: form.deadline || null,
       };
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          hypothesisId: "B",
-          location: "FundingCalls.jsx:handleSave",
-          message: "client save funding call",
-          data: { role: user?.role, callType: payload.callType, editing: Boolean(editingId) },
-          timestamp: Date.now(),
-          runId: "pre-fix",
-        }),
-      }).catch(() => {});
-      // #endregion
-      if (editingId) {
+if (editingId) {
         await fundingCallApi.updateFundingCall(accessToken, editingId, payload);
         setMessage("Funding call updated successfully.");
       } else {
@@ -194,22 +179,7 @@ export function FundingCallsPage() {
     setBusy(true);
     setError("");
     try {
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          hypothesisId: "C",
-          location: "FundingCalls.jsx:publish",
-          message: "client publish funding call",
-          data: { role: user?.role, callId: id },
-          timestamp: Date.now(),
-          runId: "pre-fix",
-        }),
-      }).catch(() => {});
-      // #endregion
-      await fundingCallApi.publishFundingCall(accessToken, id);
+await fundingCallApi.publishFundingCall(accessToken, id);
       setMessage(
         isLeadership
           ? "Funding call approved and published — eligible researchers have been notified."

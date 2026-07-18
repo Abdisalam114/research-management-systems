@@ -28,9 +28,26 @@ function attachPrincipalInvestigator(out, p) {
     const displayName = userDisplayName(researcher);
     out.principalInvestigator = { id: researcher._id, fullName: displayName, email: researcher.email, department: researcher.department };
     out.principalInvestigatorName = displayName;
-  } else if (name) out.principalInvestigatorName = name;
+  } else if (name && name !== "—") {
+    out.principalInvestigatorName = name;
+    if (piId) out.principalInvestigator = { id: piId, fullName: name };
+  } else if (name) {
+    out.principalInvestigatorName = name;
+  }
   if (piId) out.principalInvestigatorId = String(piId);
   return out;
+}
+
+async function resolveProjectIsVoluntary(req, project) {
+  if (!project?.proposalId) return true;
+  const linkedProposal = await Proposal.findOne(req.tierWhere({ _id: project.proposalId })).select(
+    "proposalKind fundingCallId"
+  );
+  if (!linkedProposal) return true;
+  const proposalKind =
+    linkedProposal.proposalKind ||
+    (linkedProposal.fundingCallId ? "grant_fund_call" : "voluntary");
+  return proposalKind === "voluntary" || (!linkedProposal.fundingCallId && proposalKind !== "grant_fund_call");
 }
 
 function sanitizeProject(p) {
@@ -211,15 +228,20 @@ async function submitClosure(req, res) {
     throw new AppError("Closure already in progress", 400);
   }
 
+  const isVoluntary = await resolveProjectIsVoluntary(req, project);
   const checklistData = checklist || {};
   const mergedChecklist = {
     publicationsArchived: Boolean(checklistData.publicationsArchived),
     assetsHandedOver: Boolean(checklistData.assetsHandedOver),
     dataArchived: Boolean(checklistData.dataArchived),
-    financialCleared: Boolean(checklistData.financialCleared),
+    // Voluntary projects have no finance track — treat as cleared automatically
+    financialCleared: isVoluntary ? true : Boolean(checklistData.financialCleared),
     ethicsClosed: Boolean(checklistData.ethicsClosed),
   };
-  const allChecked = Object.values(mergedChecklist).every(Boolean);
+  const requiredKeys = isVoluntary
+    ? ["publicationsArchived", "assetsHandedOver", "dataArchived", "ethicsClosed"]
+    : Object.keys(mergedChecklist);
+  const allChecked = requiredKeys.every((k) => Boolean(mergedChecklist[k]));
   if (!allChecked) {
     throw new AppError("Complete the closure checklist before submitting", 400);
   }
@@ -268,26 +290,53 @@ async function directorClosureApproval(req, res) {
     throw new AppError("No closure pending director approval", 400);
   }
 
-  project.closure.status = CLOSURE_STATUSES.DIRECTOR_APPROVED;
+  const isVoluntary = await resolveProjectIsVoluntary(req, project);
   project.closure.directorApprovedAt = new Date();
   project.closure.directorApprovedBy = req.user.id;
   if (comment) project.closure.auditNotes = `${project.closure.auditNotes || ""}\n[Director] ${comment}`.trim();
+
+  if (isVoluntary) {
+    // No finance stage for voluntary research — ready to archive after director
+    project.closure.status = CLOSURE_STATUSES.FINANCE_APPROVED;
+    project.closure.financeApprovedAt = new Date();
+    project.closure.financeApprovedBy = req.user.id;
+    project.closure.checklist = {
+      ...(project.closure.checklist || {}),
+      financialCleared: true,
+    };
+  } else {
+    project.closure.status = CLOSURE_STATUSES.DIRECTOR_APPROVED;
+  }
   await project.save();
 
-  try {
-    await notifyUsersByRole("finance_officer", {
-      type: "project",
-      title: "Project closure pending finance",
-      body: project.title,
-      link: `/projects/${project._id}`,
-    }, req.programTier);
-  } catch { /* best-effort */ }
+  if (!isVoluntary) {
+    try {
+      await notifyUsersByRole("finance_officer", {
+        type: "project",
+        title: "Project closure pending finance",
+        body: project.title,
+        link: `/projects/${project._id}`,
+      }, req.programTier);
+    } catch { /* best-effort */ }
+  } else {
+    try {
+      await notifyUser(project.researcherId, {
+        type: "project",
+        title: "Closure approved — ready to archive",
+        body: project.title,
+        link: `/projects/${project._id}`,
+        programTier: req.programTier,
+      });
+    } catch { /* best-effort */ }
+  }
 
   await recordAudit({
     entityType: "project",
     entityId: project._id,
-    action: "closure_director_approved",
-    label: "Director approved closure",
+    action: isVoluntary ? "closure_director_approved_voluntary" : "closure_director_approved",
+    label: isVoluntary
+      ? "Director approved voluntary closure (finance skipped)"
+      : "Director approved closure",
     detail: project.title,
     actorId: req.user.id,
     actorRole: req.user.role,

@@ -41,27 +41,7 @@ async function getPolicy(req, res) {
 async function createPolicy(req, res) {
   const { title, body, category, status } = req.body || {};
   if (!title) throw new AppError("title is required", 400);
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(process.cwd(), "..", "debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "D",
-        location: "policyController.js:createPolicy",
-        message: "leadership creating institutional policy",
-        data: { role: req.user.role, category: category || "general", status: status || "published" },
-        timestamp: Date.now(),
-        runId: "pre-fix",
-      })}\n`
-    );
-  } catch { /* ignore */ }
-  // #endregion
-
-  const policy = await InstitutionalPolicy.create(req.tierAssign({
+const policy = await InstitutionalPolicy.create(req.tierAssign({
     title: String(title).trim(),
     body: body != null ? String(body) : "",
     category: ["research", "funding", "ethics", "general"].includes(category) ? category : "general",

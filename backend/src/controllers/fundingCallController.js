@@ -90,27 +90,7 @@ async function createFundingCall(req, res) {
   } else {
     throw new AppError("Forbidden", 403);
   }
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(process.cwd(), "..", "debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "A",
-        location: "fundingCallController.js:createFundingCall",
-        message: "create funding call role/type resolution",
-        data: { role, requestedType: callType || null, resolvedType },
-        timestamp: Date.now(),
-        runId: "pre-fix",
-      })}\n`
-    );
-  } catch { /* ignore */ }
-  // #endregion
-
-  if (resolvedType === "external" && !(donorRef || "").trim()) {
+if (resolvedType === "external" && !(donorRef || "").trim()) {
     throw new AppError("Donor / agency reference is required for external funding calls", 400);
   }
 
@@ -198,27 +178,7 @@ async function publishFundingCall(req, res) {
   const role = req.user.role;
   const canPublish =
     role === "leadership" || (role === "research_director" && call.callType === "internal");
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(process.cwd(), "..", "debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "C",
-        location: "fundingCallController.js:publishFundingCall",
-        message: "publish funding call authorization",
-        data: { role, callType: call.callType, callStatus: call.status, canPublish },
-        timestamp: Date.now(),
-        runId: "pre-fix",
-      })}\n`
-    );
-  } catch { /* ignore */ }
-  // #endregion
-
-  if (!canPublish) {
+if (!canPublish) {
     throw new AppError("Only Leadership can approve funding calls for publication (Director may publish internal calls)", 403);
   }
 

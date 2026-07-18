@@ -57,37 +57,6 @@ export function ProjectDetailsPage() {
     setTeamMembers(p.teamMembers?.length ? p.teamMembers : [emptyMember]);
     setStartDate(p.startDate ? p.startDate.slice(0, 10) : "");
     setEndDate(p.endDate ? p.endDate.slice(0, 10) : "");
-    // #region agent log
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "P2",
-        location: "ProjectDetails.jsx:load",
-        message: "project page sections payload",
-        data: {
-          projectId: id,
-          isVoluntary: Boolean(p.isVoluntary || p.proposalKind === "voluntary"),
-          proposalKind: p.proposalKind || null,
-          status: p.status,
-          linkedGrantsCount: p.linkedGrants?.length || 0,
-          awardsVisible: p.awardsVisible,
-          grantsVisible: p.grantsVisible,
-          workflowStepKeys: (p.workflow?.steps || []).map((s) => s.key),
-          workflowStatuses: (p.workflow?.steps || []).map((s) => `${s.key}:${s.status}`),
-          currentStep: p.workflow?.currentStepKey || null,
-          hasMilestones: (p.milestones || []).length,
-          hasTeam: (p.teamMembers || []).length,
-          hasProgress: (p.progressReports || []).length,
-          hasWorkPlan: (p.workPlan || []).length,
-          closureStatus: p.closure?.status || "none",
-        },
-        timestamp: Date.now(),
-        runId: "post-fix",
-      }),
-    }).catch(() => {});
-    // #endregion
   }
 
   useEffect(() => {
@@ -486,7 +455,9 @@ export function ProjectDetailsPage() {
             await load();
           }}>Director approve closure</button>
         ) : null}
-        {user?.role === "finance_officer" && project.closure?.status === "director_approved" ? (
+        {useruser?.role === "finance_officer" &&
+        !isVoluntary &&
+        project.closure?.status === "director_approved" ? (
           <button type="button" className="btn primary" style={{ marginTop: 8 }} onClick={async () => {
             await projectApi.financeClosureApproval(accessToken, id, "Finance cleared");
             await load();
