@@ -14,7 +14,7 @@ import { SubmitValidationAlert } from "../components/SubmitValidationAlert";
 import { isEthicsFormComplete } from "../utils/ethicsForm";
 import { getEthicsMissingFields } from "../utils/proposalSubmitValidation";
 import { ethicsApplicationToForm, emptyEthicsForm } from "../utils/ethicsFormState";
-import { buildStatusFilterStats, filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
+import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
 
 const STATUS_BADGE = {
@@ -100,7 +100,7 @@ export function EthicsPage() {
             proposalKind: kind,
           });
         }
-      } catch (_) {
+      } catch {
         proposalLoadedRef.current = true;
       }
     })();
