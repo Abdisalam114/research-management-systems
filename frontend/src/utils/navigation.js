@@ -63,7 +63,7 @@ export function getPageTitle(pathname) {
     "/grants": "Grants & Funding",
     "/budgets": "Finance & Budget",
     "/publications": "Publications",
-    "/research-workflow": "Research Workflow (Projects)",
+    "/research-workflow": "Research Workflow Status",
     "/repository": "Repository",
     "/groups": "Groups",
     "/thesis": "Thesis",

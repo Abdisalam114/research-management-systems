@@ -86,7 +86,7 @@ function RoleDashboard({ role, user }) {
   };
 
   const quickLinks = quickLinksByRole[role] || [
-    { to: "/research-workflow", label: "Research Workflow (Projects)", primary: true },
+    { to: "/research-workflow", label: "Research Workflow Status", primary: true },
     { to: "/proposals", label: "Proposals" },
     { to: "/projects", label: "Projects" },
     { to: "/publications", label: "Publications" },

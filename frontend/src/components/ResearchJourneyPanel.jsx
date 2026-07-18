@@ -352,7 +352,8 @@ export function ResearchJourneyPanel() {
     <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.35)" }}>
       <div style={{ fontWeight: 800, fontSize: 16 }}>Projects & workflow progress</div>
       <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-        Guji project-ka — waxaad aadi doontaa project details oo aad arki doontaa meesha workflow-ku joogo (current step).
+        Each project shows the full workflow — proposal, ethics, project stages, grant, publication, and repository.
+        Guji project si aad u aragto meesha aad joogto.
       </div>
       <StatusLegend />
 
