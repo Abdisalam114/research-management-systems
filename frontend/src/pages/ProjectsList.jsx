@@ -7,7 +7,11 @@ import { PageHeader } from "../components/PageHeader";
 import { ProjectWorkflowSummary } from "../components/ProjectWorkflowPanel";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 
-export function ProjectsListPage() {
+export function ProjectsListPage({
+  pageTitle,
+  pageSubtitle,
+  showExtraActions = true,
+} = {}) {
   const { accessToken, user } = useAuth();
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState("");
@@ -24,7 +28,11 @@ export function ProjectsListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const title = user?.role === "researcher" ? "My Projects" : "Projects";
+  const title =
+    pageTitle || (user?.role === "researcher" ? "My Projects" : "Projects");
+  const subtitle =
+    pageSubtitle ||
+    "Fur project — arag meesha workflow-ku joogo (current step) iyo progress.";
 
   const stats = useMemo(() => {
     const by = (s) => projects.filter((p) => p.status === s).length;
@@ -42,16 +50,22 @@ export function ProjectsListPage() {
     <div>
       <PageHeader
         title={title}
-        subtitle="Fur project — arag meesha workflow-ku joogo (current step) iyo progress."
+        subtitle={subtitle}
         stats={stats}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
         actions={
-          <>
-            <Link className="btn primary" to="/proposals">+ Start from Proposal</Link>
-            <Link className="btn" to="/publications">Publications</Link>
-            <Link className="btn" to="/funding-calls">Funding Calls</Link>
-          </>
+          showExtraActions ? (
+            <>
+              <Link className="btn primary" to="/proposals">+ Start from Proposal</Link>
+              <Link className="btn" to="/publications">Publications</Link>
+              <Link className="btn" to="/funding-calls">Funding Calls</Link>
+            </>
+          ) : (
+            <Link className="btn" to="/projects">
+              All projects
+            </Link>
+          )
         }
       />
       {statusFilter !== "all" ? (
@@ -101,4 +115,3 @@ export function ProjectsListPage() {
     </div>
   );
 }
-
