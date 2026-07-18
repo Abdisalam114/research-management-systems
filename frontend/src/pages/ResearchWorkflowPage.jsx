@@ -1,6 +1,5 @@
 import { useAuth } from "../hooks/useAuth";
 import { FacultyResearchWorkflowModule } from "../components/FacultyResearchWorkflowModule";
-import { ResearchJourneyPanel } from "../components/ResearchJourneyPanel";
 import { PageHeader } from "../components/PageHeader";
 import { Link } from "react-router-dom";
 
@@ -18,7 +17,7 @@ export function ResearchWorkflowPage() {
     <div>
       <PageHeader
         title="Research Workflow Status"
-        subtitle="Full research pipeline (proposal → ethics → project → grant → publication → repository) plus faculty publication workflow stages."
+        subtitle="Faculty publication workflow: submission → in process → pipeline → published."
         actions={
           <>
             <Link className="btn" to="/projects">
@@ -30,8 +29,6 @@ export function ResearchWorkflowPage() {
           </>
         }
       />
-
-      <ResearchJourneyPanel />
 
       <FacultyResearchWorkflowModule
         accessToken={accessToken}

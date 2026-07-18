@@ -62,7 +62,7 @@ export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, ca
     if (embedded) {
       return (
         <div className="card" style={{ marginTop: 16, borderColor: "rgba(56,189,248,0.35)" }}>
-          <div style={{ fontWeight: 800, fontSize: 16 }}>Publication workflow</div>
+          <div style={{ fontWeight: 800, fontSize: 18 }}>Faculty publication workflow</div>
           <p className="muted" style={{ marginTop: 8 }}>Loading publication workflow…</p>
         </div>
       );
@@ -201,7 +201,7 @@ export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, ca
   if (embedded) {
     return (
       <div className="card" style={{ marginTop: 16, borderColor: "rgba(56,189,248,0.35)" }}>
-        <div style={{ fontWeight: 800, fontSize: 16 }}>Publication workflow</div>
+        <div style={{ fontWeight: 800, fontSize: 18 }}>Faculty publication workflow</div>
         <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
           {departmentLabel || data?.department} — submitted → in process → pipeline → published.
         </div>
