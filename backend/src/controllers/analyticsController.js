@@ -771,6 +771,34 @@ async function getResearchJourney(req, res) {
     if (role === "researcher") {
       const journey = await buildResearchJourneyForResearcher(userId, tierFilter, role);
       if (!journey) throw new AppError("Researcher not found", 404);
+      // #region agent log
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        fs.appendFileSync(
+          path.join(__dirname, "../../../debug-f558f7.log"),
+          `${JSON.stringify({
+            sessionId: "f558f7",
+            runId: "workflow-follows-project",
+            hypothesisId: "WF2",
+            location: "analyticsController.getResearchJourney",
+            message: "journey for researcher projects",
+            data: {
+              researcherId: String(userId),
+              projectCount: journey.projects?.length || 0,
+              pendingCount: journey.pendingProposals?.length || 0,
+              sample: (journey.projects || []).slice(0, 5).map((p) => ({
+                id: String(p.projectId),
+                title: p.title,
+                status: p.projectStatus,
+                current: p.currentStepLabel,
+              })),
+            },
+            timestamp: Date.now(),
+          })}\n`
+        );
+      } catch { /* ignore */ }
+      // #endregion
       return res.json({ mode: "journey", ...journey });
     }
     if (!isStaff) throw new AppError("Forbidden", 403);

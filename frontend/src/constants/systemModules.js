@@ -2,6 +2,7 @@
 export const SYSTEM_MODULES = [
   { key: "ethics", to: "/ethics", label: "Ethics (REC)", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher", "ethics_committee"] },
   { key: "finance_grant_approvals", to: "/finance/grant-approvals", label: "Grant funding approval", icon: "💵", roles: ["finance_officer"] },
+  { key: "finance_closures", to: "/finance/closures", label: "Project closure", icon: "📁", roles: ["finance_officer"] },
   { key: "proposals_staff", to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "reviews", to: "/review-assignments", label: "Peer Reviews", icon: "✍️", roles: ["research_director", "faculty_coordinator", "researcher", "peer_reviewer"] },
   { key: "projects_staff", to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher", "hr_officer"] },

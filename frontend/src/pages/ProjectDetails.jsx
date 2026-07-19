@@ -75,6 +75,12 @@ export function ProjectDetailsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state?.workflowHint]);
 
+  useEffect(() => {
+    if (location.hash !== "#closure") return;
+    const el = document.getElementById("closure");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [location.hash, project?.id]);
+
   if (!project) return <div>{error || "Loading..."}</div>;
 
   const isOwner = String(project.researcherId) === String(user?.id);
@@ -170,7 +176,7 @@ export function ProjectDetailsPage() {
           </div>
         ) : (
           <div className="muted" style={{ marginTop: 14, fontSize: 13 }}>
-            Funding-call grants appear here after the project is Completed.
+            Linked funding will appear here when a grant is accepted for this project.
           </div>
         )}
 
@@ -199,6 +205,8 @@ export function ProjectDetailsPage() {
       </div>
 
       <ProjectWorkflowPanel
+        projectId={id}
+        proposalId={project.proposalId || null}
         workflow={{
           ...(project.workflow || {}),
           projectStatus: project.status,
@@ -210,7 +218,7 @@ export function ProjectDetailsPage() {
       {isOwner ? (
         <div className="card" style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
           <span className="muted" style={{ width: "100%", fontSize: 13, marginBottom: 4 }}>
-            Add records for this project only:
+            Add records for this project only (title auto-selected):
           </span>
           <Link className="btn" to={`/publications?projectId=${id}`}>
             + Research output
@@ -218,10 +226,18 @@ export function ProjectDetailsPage() {
           <Link className="btn" to={`/repository?projectId=${id}`}>
             + Repository file
           </Link>
+          <Link className="btn" to={`/budgets?projectId=${id}`}>
+            Budgets
+          </Link>
           {!(project.isVoluntary || project.proposalKind === "voluntary") ? (
-            <Link className="btn" to="/funding-calls">
-              Funding Calls
-            </Link>
+            <>
+              <Link className="btn" to={`/grants?projectId=${id}`}>
+                Grants
+              </Link>
+              <Link className="btn" to={`/funding-calls?projectId=${id}`}>
+                Funding Calls
+              </Link>
+            </>
           ) : null}
         </div>
       ) : null}
@@ -390,12 +406,15 @@ export function ProjectDetailsPage() {
         onLogCommunication={logCommunication}
       />
 
-      <div className="card" style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>Project closure (Phase 6)</div>
-        <p className="muted" style={{ fontSize: 13 }}>Status: {project.closure?.status || "none"} · Project: {project.status}</p>
+      <div className="card" style={{ marginTop: 12 }} id="closure">
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>Project closure (Phase 6) — Complete project</div>
+        <p className="muted" style={{ fontSize: 13 }}>
+          Status: {project.closure?.status || "none"} · Project: {project.status}
+          {["completed", "closed"].includes(project.status) ? " · Done" : ""}
+        </p>
         {isOwner && (!project.closure?.status || project.closure.status === "none") ? (
           <>
-            <div style={{ fontWeight: 700, marginBottom: 6 }}>Closure checklist</div>
+            <div style={{ fontWeight: 700, marginBottom: 6 }}>Closure checklist (all required)</div>
             <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
               {closureItems.map((item) => (
                 <label key={item.key} style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 14 }}>
@@ -413,7 +432,7 @@ export function ProjectDetailsPage() {
             </div>
             <textarea
               rows={4}
-              placeholder="Final report summary"
+              placeholder="Final report summary *"
               value={closureForm.finalReport}
               onChange={(e) => setClosureForm({ ...closureForm, finalReport: e.target.value })}
               style={{ width: "100%" }}
@@ -432,14 +451,48 @@ export function ProjectDetailsPage() {
               onChange={(e) => setClosureForm({ ...closureForm, lessonsLearned: e.target.value })}
               style={{ width: "100%", marginTop: 8 }}
             />
-            <button type="button" className="btn primary" style={{ marginTop: 8 }} onClick={async () => {
-              if (!closureForm.finalReport?.trim()) { setError("Final report required"); return; }
-              try {
-                await projectApi.submitClosure(accessToken, id, closureForm);
-                setMessage("Closure submitted");
-                await load();
-              } catch (e) { setError(e?.response?.data?.message || "Submit failed"); }
-            }}>Submit closure</button>
+            <button
+              type="button"
+              className="btn primary"
+              style={{ marginTop: 8 }}
+              onClick={async () => {
+                setError("");
+                setMessage("");
+                if (!closureForm.finalReport?.trim()) {
+                  setError("Final report required to complete the project.");
+                  return;
+                }
+                const missing = closureItems.filter((item) => !closureForm.checklist[item.key]);
+                if (missing.length) {
+                  setError(`Tick all checklist items before submit: ${missing.map((m) => m.label).join("; ")}`);
+                  return;
+                }
+                try {
+                  await projectApi.submitClosure(accessToken, id, closureForm);
+                  setMessage("Closure submitted — Director will review. Project is now Closing.");
+                  // #region agent log
+                  fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+                    body: JSON.stringify({
+                      sessionId: "f558f7",
+                      runId: "project-complete",
+                      hypothesisId: "PC1",
+                      location: "ProjectDetails.jsx:submitClosure",
+                      message: "UI closure submit ok",
+                      data: { projectId: id },
+                      timestamp: Date.now(),
+                    }),
+                  }).catch(() => {});
+                  // #endregion
+                  await load();
+                } catch (e) {
+                  setError(e?.response?.data?.message || "Submit failed");
+                }
+              }}
+            >
+              Submit closure (complete project)
+            </button>
           </>
         ) : null}
         {project.closure?.finalReport ? <div style={{ marginTop: 8, whiteSpace: "pre-wrap" }}>{project.closure.finalReport}</div> : null}
@@ -450,25 +503,76 @@ export function ProjectDetailsPage() {
           </div>
         ) : null}
         {user?.role === "research_director" && project.closure?.status === "submitted" ? (
-          <button type="button" className="btn primary" style={{ marginTop: 8 }} onClick={async () => {
-            await projectApi.directorClosureApproval(accessToken, id, "Approved");
-            await load();
-          }}>Director approve closure</button>
+          <button
+            type="button"
+            className="btn primary"
+            style={{ marginTop: 8 }}
+            onClick={async () => {
+              try {
+                setError("");
+                await projectApi.directorClosureApproval(accessToken, id, "Approved");
+                setMessage(
+                  isVoluntary
+                    ? "Director approved — ready to archive (finance skipped for voluntary)."
+                    : "Director approved — if grant was already finance-authorized, archive is ready; otherwise waiting for Finance closure."
+                );
+                await load();
+              } catch (e) {
+                setError(e?.response?.data?.message || "Director approval failed");
+              }
+            }}
+          >
+            Director approve closure
+          </button>
         ) : null}
-        {user?.role === "finance_officer" &&
+        {user?.role === "research_director" &&
         !isVoluntary &&
         project.closure?.status === "director_approved" ? (
-          <button type="button" className="btn primary" style={{ marginTop: 8 }} onClick={async () => {
-            await projectApi.financeClosureApproval(accessToken, id, "Finance cleared");
-            await load();
-          }}>Finance approve closure</button>
+          <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
+            Waiting for Finance → <strong>Project closure (Finance)</strong> queue.
+          </p>
         ) : null}
         {user?.role === "research_director" && project.closure?.status === "finance_approved" ? (
-          <button type="button" className="btn primary" style={{ marginTop: 8 }} onClick={async () => {
-            await projectApi.archiveProject(accessToken, id);
-            setMessage("Project archived");
-            await load();
-          }}>Archive project</button>
+          <button
+            type="button"
+            className="btn primary"
+            style={{ marginTop: 8 }}
+            onClick={async () => {
+              try {
+                setError("");
+                await projectApi.archiveProject(accessToken, id);
+                setMessage("Project completed and archived.");
+                // #region agent log
+                fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+                  body: JSON.stringify({
+                    sessionId: "f558f7",
+                    runId: "project-complete",
+                    hypothesisId: "PC1",
+                    location: "ProjectDetails.jsx:archive",
+                    message: "UI archive ok",
+                    data: { projectId: id },
+                    timestamp: Date.now(),
+                  }),
+                }).catch(() => {});
+                // #endregion
+                await load();
+              } catch (e) {
+                setError(e?.response?.data?.message || "Archive failed");
+              }
+            }}
+          >
+            Archive / mark project completed
+          </button>
+        ) : null}
+        {["completed", "closed"].includes(project.status) ? (
+          <div className="card" style={{ marginTop: 10, borderColor: "rgba(34,197,94,0.45)" }}>
+            <strong>Project completed.</strong>
+            <span className="muted" style={{ marginLeft: 8, fontSize: 13 }}>
+              Closure: {project.closure?.status || "—"}
+            </span>
+          </div>
         ) : null}
       </div>
     </div>

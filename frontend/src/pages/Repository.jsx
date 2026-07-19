@@ -13,9 +13,11 @@ export function RepositoryPage() {
   const { accessToken, user } = useAuth();
   const [searchParams] = useSearchParams();
   const projectIdFromUrl = searchParams.get("projectId") || "";
+  const projectLocked = Boolean(projectIdFromUrl);
   const [items, setItems] = useState([]);
   const [projects, setProjects] = useState([]);
-  const [showForm, setShowForm] = useState(false);
+  const [linkedProject, setLinkedProject] = useState(null);
+  const [showForm, setShowForm] = useState(Boolean(projectIdFromUrl));
   const [statusFilter, setStatusFilter] = useState("all");
   const [form, setForm] = useState({ title: "", description: "", access: "private", groupId: "", projectId: projectIdFromUrl });
   const [file, setFile] = useState(null);
@@ -26,6 +28,7 @@ export function RepositoryPage() {
   useEffect(() => {
     if (projectIdFromUrl) {
       setForm((f) => ({ ...f, projectId: projectIdFromUrl }));
+      setShowForm(true);
     }
   }, [projectIdFromUrl]);
 
@@ -34,11 +37,53 @@ export function RepositoryPage() {
     projectApi.listProjects(accessToken).then((res) => {
       const list = res.projects || [];
       setProjects(list);
-      if (list.length === 1) {
+      if (list.length === 1 && !projectIdFromUrl) {
         setForm((f) => (f.projectId ? f : { ...f, projectId: list[0].id }));
       }
     }).catch(() => setProjects([]));
-  }, [accessToken, canUpload]);
+  }, [accessToken, canUpload, projectIdFromUrl]);
+
+  // Auto-fill title from the opened project — no manual re-entry
+  useEffect(() => {
+    if (!form.projectId || !accessToken || !canUpload) {
+      setLinkedProject(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await projectApi.getProject(accessToken, form.projectId);
+        if (cancelled) return;
+        const p = res.project;
+        setLinkedProject(p);
+        setForm((f) => {
+          if (f.projectId !== form.projectId) return f;
+          if (f.title.trim()) return f;
+          return { ...f, title: p.title || "" };
+        });
+        // #region agent log
+        fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+          body: JSON.stringify({
+            sessionId: "f558f7",
+            runId: "auto-project-context",
+            hypothesisId: "P2",
+            location: "Repository.jsx:autofill",
+            message: "repository auto-filled from project",
+            data: { projectId: String(form.projectId), title: p.title || null, locked: projectLocked },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+      } catch {
+        if (!cancelled) setLinkedProject(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [form.projectId, accessToken, canUpload, projectLocked]);
 
   const load = useCallback(async () => {
     const params = projectIdFromUrl ? { projectId: projectIdFromUrl } : {};
@@ -105,7 +150,7 @@ export function RepositoryPage() {
 
       {projectIdFromUrl ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          Filtered to one project —{" "}
+          Project locked: <strong>{linkedProject?.title || "selected project"}</strong> — title auto-filled.{" "}
           <Link to="/repository">show all items</Link>
         </p>
       ) : null}
@@ -133,8 +178,9 @@ export function RepositoryPage() {
               <label>Research project (required)</label>
               <select
                 value={form.projectId}
-                onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value }))}
+                onChange={(e) => setForm((f) => ({ ...f, projectId: e.target.value, title: "" }))}
                 required
+                disabled={projectLocked}
               >
                 <option value="">Select project…</option>
                 {projects.map((p) => (
@@ -143,6 +189,11 @@ export function RepositoryPage() {
                   </option>
                 ))}
               </select>
+              {projectLocked ? (
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                  Taken from the project you opened — no need to choose again.
+                </div>
+              ) : null}
             </div>
             <div className="row">
               <div className="field">

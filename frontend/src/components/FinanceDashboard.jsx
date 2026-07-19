@@ -320,6 +320,9 @@ export function FinanceDashboard() {
         <Link className="btn" to="/budgets">
           Open Finance &amp; Budgets
         </Link>
+        <Link className="btn" to="/finance/closures">
+          Project closure
+        </Link>
         <Link className="btn" to="/grants?filter=pending_finance">
           Grants pending finance
         </Link>

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { withProjectContext } from "../utils/projectContextLink";
 
 const STATUS_STYLE = {
   completed: {
@@ -179,7 +180,32 @@ function StepRow({ step, index, highlighted }) {
         </span>
         {step.link ? (
           <div style={{ marginTop: 6 }}>
-            <Link className="btn" to={step.link} style={{ fontSize: 12 }}>
+            <Link
+              className="btn"
+              to={step.link}
+              style={{ fontSize: 12 }}
+              onClick={() => {
+                // #region agent log
+                fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+                  body: JSON.stringify({
+                    sessionId: "f558f7",
+                    runId: "auto-project-context",
+                    hypothesisId: "P1",
+                    location: "ProjectWorkflowPanel.jsx:Open",
+                    message: "workflow Open with project context",
+                    data: {
+                      stepKey: step.key || null,
+                      link: step.link,
+                      hasProjectId: String(step.link || "").includes("projectId="),
+                    },
+                    timestamp: Date.now(),
+                  }),
+                }).catch(() => {});
+                // #endregion
+              }}
+            >
               Open
             </Link>
           </div>
@@ -190,7 +216,7 @@ function StepRow({ step, index, highlighted }) {
 }
 
 /** Full research workflow for one project (proposal → repository). */
-export function ProjectWorkflowPanel({ workflow }) {
+export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = null }) {
   const location = useLocation();
   const panelRef = useRef(null);
   const progress = workflow?.progressPercent;
@@ -220,10 +246,15 @@ export function ProjectWorkflowPanel({ workflow }) {
 
   if (!workflow) return null;
 
-  const visibleSteps = (workflow.steps || []).filter((step) => {
-    if (!workflow?.isVoluntary) return true;
-    return !["grant_apply", "grant_award", "budget"].includes(step.key);
-  });
+  const visibleSteps = (workflow.steps || [])
+    .filter((step) => {
+      if (!workflow?.isVoluntary) return true;
+      return !["grant_apply", "grant_award", "budget"].includes(step.key);
+    })
+    .map((step) => ({
+      ...step,
+      link: withProjectContext(step.link, { projectId, proposalId }),
+    }));
 
   return (
     <div
@@ -237,6 +268,11 @@ export function ProjectWorkflowPanel({ workflow }) {
       }}
     >
       <div style={{ fontWeight: 800, fontSize: 16 }}>Research workflow — this project</div>
+      {projectId ? (
+        <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+          Open buttons keep this project selected — no need to re-enter the title.
+        </div>
+      ) : null}
       <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
         {workflow?.isVoluntary
           ? "Proposal → ethics → review → project → publication → repository (no grants/budget)."

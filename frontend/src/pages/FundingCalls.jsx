@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
@@ -89,6 +89,8 @@ function formatMoney(amount, currency) {
 
 export function FundingCallsPage() {
   const { accessToken, user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const projectIdFromUrl = searchParams.get("projectId") || "";
   const isDirector = user?.role === "research_director";
   const isDonor = user?.role === "donor_agency";
   const isLeadership = user?.role === "leadership";
@@ -370,6 +372,13 @@ await fundingCallApi.publishFundingCall(accessToken, id);
           </>
         }
       />
+
+      {projectIdFromUrl ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Applying from a project — project context stays selected on Apply.{" "}
+          <Link to="/funding-calls">clear project filter</Link>
+        </p>
+      ) : null}
 
       {message ? <div className="fundingCallsBanner fundingCallsBannerOk">{message}</div> : null}
       {error ? <div className="fundingCallsBanner fundingCallsBannerErr">{error}</div> : null}
@@ -677,7 +686,14 @@ await fundingCallApi.publishFundingCall(accessToken, id);
 
               <div className="fundingCallActions">
                 {isResearcher && c.status === "open" && !(grantsByCallId[String(c.id)] || []).length ? (
-                  <Link className="btn primary" to={`/grants/apply?callId=${c.id}`}>
+                  <Link
+                    className="btn primary"
+                    to={
+                      projectIdFromUrl
+                        ? `/grants/apply?callId=${c.id}&projectId=${projectIdFromUrl}`
+                        : `/grants/apply?callId=${c.id}`
+                    }
+                  >
                     Apply via this call
                   </Link>
                 ) : null}

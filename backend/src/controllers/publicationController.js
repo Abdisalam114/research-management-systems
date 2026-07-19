@@ -293,10 +293,19 @@ async function submitPublication(req, res) {
 
   const sideEffects = await afterPublicationSubmitted(req, pub);
 
+  let projectCompletion = null;
+  if (pub.projectId) {
+    try {
+      const { maybeCompleteFundedProject } = require("../utils/maybeCompleteFundedProject");
+      projectCompletion = await maybeCompleteFundedProject(pub.projectId);
+    } catch { /* best-effort */ }
+  }
+
   res.json({
     message: "Publication submitted",
     publication: sanitizePublication(pub),
     sideEffects,
+    projectCompletion,
   });
 }
 

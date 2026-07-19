@@ -46,6 +46,7 @@ export function GrantApplyPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const callId = searchParams.get("callId") || "";
+  const projectIdFromUrl = searchParams.get("projectId") || "";
 
   const [call, setCall] = useState(null);
   const [proposals, setProposals] = useState([]);
@@ -170,6 +171,7 @@ export function GrantApplyPage() {
         title: autoTitle,
         callId: call.id,
         proposalId: selectedProposalId,
+        ...(projectIdFromUrl ? { projectId: projectIdFromUrl } : {}),
         donorRef: form.donorRef || call.donorRef || "",
         currency,
         amountRequested: total,

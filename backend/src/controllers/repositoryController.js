@@ -106,7 +106,15 @@ async function uploadItem(req, res) {
     uploadedBy: req.user.id,
   }));
 
-  res.status(201).json({ item: sanitizeItem(item) });
+  let projectCompletion = null;
+  if (linkedProjectId) {
+    try {
+      const { maybeCompleteFundedProject } = require("../utils/maybeCompleteFundedProject");
+      projectCompletion = await maybeCompleteFundedProject(linkedProjectId);
+    } catch { /* best-effort */ }
+  }
+
+  res.status(201).json({ item: sanitizeItem(item), projectCompletion });
 }
 
 async function getItem(req, res) {

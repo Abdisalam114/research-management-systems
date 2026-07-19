@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
@@ -7,6 +7,7 @@ import * as budgetApi from "../services/budgetApi";
 import * as paymentApi from "../services/paymentApi";
 import * as procurementApi from "../services/procurementApi";
 import * as analyticsApi from "../services/analyticsApi";
+import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
 import { statFilterLabel } from "../utils/pageHeaderFilters";
 
@@ -64,11 +65,21 @@ function formatMoney(n, currency = "USD") {
 
 export function BudgetsPage() {
   const { accessToken, user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const projectIdFromUrl = searchParams.get("projectId") || "";
+  const projectLocked = Boolean(projectIdFromUrl);
   const [budgets, setBudgets] = useState([]);
   const [payments, setPayments] = useState([]);
   const [pos, setPOs] = useState([]);
   const [financeReport, setFinanceReport] = useState(null);
-  const [newBudget, setNewBudget] = useState({ grantId: "", projectId: "", totalAllocated: 0, currency: "USD" });
+  const [projects, setProjects] = useState([]);
+  const [linkedProject, setLinkedProject] = useState(null);
+  const [newBudget, setNewBudget] = useState({
+    grantId: "",
+    projectId: projectIdFromUrl || "",
+    totalAllocated: 0,
+    currency: "USD",
+  });
   const [showTopPayment, setShowTopPayment] = useState(false);
   const [showTopPO, setShowTopPO] = useState(false);
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
@@ -80,6 +91,54 @@ export function BudgetsPage() {
   const isFinance = user?.role === "finance_officer";
   const isProcurement = user?.role === "procurement_officer";
   const canSeeFinanceReport = isDirector || isFinance;
+
+  useEffect(() => {
+    if (!projectIdFromUrl) return;
+    setNewBudget((s) => ({ ...s, projectId: projectIdFromUrl }));
+  }, [projectIdFromUrl]);
+
+  useEffect(() => {
+    if (!accessToken || !isResearcher) return;
+    projectApi
+      .listProjects(accessToken)
+      .then((res) => setProjects(res.projects || []))
+      .catch(() => setProjects([]));
+  }, [accessToken, isResearcher]);
+
+  useEffect(() => {
+    if (!projectIdFromUrl || !accessToken) {
+      setLinkedProject(null);
+      return;
+    }
+    let cancelled = false;
+    projectApi
+      .getProject(accessToken, projectIdFromUrl)
+      .then((res) => {
+        if (cancelled) return;
+        setLinkedProject(res.project || null);
+        // #region agent log
+        fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+          body: JSON.stringify({
+            sessionId: "f558f7",
+            runId: "auto-project-context",
+            hypothesisId: "P3",
+            location: "Budgets.jsx:autofill",
+            message: "budget page locked to project",
+            data: { projectId: projectIdFromUrl, title: res.project?.title || null },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+      })
+      .catch(() => {
+        if (!cancelled) setLinkedProject(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectIdFromUrl, accessToken]);
 
   const load = useCallback(async () => {
     const [b, p, po, fr] = await Promise.all([
@@ -267,9 +326,13 @@ export function BudgetsPage() {
   }
 
   const filteredBudgets = useMemo(() => {
-    if (statusFilter === "all") return budgets;
+    let list = budgets;
+    if (projectIdFromUrl) {
+      list = list.filter((b) => String(b.projectId || b.project?.id || "") === String(projectIdFromUrl));
+    }
+    if (statusFilter === "all") return list;
     if (statusFilter === "pending") {
-      return budgets.filter((b) => {
+      return list.filter((b) => {
         const pays = paymentsByBudget[String(b.id)] || [];
         const poList = posByBudget[String(b.id)] || [];
         return (
@@ -279,14 +342,14 @@ export function BudgetsPage() {
       });
     }
     if (statusFilter === "disbursed") {
-      return budgets.filter((b) => {
+      return list.filter((b) => {
         const pays = paymentsByBudget[String(b.id)] || [];
         const poList = posByBudget[String(b.id)] || [];
         return pays.some((p) => p.status === "paid") || poList.some((p) => p.status === "paid");
       });
     }
-    return budgets;
-  }, [budgets, statusFilter, paymentsByBudget, posByBudget]);
+    return list;
+  }, [budgets, statusFilter, paymentsByBudget, posByBudget, projectIdFromUrl]);
 
   const headerStats = [
     {
@@ -497,6 +560,13 @@ export function BudgetsPage() {
         </div>
       ) : null}
 
+      {projectIdFromUrl ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Project locked: <strong>{linkedProject?.title || "selected project"}</strong> —{" "}
+          <Link to="/budgets">show all budgets</Link>
+        </p>
+      ) : null}
+
       {isResearcher ? (
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ fontWeight: 800 }}>Create budget (link to Grant or Project)</div>
@@ -507,8 +577,24 @@ export function BudgetsPage() {
                 <input value={newBudget.grantId} onChange={(e) => setNewBudget((s) => ({ ...s, grantId: e.target.value }))} />
               </div>
               <div className="field">
-                <label>Project ID (optional)</label>
-                <input value={newBudget.projectId} onChange={(e) => setNewBudget((s) => ({ ...s, projectId: e.target.value }))} />
+                <label>Research project</label>
+                <select
+                  value={newBudget.projectId}
+                  disabled={projectLocked}
+                  onChange={(e) => setNewBudget((s) => ({ ...s, projectId: e.target.value }))}
+                >
+                  <option value="">Select project…</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title}
+                    </option>
+                  ))}
+                </select>
+                {projectLocked ? (
+                  <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                    Taken from the project you opened — no manual ID entry.
+                  </div>
+                ) : null}
               </div>
             </div>
             <div className="row">
@@ -536,7 +622,12 @@ export function BudgetsPage() {
                     grantId: newBudget.grantId || null,
                     projectId: newBudget.projectId || null,
                   });
-                  setNewBudget({ grantId: "", projectId: "", totalAllocated: 0, currency: "USD" });
+                  setNewBudget({
+                    grantId: "",
+                    projectId: projectIdFromUrl || "",
+                    totalAllocated: 0,
+                    currency: "USD",
+                  });
                   await reload();
                 } catch (e) {
                   setError(e?.response?.data?.message || "Failed to create budget");

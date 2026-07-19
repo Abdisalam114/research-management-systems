@@ -5,6 +5,7 @@ const { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES } = require("../models/Prop
 const { Publication, PUBLICATION_STATUSES } = require("../models/Publication");
 const { AppError } = require("../utils/AppError");
 const { ensureBudgetForGrant } = require("../utils/ensureBudgetForGrant");
+const { ensureProjectForAcceptedGrant } = require("../utils/ensureProjectForAcceptedGrant");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
 const { recordAudit } = require("../utils/audit");
 
@@ -563,6 +564,14 @@ async function directorDecision(req, res) {
   if (complianceNotes !== undefined) grant.complianceNotes = String(complianceNotes);
   await grant.save();
 
+  let projectResult = null;
+  // Accepted grant must enter Projects (create/link), not stay only on Grants
+  if (decision === GRANT_STATUSES.APPROVED) {
+    try {
+      projectResult = await ensureProjectForAcceptedGrant(grant, { programTier: req.programTier });
+    } catch { /* best-effort — finance approve will retry */ }
+  }
+
   // When a grant under a funding call is accepted, close the call (no further applications)
   if (decision === GRANT_STATUSES.APPROVED && grant.callId) {
     await closeCallAfterGrantAccepted(grant.callId, {
@@ -573,12 +582,18 @@ async function directorDecision(req, res) {
     });
   }
 
+  const projectLink = projectResult?.project?._id
+    ? `/projects/${projectResult.project._id}`
+    : grant.projectId
+      ? `/projects/${grant.projectId}`
+      : "/grants";
+
   try {
     await notifyUser(grant.researcherId, {
       type: "grant",
-      title: decision === GRANT_STATUSES.APPROVED ? "Grant approved — pending finance" : "Grant rejected",
+      title: decision === GRANT_STATUSES.APPROVED ? "Grant approved — project ready (pending finance)" : "Grant rejected",
       body: grant.title,
-      link: "/grants",
+      link: decision === GRANT_STATUSES.APPROVED ? projectLink : "/grants",
       programTier: req.programTier,
     });
     if (decision === GRANT_STATUSES.APPROVED) {
@@ -620,12 +635,17 @@ async function financeDecision(req, res) {
   grant.financeApprovedAt = new Date();
 
   let budgetResult = null;
+  let projectResult = null;
   if (decision === "approve") {
     grant.status = GRANT_STATUSES.ACTIVE;
     if (/awaiting finance approval/i.test(grant.complianceNotes || "")) {
       grant.complianceNotes = "Funding-call award authorized by finance — budget allocated (not paid).";
     }
     await grant.save();
+    // Ensure grant has a Project so it appears under Projects, not only Grants
+    try {
+      projectResult = await ensureProjectForAcceptedGrant(grant, { programTier: req.programTier });
+    } catch { /* best-effort */ }
     budgetResult = await ensureBudgetForGrant(grant);
 
     // Keep related proposal / call data consistent
@@ -690,11 +710,12 @@ async function financeDecision(req, res) {
     }
     // #endregion
     try {
+      const projectId = projectResult?.project?._id || grant.projectId;
       await notifyUser(grant.researcherId, {
         type: "grant",
-        title: "Grant budget authorized — not paid yet",
-        body: `${grant.title} — funds are allocated; payments are separate.`,
-        link: "/budgets",
+        title: "Grant authorized — project funded",
+        body: `${grant.title} — funds are allocated; open the project to continue work.`,
+        link: projectId ? `/projects/${projectId}` : "/budgets",
         programTier: req.programTier,
       });
     } catch { /* best-effort */ }

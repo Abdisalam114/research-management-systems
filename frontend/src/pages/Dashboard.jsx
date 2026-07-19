@@ -80,6 +80,7 @@ function RoleDashboard({ role, user }) {
     ],
     finance_officer: [
       { to: "/finance/grant-approvals", label: "Grant funding approval", primary: true },
+      { to: "/finance/closures", label: "Project closure" },
       { to: "/budgets", label: "Finance & budgets" },
       { to: "/grants?filter=pending_finance", label: "Grants pending finance" },
       { to: "/finance-reports", label: "Finance reports" },

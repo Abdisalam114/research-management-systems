@@ -175,22 +175,33 @@ function buildProjectCompletedStep(project) {
     return step("project_completed", "Project completed", "pending", { link: "/projects" });
   }
 
-  const link = `/projects/${project._id}`;
+  const link = `/projects/${project._id}#closure`;
   const hasProgress = (project.progressReports?.length || 0) > 0;
   const latestProgress = project.progressReports?.[0];
   const isCompleted =
     project.status === PROJECT_STATUSES.COMPLETED ||
     project.status === PROJECT_STATUSES.CLOSED;
+  const isClosing = project.status === PROJECT_STATUSES.CLOSING;
   const isOnHold = project.status === PROJECT_STATUSES.ON_HOLD;
+  const closurePending = ["submitted", "director_approved", "finance_approved"].includes(
+    project.closure?.status
+  );
 
   let completeStatus = "pending";
   if (isCompleted) completeStatus = "completed";
   else if (isOnHold) completeStatus = "blocked";
+  else if (isClosing || closurePending) completeStatus = "current";
   else if (hasProgress && (latestProgress?.progressPercent || 0) >= 90) completeStatus = "current";
 
   return step("project_completed", "Project completed", completeStatus, {
     link,
-    detail: isOnHold ? "On hold" : project.status,
+    detail: isOnHold
+      ? "On hold"
+      : isCompleted
+        ? "Completed / closed"
+        : isClosing || closurePending
+          ? `Closure: ${project.closure?.status || project.status}`
+          : project.status,
   });
 }
 
@@ -285,6 +296,9 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
 
   if (!isVoluntary) {
     const projectDone = isProjectCompleted(project);
+    const fundingLink = project ? `/funding-calls?projectId=${project._id}` : "/funding-calls";
+    const budgetLink = project ? `/budgets?projectId=${project._id}` : "/budgets";
+
     if (grant) {
       const grantApplyDone = grant.status !== GRANT_STATUSES.DRAFT;
       const awardInFlight = [
@@ -292,30 +306,33 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
         GRANT_STATUSES.PENDING_FINANCE,
         GRANT_STATUSES.APPROVED,
       ].includes(grant.status);
+      const grantLink = project
+        ? `/grants/${grant._id}?projectId=${project._id}`
+        : `/grants/${grant._id}`;
       steps.push(
         step("grant_apply", "Grant / funding request", grantApplyDone ? "completed" : "current", {
           at: ts(grant.submittedAt || grant.createdAt),
-          link: `/grants/${grant._id}`,
+          link: grantLink,
           detail: grant.status,
         })
       );
       steps.push(
         step("grant_award", "Grant awarded", grantAwarded ? "completed" : awardInFlight ? "current" : "pending", {
           at: ts(grant.decidedAt),
-          link: `/grants/${grant._id}`,
+          link: grantLink,
           detail: grantAwarded ? `${grant.currency || "USD"} ${grant.amountAwarded}` : grant.status,
         })
       );
     } else if (project) {
       steps.push(
         step("grant_apply", "Grant / funding request", projectDone ? "current" : "pending", {
-          link: "/funding-calls",
+          link: fundingLink,
           detail: projectDone
             ? "Apply through a Funding Call"
             : "Available after project is Completed/Closed — via Funding Calls only",
         })
       );
-      steps.push(step("grant_award", "Grant awarded", "pending", { link: "/funding-calls" }));
+      steps.push(step("grant_award", "Grant awarded", "pending", { link: fundingLink }));
     } else {
       steps.push(
         step("grant_apply", "Grant / funding request", "pending", {
@@ -330,14 +347,14 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
       steps.push(
         step("budget", "Budget allocated", "completed", {
           at: ts(budget.createdAt),
-          link: "/budgets",
+          link: budgetLink,
           detail: `${budget.currency || "USD"} ${budget.totalAllocated}`,
         })
       );
     } else if (grantAwarded) {
-      steps.push(step("budget", "Budget allocated", "current", { link: "/budgets", detail: "Pending budget setup" }));
+      steps.push(step("budget", "Budget allocated", "current", { link: budgetLink, detail: "Pending budget setup" }));
     } else {
-      steps.push(step("budget", "Budget allocated", "pending", { link: "/budgets" }));
+      steps.push(step("budget", "Budget allocated", "pending", { link: budgetLink }));
     }
   }
 
@@ -450,7 +467,8 @@ async function buildResearchJourneyForResearcher(researcherId, tierFilter, viewe
   const [proposals, projects, grants, budgets, publications, repositoryItems] = await Promise.all([
     Proposal.find(base).sort({ updatedAt: -1 }),
     Project.find(base).sort({ updatedAt: -1 }),
-    Grant.find({ ...base, callId: { $ne: null, $exists: true } }).sort({ updatedAt: -1 }),
+    // Include all researcher grants (call-linked and legacy) so workflow follows each project
+    Grant.find(base).sort({ updatedAt: -1 }),
     Budget.find({ ownerResearcherId: researcherId, ...tierFilter }).sort({ updatedAt: -1 }),
     Publication.find(base).sort({ updatedAt: -1 }),
     RepositoryItem.find({ uploadedBy: researcherId, ...tierFilter }).sort({ updatedAt: -1 }),

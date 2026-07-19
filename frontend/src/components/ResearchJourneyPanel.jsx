@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as analyticsApi from "../services/analyticsApi";
+import { withProjectContext } from "../utils/projectContextLink";
 
 const STATUS_STYLE = {
   completed: {
@@ -121,8 +122,9 @@ function StatusLegend() {
   );
 }
 
-function StepRow({ step, index }) {
+function StepRow({ step, index, projectId = null, proposalId = null }) {
   const style = STATUS_STYLE[step.status] || STATUS_STYLE.pending;
+  const link = withProjectContext(step.link, { projectId, proposalId });
   return (
     <div
       className="card"
@@ -177,9 +179,9 @@ function StepRow({ step, index }) {
         >
           {style.label}
         </span>
-        {step.link ? (
+        {link ? (
           <div style={{ marginTop: 6 }}>
-            <Link className="btn" to={step.link} style={{ fontSize: 12 }}>
+            <Link className="btn" to={link} style={{ fontSize: 12 }}>
               Open
             </Link>
           </div>
@@ -189,7 +191,7 @@ function StepRow({ step, index }) {
   );
 }
 
-function PipelineCard({ item, kind = "project", onOpen }) {
+function PipelineCard({ item, kind = "project", onOpen, highlighted = false }) {
   const isProject = kind === "project";
   const progress = item.progressPercent;
   const projectHref = isProject && item.projectId ? `/projects/${item.projectId}#workflow` : null;
@@ -201,8 +203,13 @@ function PipelineCard({ item, kind = "project", onOpen }) {
       className="card"
       style={{
         marginTop: 14,
-        borderColor: isProject ? "rgba(56,189,248,0.45)" : "rgba(148,163,184,0.35)",
+        borderColor: highlighted
+          ? "rgba(14,165,233,0.85)"
+          : isProject
+            ? "rgba(56,189,248,0.45)"
+            : "rgba(148,163,184,0.35)",
         borderStyle: isProject ? "solid" : "dashed",
+        boxShadow: highlighted ? "0 0 0 2px rgba(14,165,233,0.25)" : undefined,
         cursor: href ? "pointer" : "default",
       }}
       role={href ? "link" : undefined}
@@ -303,7 +310,13 @@ function PipelineCard({ item, kind = "project", onOpen }) {
           Workflow steps for this {isProject ? "project" : "proposal"}
         </div>
         {(item.steps || []).map((step, idx) => (
-          <StepRow key={step.key} step={step} index={idx} />
+          <StepRow
+            key={step.key}
+            step={step}
+            index={idx}
+            projectId={item.projectId || null}
+            proposalId={item.proposalId || null}
+          />
         ))}
       </div>
     </div>
@@ -314,6 +327,8 @@ function PipelineCard({ item, kind = "project", onOpen }) {
 export function ResearchJourneyPanel() {
   const { accessToken, user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const focusProjectId = searchParams.get("projectId") || "";
   const [data, setData] = useState(null);
   const [selectedResearcherId, setSelectedResearcherId] = useState("");
 
@@ -333,7 +348,33 @@ export function ResearchJourneyPanel() {
       isStaff && selectedResearcherId ? selectedResearcherId : undefined
     );
     setData(res);
-  }, [accessToken, isStaff, selectedResearcherId]);
+    // #region agent log
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify({
+        sessionId: "f558f7",
+        runId: "workflow-follows-project",
+        hypothesisId: "WF1",
+        location: "ResearchJourneyPanel.jsx:load",
+        message: "research workflow loaded for projects",
+        data: {
+          mode: res?.mode || null,
+          projectCount: res?.projects?.length || 0,
+          pendingCount: res?.pendingProposals?.length || 0,
+          focusProjectId: focusProjectId || null,
+          titles: (res?.projects || []).slice(0, 8).map((p) => ({
+            id: p.projectId,
+            title: p.title,
+            status: p.projectStatus,
+            current: p.currentStepLabel,
+          })),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [accessToken, isStaff, selectedResearcherId, focusProjectId]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load, [selectedResearcherId]);
 
@@ -343,18 +384,28 @@ export function ResearchJourneyPanel() {
     }
   }, [data, selectedResearcherId]);
 
-  const projectItems = data?.projects || [];
-  const pendingItems = data?.pendingProposals || [];
+  const allProjects = data?.projects || [];
+  const projectItems = useMemo(() => {
+    if (!focusProjectId) return allProjects;
+    return allProjects.filter((p) => String(p.projectId) === String(focusProjectId));
+  }, [allProjects, focusProjectId]);
+  const pendingItems = focusProjectId ? [] : data?.pendingProposals || [];
   const timeline = data?.timeline || [];
   const hasContent = projectItems.length > 0 || pendingItems.length > 0;
 
   return (
     <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.35)" }}>
-      <div style={{ fontWeight: 800, fontSize: 16 }}>Projects & workflow progress</div>
+      <div style={{ fontWeight: 800, fontSize: 16 }}>Projects &amp; workflow progress</div>
       <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-        Each project shows the full workflow — proposal, ethics, project stages, grant, publication, and repository.
-        Guji project si aad u aragto meesha aad joogto.
+        Workflow-ku wuxuu raacaa <strong>project-kasta</strong> aad sameysay — proposal, ethics, project,
+        grant, publication, repository. Guji mid si aad u aragto meesha aad joogto.
       </div>
+      {focusProjectId ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Filtered to one project —{" "}
+          <Link to="/research-workflow">show all my projects</Link>
+        </p>
+      ) : null}
       <StatusLegend />
 
       {error ? <div style={{ color: "#f87171", marginTop: 12 }}>{error}</div> : null}
@@ -404,10 +455,25 @@ export function ResearchJourneyPanel() {
 
           {projectItems.length > 0 ? (
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontWeight: 800, marginTop: 8 }}>Active projects ({projectItems.length})</div>
+              <div style={{ fontWeight: 800, marginTop: 8 }}>
+                Your projects — workflow status ({projectItems.length})
+              </div>
               {projectItems.map((item) => (
-                <PipelineCard key={item.projectId} item={item} kind="project" onOpen={openHref} />
+                <PipelineCard
+                  key={item.projectId}
+                  item={item}
+                  kind="project"
+                  onOpen={openHref}
+                  highlighted={focusProjectId && String(item.projectId) === String(focusProjectId)}
+                />
               ))}
+            </div>
+          ) : null}
+
+          {focusProjectId && !loading && projectItems.length === 0 && data?.mode === "journey" ? (
+            <div className="muted" style={{ marginTop: 12 }}>
+              That project was not found in your workflow.{" "}
+              <Link to="/research-workflow">Show all projects</Link>
             </div>
           ) : null}
 
