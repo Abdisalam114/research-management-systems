@@ -84,7 +84,7 @@ const publicationSchema = new mongoose.Schema(
     },
 
     researcherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
-    projectId: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null, index: true },
+    projectId: { type: mongoose.Schema.Types.ObjectId, ref: "Project", default: null },
     validatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
     validatedAt: { type: Date, default: null },
     validationComment: { type: String, default: "" },
@@ -92,6 +92,9 @@ const publicationSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// One output per project (1:1)
+publicationSchema.index({ projectId: 1 }, { unique: true, sparse: true });
 
 const Publication = mongoose.model("Publication", publicationSchema);
 

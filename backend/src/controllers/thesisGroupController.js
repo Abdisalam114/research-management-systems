@@ -143,6 +143,40 @@ function resolveFaculty(facultyInput, departmentInput) {
   return matchFacultyByName(departmentInput || "");
 }
 
+async function resolveThesisDepartment(req, { departmentId, department, faculty }) {
+  const facultyInput = (faculty || "").trim();
+  let cleanDepartment = department ? String(department).trim() : "";
+  let linkedDepartmentId = null;
+  let facultyValue = facultyInput;
+
+  if (departmentId) {
+    const deptDoc = await Department.findOne(req.tierWhere({ _id: departmentId }));
+    if (!deptDoc) throw new AppError("Department not found", 404);
+    if (facultyInput && deptDoc.faculty && deptDoc.faculty !== facultyInput) {
+      throw new AppError("Department does not belong to the selected faculty", 400);
+    }
+    cleanDepartment = deptDoc.name;
+    linkedDepartmentId = deptDoc._id;
+    facultyValue = deptDoc.faculty || resolveFaculty(facultyInput, cleanDepartment);
+  } else if (cleanDepartment) {
+    const deptDoc = await Department.findOne(req.tierWhere({ name: cleanDepartment }));
+    if (deptDoc) {
+      linkedDepartmentId = deptDoc._id;
+      if (facultyInput && deptDoc.faculty && deptDoc.faculty !== facultyInput) {
+        throw new AppError("Department does not belong to the selected faculty", 400);
+      }
+      facultyValue = deptDoc.faculty || resolveFaculty(facultyInput, cleanDepartment);
+    } else {
+      facultyValue = resolveFaculty(facultyInput, cleanDepartment);
+    }
+  } else {
+    throw new AppError("department is required", 400);
+  }
+
+  if (!facultyValue) facultyValue = resolveFaculty("", cleanDepartment);
+  return { cleanDepartment, linkedDepartmentId, facultyValue };
+}
+
 function ensureChapters(group) {
   if (!group.chapters || group.chapters.length === 0) {
     group.chapters = defaultChapters();
@@ -223,6 +257,7 @@ async function createGroup(req, res) {
     students,
     supervisorId,
     department,
+    departmentId,
     faculty,
     facultyResearchArea,
     meetingSchedule,
@@ -244,19 +279,18 @@ async function createGroup(req, res) {
     resolvedSupervisorId = sup._id;
   }
 
-  const facultyValue = resolveFaculty(faculty, department);
+  const { cleanDepartment, linkedDepartmentId, facultyValue } = await resolveThesisDepartment(req, {
+    departmentId,
+    department,
+    faculty,
+  });
   const coordinatorId = role === ROLES.FACULTY_COORDINATOR ? userId : null;
-  const cleanDepartment = department ? String(department).trim() : "";
 
   const leadId = resolvedSupervisorId || userId;
   const memberIds = new Set([String(leadId)]);
   if (String(leadId) !== String(userId)) memberIds.add(String(userId));
 
-  let departmentId = null;
-  if (cleanDepartment) {
-    const deptDoc = await Department.findOne(req.tierWhere({ name: cleanDepartment })).select("_id");
-    if (deptDoc) departmentId = deptDoc._id;
-  }
+  let departmentIdForGroup = linkedDepartmentId;
 
   const firstStudent = Array.isArray(students) && students[0] ? String(students[0].fullName || "").trim() : "";
   const rgNameBase = firstStudent ? `Thesis: ${firstStudent}` : "Thesis Group";
@@ -266,7 +300,7 @@ async function createGroup(req, res) {
     name: rgName,
     description: "Thesis student group (auto-created).",
     kind: GROUP_KINDS.THESIS,
-    departmentId,
+    departmentId: departmentIdForGroup,
     createdBy: userId,
     members: Array.from(memberIds).map((id) => ({
       userId: id,
@@ -315,6 +349,7 @@ async function updateGroup(req, res) {
     students,
     supervisorId,
     department,
+    departmentId,
     faculty,
     facultyResearchArea,
     meetingSchedule,
@@ -341,9 +376,20 @@ async function updateGroup(req, res) {
       group.supervisorId = sup._id;
     }
   }
-  if (department !== undefined) group.department = String(department).trim();
-  if (faculty !== undefined || department !== undefined) {
-    group.faculty = resolveFaculty(faculty !== undefined ? faculty : group.faculty, department !== undefined ? department : group.department);
+  if (department !== undefined || departmentId !== undefined || faculty !== undefined) {
+    const resolved = await resolveThesisDepartment(req, {
+      departmentId: departmentId !== undefined ? departmentId : undefined,
+      department: department !== undefined ? department : group.department,
+      faculty: faculty !== undefined ? faculty : group.faculty,
+    });
+    group.department = resolved.cleanDepartment;
+    group.faculty = resolved.facultyValue;
+    if (group.researchGroupId && resolved.linkedDepartmentId) {
+      await ResearchGroup.updateOne(
+        req.tierWhere({ _id: group.researchGroupId }),
+        { $set: { departmentId: resolved.linkedDepartmentId } }
+      );
+    }
   }
   if (facultyResearchArea !== undefined) group.facultyResearchArea = String(facultyResearchArea).trim();
   if (meetingSchedule !== undefined) group.meetingSchedule = String(meetingSchedule).trim();

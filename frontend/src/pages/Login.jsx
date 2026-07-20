@@ -85,9 +85,7 @@ export function LoginPage() {
                   return;
                 }
                 const roleHome = {
-                  ethics_committee: "/ethics",
                   procurement_officer: "/budgets",
-                  peer_reviewer: "/review-assignments",
                   hr_officer: "/projects",
                   leadership: "/grants",
                   donor_agency: "/donor-reports",

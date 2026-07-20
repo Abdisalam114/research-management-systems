@@ -7,6 +7,7 @@ function sanitize(p) {
     id: p._id,
     title: p.title,
     body: p.body,
+    moduleKey: p.moduleKey,
     category: p.category,
     status: p.status,
     updatedBy: p.updatedBy,
@@ -39,11 +40,16 @@ async function getPolicy(req, res) {
 }
 
 async function createPolicy(req, res) {
-  const { title, body, category, status } = req.body || {};
+  const { title, body, category, status, moduleKey } = req.body || {};
   if (!title) throw new AppError("title is required", 400);
-const policy = await InstitutionalPolicy.create(req.tierAssign({
+  if (!moduleKey) throw new AppError("moduleKey is required", 400);
+  const { POLICY_MODULE_KEYS } = require("../constants/institutionalPolicyCatalog");
+  if (!POLICY_MODULE_KEYS.includes(moduleKey)) throw new AppError("Invalid moduleKey", 400);
+
+  const policy = await InstitutionalPolicy.create(req.tierAssign({
     title: String(title).trim(),
     body: body != null ? String(body) : "",
+    moduleKey,
     category: ["research", "funding", "ethics", "general"].includes(category) ? category : "general",
     status: status === "draft" ? "draft" : "published",
     updatedBy: req.user.id,
@@ -69,6 +75,11 @@ async function updatePolicy(req, res) {
 
   if (req.body?.title !== undefined) policy.title = String(req.body.title).trim();
   if (req.body?.body !== undefined) policy.body = String(req.body.body);
+  if (req.body?.moduleKey !== undefined) {
+    const { POLICY_MODULE_KEYS } = require("../constants/institutionalPolicyCatalog");
+    if (!POLICY_MODULE_KEYS.includes(req.body.moduleKey)) throw new AppError("Invalid moduleKey", 400);
+    policy.moduleKey = req.body.moduleKey;
+  }
   if (req.body?.category !== undefined && ["research", "funding", "ethics", "general"].includes(req.body.category)) {
     policy.category = req.body.category;
   }

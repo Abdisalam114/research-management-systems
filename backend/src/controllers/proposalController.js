@@ -349,7 +349,7 @@ async function getProposalEthicsApplication(req, res) {
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const isOwner = String(proposal.researcherId) === String(req.user.id);
-  const isStaff = ["faculty_coordinator", "research_director", "ethics_committee", "finance_officer"].includes(req.user.role);
+  const isStaff = ["faculty_coordinator", "research_director", "finance_officer"].includes(req.user.role);
   const isAssignedReviewer = (proposal.assignedReviewers || []).some(
     (r) => refId(r.userId) === String(req.user.id)
   );
@@ -448,9 +448,9 @@ async function submitProposal(req, res) {
       link: `/proposals/${proposal._id}/review`,
     }, req.programTier);
     if (proposal.requiresEthics) {
-      await notifyUsersByRole("ethics_committee", {
+      await notifyUsersByRole("research_director", {
         type: "ethics",
-        title: "Proposal ethics ready for REC review",
+        title: "Proposal ethics ready for director review",
         body: proposal.title,
         link: proposal.ethicsApplicationId
           ? `/ethics?applicationId=${proposal.ethicsApplicationId}`
@@ -539,7 +539,7 @@ async function listProposals(req, res) {
     return;
   }
 
-  if (role === "peer_reviewer") {
+  if (role === "leadership") {
     const proposals = await Proposal.find(
       req.tierWhere({
         "assignedReviewers.userId": req.user.id,
@@ -585,7 +585,7 @@ async function getProposal(req, res) {
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const isOwner = String(proposal.researcherId) === String(req.user.id);
-  const isStaff = ["faculty_coordinator", "research_director", "ethics_committee", "finance_officer"].includes(req.user.role);
+  const isStaff = ["faculty_coordinator", "research_director", "finance_officer"].includes(req.user.role);
   const isAssignedReviewer = (proposal.assignedReviewers || []).some(
     (r) => refId(r.userId) === String(req.user.id)
   );
@@ -797,6 +797,10 @@ if (!Array.isArray(reviewerIds) || reviewerIds.length === 0) {
 
   const users = await User.find(req.tierWhere({ _id: { $in: reviewerIds }, status: "active" }));
   if (users.length !== reviewerIds.length) throw new AppError("One or more reviewers not found", 400);
+  const notLeadership = users.filter((u) => u.role !== "leadership");
+  if (notLeadership.length) {
+    throw new AppError("Peer reviewers must be University Leadership accounts", 400);
+  }
 
   const prevIds = new Set((proposal.assignedReviewers || []).map((r) => String(r.userId)));
   proposal.assignedReviewers = reviewerIds.map((userId) => ({
@@ -836,7 +840,32 @@ if (!Array.isArray(reviewerIds) || reviewerIds.length === 0) {
       /* best-effort */
     }
   }
-res.json({ message: "Reviewers assigned", proposal: sanitizeProposal(proposal) });
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const line = `${JSON.stringify({
+      sessionId: "f558f7",
+      runId: "peer-assign",
+      hypothesisId: "PA2",
+      location: "proposalController.assignReviewers",
+      message: "reviewers assigned",
+      data: {
+        proposalId: String(proposal._id),
+        title: proposal.title,
+        status: proposal.status,
+        programTier: req.programTier,
+        reviewerIds: users.map((u) => ({ id: String(u._id), email: u.email, role: u.role })),
+        notified,
+      },
+      timestamp: Date.now(),
+    })}\n`;
+    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+  res.json({ message: "Reviewers assigned", proposal: sanitizeProposal(proposal) });
 }
 
 module.exports = {

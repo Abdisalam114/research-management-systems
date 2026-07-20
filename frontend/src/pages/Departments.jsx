@@ -62,6 +62,27 @@ export function DepartmentsPage() {
     setShowForm(true);
   }
 
+  async function removeFaculty(facultyName, count) {
+    if (!count) {
+      setError("This faculty has no departments to delete.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `Delete all ${count} department(s) under "${facultyName}"?\n\nThe faculty structure stays; only its departments are removed.`
+      )
+    ) {
+      return;
+    }
+    try {
+      setError("");
+      await departmentApi.deleteFacultyDepartments(accessToken, facultyName);
+      await load();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to delete faculty departments");
+    }
+  }
+
   async function remove(id) {
     if (!window.confirm("Delete this department?")) return;
     try {
@@ -179,6 +200,7 @@ export function DepartmentsPage() {
             onAdd={() => startAddForFaculty(f.value)}
             onEdit={startEdit}
             onDelete={remove}
+            onDeleteFaculty={() => removeFaculty(f.value, departmentsByFaculty[f.value].length)}
           />
         ))}
       </div>
@@ -186,7 +208,7 @@ export function DepartmentsPage() {
   );
 }
 
-function FacultyCard({ faculty, departments, onAdd, onEdit, onDelete }) {
+function FacultyCard({ faculty, departments, onAdd, onEdit, onDelete, onDeleteFaculty }) {
   return (
     <div className="card" style={{ borderColor: "rgba(56,189,248,0.25)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -199,9 +221,23 @@ function FacultyCard({ faculty, departments, onAdd, onEdit, onDelete }) {
             {departments.length} department{departments.length === 1 ? "" : "s"}
           </div>
         </div>
-        {onAdd ? (
-          <button type="button" className="btn" onClick={onAdd}>+ Add department to this faculty</button>
-        ) : null}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {onAdd ? (
+            <button type="button" className="btn" onClick={onAdd}>+ Add department</button>
+          ) : null}
+          {onDeleteFaculty ? (
+            <button
+              type="button"
+              className="btn"
+              disabled={!departments.length}
+              style={{ borderColor: "rgba(239,68,68,0.55)", color: "#fca5a5" }}
+              onClick={onDeleteFaculty}
+              title={departments.length ? "Delete all departments in this faculty" : "No departments to delete"}
+            >
+              Delete faculty
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {departments.length ? (
@@ -219,7 +255,14 @@ function FacultyCard({ faculty, departments, onAdd, onEdit, onDelete }) {
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   <button type="button" className="btn" onClick={() => onEdit(d)}>Edit</button>
-                  <button type="button" className="btn" onClick={() => onDelete(d.id)}>Delete</button>
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{ borderColor: "rgba(239,68,68,0.45)", color: "#fca5a5" }}
+                    onClick={() => onDelete(d.id)}
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             </div>

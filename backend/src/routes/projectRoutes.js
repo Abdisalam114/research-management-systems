@@ -24,6 +24,14 @@ router.put(
   asyncHandler(projectController.updateProject)
 );
 
+router.delete(
+  "/:id",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("researcher", "research_director"),
+  asyncHandler(projectController.deleteProject)
+);
+
 router.post(
   "/:id/progress",
   authenticateUser,

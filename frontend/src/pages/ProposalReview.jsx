@@ -20,8 +20,7 @@ export function ProposalReviewPage() {
 
   const isCoordinator = user?.role === "faculty_coordinator";
   const isDirector = user?.role === "research_director";
-  const isPeerReviewer = user?.role === "peer_reviewer";
-  const isEthicsCommittee = user?.role === "ethics_committee";
+  const isLeadershipReviewer = user?.role === "leadership";
 
   const actions = useMemo(() => {
     if (isCoordinator) {
@@ -78,27 +77,6 @@ export function ProposalReviewPage() {
     }
   }
 
-  async function clearEthicsAsCommittee() {
-    if (!ethics?.id) return;
-    if (
-      !window.confirm(
-        "Clear this ethics application? Research Director will be notified to approve the proposal and create the project."
-      )
-    ) {
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-await ethicsApi.directorDecision(accessToken, ethics.id, { decision: "approve" });
-      await load();
-    } catch (e) {
-      setError(e?.response?.data?.message || "Ethics clearance failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
   if (!proposal) return <div style={{ padding: 8 }}>{error ? error : "Loading..."}</div>;
 
   const ethicsApproved =
@@ -108,17 +86,15 @@ await ethicsApi.directorDecision(accessToken, ethics.id, { decision: "approve" }
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <h2 style={{ marginTop: 0 }}>
-          {isPeerReviewer
+          {isLeadershipReviewer
             ? "Peer review — Proposal"
-            : isEthicsCommittee
-              ? "Ethics Committee review — Proposal + Ethics"
-              : "Director review — Proposal + Ethics"}
+            : "Director review — Proposal + Ethics"}
         </h2>
         <Link
           className="btn"
-          to={isPeerReviewer ? "/review-assignments" : isEthicsCommittee ? "/ethics" : `/proposals/${id}`}
+          to={isLeadershipReviewer ? "/review-assignments" : `/proposals/${id}`}
         >
-          {isPeerReviewer ? "Back to assignments" : isEthicsCommittee ? "Back to Ethics" : "Back to details"}
+          {isLeadershipReviewer ? "Back to assignments" : "Back to details"}
         </Link>
       </div>
 
@@ -164,15 +140,14 @@ await ethicsApi.directorDecision(accessToken, ethics.id, { decision: "approve" }
         <ProposalEthicsReviewPanel
           ethics={ethics}
           isDirector={isDirector}
-          isEthicsCommittee={isEthicsCommittee}
-          onApproveEthics={isEthicsCommittee ? clearEthicsAsCommittee : () => setEthicsDecisionModal("approve")}
+          onApproveEthics={() => setEthicsDecisionModal("approve")}
           onIssueCertificate={() => setEthicsDecisionModal("approve")}
           onRejectEthics={() => setEthicsDecisionModal("reject")}
           busy={busy}
         />
       ) : null}
 
-      {!isEthicsCommittee && !isPeerReviewer ? (
+      {!isLeadershipReviewer ? (
         <ProposalMultiStageReview proposal={proposal} onReload={load} />
       ) : null}
 
@@ -184,7 +159,7 @@ await ethicsApi.directorDecision(accessToken, ethics.id, { decision: "approve" }
           </div>
           {isDirector && proposal.requiresEthics && !ethicsApproved ? (
             <div className="muted" style={{ marginBottom: 10, fontSize: 13 }}>
-              Ethics Committee must clear ethics first. Then you can approve the proposal to create the project.
+              Approve ethics (certificate) above first. Then you can approve the proposal to create the project.
             </div>
           ) : null}
           {isDirector && proposal.requiresEthics && ethicsApproved ? (
@@ -220,7 +195,7 @@ await ethicsApi.directorDecision(accessToken, ethics.id, { decision: "approve" }
             }
             title={
               isDirector && selected === "approved" && !ethicsApproved
-                ? "Wait for Ethics Committee clearance first"
+                ? "Approve ethics first"
                 : undefined
             }
             onClick={async () => {

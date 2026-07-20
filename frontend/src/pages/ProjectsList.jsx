@@ -97,7 +97,7 @@ function ProjectCard({ p }) {
             Open workflow
           </Link>
           <Link className="btn" to={`/research-workflow?projectId=${p.id}`}>
-            Workflow status
+            Publish pipeline
           </Link>
         </div>
       </div>
@@ -162,6 +162,25 @@ export function ProjectsListPage({
           campus: list
             .filter((p) => /Campus Sustainability/i.test(p.title || ""))
             .map((p) => ({ title: p.title, status: p.status, kind: projectKind(p) })),
+          predictive: list
+            .filter((p) => /Predictive Analytics/i.test(p.title || ""))
+            .map((p) => ({ title: p.title, status: p.status, kind: projectKind(p) })),
+          statusBreakdown: {
+            total: list.length,
+            active: list.filter((p) => p.status === "active").length,
+            closing: list.filter((p) => p.status === "closing").length,
+            completed: list.filter((p) => ["completed", "closed"].includes(p.status)).length,
+            on_hold: list.filter((p) => p.status === "on_hold").length,
+          },
+          benchmarking: list
+            .filter((p) => /Benchmarking Gradient Boosting/i.test(p.title || ""))
+            .map((p) => ({
+              title: p.title,
+              status: p.status,
+              kind: projectKind(p),
+              isVoluntary: p.isVoluntary,
+              proposalKind: p.proposalKind,
+            })),
         },
         timestamp: Date.now(),
       }),
@@ -178,23 +197,51 @@ export function ProjectsListPage({
     pageTitle || (user?.role === "researcher" ? "My Projects" : "Projects");
   const subtitle =
     pageSubtitle ||
-    "Labada nooc: Voluntary research iyo Grant Fund Call — mid walba gooni ayaa loo liistaa.";
+    "Total = Active + Closing + Completed. Labada nooc: Voluntary iyo Grant Fund Call. Modules kale (Publications, Workflow) waxay ka akhriyaan xogtan.";
 
   const stats = useMemo(() => {
     const byStatus = (s) => projects.filter((p) => p.status === s).length;
+    const activeCount = byStatus("active");
+    const closingCount = byStatus("closing");
     const completedCount = projects.filter((p) =>
       ["completed", "closed"].includes(p.status)
     ).length;
+    const onHoldCount = byStatus("on_hold");
     const voluntaryCount = projects.filter((p) => projectKind(p) === "voluntary").length;
     const grantCount = projects.filter((p) => projectKind(p) === "grant_fund_call").length;
+    // Total = Active + Closing + Completed (+ On hold if any)
+    const sumParts = activeCount + closingCount + completedCount + onHoldCount;
+    // #region agent log
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify({
+        sessionId: "f558f7",
+        runId: "stats-formula",
+        hypothesisId: "H1",
+        location: "ProjectsList.jsx:stats",
+        message: "Total vs Active+Closing+Completed",
+        data: {
+          total: projects.length,
+          active: activeCount,
+          closing: closingCount,
+          completed: completedCount,
+          onHold: onHoldCount,
+          sumParts,
+          equals: sumParts === projects.length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     return [
       { label: "Total", value: projects.length, filterKey: "all" },
       { label: "Voluntary", value: voluntaryCount, filterKey: "kind:voluntary", accent: "#38bdf8" },
       { label: "Grant Fund", value: grantCount, filterKey: "kind:grant_fund_call", accent: "#eab308" },
-      { label: "Active", value: byStatus("active"), filterKey: "active", accent: "#38bdf8" },
-      { label: "Closing", value: byStatus("closing"), filterKey: "closing", accent: "#fcd34d" },
+      { label: "Active", value: activeCount, filterKey: "active", accent: "#38bdf8" },
+      { label: "Closing", value: closingCount, filterKey: "closing", accent: "#fcd34d" },
       { label: "Completed", value: completedCount, filterKey: "completed", accent: "#1d4ed8" },
-      { label: "On hold", value: byStatus("on_hold"), filterKey: "on_hold" },
+      ...(onHoldCount > 0 ? [{ label: "On hold", value: onHoldCount, filterKey: "on_hold" }] : []),
     ];
   }, [projects]);
 
@@ -202,6 +249,8 @@ export function ProjectsListPage({
     () =>
       filterByStatKey(projects, statusFilter, {
         customFilters: {
+          active: (p) => p.status === "active",
+          closing: (p) => p.status === "closing",
           completed: (p) => ["completed", "closed"].includes(p.status),
           "kind:voluntary": (p) => projectKind(p) === "voluntary",
           "kind:grant_fund_call": (p) => projectKind(p) === "grant_fund_call",

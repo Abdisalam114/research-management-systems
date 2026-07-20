@@ -1,15 +1,23 @@
 const { RepositoryItem, REPOSITORY_ACCESS } = require("../models/RepositoryItem");
 const { ResearchGroup } = require("../models/ResearchGroup");
+const { Project } = require("../models/Project");
 const { validateProjectQuery } = require("../utils/projectScopedRecords");
 
 async function fetchItemsForUser(req) {
   const { role } = req.user;
   const tw = (base = {}) => (req.tierWhere ? req.tierWhere(base) : base);
   const projectFilter = {};
+  const projectIdQuery = req.query?.projectId ? String(req.query.projectId) : "";
 
-  if (req.query?.projectId) {
-    await validateProjectQuery(req, req.query.projectId, { ownerOnly: role === "researcher" });
-    projectFilter.projectId = req.query.projectId;
+  if (projectIdQuery) {
+    await validateProjectQuery(req, projectIdQuery, { ownerOnly: role === "researcher" });
+    projectFilter.projectId = projectIdQuery;
+  } else if (role === "researcher") {
+    const myProjects = await Project.find(tw({ researcherId: req.user.id })).select("_id");
+    projectFilter.projectId = { $in: myProjects.map((p) => p._id) };
+  } else {
+    // Staff catalogue: project-linked only (no orphan silo)
+    projectFilter.projectId = { $ne: null, $exists: true };
   }
 
   if (["research_director", "faculty_coordinator"].includes(role)) {
@@ -17,7 +25,9 @@ async function fetchItemsForUser(req) {
   }
 
   if (role === "finance_officer") {
-    return RepositoryItem.find(tw({ access: REPOSITORY_ACCESS.INSTITUTION, ...projectFilter })).sort({ createdAt: -1 });
+    return RepositoryItem.find(tw({ access: REPOSITORY_ACCESS.INSTITUTION, ...projectFilter })).sort({
+      createdAt: -1,
+    });
   }
 
   const groups = await ResearchGroup.find(tw({ "members.userId": req.user.id })).select("_id");
@@ -29,11 +39,7 @@ async function fetchItemsForUser(req) {
     { access: REPOSITORY_ACCESS.GROUP, groupId: { $in: groupIds } },
   ];
 
-  if (Object.keys(projectFilter).length) {
-    return RepositoryItem.find(tw({ ...projectFilter, $or: accessOr })).sort({ createdAt: -1 });
-  }
-
-  return RepositoryItem.find(tw({ $or: accessOr })).sort({ createdAt: -1 });
+  return RepositoryItem.find(tw({ ...projectFilter, $or: accessOr })).sort({ createdAt: -1 });
 }
 
 function itemsToExportRows(items, fileBaseUrl = "") {

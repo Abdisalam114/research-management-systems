@@ -59,7 +59,12 @@ export function RepositoryPage() {
         setForm((f) => {
           if (f.projectId !== form.projectId) return f;
           if (f.title.trim()) return f;
-          return { ...f, title: p.title || "" };
+          const projectTitle = String(p.title || "").trim();
+          const looksLikeFunding =
+            /\b(fund|grant|award|fellowship|scholarship|challenge|call|seed)\b/i.test(projectTitle);
+          // Keep projectId locked; do not invent file titles from funding-call names
+          if (!projectTitle || looksLikeFunding) return f;
+          return { ...f, title: projectTitle };
         });
         // #region agent log
         fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
@@ -104,6 +109,64 @@ export function RepositoryPage() {
 
   const filteredItems = useMemo(() => filterByStatKey(items, statusFilter), [items, statusFilter]);
 
+  const groupedByProject = useMemo(() => {
+    const map = new Map();
+    const titleFor = (projectId, fallback) => {
+      const fromList = projects.find((x) => String(x.id) === String(projectId));
+      return fromList?.title || fallback || "Project";
+    };
+
+    for (const item of filteredItems) {
+      if (!item.projectId) continue;
+      const key = String(item.projectId);
+      if (!map.has(key)) {
+        map.set(key, {
+          projectId: key,
+          title: titleFor(key, item.projectTitle),
+          items: [],
+        });
+      }
+      map.get(key).items.push(item);
+    }
+
+    if (canUpload && !projectIdFromUrl) {
+      for (const proj of projects) {
+        const key = String(proj.id);
+        if (!map.has(key)) {
+          map.set(key, { projectId: key, title: proj.title, items: [] });
+        }
+      }
+    }
+
+    return [...map.values()].sort((a, b) => String(a.title).localeCompare(String(b.title)));
+  }, [filteredItems, projects, canUpload, projectIdFromUrl]);
+
+  function canDeleteItem(item) {
+    if (user?.role === "research_director") return true;
+    if (!canUpload || !user?.id) return false;
+    const uid = String(user.id);
+    const owner = item.uploadedBy;
+    const ownerId =
+      owner == null
+        ? ""
+        : typeof owner === "object"
+          ? String(owner._id || owner.id || "")
+          : String(owner);
+    return ownerId === uid;
+  }
+
+  async function handleDeleteItem(item) {
+    const ok = window.confirm(`Delete repository file "${item.title}"? This cannot be undone.`);
+    if (!ok) return;
+    try {
+      setError("");
+      await repositoryApi.deleteRepositoryItem(accessToken, item.id);
+      await reload();
+    } catch (e) {
+      setError(e?.response?.data?.message || e.message || "Delete failed");
+    }
+  }
+
   async function handleExport(kind) {
     try {
       setExporting(kind);
@@ -122,7 +185,11 @@ export function RepositoryPage() {
     <div>
       <PageHeader
         title="Research Repository"
-        subtitle="PDF, CSV, and Excel files — upload and export your repository catalog."
+        subtitle={
+          canUpload
+            ? "Files from My Projects only (projectId) — PDF, CSV, Excel upload & export."
+            : "Project-linked repository files — grouped by research project."
+        }
         stats={stats}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
@@ -272,25 +339,69 @@ export function RepositoryPage() {
       ) : null}
 
       <div className="card" style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800 }}>Items</div>
-        <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-          {filteredItems.map((i) => (
-            <div key={i.id} className="card">
-              <div style={{ fontWeight: 800 }}>{i.title}</div>
-              <div className="muted">
-                {i.type} • {i.access}
-                {i.projectTitle ? ` • Project: ${i.projectTitle}` : i.projectId ? " • Project linked" : ""}
+        <div style={{ fontWeight: 800 }}>Items by project</div>
+        <div style={{ display: "grid", gap: 12, marginTop: 10 }}>
+          {groupedByProject.map((group) => (
+            <div key={group.projectId} className="card" style={{ borderColor: "rgba(148,163,184,0.25)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <div>
+                  <Link
+                    to={`/projects/${group.projectId}`}
+                    style={{ fontWeight: 800, fontSize: 15, color: "inherit", textDecoration: "none" }}
+                  >
+                    {group.title}
+                  </Link>
+                  <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                    {group.items.length} file{group.items.length === 1 ? "" : "s"}
+                  </div>
+                </div>
+                {canUpload ? (
+                  <Link className="btn primary" to={`/repository?projectId=${group.projectId}`}>
+                    + Upload
+                  </Link>
+                ) : null}
               </div>
-              <div className="muted" style={{ marginTop: 6 }}>
-                File:{" "}
-                <a href={`${apiOrigin()}${i.filePath}`} target="_blank" rel="noreferrer">
-                  {i.filePath}
-                </a>
-              </div>
+
+              {group.items.length === 0 ? (
+                <p className="muted" style={{ marginTop: 10, fontSize: 13 }}>No files for this project yet.</p>
+              ) : (
+                <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                  {group.items.map((i) => (
+                    <div key={i.id} className="card" style={{ background: "rgba(15,23,42,0.03)" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                        <div>
+                          <div style={{ fontWeight: 800 }}>{i.title}</div>
+                          <div className="muted">
+                            {i.type} • {i.access}
+                          </div>
+                          <div className="muted" style={{ marginTop: 6 }}>
+                            File:{" "}
+                            <a href={`${apiOrigin()}${i.filePath}`} target="_blank" rel="noreferrer">
+                              {i.filePath}
+                            </a>
+                          </div>
+                        </div>
+                        {canDeleteItem(i) ? (
+                          <button
+                            type="button"
+                            className="btn"
+                            style={{ borderColor: "rgba(248,113,113,0.6)", color: "#f87171", alignSelf: "start" }}
+                            onClick={() => handleDeleteItem(i)}
+                          >
+                            Delete
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
-          {filteredItems.length === 0 ? (
-            <div className="muted">{items.length === 0 ? "No repository items yet." : "No items match this filter."}</div>
+          {groupedByProject.length === 0 ? (
+            <div className="muted">
+              No project-linked files. Open <Link to="/projects">Projects</Link> first, then upload from a project.
+            </div>
           ) : null}
         </div>
       </div>

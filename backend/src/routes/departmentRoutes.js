@@ -24,6 +24,13 @@ router.put(
   asyncHandler(departmentController.updateDepartment)
 );
 router.delete(
+  "/by-faculty/:faculty",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("research_director"),
+  asyncHandler(departmentController.deleteDepartmentsByFaculty)
+);
+router.delete(
   "/:id",
   authenticateUser,
   requireActiveUser,

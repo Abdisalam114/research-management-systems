@@ -75,7 +75,7 @@ router.post(
   "/:id/ethics-decision",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("research_director", "faculty_coordinator", "ethics_committee"),
+  authorizeRoles("research_director", "faculty_coordinator"),
   asyncHandler(proposalController.ethicsDecision)
 );
 

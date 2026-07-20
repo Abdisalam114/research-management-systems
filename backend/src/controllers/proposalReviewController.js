@@ -218,17 +218,20 @@ async function financeProposalReview(req, res) {
 }
 
 async function listMyReviewAssignments(req, res) {
+  const userId = req.user.id;
   const proposals = await Proposal.find(
     req.tierWhere({
-      "assignedReviewers.userId": req.user.id,
-      status: { $in: [PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW] },
+      "assignedReviewers.userId": userId,
+      status: {
+        $nin: [PROPOSAL_STATUSES.DRAFT, PROPOSAL_STATUSES.REJECTED],
+      },
     })
   )
     .sort({ submittedAt: -1 })
     .select("title status department submittedAt assignedReviewers peerReviews reviewPipeline");
 
   const items = proposals.map((p) => {
-    const reviewed = (p.peerReviews || []).some((r) => String(r.userId) === String(req.user.id));
+    const reviewed = (p.peerReviews || []).some((r) => String(r.userId) === String(userId));
     return {
       id: p._id,
       title: p.title,
@@ -239,6 +242,32 @@ async function listMyReviewAssignments(req, res) {
       peerReviewSubmitted: reviewed,
     };
   });
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const line = `${JSON.stringify({
+      sessionId: "f558f7",
+      runId: "peer-assign",
+      hypothesisId: "PA1",
+      location: "proposalReviewController.listMyReviewAssignments",
+      message: "review assignments listed",
+      data: {
+        role: req.user.role,
+        userId: String(userId),
+        programTier: req.programTier,
+        count: items.length,
+        pending: items.filter((i) => !i.peerReviewSubmitted).length,
+        sample: items.slice(0, 5).map((i) => ({ id: String(i.id), title: i.title, status: i.status })),
+      },
+      timestamp: Date.now(),
+    })}\n`;
+    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
+  } catch {
+    /* ignore */
+  }
+  // #endregion
 
   res.json({ assignments: items });
 }

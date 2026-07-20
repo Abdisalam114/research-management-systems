@@ -26,9 +26,15 @@ function debugLog(message, data, hypothesisId = "G1") {
   // #endregion
 }
 
+function looksLikeFundingAwardTitle(title) {
+  const t = String(title || "").trim();
+  if (!t) return true;
+  return /\b(fund|grant|award|fellowship|scholarship|challenge|call|seed)\b/i.test(t);
+}
+
 /**
- * When a grant is accepted (director → pending_finance, or finance → active),
- * ensure it has a Project so it appears under Projects — not only Grants.
+ * Link an accepted grant to a real research Project.
+ * Never invent a Project from a funding-call / grant name alone.
  */
 async function ensureProjectForAcceptedGrant(grant, { programTier } = {}) {
   if (!grant?._id) return null;
@@ -36,12 +42,21 @@ async function ensureProjectForAcceptedGrant(grant, { programTier } = {}) {
   if (grant.projectId) {
     const existing = await Project.findById(grant.projectId);
     if (existing) {
-      debugLog("reuse existing grant.projectId", {
-        grantId: String(grant._id),
-        projectId: String(existing._id),
-        created: false,
-      }, "G1");
-      return { project: existing, created: false, linked: false };
+      // Drop link if the "project" is only a fake funding-named shell
+      if (!existing.proposalId && looksLikeFundingAwardTitle(existing.title)) {
+        debugLog("reject fake funding-named project link", {
+          grantId: String(grant._id),
+          projectId: String(existing._id),
+          title: existing.title,
+        }, "G0");
+      } else {
+        debugLog("reuse existing grant.projectId", {
+          grantId: String(grant._id),
+          projectId: String(existing._id),
+          created: false,
+        }, "G1");
+        return { project: existing, created: false, linked: false };
+      }
     }
   }
 
@@ -58,44 +73,49 @@ async function ensureProjectForAcceptedGrant(grant, { programTier } = {}) {
       }, "G2");
       return { project: byProposal, created: false, linked: true };
     }
+
+    // Create project from the real proposal title (research work), not the call name
+    const proposal = await Proposal.findById(grant.proposalId).select(
+      "title ethicsStatus researcherId programTier"
+    );
+    if (proposal?.title && !looksLikeFundingAwardTitle(proposal.title)) {
+      const ethicsApproved = proposal.ethicsStatus === ETHICS_STATUSES.APPROVED;
+      const tier = programTier || grant.programTier || proposal.programTier;
+      const project = await Project.create({
+        proposalId: proposal._id,
+        title: proposal.title,
+        researcherId: proposal.researcherId || grant.researcherId,
+        teamMembers: [],
+        milestones: [
+          { title: "Ethics clearance", dueDate: null, completed: ethicsApproved },
+          { title: "Mid-term review", dueDate: null, completed: false },
+          { title: "Final report", dueDate: null, completed: false },
+        ],
+        status: PROJECT_STATUSES.ACTIVE,
+        progressReports: [],
+        programTier: tier,
+      });
+      grant.projectId = project._id;
+      await grant.save();
+      debugLog("created project from proposal (not grant title)", {
+        grantId: String(grant._id),
+        projectId: String(project._id),
+        title: project.title,
+        created: true,
+      }, "G3");
+      return { project, created: true, linked: true };
+    }
   }
 
-  let title = grant.title;
-  let ethicsApproved = false;
-  if (grant.proposalId) {
-    const proposal = await Proposal.findById(grant.proposalId).select("title ethicsStatus");
-    if (proposal?.title) title = proposal.title;
-    ethicsApproved = proposal?.ethicsStatus === ETHICS_STATUSES.APPROVED;
-  }
-
-  const tier = programTier || grant.programTier;
-  const project = await Project.create({
-    proposalId: grant.proposalId || undefined,
-    title: title || "Funded research project",
-    researcherId: grant.researcherId,
-    teamMembers: [],
-    milestones: [
-      { title: "Ethics clearance", dueDate: null, completed: ethicsApproved },
-      { title: "Mid-term review", dueDate: null, completed: false },
-      { title: "Final report", dueDate: null, completed: false },
-    ],
-    status: PROJECT_STATUSES.ACTIVE,
-    progressReports: [],
-    programTier: tier,
-  });
-
-  grant.projectId = project._id;
+  // No real research project available — leave grant without inventing a fake project
+  grant.projectId = null;
   await grant.save();
-
-  debugLog("created project for accepted grant", {
+  debugLog("skip create — no proposal/research project (will not invent funding-named project)", {
     grantId: String(grant._id),
-    projectId: String(project._id),
-    title: project.title,
+    grantTitle: grant.title,
     hadProposalId: Boolean(grant.proposalId),
-    created: true,
-  }, "G3");
-
-  return { project, created: true, linked: true };
+  }, "G4");
+  return null;
 }
 
-module.exports = { ensureProjectForAcceptedGrant };
+module.exports = { ensureProjectForAcceptedGrant, looksLikeFundingAwardTitle };

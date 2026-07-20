@@ -38,30 +38,12 @@ const PORTAL_USER_SPECS = {
       status: USER_STATUSES.ACTIVE,
     },
     {
-      fullName: "Dr. Hassan Ali",
-      email: "ethics@rms.edu",
-      password: process.env.SEED_ETHICS_PASSWORD || "Ethics2024!",
-      role: ROLES.ETHICS_COMMITTEE,
-      department: "Ethics Committee",
-      rank: "Chair",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
       fullName: "Samira Noor",
       email: "procurement@rms.edu",
       password: process.env.SEED_PROCUREMENT_PASSWORD || "Procurement2024!",
       role: ROLES.PROCUREMENT_OFFICER,
       department: "Procurement Office",
       rank: "Officer",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
-      fullName: "Dr. Omar Khaled",
-      email: "reviewer@rms.edu",
-      password: process.env.SEED_REVIEWER_PASSWORD || "Reviewer2024!",
-      role: ROLES.PEER_REVIEWER,
-      department: "Faculty of Science",
-      rank: "Peer Reviewer",
       status: USER_STATUSES.ACTIVE,
     },
     {
@@ -121,30 +103,12 @@ const PORTAL_USER_SPECS = {
       status: USER_STATUSES.ACTIVE,
     },
     {
-      fullName: "Dr. Amina Farah",
-      email: "ethics.pg@rms.edu",
-      password: process.env.SEED_ETHICS_PASSWORD || "Ethics2024!",
-      role: ROLES.ETHICS_COMMITTEE,
-      department: "Ethics Committee",
-      rank: "Chair",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
       fullName: "Omar Said",
       email: "procurement.pg@rms.edu",
       password: process.env.SEED_PROCUREMENT_PASSWORD || "Procurement2024!",
       role: ROLES.PROCUREMENT_OFFICER,
       department: "Procurement Office",
       rank: "Officer",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
-      fullName: "Dr. Layla Hassan",
-      email: "reviewer.pg@rms.edu",
-      password: process.env.SEED_REVIEWER_PASSWORD || "Reviewer2024!",
-      role: ROLES.PEER_REVIEWER,
-      department: "Graduate Research",
-      rank: "Peer Reviewer",
       status: USER_STATUSES.ACTIVE,
     },
     {
@@ -199,7 +163,14 @@ function buildInstitutionalUsers() {
 const INSTITUTIONAL_USERS = buildInstitutionalUsers();
 
 /** Former seed accounts removed from institutional roster (cleaned on seed). */
-const REMOVED_INSTITUTIONAL_EMAILS = ["sahra@rms.edu", "amina@rms.edu"];
+const REMOVED_INSTITUTIONAL_EMAILS = [
+  "sahra@rms.edu",
+  "amina@rms.edu",
+  "ethics@rms.edu",
+  "ethics.pg@rms.edu",
+  "reviewer@rms.edu",
+  "reviewer.pg@rms.edu",
+];
 
 const PORTAL_ORDER = [PROGRAM_TIERS.UNDERGRADUATE, PROGRAM_TIERS.POSTGRADUATE];
 

@@ -256,6 +256,11 @@ export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = 
       link: withProjectContext(step.link, { projectId, proposalId }),
     }));
 
+  const currentSteps = visibleSteps.filter((s) => s.status === "current");
+  const currentLabels = currentSteps.map((s) => s.label).filter(Boolean);
+  const displayCurrentLabel =
+    currentLabels.length > 1 ? currentLabels.join(" · ") : currentLabel || currentLabels[0];
+
   return (
     <div
       id="project-workflow"
@@ -275,15 +280,15 @@ export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = 
       ) : null}
       <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
         {workflow?.isVoluntary
-          ? "Proposal → ethics → review → project → publication → repository (no grants/budget)."
+          ? "Proposal → ethics → review → project → publication → repository (no grants/budget). Steps can progress independently."
           : workflow?.projectStatus !== "completed" && workflow?.projectStatus !== "closed"
-            ? "Proposal → ethics → review → project → publication → repository · Funding-call grants after Completed/Closed."
+            ? "Proposal → ethics → review → project → publication → repository · Funding-call grants after Completed/Closed. Steps can progress independently."
             : workflow?.awardsVisible === false
               ? "Proposal → ethics → review → project → publication → repository · Grant amounts after publication."
               : "Proposal → ethics → review → project → funding-call grant → budget → publication → repository."}
       </div>
 
-      {currentLabel ? (
+      {displayCurrentLabel ? (
         <div
           style={{
             marginTop: 12,
@@ -295,8 +300,9 @@ export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = 
         >
           <div style={{ fontSize: 12, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", letterSpacing: 0.4 }}>
             Hadda waxaad joogtaa · You are here
+            {currentLabels.length > 1 ? " (tallaabooyin badan — mid mid u hormar)" : ""}
           </div>
-          <div style={{ fontWeight: 900, fontSize: 18, marginTop: 4, color: "#0c4a6e" }}>{currentLabel}</div>
+          <div style={{ fontWeight: 900, fontSize: 18, marginTop: 4, color: "#0c4a6e" }}>{displayCurrentLabel}</div>
           {progress != null ? (
             <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{progress}% project progress</div>
           ) : null}

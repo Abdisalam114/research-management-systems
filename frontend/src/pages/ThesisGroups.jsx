@@ -3,10 +3,11 @@ import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as thesisApi from "../services/thesisGroupApi";
 import * as userApi from "../services/userApi";
+import * as departmentApi from "../services/departmentApi";
 import { PageHeader } from "../components/PageHeader";
 import { GroupsModuleNav } from "../components/GroupsModuleNav";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
-import { FACULTIES } from "../constants/faculties";
+import { FACULTIES, matchFacultyByName } from "../constants/faculties";
 import "./groups.css";
 
 const MANAGE_ROLES = ["faculty_coordinator", "research_director"];
@@ -39,6 +40,7 @@ const CHAPTER_STATUSES = [
 
 const EMPTY_FORM = {
   department: "",
+  departmentId: "",
   faculty: FACULTIES[0].value,
   facultyResearchArea: "",
   supervisorId: "",
@@ -46,6 +48,25 @@ const EMPTY_FORM = {
   status: "proposed",
   students: defaultStudentRows(),
 };
+
+function departmentFieldsFromGroup(g, departments) {
+  const match =
+    departments.find((d) => d.id === g.departmentId) ||
+    departments.find((d) => d.name === g.department);
+  const faculty = g.faculty || match?.faculty || matchFacultyByName(g.department) || FACULTIES[0].value;
+  return {
+    faculty,
+    departmentId: match?.id || "",
+    department: match?.name || g.department || "",
+  };
+}
+
+function defaultFacultyForUser(user) {
+  if (user?.role === "faculty_coordinator" && user?.department) {
+    return matchFacultyByName(user.department);
+  }
+  return FACULTIES[0].value;
+}
 
 const EMPTY_MEETING = { date: "", location: "", agenda: "", notes: "", chaptersDiscussed: [] };
 
@@ -98,6 +119,7 @@ export function ThesisGroupsPage() {
   const { accessToken, user } = useAuth();
   const [groups, setGroups] = useState([]);
   const [researchers, setResearchers] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
@@ -120,13 +142,39 @@ export function ThesisGroupsPage() {
     if (!accessToken) return;
     (async () => {
       try {
-        const res = await userApi.listUsers(accessToken, { role: "researcher", status: "active" });
-        setResearchers(res.users || []);
+        const [usersRes, deptRes] = await Promise.all([
+          userApi.listUsers(accessToken, { role: "researcher", status: "active" }),
+          departmentApi.listDepartments(accessToken),
+        ]);
+        setResearchers(usersRes.users || []);
+        setDepartments(deptRes.departments || []);
       } catch (_) {
         setResearchers([]);
+        setDepartments([]);
       }
     })();
   }, [accessToken]);
+
+  const departmentsByFaculty = useMemo(() => {
+    const map = {};
+    FACULTIES.forEach((f) => {
+      map[f.value] = [];
+    });
+    departments.forEach((d) => {
+      const key = d.faculty || matchFacultyByName(d.name);
+      if (!map[key]) map[key] = [];
+      map[key].push(d);
+    });
+    for (const key of Object.keys(map)) {
+      map[key].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    }
+    return map;
+  }, [departments]);
+
+  const departmentsForFaculty = useMemo(
+    () => departmentsByFaculty[form.faculty] || [],
+    [departmentsByFaculty, form.faculty]
+  );
 
   const stats = useMemo(() => {
     const validGroups = groups.filter(isValidThesisGroup);
@@ -154,14 +202,14 @@ export function ThesisGroupsPage() {
   );
 
   function resetForm() {
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, faculty: defaultFacultyForUser(user) });
     setEditingId(null);
     setShowForm(false);
   }
 
   function openCreate() {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, faculty: defaultFacultyForUser(user) });
     setShowForm(true);
   }
 
@@ -173,9 +221,9 @@ export function ThesisGroupsPage() {
 
   function openEdit(g) {
     setEditingId(g.id);
+    const deptFields = departmentFieldsFromGroup(g, departments);
     setForm({
-      department: g.department || "",
-      faculty: g.faculty || FACULTIES[0].value,
+      ...deptFields,
       facultyResearchArea: g.facultyResearchArea || "",
       supervisorId: g.supervisorId?._id || g.supervisorId || "",
       meetingSchedule: g.meetingSchedule || "",
@@ -183,6 +231,24 @@ export function ThesisGroupsPage() {
       students: studentRowsForForm(g.students),
     });
     setShowForm(true);
+  }
+
+  function onFacultyChange(faculty) {
+    setForm((prev) => ({
+      ...prev,
+      faculty,
+      department: "",
+      departmentId: "",
+    }));
+  }
+
+  function onDepartmentChange(departmentId) {
+    const dept = departmentsForFaculty.find((d) => d.id === departmentId);
+    setForm((prev) => ({
+      ...prev,
+      departmentId,
+      department: dept?.name || "",
+    }));
   }
 
   function toggleView(g) {
@@ -203,6 +269,10 @@ export function ThesisGroupsPage() {
         .filter((s) => s.fullName);
       if (cleanStudents.length < MIN_THESIS_GROUP_STUDENTS) {
         setError(`Each thesis group requires at least ${MIN_THESIS_GROUP_STUDENTS} students`);
+        return;
+      }
+      if (!form.departmentId && !form.department?.trim()) {
+        setError("Select a department under the chosen faculty.");
         return;
       }
       const body = { ...form, students: cleanStudents };
@@ -358,25 +428,44 @@ export function ThesisGroupsPage() {
 
           <div className="row">
             <div className="field">
-              <label>Status</label>
-              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                {THESIS_STATUSES.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
+              <label>Faculty *</label>
+              <select value={form.faculty} onChange={(e) => onFacultyChange(e.target.value)} required>
+                {FACULTIES.map((f) => (
+                  <option key={f.value} value={f.value}>{f.icon} {f.value}</option>
                 ))}
               </select>
             </div>
             <div className="field">
-              <label>Department</label>
-              <input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} placeholder="e.g. Computer Science" />
+              <label>Department *</label>
+              <select
+                value={form.departmentId}
+                onChange={(e) => onDepartmentChange(e.target.value)}
+                required
+                disabled={!departmentsForFaculty.length}
+              >
+                <option value="">
+                  {departmentsForFaculty.length ? "— Select department —" : "No departments for this faculty"}
+                </option>
+                {departmentsForFaculty.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}{d.code ? ` (${d.code})` : ""}
+                  </option>
+                ))}
+              </select>
+              {!departmentsForFaculty.length ? (
+                <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                  Add departments under this faculty on the Faculties &amp; Departments page first.
+                </p>
+              ) : null}
             </div>
           </div>
 
           <div className="row">
             <div className="field">
-              <label>Faculty</label>
-              <select value={form.faculty} onChange={(e) => setForm({ ...form, faculty: e.target.value })}>
-                {FACULTIES.map((f) => (
-                  <option key={f.value} value={f.value}>{f.icon} {f.value}</option>
+              <label>Status</label>
+              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                {THESIS_STATUSES.map((s) => (
+                  <option key={s.value} value={s.value}>{s.label}</option>
                 ))}
               </select>
             </div>

@@ -27,29 +27,26 @@ const ROLE_CHECKS = {
     ["GET", "/api/budgets", [200]],
     ["GET", "/api/analytics/finance-report", [200]],
     ["GET", "/api/grants", [200]],
-  ],
-  ethics_committee: [
-    ["GET", "/api/analytics/dashboard", [200]],
-    ["GET", "/api/ethics", [200]],
-  ],
-  procurement_officer: [
-    ["GET", "/api/analytics/dashboard", [200]],
-    ["GET", "/api/budgets", [200]],
-    ["GET", "/api/grants", [200]],
-  ],
-  peer_reviewer: [
-    ["GET", "/api/analytics/dashboard", [200]],
-    ["GET", "/api/proposals/my-review-assignments", [200]],
-  ],
-  hr_officer: [
-    ["GET", "/api/analytics/dashboard", [200]],
-    ["GET", "/api/projects", [200]],
-    ["GET", "/api/thesis-groups", [200]],
+    ["GET", "/api/policies", [200]],
   ],
   leadership: [
     ["GET", "/api/analytics/dashboard", [200]],
     ["GET", "/api/grants", [200]],
     ["GET", "/api/analytics/kpi-dashboard", [200]],
+    ["GET", "/api/proposals/my-review-assignments", [200]],
+    ["GET", "/api/policies", [200]],
+  ],
+  procurement_officer: [
+    ["GET", "/api/analytics/dashboard", [200]],
+    ["GET", "/api/budgets", [200]],
+    ["GET", "/api/grants", [200]],
+    ["GET", "/api/policies", [200]],
+  ],
+  hr_officer: [
+    ["GET", "/api/analytics/dashboard", [200]],
+    ["GET", "/api/projects", [200]],
+    ["GET", "/api/thesis-groups", [200]],
+    ["GET", "/api/policies", [200]],
   ],
   donor_agency: [
     ["GET", "/api/analytics/dashboard", [200]],

@@ -62,6 +62,41 @@ export function PublicationsPage() {
   const canCreate = user?.role === "researcher";
   const canValidate = ["faculty_coordinator", "research_director"].includes(user?.role);
   const projectLocked = Boolean(projectIdFromUrl);
+  const isResearcher = user?.role === "researcher";
+
+  const projectIdsWithOutput = useMemo(
+    () => new Set(publications.map((p) => (p.projectId ? String(p.projectId) : "")).filter(Boolean)),
+    [publications]
+  );
+
+  const projectsForNewOutput = useMemo(
+    () => projects.filter((p) => !projectIdsWithOutput.has(String(p.id))),
+    [projects, projectIdsWithOutput]
+  );
+
+  const projectAlreadyHasOutput = Boolean(
+    projectIdFromUrl && projectIdsWithOutput.has(String(projectIdFromUrl))
+  );
+
+  const canAddNewOutput = canCreate && projectsForNewOutput.length > 0 && !projectAlreadyHasOutput;
+
+  function canDeletePublication(p) {
+    if (user?.role === "research_director") return true;
+    if (canCreate && (p.status === "draft" || p.status === "rejected")) return true;
+    return false;
+  }
+
+  async function handleDeletePublication(p) {
+    const ok = window.confirm(`Delete output "${p.title}"? This cannot be undone.`);
+    if (!ok) return;
+    try {
+      setError("");
+      await publicationApi.deletePublication(accessToken, p.id);
+      await reload();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to delete output");
+    }
+  }
 
   useEffect(() => {
     if (projectIdFromUrl) {
@@ -70,21 +105,69 @@ export function PublicationsPage() {
     }
   }, [projectIdFromUrl]);
 
+  useEffect(() => {
+    if (projectAlreadyHasOutput) setShowForm(false);
+  }, [projectAlreadyHasOutput]);
+
   const load = useCallback(async () => {
     const params = projectIdFromUrl ? { projectId: projectIdFromUrl } : {};
     const res = await publicationApi.listPublications(accessToken, params);
-    setPublications(res.publications || []);
-  }, [accessToken, projectIdFromUrl]);
+    let list = res.publications || [];
+    // Researcher: never show another person's outputs (client belt-and-suspenders)
+    if (user?.role === "researcher" && user?.id) {
+      const uid = String(user.id);
+      list = list.filter((p) => {
+        const rid = p.researcherId;
+        if (rid == null) return true;
+        const owner = typeof rid === "object" ? String(rid._id || rid.id || "") : String(rid);
+        return !owner || owner === uid;
+      });
+    }
+    // #region agent log
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify({
+        sessionId: "f558f7",
+        runId: "owner-only-pubs",
+        hypothesisId: "H3",
+        location: "Publications.jsx:load",
+        message: "Publications menu — data from Projects only",
+        data: {
+          role: user?.role || null,
+          userId: user?.id ? String(user.id) : null,
+          count: list.length,
+          projectFilter: projectIdFromUrl || null,
+          withProjectId: list.filter((p) => p.projectId).length,
+          orphansExcluded: list.filter((p) => !p.projectId).length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+    setPublications(list);
+  }, [accessToken, projectIdFromUrl, user?.role, user?.id]);
 
   useEffect(() => {
-    if (!canCreate || !accessToken) return;
-    projectApi.listProjects(accessToken).then((res) => {
-      const list = res.projects || [];
-      setProjects(list);
-      if (list.length === 1 && !projectIdFromUrl) {
-        setForm((f) => (f.projectId ? f : { ...f, projectId: list[0].id }));
-      }
-    }).catch(() => setProjects([]));
+    if (!accessToken) return;
+    // Publication Tracking UI is structured from Projects
+    projectApi
+      .listProjects(accessToken)
+      .then((res) => {
+        const list = res.projects || [];
+        setProjects(list);
+        if (canCreate && list.length === 1 && !projectIdFromUrl) {
+          const only = list[0];
+          publicationApi
+            .listPublications(accessToken)
+            .then((res) => {
+              const has = (res.publications || []).some((p) => String(p.projectId) === String(only.id));
+              if (!has) setForm((f) => (f.projectId ? f : { ...f, projectId: only.id }));
+            })
+            .catch(() => {});
+        }
+      })
+      .catch(() => setProjects([]));
   }, [accessToken, canCreate, projectIdFromUrl]);
 
   // When project is selected, auto-fill title + authors from that project
@@ -102,9 +185,12 @@ export function PublicationsPage() {
         setLinkedProject(p);
         setForm((f) => {
           const next = { ...f };
-          if (!f.title.trim() || f.projectId !== form.projectId) {
-            // Prefer project title when empty or when switching project with empty title
-            if (!f.title.trim()) next.title = p.title || "";
+          const projectTitle = String(p.title || "").trim();
+          const looksLikeFunding =
+            /\b(fund|grant|award|fellowship|scholarship|challenge|call|seed)\b/i.test(projectTitle);
+          // Autofill research title only — never invent from funding-call / grant names
+          if (!f.title.trim() && projectTitle && !looksLikeFunding) {
+            next.title = projectTitle;
           }
           if (!f.authors.trim()) {
             next.authors = authorsFromProject(p, user);
@@ -137,6 +223,44 @@ export function PublicationsPage() {
     return list.filter((p) => matchesTrackingFilter(p, typeFilter));
   }, [publications, statusFilter, typeFilter]);
 
+  /** Publication Tracking reads from Projects — group outputs under each project (no silo list). */
+  const groupedByProject = useMemo(() => {
+    const map = new Map();
+    const titleFor = (projectId, fallback) => {
+      const fromList = projects.find((x) => String(x.id) === String(projectId));
+      return fromList?.title || fallback || "Project";
+    };
+
+    for (const p of filtered) {
+      if (!p.projectId) continue; // never show orphan / non-project data
+      const key = String(p.projectId);
+      if (map.has(key)) continue; // 1:1 — one output per project
+      map.set(key, {
+        projectId: key,
+        title: titleFor(key, p.projectTitle),
+        status: projects.find((x) => String(x.id) === key)?.status || null,
+        items: [p],
+      });
+    }
+
+    // Researcher: also show My Projects that have no outputs yet (source = Projects)
+    if (user?.role === "researcher" && !projectIdFromUrl) {
+      for (const proj of projects) {
+        const key = String(proj.id);
+        if (!map.has(key)) {
+          map.set(key, {
+            projectId: key,
+            title: proj.title,
+            status: proj.status,
+            items: [],
+          });
+        }
+      }
+    }
+
+    return [...map.values()].sort((a, b) => String(a.title).localeCompare(String(b.title)));
+  }, [filtered, projects, user?.role, projectIdFromUrl]);
+
   const stats = useMemo(() => {
     const by = (s) => publications.filter((p) => p.status === s).length;
     const totalCitations = publications.reduce((acc, p) => acc + Number(p.citationCount || 0), 0);
@@ -152,10 +276,13 @@ export function PublicationsPage() {
   const isCommunityType = form.type === "community_research_impact";
 
   function resetForm() {
-    setForm({
-      ...EMPTY_FORM,
-      projectId: projects.length === 1 ? projects[0].id : projectIdFromUrl || "",
-    });
+    const fallback =
+      projectsForNewOutput.length === 1
+        ? projectsForNewOutput[0].id
+        : projectsForNewOutput.some((p) => String(p.id) === String(projectIdFromUrl))
+          ? projectIdFromUrl
+          : "";
+    setForm({ ...EMPTY_FORM, projectId: fallback });
     setAutoFilled(false);
   }
 
@@ -187,7 +314,7 @@ export function PublicationsPage() {
       const linkedId = projectIdFromUrl || form.projectId || created?.publication?.projectId;
       // Return to project so Research workflow / awards / activity refresh
       if (submitNow && linkedId) {
-        navigate(`/projects/${linkedId}`, {
+        navigate(`/projects/${linkedId}#project-outputs`, {
           replace: true,
           state: { workflowHint: "publication_submitted" },
         });
@@ -202,16 +329,24 @@ export function PublicationsPage() {
   return (
     <div>
       <PageHeader
-        title="Publication & Output Tracking"
-        subtitle="Papers • Conference • Review • Case studies • Letter to editor — plus journal articles, books, patents, thesis, and community impact."
+        title="Publications & Outputs"
+        subtitle={
+          isResearcher
+            ? "Hal project = hal output (1:1). Xogta waxay ka timaadaa My Projects kaliya."
+            : "Staff view: one output per project (1:1), linked via projectId."
+        }
         stats={stats}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
         actions={
-          canCreate ? (
+          canAddNewOutput ? (
             <button type="button" className="btn primary" onClick={() => setShowForm((v) => !v)}>
               {showForm ? "Close form" : "+ New output"}
             </button>
+          ) : canCreate && projectAlreadyHasOutput ? (
+            <span className="muted" style={{ fontSize: 13 }}>
+              This project already has its output (1:1).
+            </span>
           ) : null
         }
       />
@@ -225,10 +360,16 @@ export function PublicationsPage() {
 
       {projectIdFromUrl ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          Linked to project — title & authors auto-fill from the project.{" "}
-          <Link to="/publications">show all outputs</Link>
+          Filtered to one project.{" "}
+          <Link to={`/projects/${projectIdFromUrl}#project-outputs`}>Open project</Link>
+          {" · "}
+          <Link to="/publications">all from My Projects</Link>
         </p>
-      ) : null}
+      ) : (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Xogta waxay ka akhrisaa <Link to="/projects">Projects</Link> — grouped by project; xog gooni ah lama hayo.
+        </p>
+      )}
 
       {loading ? <p className="muted">Loading publications…</p> : null}
       {error ? (
@@ -270,7 +411,7 @@ export function PublicationsPage() {
         </div>
       ) : null}
 
-      {canCreate && showForm ? (
+      {canCreate && showForm && canAddNewOutput ? (
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ fontWeight: 800 }}>Register research output</div>
           {autoFilled && linkedProject ? (
@@ -281,7 +422,7 @@ export function PublicationsPage() {
           ) : null}
           <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
             <div className="field">
-              <label>Research project (required)</label>
+              <label>Research project (required — from Projects)</label>
               <select
                 value={form.projectId}
                 onChange={(e) => {
@@ -298,13 +439,17 @@ export function PublicationsPage() {
                 required
                 disabled={projectLocked}
               >
-                <option value="">Select project…</option>
-                {projects.map((p) => (
+                <option value="">Select from My Projects…</option>
+                {projectsForNewOutput.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.title}
+                    {p.status ? ` (${p.status})` : ""}
                   </option>
                 ))}
               </select>
+              <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                Hal project = hal output keliya. Projects leh output horay lama dooran karo.
+              </p>
             </div>
             <div className="field">
               <label>Title</label>
@@ -389,18 +534,55 @@ export function PublicationsPage() {
 
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800 }}>
-          Outputs {typeFilter !== "all" ? `(${filtered.length})` : `(${publications.length})`}
+          From Projects — outputs {typeFilter !== "all" ? `(${filtered.length})` : `(${publications.length})`}
         </div>
-        <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-          {filtered.map((p) => (
-            <div key={p.id} className="card">
+        <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+          Menu: Publications & Outputs · Data source: Projects only (no separate silo).
+        </div>
+        <div style={{ display: "grid", gap: 14, marginTop: 12 }}>
+          {groupedByProject.map((group) => (
+            <div
+              key={group.projectId}
+              className="card"
+              style={{ padding: 12, borderColor: "rgba(56,189,248,0.3)", background: "rgba(14,165,233,0.04)" }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+                <div>
+                  <Link
+                    to={`/projects/${group.projectId}`}
+                    style={{ fontWeight: 800, fontSize: 15, color: "inherit", textDecoration: "none" }}
+                  >
+                    {group.title}
+                  </Link>
+                  <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                    Project{group.status ? ` · ${group.status}` : ""} · {group.items.length} output
+                    {group.items.length === 1 ? "" : "s"}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Link className="btn" to={`/projects/${group.projectId}#project-outputs`}>
+                    Open project
+                  </Link>
+                  {canCreate ? (
+                    <Link className="btn primary" to={`/publications?projectId=${group.projectId}`}>
+                      + Output
+                    </Link>
+                  ) : null}
+                </div>
+              </div>
+
+              {group.items.length === 0 ? (
+                <p className="muted" style={{ marginTop: 10, fontSize: 13 }}>No outputs registered on this project yet.</p>
+              ) : (
+                <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                  {group.items.map((p) => (
+            <div key={p.id} className="card" style={{ background: "rgba(15,23,42,0.03)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                 <div>
                   <div style={{ fontWeight: 800 }}>{p.title}</div>
                   <div className="muted">
                     {publicationTypeLabel(p.type)} • {p.year} • {p.status}
                     {p.venue ? ` • ${p.venue}` : ""}
-                    {p.projectTitle ? ` • Project: ${p.projectTitle}` : p.projectId ? ` • Project linked` : ""}
                   </div>
                   {Array.isArray(p.authors) && p.authors.length ? (
                     <div className="muted" style={{ fontSize: 13 }}>
@@ -422,7 +604,7 @@ export function PublicationsPage() {
                   ) : null}
                   {p.communityImpact ? (
                     <div className="muted" style={{ marginTop: 4 }}>
-                      🌍 Community impact: {p.communityImpact}
+                      Community impact: {p.communityImpact}
                     </div>
                   ) : null}
                 </div>
@@ -458,7 +640,7 @@ export function PublicationsPage() {
                           await publicationApi.submitPublication(accessToken, p.id);
                           await reload();
                           if (p.projectId) {
-                            navigate(`/projects/${p.projectId}`, {
+                        navigate(`/projects/${p.projectId}#project-outputs`, {
                               replace: true,
                               state: { workflowHint: "publication_submitted" },
                             });
@@ -515,15 +697,27 @@ export function PublicationsPage() {
                       </button>
                     </>
                   ) : null}
+                  {canDeletePublication(p) ? (
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ borderColor: "rgba(248,113,113,0.6)", color: "#f87171" }}
+                      onClick={() => handleDeletePublication(p)}
+                    >
+                      Delete
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
-          {filtered.length === 0 ? (
+          {groupedByProject.length === 0 ? (
             <div className="muted">
-              {publications.length === 0
-                ? "No outputs yet. Use + New output (or Project → Research output) — project fields auto-fill."
-                : "No outputs in this category."}
+              No project-linked outputs. Open <Link to="/projects">Projects</Link> first, then register an output.
             </div>
           ) : null}
         </div>

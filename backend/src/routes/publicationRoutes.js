@@ -62,5 +62,13 @@ router.patch(
   asyncHandler(publicationController.updateWorkflowStage)
 );
 
+router.delete(
+  "/:id",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("researcher", "research_director"),
+  asyncHandler(publicationController.deletePublication)
+);
+
 module.exports = { publicationRoutes: router };
 

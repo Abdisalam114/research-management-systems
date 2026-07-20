@@ -106,7 +106,7 @@ async function getEthicsApplication(req, res) {
   const a = await EthicsApplication.findOne(req.tierWhere({ _id: req.params.id }));
   if (!a) throw new AppError("Application not found", 404);
   const isOwner = String(a.researcherId) === String(req.user.id);
-  const isStaff = ["research_director", "faculty_coordinator", "ethics_committee"].includes(req.user.role);
+  const isStaff = ["research_director", "faculty_coordinator"].includes(req.user.role);
 if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
   res.json({ application: sanitize(a) });
 }
@@ -162,13 +162,6 @@ async function submitEthicsApplication(req, res) {
       link: a.proposalId ? `/ethics?applicationId=${a._id}` : "/ethics",
       programTier: a.programTier,
     });
-    await notifyUsersByRole("ethics_committee", {
-      type: "ethics",
-      title: a.proposalId ? "Ethics form submitted with proposal" : "New ethics application submitted",
-      body: a.projectTitle,
-      link: `/ethics?applicationId=${a._id}`,
-      programTier: a.programTier,
-    });
   } catch {
     /* notifications best-effort */
   }
@@ -222,25 +215,21 @@ async function directorDecision(req, res) {
   const a = await EthicsApplication.findOne(req.tierWhere({ _id: req.params.id }));
   if (!a) throw new AppError("Application not found", 404);
 
-  const isCommittee = req.user.role === "ethics_committee";
-  const isDirector = req.user.role === "research_director";
+  if (req.user.role !== "research_director") throw new AppError("Forbidden", 403);
+
   const hasCertificate = Boolean(a.approval?.certificateNumber || a.approval?.certificateId);
-if (decision === "reject") {
+  if (decision === "reject") {
     if (a.status !== ETHICS_STATUSES.SUBMITTED && !(a.status === ETHICS_STATUSES.APPROVED && !hasCertificate)) {
-      throw new AppError("Only submitted (or committee-cleared) applications can be rejected", 400);
+      throw new AppError("Only submitted applications can be rejected", 400);
     }
     a.status = ETHICS_STATUSES.REJECTED;
     a.approval = {
       ...a.approval,
       decision: "rejected",
       signedByUserId: req.user.id,
-      signedByName: req.user.fullName || (isCommittee ? "Ethics Committee" : "Research Director"),
+      signedByName: req.user.fullName || "Research Director",
       signedAt: new Date(),
-      rejectionReason: rejectionReason
-        ? String(rejectionReason)
-        : isCommittee
-          ? "Rejected by Ethics Committee"
-          : "Rejected by Research Director",
+      rejectionReason: rejectionReason ? String(rejectionReason) : "Rejected by Research Director",
     };
     if (a.proposalId) {
       await Proposal.updateOne({ _id: a.proposalId }, { ethicsStatus: PROPOSAL_ETHICS_STATUSES.REJECTED });
@@ -255,91 +244,17 @@ if (decision === "reject") {
         link: "/ethics",
         programTier: a.programTier,
       });
-      if (isCommittee) {
-        await notifyUsersByRole(
-          "research_director",
-          {
-            type: "ethics",
-            title: "Ethics rejected by committee",
-            body: a.projectTitle || "An ethics application was rejected by the Ethics Committee",
-            link: a.proposalId ? `/proposals/${a.proposalId}/review` : "/ethics",
-          },
-          a.programTier
-        );
-      }
     } catch { /* best-effort */ }
 
     return res.json({ message: "Application rejected", application: sanitize(a) });
   }
 
-  // —— APPROVE ——
-  if (isCommittee) {
-    if (a.status !== ETHICS_STATUSES.SUBMITTED) {
-      throw new AppError("Only submitted applications can be cleared by the Ethics Committee", 400);
-    }
-
-    a.status = ETHICS_STATUSES.APPROVED;
-    a.approval = {
-      decision: "approved",
-      signedByUserId: req.user.id,
-      signedByName: req.user.fullName || "Ethics Committee",
-      signedAt: new Date(),
-      certificateId: "",
-      serialNumber: "",
-      refNumber: "",
-      certificateNumber: "",
-      academicYear: "",
-      year: "",
-      receivedAt: a.submittedAt || a.createdAt,
-      reviewedAt: new Date(),
-      chairpersonLine: "",
-      signatoryKey: "",
-      signatoryTitle: "Chairperson",
-      includeSignature: true,
-      includeStamp: true,
-      displayPrincipalInvestigator: "",
-      displayFacultyCenter: "",
-      displayProjectTitle: "",
-      rejectionReason: "",
-    };
-    if (a.proposalId) {
-      await Proposal.updateOne({ _id: a.proposalId }, { ethicsStatus: PROPOSAL_ETHICS_STATUSES.APPROVED });
-    }
-    await a.save();
-try {
-      await notifyUsersByRole(
-        "research_director",
-        {
-          type: "ethics",
-          title: "Ethics cleared — ready for your approval",
-          body: `${a.projectTitle || "Ethics application"} — Ethics Committee approved. Issue certificate and/or approve the proposal to create the project.`,
-          link: a.proposalId ? `/proposals/${a.proposalId}/review` : "/ethics",
-        },
-        a.programTier
-      );
-      await notifyUser(a.researcherId, {
-        type: "ethics",
-        title: "Ethics cleared by committee",
-        body: `${a.projectTitle || "Your ethics application"} — awaiting Research Director final approval for the project.`,
-        link: a.proposalId ? `/proposals/${a.proposalId}` : "/ethics",
-        programTier: a.programTier,
-      });
-    } catch { /* best-effort */ }
-
-    return res.json({
-      message: "Ethics cleared by committee. Research Director has been notified.",
-      application: sanitize(a),
-    });
-  }
-
-  // Director: issue certificate (from submitted, or after committee clearance without cert)
-  if (!isDirector) throw new AppError("Forbidden", 403);
-
+  // —— APPROVE (Director issues certificate) ——
   const canIssueCert =
     a.status === ETHICS_STATUSES.SUBMITTED ||
     (a.status === ETHICS_STATUSES.APPROVED && !hasCertificate);
   if (!canIssueCert) {
-    throw new AppError("Certificate can only be issued for submitted or committee-cleared applications", 400);
+    throw new AppError("Certificate can only be issued for submitted applications", 400);
   }
 
   if (!refNumber?.trim() || !certificateNumber?.trim()) {
@@ -448,7 +363,7 @@ async function downloadCertificate(req, res) {
     throw new AppError("Certificate is only available for approved applications", 400);
   }
   const isOwner = String(a.researcherId) === String(req.user.id);
-  const isStaff = ["research_director", "faculty_coordinator", "ethics_committee"].includes(req.user.role);
+  const isStaff = ["research_director", "faculty_coordinator"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
   const margin = 60;

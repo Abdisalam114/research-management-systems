@@ -1,4 +1,5 @@
 const { Project } = require("../models/Project");
+const { Publication } = require("../models/Publication");
 const { AppError } = require("../utils/AppError");
 
 function indexByProjectId(items) {
@@ -47,6 +48,23 @@ async function resolveOwnedProjectId(req, projectId, researcherId) {
   if (!projectId) return null;
   const project = await Project.findOne(req.tierWhere({ _id: projectId, researcherId }));
   if (!project) throw new AppError("Research project not found or does not belong to you", 404);
+
+  // Must be a recognized project (appears on Projects — approved proposal when linked)
+  if (project.proposalId) {
+    const { Proposal, PROPOSAL_STATUSES } = require("../models/Proposal");
+    const proposal = await Proposal.findById(project.proposalId).select("status proposalKind researchArea abstract");
+    if (proposal) {
+      const isShell =
+        proposal.researchArea === "Research Outputs" ||
+        /linked from publication|Seeded voluntary proposal for publication/i.test(proposal.abstract || "");
+      if (isShell) {
+        throw new AppError("Select a recognized research project from Projects (not a temporary output shell)", 400);
+      }
+      if (proposal.status && proposal.status !== PROPOSAL_STATUSES.APPROVED) {
+        throw new AppError("Publication can only link to an approved research project", 400);
+      }
+    }
+  }
   return project._id;
 }
 
@@ -68,6 +86,17 @@ async function validateProjectQuery(req, projectId, { ownerOnly = false } = {}) 
   return project._id;
 }
 
+/** One research output per project (1:1). */
+async function assertSinglePublicationPerProject(req, projectId, { excludePublicationId } = {}) {
+  if (!projectId) return;
+  const filter = { projectId };
+  if (excludePublicationId) filter._id = { $ne: excludePublicationId };
+  const existing = await Publication.findOne(req.tierWhere(filter)).select("_id title");
+  if (existing) {
+    throw new AppError("This project already has a research output — only one output per project is allowed", 409);
+  }
+}
+
 module.exports = {
   indexByProjectId,
   pickLatestByDate,
@@ -76,4 +105,5 @@ module.exports = {
   resolveOwnedProjectId,
   requireOwnedProjectId,
   validateProjectQuery,
+  assertSinglePublicationPerProject,
 };

@@ -205,23 +205,34 @@ function buildProjectCompletedStep(project) {
   });
 }
 
-/** Later pipeline steps stay pending until the current stage is finished.
- *  Never erase real completed work (e.g. a submitted publication) just because
- *  an earlier step is still marked current.
+/**
+ * Allow independent step progress: later ready steps stay "current"
+ * even if an earlier step is still open (e.g. team setup + repository).
+ * Completed / blocked / skipped statuses are never rewritten.
  */
 function enforceSequentialWorkflow(steps) {
-  const haltIdx = steps.findIndex((s) => s.status === "current" || s.status === "blocked");
-  if (haltIdx === -1) return steps;
-
-  return steps.map((s, i) => {
-    if (i <= haltIdx || s.status === "skipped" || s.status === "completed") return s;
-    if (s.status !== "current") return s;
-    const downgraded = { ...s, status: "pending", at: null };
-    if (s.key === "project_completed") {
-      downgraded.detail = "Pending — finish earlier project stages first";
-    }
-    return downgraded;
-  });
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const currents = steps.filter((s) => s.status === "current").map((s) => s.key);
+    fs.appendFileSync(
+      path.join(__dirname, "..", "..", "debug-f558f7.log"),
+      JSON.stringify({
+        sessionId: "f558f7",
+        runId: "parallel-steps",
+        hypothesisId: "S1",
+        location: "researchJourney.js:enforceSequentialWorkflow",
+        message: "independent steps (no downgrade of later current)",
+        data: { currentKeys: currents, stepCount: steps.length },
+        timestamp: Date.now(),
+      }) + "\n"
+    );
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+  return steps;
 }
 
 function buildStepsForTrack({ proposal, project, grants, budget, publication, repositoryItem }) {

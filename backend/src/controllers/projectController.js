@@ -229,7 +229,7 @@ async function getProject(req, res) {
   if (!project) throw new AppError("Project not found", 404);
 
   const isOwner = String(project.researcherId?._id || project.researcherId) === String(req.user.id);
-  const isStaff = ["faculty_coordinator", "research_director", "finance_officer", "procurement_officer", "ethics_committee", "hr_officer"].includes(req.user.role);
+  const isStaff = ["faculty_coordinator", "research_director", "finance_officer", "procurement_officer", "hr_officer"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
   // Finance: return closure/finance payload only — never general project dossier.
@@ -858,6 +858,89 @@ async function backfillProjectFromApprovedProposal(req, res) {
   res.status(201).json({ message: "Project created", project: sanitizeProject(created) });
 }
 
+async function deleteProject(req, res) {
+  const { id } = req.params;
+  const project = await Project.findOne(req.tierWhere({ _id: id }));
+  if (!project) throw new AppError("Project not found", 404);
+
+  const isDirector = req.user.role === "research_director";
+  const isOwner = String(project.researcherId?._id || project.researcherId) === String(req.user.id);
+  if (!isDirector && !isOwner) throw new AppError("Forbidden", 403);
+
+  if (!isDirector) {
+    const blockedPub = await Publication.findOne({
+      projectId: project._id,
+      status: { $in: [PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.VALIDATED] },
+    }).select("_id title status");
+    if (blockedPub) {
+      throw new AppError(
+        "Cannot delete project while it has a submitted or validated output. Delete or withdraw the output first.",
+        400
+      );
+    }
+    const activeGrant = await Grant.findOne({
+      projectId: project._id,
+      status: { $in: [GRANT_STATUSES.ACTIVE, GRANT_STATUSES.PENDING_FINANCE, GRANT_STATUSES.APPROVED] },
+    }).select("_id title status");
+    if (activeGrant) {
+      throw new AppError("Cannot delete project with an active or approved grant", 400);
+    }
+  }
+
+  const { Budget } = require("../models/Budget");
+  const { Payment } = require("../models/Payment");
+  const { EthicsApplication } = require("../models/EthicsApplication");
+
+  const projectId = project._id;
+  const title = project.title;
+
+  const budgets = await Budget.find({ projectId }).select("_id");
+  const budgetIds = budgets.map((b) => b._id);
+  if (budgetIds.length) {
+    await Payment.deleteMany({ budgetId: { $in: budgetIds } });
+    await Budget.deleteMany({ _id: { $in: budgetIds } });
+  }
+
+  await Publication.deleteMany({ projectId });
+  await RepositoryItem.deleteMany({ projectId });
+  await EthicsApplication.deleteMany({ projectId });
+  await Grant.updateMany({ projectId }, { $set: { projectId: null } });
+  await Project.deleteOne({ _id: projectId });
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(__dirname, "../../..", "debug-f558f7.log"),
+      `${JSON.stringify({
+        sessionId: "f558f7",
+        hypothesisId: "DEL2",
+        location: "projectController.deleteProject",
+        message: "project deleted",
+        data: { id: String(projectId), title, by: req.user.role, userId: String(req.user.id) },
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+
+  try {
+    await recordAudit(req, {
+      action: "project.deleted",
+      entityType: "project",
+      entityId: String(projectId),
+      summary: `Deleted project: ${title}`,
+    });
+  } catch {
+    /* optional */
+  }
+
+  res.json({ message: "Project deleted", id: String(projectId) });
+}
+
 module.exports = {
   listProjects,
   getProject,
@@ -867,6 +950,7 @@ module.exports = {
   directorClosureApproval,
   financeClosureApproval,
   archiveProject,
+  deleteProject,
   exportTechnicalReportPdf,
   addCommunicationLog,
   backfillProjectFromApprovedProposal,

@@ -23,3 +23,11 @@ export async function deleteDepartment(accessToken, id) {
   const { data } = await api.delete(`/api/departments/${id}`, authHeaders(accessToken));
   return data;
 }
+
+export async function deleteFacultyDepartments(accessToken, faculty) {
+  const { data } = await api.delete(
+    `/api/departments/by-faculty/${encodeURIComponent(faculty)}`,
+    authHeaders(accessToken)
+  );
+  return data;
+}

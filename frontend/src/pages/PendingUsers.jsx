@@ -3,18 +3,12 @@ import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import * as userApi from "../services/userApi";
 import { formatRole } from "../utils/roleLabels";
+import { SYSTEM_ROLES } from "../constants/systemRoles";
 
-const CREATE_ROLES = [
-  { value: "researcher", label: "Researcher / PI" },
-  { value: "faculty_coordinator", label: "Faculty Coordinator (Department)" },
-  { value: "finance_officer", label: "Finance Officer" },
-  { value: "ethics_committee", label: "Ethics Committee" },
-  { value: "procurement_officer", label: "Procurement Officer" },
-  { value: "peer_reviewer", label: "Peer Reviewer" },
-  { value: "hr_officer", label: "HR Officer" },
-  { value: "leadership", label: "University Leadership" },
-  { value: "donor_agency", label: "Donor / External Agency" },
-];
+const CREATE_ROLES = SYSTEM_ROLES.filter((r) => r !== "research_director").map((value) => ({
+  value,
+  label: formatRole(value),
+}));
 
 const emptyForm = {
   fullName: "",

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import * as publicationApi from "../services/publicationApi";
 import { PageHeader } from "./PageHeader";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
@@ -7,7 +7,16 @@ import { statFilterLabel } from "../utils/pageHeaderFilters";
 import { FACULTY_WORKFLOW_STAGES, nextWorkflowStage, workflowStageMeta } from "../constants/facultyWorkflow";
 import { publicationTypeLabel } from "../constants/publicationTypes";
 
-export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, canManage, standalone = false, embedded = false }) {
+export function FacultyResearchWorkflowModule({
+  accessToken,
+  departmentLabel,
+  canManage,
+  standalone = false,
+  embedded = false,
+  projectId: projectIdProp = "",
+}) {
+  const [searchParams] = useSearchParams();
+  const projectIdFromUrl = projectIdProp || searchParams.get("projectId") || "";
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState(null);
@@ -20,9 +29,32 @@ export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, ca
     : setInternalStageFilter;
 
   const load = useCallback(async () => {
-    const res = await publicationApi.getFacultyWorkflow(accessToken);
+    const res = await publicationApi.getFacultyWorkflow(
+      accessToken,
+      projectIdFromUrl ? { projectId: projectIdFromUrl } : {}
+    );
     setData(res);
-  }, [accessToken]);
+    // #region agent log
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify({
+        sessionId: "f558f7",
+        runId: "project-hub",
+        hypothesisId: "PH1",
+        location: "FacultyResearchWorkflowModule.jsx:load",
+        message: "Workflow UI — project-linked data only (look unchanged)",
+        data: {
+          projectIdFromUrl: projectIdFromUrl || null,
+          viaProp: Boolean(projectIdProp),
+          total: Object.values(res?.counts || {}).reduce((a, b) => a + Number(b || 0), 0),
+          stagesWithItems: (res?.stages || []).filter((s) => (s.items || []).length).length,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
+  }, [accessToken, projectIdFromUrl, projectIdProp]);
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load faculty workflow"));
@@ -90,6 +122,13 @@ export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, ca
     <>
       {error ? <div style={{ color: "#f87171", marginTop: standalone ? 0 : 8 }}>{error}</div> : null}
 
+      {projectIdFromUrl ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Filtered to project: <strong>{data?.projectFilter?.title || "selected"}</strong> —{" "}
+          <Link to="/research-workflow">show all</Link>
+        </p>
+      ) : null}
+
       {showStageTiles ? (
         <div className="overviewGrid pubCategoryGrid" style={{ marginTop: 12 }}>
           {(data?.stages || FACULTY_WORKFLOW_STAGES).map((stage) => {
@@ -150,6 +189,9 @@ export function FacultyResearchWorkflowModule({ accessToken, departmentLabel, ca
               </div>
             ) : null
           )}
+          {(data?.stages || []).every((s) => !(s.items || []).length) ? (
+            <div className="muted">No publications in the pipeline yet.</div>
+          ) : null}
         </div>
       )}
 
@@ -234,6 +276,17 @@ function WorkflowRow({ pub, canManage, busyId, onAdvance }) {
         <div style={{ fontWeight: 700 }}>{pub.title}</div>
         <div className="muted" style={{ fontSize: 12 }}>
           {publicationTypeLabel(pub.type)} • {pub.year} • validation: {pub.status}
+          {pub.projectId ? (
+            <>
+              {" "}
+              • Project:{" "}
+              <Link to={`/projects/${pub.projectId}`}>
+                {pub.projectTitle || "Open linked project"}
+              </Link>
+            </>
+          ) : (
+            <> • <span style={{ color: "#f87171" }}>No project linked</span></>
+          )}
         </div>
         <div style={{ fontSize: 12, marginTop: 4, color: meta.accent }}>
           {meta.icon} {pub.workflowStageLabel || meta.label}

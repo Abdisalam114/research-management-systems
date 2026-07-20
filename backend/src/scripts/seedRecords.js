@@ -203,7 +203,6 @@ const GRANT_TEMPLATES = [
 ];
 
 const PUBLICATION_TEMPLATES = [
-  { title: "Benchmarking Gradient Boosting for Educational Risk Prediction", type: "journal_article", venue: "Journal of Learning Analytics", year: 2025, status: PUBLICATION_STATUSES.VALIDATED, workflowStage: WORKFLOW_STAGES.PUBLISHED, citations: 14 },
   { title: "A Mobile-First Architecture for Campus Event Coordination", type: "conference", venue: "IEEE International Conference on Software Engineering Education", year: 2024, status: PUBLICATION_STATUSES.VALIDATED, workflowStage: WORKFLOW_STAGES.PUBLISHED, citations: 6 },
   { title: "Comparative Analysis of Intrusion Detection Models on Campus Networks", type: "paper", venue: "Computers & Security", year: 2025, status: PUBLICATION_STATUSES.SUBMITTED, workflowStage: WORKFLOW_STAGES.IN_PROCESS, citations: 0 },
   { title: "Field Performance of Rooftop Solar Installations in Tropical Climates", type: "journal_article", venue: "Renewable Energy", year: 2024, status: PUBLICATION_STATUSES.VALIDATED, workflowStage: WORKFLOW_STAGES.PUBLISHED, citations: 22 },

@@ -1,13 +1,16 @@
-import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { FacultyResearchWorkflowModule } from "../components/FacultyResearchWorkflowModule";
-import { ResearchJourneyPanel } from "../components/ResearchJourneyPanel";
 import { PageHeader } from "../components/PageHeader";
+import { Link, useSearchParams } from "react-router-dom";
 
+/**
+ * Own page / own list — data always comes from project-linked publications.
+ */
 export function ResearchWorkflowPage() {
   const { accessToken, user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const projectIdFromUrl = searchParams.get("projectId") || "";
   const canManage = ["faculty_coordinator", "research_director"].includes(user?.role);
-  const isResearcher = user?.role === "researcher";
   const departmentLabel =
     user?.role === "research_director"
       ? "All faculties"
@@ -20,51 +23,34 @@ export function ResearchWorkflowPage() {
       <PageHeader
         title="Research Workflow Status"
         subtitle={
-          isResearcher
-            ? "Raac project-kasta aad sameysay — meesha workflow-ku joogo (proposal → project → grant → publication → repository)."
-            : "Track each researcher’s projects through the full research workflow."
+          user?.role === "researcher"
+            ? "Publication pipeline-kaaga (project-linked). Optional: filter by one project from Projects."
+            : "Faculty publication workflow: submission → in process → pipeline → published (from Projects)."
         }
         actions={
           <>
-            <Link className="btn primary" to="/projects">
+            <Link className="btn" to="/projects">
               Projects
             </Link>
             <Link className="btn" to="/publications">
               Publications
             </Link>
+            {projectIdFromUrl ? (
+              <Link className="btn" to={`/projects/${projectIdFromUrl}`}>
+                Open project
+              </Link>
+            ) : null}
           </>
         }
       />
 
-      {/* Primary: project-scoped research workflow (follows projects you created) */}
-      <ResearchJourneyPanel />
-
-      {/* Secondary: faculty publication pipeline (staff / optional) */}
-      {canManage || !isResearcher ? (
-        <div style={{ marginTop: 20 }}>
-          <div className="muted" style={{ fontSize: 13, marginBottom: 4 }}>
-            Faculty publication pipeline (outputs only)
-          </div>
-          <FacultyResearchWorkflowModule
-            accessToken={accessToken}
-            departmentLabel={departmentLabel}
-            canManage={canManage}
-            embedded
-          />
-        </div>
-      ) : (
-        <details style={{ marginTop: 16 }}>
-          <summary className="muted" style={{ cursor: "pointer", fontSize: 13 }}>
-            Show publication pipeline (optional)
-          </summary>
-          <FacultyResearchWorkflowModule
-            accessToken={accessToken}
-            departmentLabel={departmentLabel}
-            canManage={false}
-            embedded
-          />
-        </details>
-      )}
+      <FacultyResearchWorkflowModule
+        accessToken={accessToken}
+        departmentLabel={departmentLabel}
+        canManage={canManage}
+        embedded
+        projectId={projectIdFromUrl}
+      />
     </div>
   );
 }

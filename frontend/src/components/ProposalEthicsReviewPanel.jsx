@@ -18,7 +18,6 @@ function personLabel(p) {
 export function ProposalEthicsReviewPanel({
   ethics,
   isDirector,
-  isEthicsCommittee,
   onApproveEthics,
   onRejectEthics,
   onIssueCertificate,
@@ -35,7 +34,6 @@ export function ProposalEthicsReviewPanel({
 
   const approved = ethics.status === "approved";
   const hasCert = Boolean(ethics.approval?.certificateNumber || ethics.approval?.certificateId);
-  const canCommitteeAct = isEthicsCommittee && ethics.status === "submitted";
   const canDirectorIssueCert =
     isDirector &&
     (ethics.status === "submitted" || (ethics.status === "approved" && !hasCert));
@@ -47,7 +45,7 @@ export function ProposalEthicsReviewPanel({
         <span style={{ fontSize: 13 }}>
           Status: <strong>{ethics.status}</strong>
           {ethics.formComplete ? " • form complete" : " • incomplete"}
-          {approved && !hasCert ? " • awaiting Director certificate" : null}
+          {approved && !hasCert ? " • awaiting certificate" : null}
         </span>
       </div>
 
@@ -74,17 +72,6 @@ export function ProposalEthicsReviewPanel({
         {ethics.approval?.refNumber ? <Row label="JUREC Ref" value={ethics.approval.refNumber} /> : null}
       </div>
 
-      {canCommitteeAct ? (
-        <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-          <button type="button" className="btn primary" disabled={busy} onClick={onApproveEthics}>
-            Clear ethics (notify Director)
-          </button>
-          <button type="button" className="btn" disabled={busy} onClick={onRejectEthics}>
-            Reject ethics
-          </button>
-        </div>
-      ) : null}
-
       {canDirectorIssueCert ? (
         <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
           <button type="button" className="btn primary" disabled={busy} onClick={onIssueCertificate || onApproveEthics}>
@@ -102,17 +89,8 @@ export function ProposalEthicsReviewPanel({
         <div className="muted" style={{ marginTop: 12, color: "#1d4ed8" }}>
           ✓ Ethics approved with certificate — Director may approve the proposal to create the project.
         </div>
-      ) : approved && !hasCert && isDirector ? (
-        <div className="muted" style={{ marginTop: 12, color: "#0369a1" }}>
-          ✓ Ethics Committee cleared this application. Issue the certificate (optional) then approve the proposal
-          below to create the project.
-        </div>
-      ) : approved && isEthicsCommittee ? (
-        <div className="muted" style={{ marginTop: 12, color: "#0369a1" }}>
-          ✓ Cleared — Research Director has been notified for final proposal approval (project creation).
-        </div>
-      ) : ethics.status === "submitted" && !isDirector && !isEthicsCommittee ? (
-        <div className="muted" style={{ marginTop: 12 }}>Awaiting Ethics Committee review.</div>
+      ) : ethics.status === "submitted" && !isDirector ? (
+        <div className="muted" style={{ marginTop: 12 }}>Awaiting Research Director ethics review.</div>
       ) : null}
     </div>
   );

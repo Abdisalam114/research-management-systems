@@ -17,17 +17,17 @@ const COLORS = {
 };
 
 const ROLES = [
-  ["Research Director", "research_director", "Institutional oversight, ethics approval, grants, user management, departments, analytics"],
+  ["Research Director", "research_director", "Institutional oversight, ethics review/approval, grants, user management, departments, analytics"],
   ["Faculty Coordinator", "faculty_coordinator", "Faculty proposal pre-review, publication validation, faculty reports, audit trail"],
   ["Finance Officer", "finance_officer", "Budgets, payment disbursement, finance reports, donor reports, closure finance approval"],
-  ["Ethics Committee", "ethics_committee", "JUREC ethics review and approval (/ethics)"],
+  ["University Leadership", "leadership", "Peer review assignments, funding call approval, KPIs, institutional policies"],
   ["Procurement Officer", "procurement_officer", "Purchase order review before director (/budgets queue)"],
   ["Researcher", "researcher", "Proposals (budget, compliance docs), ethics forms, projects, publications, groups, repository uploads"],
 ];
 
 const FRONTEND_PAGES = [
   ["/dashboard", "Dashboard & Analytics", "All roles — role-specific widgets"],
-  ["/ethics", "Ethics (REC)", "Director, Coordinator, Researcher, Ethics Committee"],
+  ["/ethics", "Ethics (REC)", "Director, Coordinator, Researcher"],
   ["/proposals", "Proposals", "Director, Coordinator, Researcher"],
   ["/proposals/new", "New Proposal + budget + compliance docs + Ethics", "Researcher only"],
   ["/proposals/:id/review", "Director/Coordinator Review", "Director, Coordinator"],

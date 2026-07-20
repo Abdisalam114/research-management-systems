@@ -71,3 +71,10 @@ export async function archiveProject(accessToken, id) {
   return data;
 }
 
+export async function deleteProject(accessToken, id) {
+  const { data } = await api.delete(`/api/projects/${id}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+

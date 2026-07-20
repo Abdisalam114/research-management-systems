@@ -9,7 +9,13 @@ const { Project } = require("../models/Project");
 const { User } = require("../models/User");
 const { AppError } = require("../utils/AppError");
 const { notifyUser } = require("../utils/notify");
-const { resolveOwnedProjectId, requireOwnedProjectId, validateProjectQuery } = require("../utils/projectScopedRecords");
+const { recordAudit } = require("../utils/audit");
+const {
+  resolveOwnedProjectId,
+  requireOwnedProjectId,
+  validateProjectQuery,
+  assertSinglePublicationPerProject,
+} = require("../utils/projectScopedRecords");
 const {
   resolveWorkflowStage,
   workflowStageLabel,
@@ -51,11 +57,19 @@ async function authorsFromProject(projectId, researcherId) {
   return names;
 }
 
+function looksLikeFundingAwardTitle(title) {
+  const t = String(title || "").trim();
+  if (!t) return false;
+  return /\b(fund|grant|award|fellowship|scholarship|challenge|call|seed)\b/i.test(t);
+}
+
 async function projectDefaults(projectId, researcherId) {
   const project = await Project.findById(projectId).select("title");
   const authors = await authorsFromProject(projectId, researcherId);
+  const rawTitle = project?.title ? String(project.title).trim() : "";
+  // Do not invent publication titles from funding-call / grant names
   return {
-    title: project?.title ? String(project.title).trim() : "",
+    title: looksLikeFundingAwardTitle(rawTitle) ? "" : rawTitle,
     authors,
   };
 }
@@ -93,16 +107,63 @@ async function listPublications(req, res) {
   const { role } = req.user;
   const filter = {};
 
-  if (role === "researcher") filter.researcherId = req.user.id;
-  if (req.query.projectId) {
-    await validateProjectQuery(req, req.query.projectId, { ownerOnly: true });
+  // Researcher: NEVER see another person's outputs
+  if (role === "researcher") {
+    filter.researcherId = req.user.id;
+    if (req.query.projectId) {
+      await validateProjectQuery(req, req.query.projectId, { ownerOnly: true });
+      filter.projectId = req.query.projectId;
+    } else {
+      const myProjects = await Project.find(req.tierWhere({ researcherId: req.user.id })).select("_id");
+      filter.projectId = { $in: myProjects.map((p) => p._id) };
+    }
+  } else if (req.query.projectId) {
+    await validateProjectQuery(req, req.query.projectId, { ownerOnly: false });
     filter.projectId = req.query.projectId;
+  } else {
+    // Staff: Publications & Outputs only from Projects (no orphan silo)
+    filter.projectId = { $ne: null, $exists: true };
   }
 
-  const pubs = await Publication.find(req.tierWhere(filter))
+  let pubs = await Publication.find(req.tierWhere(filter))
     .sort({ createdAt: -1 })
     .populate("researcherId", "fullName department")
     .populate("projectId", "title status");
+
+  // Defense in depth — strip any non-owned rows for researchers
+  if (role === "researcher") {
+    const uid = String(req.user.id);
+    pubs = pubs.filter((p) => String(p.researcherId?._id || p.researcherId) === uid);
+  }
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(__dirname, "../../../debug-f558f7.log"),
+      `${JSON.stringify({
+        sessionId: "f558f7",
+        runId: "project-source",
+        hypothesisId: "SRC2",
+        location: "publicationController.listPublications",
+        message: "Publications data sourced from Projects only",
+        data: {
+          role,
+          userId: String(req.user.id),
+          count: pubs.length,
+          withProjectId: pubs.filter((p) => p.projectId).length,
+          withoutProjectId: pubs.filter((p) => !p.projectId).length,
+          projectIdQuery: req.query.projectId ? String(req.query.projectId) : null,
+        },
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+
   res.json({ publications: pubs.map(sanitizePublication) });
 }
 
@@ -113,17 +174,67 @@ async function getFacultyWorkflow(req, res) {
   }
 
   const dept = (department || "").trim();
-  let pubs = await Publication.find(req.tierWhere({
-    status: { $ne: PUBLICATION_STATUSES.DRAFT },
-  }))
+  const projectIdQuery = req.query.projectId ? String(req.query.projectId) : "";
+  const filter = { status: { $ne: PUBLICATION_STATUSES.DRAFT } };
+
+  // Researcher: only own outputs (never other people's)
+  if (role === "researcher") {
+    filter.researcherId = req.user.id;
+  }
+
+  // Optional project filter; otherwise show all project-linked outputs (as before)
+  if (projectIdQuery) {
+    await validateProjectQuery(req, projectIdQuery, { ownerOnly: role === "researcher" });
+    filter.projectId = projectIdQuery;
+  } else {
+    filter.projectId = { $ne: null, $exists: true };
+  }
+
+  let pubs = await Publication.find(req.tierWhere(filter))
     .sort({ updatedAt: -1 })
-    .populate("researcherId", "fullName department");
+    .populate("researcherId", "fullName department")
+    .populate("projectId", "title status");
 
   if (role === "researcher") {
-    pubs = pubs.filter((p) => String(p.researcherId?._id || p.researcherId) === String(req.user.id));
+    const myProjects = await Project.find(req.tierWhere({ researcherId: req.user.id })).select("_id");
+    const myIds = new Set(myProjects.map((p) => String(p._id)));
+    const uid = String(req.user.id);
+    pubs = pubs.filter((p) => {
+      const ownerOk = String(p.researcherId?._id || p.researcherId) === uid;
+      const projectOk = p.projectId && myIds.has(String(p.projectId._id || p.projectId));
+      return ownerOk && projectOk;
+    });
   } else if (role === "faculty_coordinator" && dept) {
     pubs = pubs.filter((p) => p.researcherId && p.researcherId.department === dept);
   }
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(__dirname, "../../../debug-f558f7.log"),
+      `${JSON.stringify({
+        sessionId: "f558f7",
+        runId: "project-source",
+        hypothesisId: "SRC3",
+        location: "publicationController.getFacultyWorkflow",
+        message: "Workflow Status sourced from project-linked pubs only",
+        data: {
+          role,
+          userId: String(req.user.id),
+          pubCount: pubs.length,
+          withProjectId: pubs.filter((p) => p.projectId).length,
+          withoutProjectId: pubs.filter((p) => !p.projectId).length,
+          projectIdQuery: projectIdQuery || null,
+        },
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch {
+    /* ignore */
+  }
+  // #endregion
 
   const sanitized = pubs.map(sanitizePublication);
   const byStage = {};
@@ -134,8 +245,15 @@ async function getFacultyWorkflow(req, res) {
   const deptLabel =
     role === "research_director" ? "All faculties" : role === "researcher" ? "My outputs" : dept || "Faculty";
 
+  let projectFilter = null;
+  if (projectIdQuery) {
+    const proj = await Project.findById(projectIdQuery).select("title status");
+    if (proj) projectFilter = { id: String(proj._id), title: proj.title, status: proj.status };
+  }
+
   res.json({
     department: deptLabel,
+    projectFilter,
     generatedAt: new Date().toISOString(),
     counts: countByWorkflowStage(pubs),
     stages: STAGE_ORDER.map((id) => ({
@@ -182,6 +300,7 @@ async function createPublication(req, res) {
   }
 
   const linkedProjectId = await requireOwnedProjectId(req, projectId, req.user.id);
+  await assertSinglePublicationPerProject(req, linkedProjectId);
   const defaults = await projectDefaults(linkedProjectId, req.user.id);
 
   let authorList = Array.isArray(authors) ? authors.map((a) => String(a).trim()).filter(Boolean) : [];
@@ -247,7 +366,11 @@ async function updatePublication(req, res) {
     if (!projectId) {
       throw new AppError("projectId cannot be removed — link a research project", 400);
     }
-    pub.projectId = await requireOwnedProjectId(req, projectId, req.user.id);
+    const nextProjectId = await requireOwnedProjectId(req, projectId, req.user.id);
+    if (String(nextProjectId) !== String(pub.projectId)) {
+      await assertSinglePublicationPerProject(req, nextProjectId, { excludePublicationId: pub._id });
+    }
+    pub.projectId = nextProjectId;
   }
 
   // Editing a rejected output returns it to draft so it can be resubmitted
@@ -281,10 +404,14 @@ async function submitPublication(req, res) {
   }
   if (!(pub.title || "").trim()) {
     const project = await Project.findById(pub.projectId).select("title");
-    if (project?.title) pub.title = project.title;
+    const t = project?.title ? String(project.title).trim() : "";
+    if (t && !looksLikeFundingAwardTitle(t)) pub.title = t;
   }
   if (!(pub.title || "").trim()) {
-    throw new AppError("Publication title is required before submit", 400);
+    throw new AppError("Publication title is required before submit — enter a real research output title (not the funding-call name)", 400);
+  }
+  if (looksLikeFundingAwardTitle(pub.title)) {
+    throw new AppError("Publication title cannot be a funding-call / grant name — enter the real research output title", 400);
   }
 
   pub.status = PUBLICATION_STATUSES.SUBMITTED;
@@ -330,6 +457,16 @@ async function validatePublication(req, res) {
   }
   await pub.save();
 
+  let projectCompletion = null;
+  if (decision === "validated" && pub.projectId) {
+    try {
+      const { maybeCompleteFundedProject } = require("../utils/maybeCompleteFundedProject");
+      projectCompletion = await maybeCompleteFundedProject(pub.projectId);
+    } catch {
+      /* best-effort */
+    }
+  }
+
   try {
     await notifyUser(pub.researcherId, {
       type: "publication",
@@ -341,7 +478,7 @@ async function validatePublication(req, res) {
     /* notifications are best-effort */
   }
 
-  res.json({ message: "Validation saved", publication: sanitizePublication(pub) });
+  res.json({ message: "Validation saved", publication: sanitizePublication(pub), projectCompletion });
 }
 
 async function refreshCitations(req, res) {
@@ -399,6 +536,9 @@ async function updateWorkflowStage(req, res) {
   if (pub.status === PUBLICATION_STATUSES.DRAFT) {
     throw new AppError("Submit the publication before updating faculty workflow stage", 400);
   }
+  if (!pub.projectId) {
+    throw new AppError("Publication must be linked to a research projectId before faculty workflow", 400);
+  }
 
   const isStaff = ["faculty_coordinator", "research_director"].includes(req.user.role);
   if (!isStaff) throw new AppError("Forbidden", 403);
@@ -431,6 +571,16 @@ async function updateWorkflowStage(req, res) {
   }
   await pub.save();
 
+  let projectCompletion = null;
+  if (pub.projectId && (stage === WORKFLOW_STAGES.PUBLISHED || pub.status === PUBLICATION_STATUSES.VALIDATED)) {
+    try {
+      const { maybeCompleteFundedProject } = require("../utils/maybeCompleteFundedProject");
+      projectCompletion = await maybeCompleteFundedProject(pub.projectId);
+    } catch {
+      /* best-effort */
+    }
+  }
+
   try {
     const researcherId = pub.researcherId?._id || pub.researcherId;
     await notifyUser(researcherId, {
@@ -443,7 +593,61 @@ async function updateWorkflowStage(req, res) {
     /* best-effort */
   }
 
-  res.json({ message: "Workflow stage updated", publication: sanitizePublication(pub) });
+  res.json({ message: "Workflow stage updated", publication: sanitizePublication(pub), projectCompletion });
+}
+
+async function deletePublication(req, res) {
+  const { id } = req.params;
+  const pub = await Publication.findOne(req.tierWhere({ _id: id }));
+  if (!pub) throw new AppError("Publication not found", 404);
+
+  const isDirector = req.user.role === "research_director";
+  const isOwner = String(pub.researcherId) === String(req.user.id);
+  if (!isDirector && !isOwner) throw new AppError("Forbidden", 403);
+
+  if (
+    !isDirector &&
+    ![PUBLICATION_STATUSES.DRAFT, PUBLICATION_STATUSES.REJECTED].includes(pub.status)
+  ) {
+    throw new AppError("Only draft or rejected outputs can be deleted", 400);
+  }
+
+  const title = pub.title;
+  const projectId = pub.projectId ? String(pub.projectId) : null;
+  await pub.deleteOne();
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(__dirname, "../../../debug-f558f7.log"),
+      `${JSON.stringify({
+        sessionId: "f558f7",
+        hypothesisId: "DEL1",
+        location: "publicationController.deletePublication",
+        message: "publication deleted",
+        data: { id, title, projectId, by: req.user.role, userId: String(req.user.id) },
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+
+  try {
+    await recordAudit(req, {
+      action: "publication.deleted",
+      entityType: "publication",
+      entityId: id,
+      summary: `Deleted publication: ${title}`,
+    });
+  } catch {
+    /* optional */
+  }
+
+  res.json({ message: "Publication deleted", id, projectId });
 }
 
 module.exports = {
@@ -456,5 +660,6 @@ module.exports = {
   validatePublication,
   refreshCitations,
   updateWorkflowStage,
+  deletePublication,
 };
 

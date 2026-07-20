@@ -5,6 +5,7 @@ import * as projectApi from "../services/projectApi";
 import * as analyticsApi from "../services/analyticsApi";
 import { ProjectWorkflowPanel } from "../components/ProjectWorkflowPanel";
 import { ProjectExecutionPanel, CLOSURE_CHECKLIST_ITEMS } from "../components/ProjectExecutionPanel";
+import { ProjectOutputsHub } from "../components/ProjectOutputsHub";
 
 const emptyMilestone = { title: "", dueDate: "", completed: false };
 const emptyMember = { name: "", role: "member" };
@@ -76,8 +77,13 @@ export function ProjectDetailsPage() {
   }, [location.state?.workflowHint]);
 
   useEffect(() => {
-    if (location.hash !== "#closure") return;
-    const el = document.getElementById("closure");
+    const hash = location.hash || "";
+    if (!hash || !project?.id) return;
+    const id = hash.replace(/^#/, "");
+    if (!["closure", "project-outputs", "project-workflow", "workflow"].includes(id)) return;
+    const el =
+      document.getElementById(id) ||
+      (id === "workflow" ? document.getElementById("project-workflow") : null);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [location.hash, project?.id]);
 
@@ -94,9 +100,34 @@ export function ProjectDetailsPage() {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
         <h2 style={{ marginTop: 0 }}>Project Management</h2>
-        <Link className="btn" to="/projects">
-          Back
-        </Link>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          {isOwner || user?.role === "research_director" ? (
+            <button
+              type="button"
+              className="btn"
+              style={{ borderColor: "rgba(248,113,113,0.6)", color: "#f87171" }}
+              onClick={async () => {
+                const ok = window.confirm(
+                  `Delete project "${project.title}"?\n\nLinked outputs, repository files, and budgets for this project will be removed. This cannot be undone.`
+                );
+                if (!ok) return;
+                try {
+                  setError("");
+                  setMessage("");
+                  await projectApi.deleteProject(accessToken, id);
+                  navigate("/projects", { replace: true });
+                } catch (e) {
+                  setError(e?.response?.data?.message || "Failed to delete project");
+                }
+              }}
+            >
+              Delete project
+            </button>
+          ) : null}
+          <Link className="btn" to="/projects">
+            Back
+          </Link>
+        </div>
       </div>
 
       {error ? <div className="card" style={{ borderColor: "rgba(255, 99, 132, 0.55)", marginTop: 12 }}>{error}</div> : null}
@@ -215,14 +246,20 @@ export function ProjectDetailsPage() {
         }}
       />
 
+      <ProjectOutputsHub
+        projectId={id}
+        accessToken={accessToken}
+        canAddOutput={isOwner}
+        canDeleteOutput={isOwner || user?.role === "research_director"}
+        canManage={["faculty_coordinator", "research_director"].includes(user?.role)}
+        departmentLabel={project.title}
+      />
+
       {isOwner ? (
         <div className="card" style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 8 }}>
           <span className="muted" style={{ width: "100%", fontSize: 13, marginBottom: 4 }}>
-            Add records for this project only (title auto-selected):
+            Add other records for this project (same project context):
           </span>
-          <Link className="btn" to={`/publications?projectId=${id}`}>
-            + Research output
-          </Link>
           <Link className="btn" to={`/repository?projectId=${id}`}>
             + Repository file
           </Link>

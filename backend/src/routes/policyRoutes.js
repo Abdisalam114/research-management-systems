@@ -2,6 +2,7 @@ const express = require("express");
 const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const policyController = require("../controllers/policyController");
 const { authenticateUser, requireActiveUser, authorizeRoles } = require("../middleware/auth");
+const { SYSTEM_ROLES } = require("../constants/systemRoles");
 
 const router = express.Router();
 
@@ -9,15 +10,7 @@ router.get(
   "/",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles(
-    "leadership",
-    "research_director",
-    "faculty_coordinator",
-    "finance_officer",
-    "researcher",
-    "donor_agency",
-    "ethics_committee"
-  ),
+  authorizeRoles(...SYSTEM_ROLES),
   asyncHandler(policyController.listPolicies)
 );
 
@@ -25,15 +18,7 @@ router.get(
   "/:id",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles(
-    "leadership",
-    "research_director",
-    "faculty_coordinator",
-    "finance_officer",
-    "researcher",
-    "donor_agency",
-    "ethics_committee"
-  ),
+  authorizeRoles(...SYSTEM_ROLES),
   asyncHandler(policyController.getPolicy)
 );
 

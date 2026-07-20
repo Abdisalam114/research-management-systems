@@ -29,8 +29,9 @@ const { writeSimplePdf } = require("../utils/pdf");
 const { syncGrantAwards } = require("../utils/syncGrantAwards");
 const { syncGrantProjectLinks } = require("../utils/syncGrantProjectLinks");
 const { defaultChapters, TITLE_PROPOSAL_STATUSES, MIN_THESIS_GROUP_STUDENTS } = require("../utils/thesisDefaults");
+const { INSTITUTIONAL_POLICY_CATALOG } = require("../constants/institutionalPolicyCatalog");
+const { InstitutionalPolicy } = require("../models/InstitutionalPolicy");
 const { INSTITUTIONAL_USERS, PORTAL_ORDER, PROGRAM_TIERS, REMOVED_INSTITUTIONAL_EMAILS } = require("./seedData");
-const {
   RECORDS_PER_TIER,
   MAX_SAMPLE_RECORDS,
   GRANT_TEMPLATES,
@@ -43,6 +44,39 @@ const {
   FUNDING_CALL_TEMPLATES,
   proposalsForTier,
 } = require("./seedRecords");
+
+async function seedInstitutionalPolicies(users) {
+  const leadership =
+    users.find((u) => u.role === ROLES.LEADERSHIP) ||
+    users.find((u) => u.role === ROLES.RESEARCH_DIRECTOR);
+  if (!leadership) return 0;
+  let count = 0;
+  for (const tier of PORTAL_ORDER) {
+    for (const spec of INSTITUTIONAL_POLICY_CATALOG) {
+      const existing = await InstitutionalPolicy.findOne({ programTier: tier, moduleKey: spec.moduleKey });
+      if (existing) {
+        existing.title = spec.title;
+        existing.body = spec.body;
+        existing.category = spec.category;
+        existing.status = "published";
+        existing.updatedBy = leadership._id;
+        await existing.save();
+      } else {
+        await InstitutionalPolicy.create({
+          programTier: tier,
+          moduleKey: spec.moduleKey,
+          title: spec.title,
+          body: spec.body,
+          category: spec.category,
+          status: "published",
+          updatedBy: leadership._id,
+        });
+      }
+      count += 1;
+    }
+  }
+  return count;
+}
 
 function splitPersonName(fullName) {
   const cleaned = String(fullName || "")
@@ -475,6 +509,10 @@ async function seedGrantsAndBudgets(ctx) {
 }
 
 async function seedPublications(ctx) {
+  // Demo publications disabled — outputs must be registered by researchers on real Projects (1:1).
+  // Seed must not create fake outputs that appear in Publications & Outputs menu.
+  return 0;
+
   const { programTier, researchers, coordinator } = ctx;
   const slots = await sampleSlots(Publication, programTier);
   if (slots < 1) return 0;
@@ -495,10 +533,16 @@ async function seedPublications(ctx) {
     });
     const project = proposal ? await Project.findOne({ proposalId: proposal._id }) : null;
 
+    // Only seed publications onto recognized projects (skip if no approved project)
+    if (!project) continue;
+    if (await Publication.exists({ projectId: project._id })) continue;
+
+    const { citations, ...pubFields } = tpl;
     await Publication.create({
-      ...tpl,
+      ...pubFields,
+      citationCount: typeof citations === "number" ? citations : tpl.citationCount || 0,
       researcherId: researcher._id,
-      projectId: project?._id || null,
+      projectId: project._id,
       programTier,
       authors: [researcher.fullName],
       doi: tpl.status === PUBLICATION_STATUSES.VALIDATED ? `10.1000/rms.${programTier}.${i + 1}` : "",
@@ -600,6 +644,9 @@ async function ensureRepositoryFile(fileName, content) {
 }
 
 async function seedRepository(ctx) {
+  // Demo repository files disabled — uploads must come from real Projects.
+  return 0;
+
   const { programTier, researchers } = ctx;
   const slots = await sampleSlots(RepositoryItem, programTier);
   if (slots < 1) return 0;
@@ -1026,6 +1073,10 @@ async function run() {
     }
     await seedPortal(ctx);
   }
+
+  console.log("2b Institutional policies (all RMS modules)...");
+  const pol = await seedInstitutionalPolicies(Object.values(users));
+  console.log(`     ${pol} policy record(s) upserted (${INSTITUTIONAL_POLICY_CATALOG.length} modules × ${PORTAL_ORDER.length} tiers)`);
 
   console.log("3/3 Data repairs...");
   const repoFixed = await repairRepositoryAccess();

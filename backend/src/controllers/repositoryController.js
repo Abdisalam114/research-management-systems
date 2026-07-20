@@ -1,4 +1,6 @@
 const PDFDocument = require("pdfkit");
+const fs = require("fs");
+const path = require("path");
 const { RepositoryItem, REPOSITORY_ACCESS } = require("../models/RepositoryItem");
 const { ResearchGroup } = require("../models/ResearchGroup");
 const { AppError } = require("../utils/AppError");
@@ -65,6 +67,30 @@ function sanitizeItem(i) {
 async function listItems(req, res) {
   const items = await fetchItemsForUser(req);
   const populated = await RepositoryItem.populate(items, { path: "projectId", select: "title status" });
+
+  // #region agent log
+  try {
+    fs.appendFileSync(
+      path.join(__dirname, "../../../debug-f558f7.log"),
+      `${JSON.stringify({
+        sessionId: "f558f7",
+        hypothesisId: "REPO1",
+        location: "repositoryController.listItems",
+        message: "repository list project-scoped",
+        data: {
+          role: req.user.role,
+          projectIdQuery: req.query.projectId ? String(req.query.projectId) : null,
+          count: populated.length,
+          withProjectId: populated.filter((i) => i.projectId).length,
+        },
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+
   return res.json({ items: populated.map(sanitizeItem) });
 }
 
@@ -92,6 +118,10 @@ async function uploadItem(req, res) {
       : projectId
         ? await validateProjectQuery(req, projectId)
         : null;
+
+  if (!linkedProjectId) {
+    throw new AppError("projectId is required — select the research project this file belongs to", 400);
+  }
 
   const item = await RepositoryItem.create(req.tierAssign({
     type,
@@ -136,6 +166,49 @@ async function getItem(req, res) {
   }
 
   throw new AppError("Forbidden", 403);
+}
+
+async function deleteItem(req, res) {
+  const { id } = req.params;
+  const item = await RepositoryItem.findOne(req.tierWhere({ _id: id }));
+  if (!item) throw new AppError("Repository item not found", 404);
+
+  const isDirector = req.user.role === "research_director";
+  const isOwner = String(item.uploadedBy) === String(req.user.id);
+  if (!isDirector && !isOwner) throw new AppError("Forbidden", 403);
+
+  const filePath = item.filePath;
+  const title = item.title;
+  await item.deleteOne();
+
+  if (filePath) {
+    try {
+      const abs = path.join(process.cwd(), filePath.replace(/^\//, ""));
+      if (fs.existsSync(abs)) fs.unlinkSync(abs);
+    } catch {
+      /* optional file cleanup */
+    }
+  }
+
+  // #region agent log
+  try {
+    fs.appendFileSync(
+      path.join(__dirname, "../../../debug-f558f7.log"),
+      `${JSON.stringify({
+        sessionId: "f558f7",
+        hypothesisId: "REPO2",
+        location: "repositoryController.deleteItem",
+        message: "repository item deleted",
+        data: { id, title, projectId: item.projectId ? String(item.projectId) : null, by: req.user.role },
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+
+  res.json({ message: "Repository item deleted", id });
 }
 
 async function buildExportRows(req) {
@@ -347,6 +420,7 @@ module.exports = {
   listItems,
   uploadItem,
   getItem,
+  deleteItem,
   exportRepositoryCsv,
   exportRepositoryExcel,
   exportRepositoryPdf,

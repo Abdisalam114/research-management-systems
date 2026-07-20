@@ -1,5 +1,12 @@
 const { Department } = require("../models/Department");
 const { AppError } = require("../utils/AppError");
+const { FACULTIES, matchFacultyByName } = require("../utils/facultyMatcher");
+
+function facultyKeyForDepartment(d) {
+  const f = (d.faculty || "").trim();
+  if (f && FACULTIES.includes(f)) return f;
+  return matchFacultyByName(d.name);
+}
 
 function sanitizeDepartment(d) {
   return {
@@ -56,4 +63,28 @@ async function deleteDepartment(req, res) {
   res.json({ message: "Department deleted" });
 }
 
-module.exports = { listDepartments, createDepartment, updateDepartment, deleteDepartment };
+async function deleteDepartmentsByFaculty(req, res) {
+  const faculty = decodeURIComponent(req.params.faculty || "").trim();
+  if (!FACULTIES.includes(faculty)) throw new AppError("Invalid faculty", 400);
+
+  const all = await Department.find(req.tierWhere({}));
+  const ids = all.filter((d) => facultyKeyForDepartment(d) === faculty).map((d) => d._id);
+  if (!ids.length) {
+    res.json({ message: "No departments to delete for this faculty", deletedCount: 0 });
+    return;
+  }
+
+  const result = await Department.deleteMany({ _id: { $in: ids } });
+  res.json({
+    message: `Deleted ${result.deletedCount} department(s) from ${faculty}`,
+    deletedCount: result.deletedCount,
+  });
+}
+
+module.exports = {
+  listDepartments,
+  createDepartment,
+  updateDepartment,
+  deleteDepartment,
+  deleteDepartmentsByFaculty,
+};

@@ -3,7 +3,7 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 
 const repositoryController = require("../controllers/repositoryController");
 const { AppError } = require("../utils/AppError");
-const { authenticateUser, requireActiveUser } = require("../middleware/auth");
+const { authenticateUser, requireActiveUser, authorizeRoles } = require("../middleware/auth");
 const { repositoryUpload } = require("../middleware/repositoryUpload");
 
 const router = express.Router();
@@ -29,6 +29,15 @@ router.post(
   requireActiveUser,
   repositoryUpload.single("file"),
   asyncHandler(repositoryController.uploadItem)
+);
+
+router.delete(
+  "/:id",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("researcher", "research_director"),
+  blockReservedRepoIds,
+  asyncHandler(repositoryController.deleteItem)
 );
 
 module.exports = { repositoryRoutes: router };

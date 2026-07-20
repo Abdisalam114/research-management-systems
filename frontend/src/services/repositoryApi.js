@@ -15,6 +15,13 @@ export async function uploadRepositoryItem(accessToken, formData) {
   return res.data;
 }
 
+export async function deleteRepositoryItem(accessToken, id) {
+  const res = await api.delete(`/api/repository/${id}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
+
 async function downloadExport(accessToken, path, filename) {
   const res = await api.get(path, {
     headers: { Authorization: `Bearer ${accessToken}` },

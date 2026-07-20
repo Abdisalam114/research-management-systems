@@ -36,7 +36,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
   const isDirector = user?.role === "research_director";
   const isCoordinator = user?.role === "faculty_coordinator";
   const isFinance = user?.role === "finance_officer";
-  const isPeerReviewer = user?.role === "peer_reviewer";
+  const isLeadershipReviewer = user?.role === "leadership";
   const isVoluntary =
     proposal.proposalKind === "voluntary" ||
     (!proposal.fundingCallId && proposal.proposalKind !== "grant_fund_call");
@@ -54,7 +54,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await userApi.listUsers(accessToken, { role: "peer_reviewer", status: "active" });
+        const res = await userApi.listUsers(accessToken, { role: "leadership", status: "active" });
         if (cancelled) return;
         setPeerReviewers(res.users || []);
         const current = (proposal.assignedReviewers || []).map((r) => reviewerRefId(r.userId));
@@ -111,7 +111,7 @@ await onReload();
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div style={{ fontWeight: 800, marginBottom: 8 }}>
-        {isPeerReviewer ? "Your peer review" : "Multi-stage review (Phase 3)"}
+        {isLeadershipReviewer ? "Your peer review" : "Multi-stage review (Phase 3)"}
       </div>
       <p className="muted" style={{ fontSize: 13 }}>Current stage: <strong>{STAGE_LABELS[stage] || stage}</strong></p>
       {err ? <div className="bannerErr">{err}</div> : null}
@@ -121,7 +121,7 @@ await onReload();
         </div>
       ) : null}
 
-      {!isPeerReviewer ? (
+      {!isLeadershipReviewer ? (
         <div style={{ display: "grid", gap: 6, fontSize: 13, marginBottom: 12 }}>
           <div>1. Admin screening <StageBadge status={pipe.adminScreening?.status} /></div>
           <div>2. Peer review <StageBadge status={pipe.peerReview?.status} /> ({(proposal.peerReviews || []).length} reviews)</div>
@@ -147,7 +147,7 @@ await onReload();
             Select reviewers and click Assign — each gets a notification.
           </p>
           {peerReviewers.length === 0 ? (
-            <p className="muted" style={{ fontSize: 13 }}>No active peer reviewers on this portal.</p>
+            <p className="muted" style={{ fontSize: 13 }}>No active leadership reviewers on this portal.</p>
           ) : (
             <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
               {peerReviewers.map((u) => (
@@ -184,7 +184,7 @@ await onReload();
         </div>
       ) : null}
 
-      {isPeerReviewer && !assigned ? (
+      {isLeadershipReviewer && !assigned ? (
         <div className="muted" style={{ marginBottom: 12, fontSize: 13 }}>
           Ask the Research Director to assign you from the proposal review page.
         </div>
@@ -203,7 +203,7 @@ await onReload();
         </div>
       ) : null}
 
-      {isPeerReviewer && peerDone ? (
+      {isLeadershipReviewer && peerDone ? (
         <div className="card" style={{ borderColor: "rgba(34,197,94,0.4)", background: "rgba(34,197,94,0.08)", fontSize: 13 }}>
           ✓ Your peer review was submitted. Thank you.
         </div>
