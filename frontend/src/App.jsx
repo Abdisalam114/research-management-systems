@@ -152,7 +152,7 @@ export default function App() {
             <Route path="/funding-calls" element={<FundingCallsPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "leadership"]} />}>
+          <Route element={<ProtectedRoute roles={["research_director", "leadership"]} />}>
             <Route path="/review-assignments" element={<ReviewAssignmentsPage />} />
           </Route>
 

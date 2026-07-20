@@ -46,8 +46,11 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
   const peerDone = (proposal.peerReviews || []).some(
     (r) => reviewerRefId(r.userId) === String(user?.id)
   );
-  // Peer reviewer power: assigned → can score immediately (no screening wait)
-  const canSubmitPeerReview = (assigned || isDirector) && !peerDone;
+  // Peer reviewer (Leadership): assigned → can score + comment
+  const canSubmitPeerReview = assigned && !peerDone && (isLeadershipReviewer || isDirector);
+  // Director may also submit if assigned; unassigned directors manage stage only
+  const canDirectorSubmitPeer = isDirector && !peerDone && !isLeadershipReviewer;
+  const showPeerSubmitForm = canSubmitPeerReview || canDirectorSubmitPeer;
   const canAssignReviewers = isDirector;
   useEffect(() => {
     if (!canAssignReviewers || !accessToken) return;
@@ -190,14 +193,74 @@ await onReload();
         </div>
       ) : null}
 
-      {canSubmitPeerReview ? (
+      {(isDirector || isCoordinator) && (proposal.peerReviews || []).length > 0 ? (
+        <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, border: "1px solid rgba(34,197,94,0.35)", background: "rgba(34,197,94,0.06)" }}>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>
+            Leadership peer reviews ({(proposal.peerReviews || []).length})
+          </div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {(proposal.peerReviews || []).map((r, idx) => (
+              <div key={`${r.userId}-${idx}`} style={{ fontSize: 13, paddingBottom: 8, borderBottom: "1px solid rgba(148,197,255,0.15)" }}>
+                <div>
+                  <strong>{r.reviewerName || r.reviewerEmail || "Reviewer"}</strong>
+                  {" · "}
+                  Score: <strong>{r.score}/5</strong>
+                  {r.at ? (
+                    <span className="muted"> · {new Date(r.at).toLocaleString()}</span>
+                  ) : null}
+                </div>
+                <div style={{ marginTop: 4, whiteSpace: "pre-wrap" }}>
+                  {r.comment?.trim() ? r.comment : <span className="muted">No comment</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+          {isDirector && pipe.peerReview?.status !== "passed" ? (
+            <button
+              type="button"
+              className="btn primary"
+              style={{ marginTop: 10 }}
+              disabled={busy}
+              onClick={() => run(() => proposalApi.completePeerReview(accessToken, proposal.id))}
+            >
+              Complete peer review stage
+            </button>
+          ) : null}
+          {pipe.peerReview?.status === "passed" ? (
+            <div className="muted" style={{ marginTop: 8, fontSize: 12, color: "#22c55e" }}>
+              ✓ Peer review stage completed — continue with committee / director decision.
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {showPeerSubmitForm ? (
         <div style={{ marginBottom: 12, padding: 12, borderRadius: 8, border: "1px solid rgba(56,189,248,0.35)", background: "rgba(56,189,248,0.06)" }}>
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>Submit peer review (score 1–5)</div>
+          <div style={{ fontWeight: 700, marginBottom: 8 }}>
+            {isLeadershipReviewer ? "Your peer review — score & comment" : "Submit peer review (score 1–5)"}
+          </div>
+          <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+            Read the proposal above, then give a score (1–5) and a written comment.
+          </p>
           <label>Score
             <input type="number" min={1} max={5} value={score} onChange={(e) => setScore(Number(e.target.value))} style={{ marginLeft: 8 }} />
           </label>
-          <input placeholder="Peer review comment" value={comment} onChange={(e) => setComment(e.target.value)} style={{ marginTop: 8, width: "100%" }} />
-          <button type="button" className="btn primary" style={{ marginTop: 8 }} disabled={busy} onClick={() => run(() => proposalApi.submitPeerReview(accessToken, proposal.id, score, comment))}>
+          <textarea
+            placeholder="Peer review comment (required)"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            rows={4}
+            style={{ marginTop: 8, width: "100%", display: "block" }}
+          />
+          <button
+            type="button"
+            className="btn primary"
+            style={{ marginTop: 8 }}
+            disabled={busy || !comment.trim() || score < 1 || score > 5}
+            onClick={() =>
+              run(() => proposalApi.submitPeerReview(accessToken, proposal.id, score, comment.trim()))
+            }
+          >
             Submit peer review
           </button>
         </div>
@@ -205,12 +268,14 @@ await onReload();
 
       {isLeadershipReviewer && peerDone ? (
         <div className="card" style={{ borderColor: "rgba(34,197,94,0.4)", background: "rgba(34,197,94,0.08)", fontSize: 13 }}>
-          ✓ Your peer review was submitted. Thank you.
+          ✓ Your peer review was submitted. The Research Director can see your score and comments.
         </div>
       ) : null}
 
-      {isDirector && pipe.peerReview?.status !== "passed" && (proposal.peerReviews || []).length > 0 ? (
-        <button type="button" className="btn" style={{ marginBottom: 12 }} disabled={busy} onClick={() => run(() => proposalApi.completePeerReview(accessToken, proposal.id))}>Complete peer review stage</button>
+      {isDirector && pipe.peerReview?.status !== "passed" && (proposal.peerReviews || []).length === 0 ? (
+        <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+          Assign Leadership reviewers above. After they submit scores &amp; comments, complete the peer review stage here.
+        </p>
       ) : null}
 
       {(isCoordinator || isDirector) && pipe.peerReview?.status === "passed" && pipe.committeeReview?.status === "pending" ? (

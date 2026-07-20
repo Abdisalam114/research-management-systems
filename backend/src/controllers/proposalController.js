@@ -69,6 +69,8 @@ function sanitizeProposal(p) {
     reviewerComments: p.reviewerComments,
     peerReviews: (p.peerReviews || []).map((r) => ({
       userId: refId(r.userId),
+      reviewerName: r.userId?.fullName || null,
+      reviewerEmail: r.userId?.email || null,
       score: r.score,
       comment: r.comment || "",
       at: r.at,
@@ -581,7 +583,9 @@ async function listProposals(req, res) {
 
 async function getProposal(req, res) {
   const { id } = req.params;
-  const proposal = await Proposal.findOne(req.tierWhere({ _id: id })).populate("assignedReviewers.userId", "fullName email role department");
+  const proposal = await Proposal.findOne(req.tierWhere({ _id: id }))
+    .populate("assignedReviewers.userId", "fullName email role department")
+    .populate("peerReviews.userId", "fullName email role");
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const isOwner = String(proposal.researcherId) === String(req.user.id);

@@ -81,6 +81,9 @@ async function submitPeerReview(req, res) {
   if (typeof score !== "number" || score < 1 || score > 5) {
     throw new AppError("score must be 1–5", 400);
   }
+  if (!comment || !String(comment).trim()) {
+    throw new AppError("comment is required", 400);
+  }
 
   const proposal = await Proposal.findOne(req.tierWhere({ _id: req.params.id }));
   if (!proposal) throw new AppError("Proposal not found", 404);
@@ -98,13 +101,38 @@ async function submitPeerReview(req, res) {
   proposal.peerReviews.push({
     userId: req.user.id,
     score,
-    comment: comment ? String(comment) : "",
+    comment: String(comment).trim(),
     at: new Date(),
   });
 
   const pipe = ensureReviewPipeline(proposal);
   pipe.peerReview.status = STAGE_STATUS.IN_PROGRESS;
   await proposal.save();
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const line = `${JSON.stringify({
+      sessionId: "f558f7",
+      runId: "peer-flow",
+      hypothesisId: "PF1",
+      location: "proposalReviewController.submitPeerReview",
+      message: "peer review submitted",
+      data: {
+        role: req.user.role,
+        proposalId: String(proposal._id),
+        score,
+        hasComment: Boolean(String(comment).trim()),
+        totalReviews: (proposal.peerReviews || []).length,
+      },
+      timestamp: Date.now(),
+    })}\n`;
+    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
+  } catch {
+    /* ignore */
+  }
+  // #endregion
 
   await recordAudit({
     entityType: "proposal",

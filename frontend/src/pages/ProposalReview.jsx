@@ -147,9 +147,7 @@ export function ProposalReviewPage() {
         />
       ) : null}
 
-      {!isLeadershipReviewer ? (
-        <ProposalMultiStageReview proposal={proposal} onReload={load} />
-      ) : null}
+      <ProposalMultiStageReview proposal={proposal} onReload={load} />
 
       {(isCoordinator || isDirector) &&
       ["submitted", "under_review", "revision_requested"].includes(proposal.status) ? (

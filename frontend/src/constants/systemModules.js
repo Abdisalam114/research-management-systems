@@ -6,7 +6,7 @@ export const SYSTEM_MODULES = [
   { key: "finance_grant_approvals", to: "/finance/grant-approvals", label: "Grant funding approval", icon: "💵", roles: ["finance_officer"] },
   { key: "finance_closures", to: "/finance/closures", label: "Project closure", icon: "📁", roles: ["finance_officer"] },
   { key: "proposals_staff", to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher", "leadership"] },
-  { key: "reviews", to: "/review-assignments", label: "Peer Reviews", icon: "✍️", roles: ["research_director", "faculty_coordinator", "researcher", "leadership"] },
+  { key: "reviews", to: "/review-assignments", label: "Peer Reviews", icon: "✍️", roles: ["research_director", "leadership"] },
   { key: "projects_staff", to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher", "hr_officer"] },
   { key: "funding_calls", to: "/funding-calls", label: "Funding Calls", icon: "📢", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher", "leadership", "procurement_officer", "donor_agency"] },
   { key: "policies", to: "/policies", label: "Policies", icon: "📜", roles: [...SYSTEM_ROLES] },

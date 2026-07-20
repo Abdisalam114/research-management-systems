@@ -29,7 +29,8 @@ export function ProtectedRoute({ roles }) {
       headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
       body: JSON.stringify({
         sessionId: "f558f7",
-        hypothesisId: "H4",
+        runId: "peer-flow",
+        hypothesisId: "PF3",
         location: "ProtectedRoute.jsx:roleDenied",
         message: "role blocked from route",
         data: { role: user?.role, path: location.pathname, allowedRoles: roles },
@@ -51,20 +52,6 @@ export function ProtectedRoute({ roles }) {
   if (user?.role === "finance_officer") {
     const remap = financeRedirectPath(location.pathname);
     if (remap && remap !== location.pathname) {
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          hypothesisId: "H7",
-          location: "ProtectedRoute.jsx:financeRemap",
-          message: "finance remapped to scoped page",
-          data: { from: location.pathname, to: remap },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       return <Navigate to={remap} replace />;
     }
     if (!isFinanceOnlyPath(location.pathname)) {
@@ -74,10 +61,11 @@ export function ProtectedRoute({ roles }) {
         headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
         body: JSON.stringify({
           sessionId: "f558f7",
-          hypothesisId: "H4",
+          runId: "peer-flow",
+          hypothesisId: "PF2",
           location: "ProtectedRoute.jsx:financeScope",
           message: "finance blocked from non-finance path",
-          data: { path: location.pathname },
+          data: { path: location.pathname, policiesAllowed: isFinanceOnlyPath("/policies") },
           timestamp: Date.now(),
         }),
       }).catch(() => {});

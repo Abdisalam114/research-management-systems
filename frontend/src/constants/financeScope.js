@@ -8,6 +8,7 @@ export const FINANCE_MENU_PATHS = [
   "/budgets",
   "/finance-reports",
   "/donor-reports",
+  "/policies",
   "/notifications",
   "/profile",
 ];

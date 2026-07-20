@@ -13,7 +13,7 @@ const MENU = [
   { to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher", "leadership"] },
   { to: "/finance/grant-approvals", label: "Grant funding approval", icon: "💵", roles: ["finance_officer"] },
   { to: "/finance/closures", label: "Project closure (Finance)", icon: "📁", roles: ["finance_officer"] },
-  { to: "/review-assignments", label: "Peer Reviews", icon: "✍️", roles: ["research_director", "faculty_coordinator", "researcher", "leadership"] },
+  { to: "/review-assignments", label: "Peer Reviews", icon: "✍️", roles: ["research_director", "leadership"] },
   { to: "/thesis", label: "Thesis", icon: "🎓", roles: ["research_director", "faculty_coordinator", "researcher", "hr_officer"] },
   { to: "/funding-calls", label: "Funding Calls", icon: "📢", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher", "leadership", "procurement_officer", "donor_agency"] },
   { to: "/policies", label: "Policies (Siyaasada)", icon: "📜", roles: [...SYSTEM_ROLES] },
