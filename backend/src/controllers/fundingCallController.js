@@ -6,29 +6,25 @@ const { notifyUsersByRole, notifyUser } = require("../utils/notify");
 const { recordAudit } = require("../utils/audit");
 const { tierMatchesCall } = require("../utils/fundingCallEligibility");
 const { closeExpiredOpenCalls } = require("../utils/fundingCallAutoClose");
-const fs = require("fs");
-const path = require("path");
-const DEBUG_LOG = path.join(__dirname, "../../../debug-f558f7.log");
+const { PROGRAM_TIERS } = require("../constants/programTier");
 
-function debugLog(hypothesisId, location, message, data) {
-  // #region agent log
-  try {
-    fs.appendFileSync(
-      DEBUG_LOG,
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "accepted-visibility",
-        hypothesisId,
-        location,
-        message,
-        data,
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch {
-    /* ignore */
+function defaultRequiredDocuments(callType) {
+  if (callType === "external") {
+    return [
+      "Signed research proposal (PDF)",
+      "Detailed budget breakdown",
+      "Donor / agency compliance forms",
+      "Ethics clearance (if human subjects)",
+      "CV of Principal Investigator",
+      "Letter of institutional support",
+    ].join("\n");
   }
-  // #endregion
+  return [
+    "Signed research proposal (PDF)",
+    "Detailed budget breakdown",
+    "Ethics clearance (if human subjects)",
+    "CV of Principal Investigator",
+  ].join("\n");
 }
 
 function sanitizeCall(c) {
@@ -90,15 +86,6 @@ async function listFundingCalls(req, res) {
       { status: CALL_STATUSES.OPEN },
       ...(appliedCallIds.length ? [{ _id: { $in: appliedCallIds } }] : []),
     ];
-    debugLog("H3", "fundingCallController.listFundingCalls", "researcher call visibility", {
-      appliedCallIds,
-      acceptedGrants: myApps
-        .filter((g) => Number(g.amountAwarded || 0) > 0 || ["pending_finance", "active", "approved"].includes(g.status))
-        .map((g) => ({ callId: String(g.callId), status: g.status })),
-      acceptedProposals: myProps
-        .filter((p) => p.status === "approved")
-        .map((p) => ({ callId: String(p.fundingCallId), status: p.status })),
-    });
   } else if (req.user.role === "researcher") {
     // Explicit status filter (e.g. closed) — still only their applied calls when not open
     if (status === CALL_STATUSES.OPEN) {
@@ -128,20 +115,43 @@ async function listFundingCalls(req, res) {
     ];
   }
 
-  const calls = await FundingCall.find(req.tierWhere(filter)).sort({ deadline: 1, createdAt: -1 });
+  let calls;
+  if (req.user.role === "researcher") {
+    // Researchers see: (1) open calls they are eligible for (any portal), (2) calls they already applied to
+    const eligCodes =
+      req.programTier === "undergraduate" ? ["ug", "all"] : ["pg", "pgd", "all"];
+    const researcherFilter = {
+      $or: [
+        {
+          status: CALL_STATUSES.OPEN,
+          $or: [
+            { programTier: req.programTier },
+            { eligibilityTier: { $in: eligCodes } },
+          ],
+        },
+        ...(appliedCallIds.length ? [{ _id: { $in: appliedCallIds } }] : []),
+      ],
+    };
+    if (status === CALL_STATUSES.OPEN) {
+      calls = await FundingCall.find({
+        status: CALL_STATUSES.OPEN,
+        $or: [{ programTier: req.programTier }, { eligibilityTier: { $in: eligCodes } }],
+      }).sort({ deadline: 1, createdAt: -1 });
+    } else if (status && status !== CALL_STATUSES.OPEN) {
+      calls = await FundingCall.find({
+        _id: { $in: appliedCallIds.length ? appliedCallIds : ["000000000000000000000000"] },
+        status,
+      }).sort({ deadline: 1, createdAt: -1 });
+    } else {
+      calls = await FundingCall.find(researcherFilter).sort({ deadline: 1, createdAt: -1 });
+    }
+  } else {
+    calls = await FundingCall.find(req.tierWhere(filter)).sort({ deadline: 1, createdAt: -1 });
+  }
+
   const visible = req.user.role === "researcher"
     ? calls.filter((c) => tierMatchesCall(req, c) || appliedCallIds.includes(String(c._id)))
     : calls;
-
-  debugLog("H3", "fundingCallController.listFundingCalls", "list result", {
-    role: req.user.role,
-    total: visible.length,
-    byStatus: {
-      open: visible.filter((c) => c.status === "open").length,
-      closed: visible.filter((c) => c.status === "closed").length,
-      draft: visible.filter((c) => c.status === "draft").length,
-    },
-  });
 
   res.json({ calls: visible.map(sanitizeCall) });
 }
@@ -153,12 +163,17 @@ async function getFundingCall(req, res) {
     programTier: req.programTier,
   });
 
-  const call = await FundingCall.findOne(req.tierWhere({ _id: req.params.id }));
+  let call = await FundingCall.findOne(req.tierWhere({ _id: req.params.id }));
+  // Researchers may open an eligible call from the other portal via notification deep-link
+  if (!call && req.user.role === "researcher") {
+    call = await FundingCall.findById(req.params.id);
+  }
   if (!call) throw new AppError("Funding call not found", 404);
   if (req.user.role === "researcher") {
-    const applied = await Grant.exists(
-      req.tierWhere({ researcherId: req.user.id, callId: call._id })
-    );
+    const applied = await Grant.exists({
+      researcherId: req.user.id,
+      callId: call._id,
+    });
     if (call.status !== CALL_STATUSES.OPEN && !applied) {
       throw new AppError("Funding call not available", 404);
     }
@@ -185,32 +200,39 @@ async function createFundingCall(req, res) {
   if (role === "donor_agency") {
     resolvedType = "external";
   } else if (role === "research_director") {
-    // Director creates internal institutional calls only
-    if (resolvedType === "external") {
-      throw new AppError("External funding calls are created by the Donor Agency. Use call type Internal.", 400);
-    }
-    resolvedType = "internal";
+    // Director may create Internal or External institutional calls
+    resolvedType = callType === "external" ? "external" : "internal";
   } else {
     throw new AppError("Forbidden", 403);
   }
-if (resolvedType === "external" && !(donorRef || "").trim()) {
+  if (resolvedType === "external" && !(donorRef || "").trim()) {
     throw new AppError("Donor / agency reference is required for external funding calls", 400);
   }
 
-  const call = await FundingCall.create(req.tierAssign({
-    title: String(title).trim(),
-    description: description ? String(description) : "",
-    fundingSource: String(fundingSource).trim(),
-    callType: resolvedType,
-    donorRef: donorRef ? String(donorRef).trim() : "",
-    amountCap: typeof amountCap === "number" ? amountCap : Number(amountCap) || 0,
-    currency: currency ? String(currency).trim().toUpperCase() : "USD",
-    deadline: deadline ? new Date(deadline) : null,
-    eligibilityTier: eligibilityTier || "all",
-    requiredDocuments: requiredDocuments ? String(requiredDocuments) : "",
-    status: CALL_STATUSES.DRAFT,
-    createdBy: req.user.id,
-  }));
+  const eligibility = ["ug", "pg", "pgd", "all"].includes(eligibilityTier) ? eligibilityTier : "all";
+  const docs =
+    requiredDocuments && String(requiredDocuments).trim()
+      ? String(requiredDocuments).trim()
+      : defaultRequiredDocuments(resolvedType);
+  // Stay on the portal the director is managing; eligibility controls who is notified/can apply
+  const portalTier = req.programTier;
+
+  const call = await FundingCall.create(
+    req.tierAssign({
+      title: String(title).trim(),
+      description: description ? String(description) : "",
+      fundingSource: String(fundingSource).trim(),
+      callType: resolvedType,
+      donorRef: donorRef ? String(donorRef).trim() : "",
+      amountCap: typeof amountCap === "number" ? amountCap : Number(amountCap) || 0,
+      currency: currency ? String(currency).trim().toUpperCase() : "USD",
+      deadline: deadline ? new Date(deadline) : null,
+      eligibilityTier: eligibility,
+      requiredDocuments: docs,
+      status: CALL_STATUSES.DRAFT,
+      createdBy: req.user.id,
+    })
+  );
 
   await recordAudit({
     entityType: "funding_call",
@@ -220,7 +242,7 @@ if (resolvedType === "external" && !(donorRef || "").trim()) {
     detail: call.title,
     actorId: req.user.id,
     actorRole: req.user.role,
-    programTier: req.programTier,
+    programTier: portalTier,
   });
 
   try {
@@ -228,8 +250,8 @@ if (resolvedType === "external" && !(donorRef || "").trim()) {
       type: "grant",
       title: "Funding call awaiting approval",
       body: `${call.title} (${resolvedType}) — ready for Leadership to approve/publish`,
-      link: "/funding-calls",
-    }, req.programTier);
+      link: `/funding-calls?callId=${call._id}`,
+    }, portalTier);
   } catch { /* best-effort */ }
 
   res.status(201).json({ call: sanitizeCall(call) });
@@ -245,27 +267,34 @@ async function updateFundingCall(req, res) {
     if (call.callType !== "external") throw new AppError("Donors may only edit external funding calls", 403);
     if (!isCallOwner(call, req.user.id)) throw new AppError("You can only edit funding calls you created", 403);
   } else if (role === "research_director") {
-    if (call.callType === "external") throw new AppError("External calls are managed by the Donor Agency", 403);
+    // Director may edit internal or external institutional drafts
   } else if (role !== "leadership") {
     throw new AppError("Forbidden", 403);
   }
 
-  const fields = ["title", "description", "fundingSource", "donorRef", "amountCap", "currency", "deadline", "eligibilityTier", "requiredDocuments"];
+  const fields = ["title", "description", "fundingSource", "donorRef", "amountCap", "currency", "deadline", "eligibilityTier", "requiredDocuments", "callType"];
   for (const f of fields) {
     if (req.body?.[f] !== undefined) {
       if (f === "deadline") call.deadline = req.body.deadline ? new Date(req.body.deadline) : null;
       else if (f === "amountCap") call.amountCap = Number(req.body.amountCap) || 0;
       else if (f === "currency") call.currency = String(req.body.currency).trim().toUpperCase();
+      else if (f === "callType") {
+        if (role === "donor_agency") call.callType = "external";
+        else if (["internal", "external"].includes(req.body.callType)) call.callType = req.body.callType;
+      }
       else call[f] = String(req.body[f]).trim();
     }
   }
 
-  // callType is locked by role — donor stays external, director stays internal
+  // Donor stays external; director may set internal or external
   if (role === "donor_agency") call.callType = "external";
-  if (role === "research_director") call.callType = "internal";
 
   if (call.callType === "external" && !(call.donorRef || "").trim()) {
     throw new AppError("Donor / agency reference is required for external funding calls", 400);
+  }
+
+  if (!(call.requiredDocuments || "").trim()) {
+    call.requiredDocuments = defaultRequiredDocuments(call.callType);
   }
 
   await call.save();
@@ -279,30 +308,49 @@ async function publishFundingCall(req, res) {
   if (call.status !== CALL_STATUSES.DRAFT) throw new AppError("Only draft calls can be published", 400);
 
   const role = req.user.role;
-  const canPublish =
-    role === "leadership" || (role === "research_director" && call.callType === "internal");
-if (!canPublish) {
-    throw new AppError("Only Leadership can approve funding calls for publication (Director may publish internal calls)", 403);
+  const canPublish = role === "leadership" || role === "research_director";
+  if (!canPublish) {
+    throw new AppError("Only Leadership or Research Director can publish funding calls", 403);
   }
 
   call.status = CALL_STATUSES.OPEN;
   call.publishedAt = new Date();
+  if (!(call.requiredDocuments || "").trim()) {
+    call.requiredDocuments = defaultRequiredDocuments(call.callType);
+  }
   await call.save();
 
+  const callLink = `/funding-calls?callId=${call._id}`;
+  // Notify by eligibility — PG researchers (e.g. Mahad) when eligibility is pg/pgd/all
+  let tiersToNotify = [call.programTier || req.programTier];
+  if (call.eligibilityTier === "all") {
+    tiersToNotify = [PROGRAM_TIERS.UNDERGRADUATE, PROGRAM_TIERS.POSTGRADUATE];
+  } else if (call.eligibilityTier === "ug") {
+    tiersToNotify = [PROGRAM_TIERS.UNDERGRADUATE];
+  } else if (call.eligibilityTier === "pg" || call.eligibilityTier === "pgd") {
+    tiersToNotify = [PROGRAM_TIERS.POSTGRADUATE];
+  }
+
   try {
-    await notifyUsersByRole("researcher", {
-      type: "grant",
-      title: "New funding call published",
-      body: call.title,
-      link: "/funding-calls",
-    }, req.programTier);
+    for (const tier of tiersToNotify) {
+      await notifyUsersByRole(
+        "researcher",
+        {
+          type: "grant",
+          title: "New funding call open — apply now",
+          body: `${call.title} (${call.callType === "external" ? "External" : "Internal"})`,
+          link: callLink,
+        },
+        tier
+      );
+    }
     if (call.createdBy) {
       await notifyUser(call.createdBy, {
         type: "grant",
         title: "Funding call approved & published",
         body: call.title,
-        link: "/funding-calls",
-        programTier: req.programTier,
+        link: callLink,
+        programTier: call.programTier || req.programTier,
       });
     }
   } catch { /* best-effort */ }
@@ -315,7 +363,7 @@ if (!canPublish) {
     detail: call.title,
     actorId: req.user.id,
     actorRole: req.user.role,
-    programTier: req.programTier,
+    programTier: call.programTier || req.programTier,
   });
 
   res.json({ message: "Funding call approved and published", call: sanitizeCall(call) });

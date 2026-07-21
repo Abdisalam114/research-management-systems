@@ -246,6 +246,25 @@ export function GrantDetailsPage() {
             </div>
           ) : null}
 
+          {!canFinanceDecide && grant.status === "pending_finance" ? (
+            <div className="card" style={{ marginTop: 12, borderColor: "rgba(251,191,36,0.45)" }}>
+              <div style={{ fontWeight: 800 }}>Waiting for Finance to authorize budget</div>
+              <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+                After a funding-call award is accepted, money is authorized by the Finance Officer under{" "}
+                <strong>Grant funding approval</strong> (not from this screen unless you are Finance).
+              </p>
+              {isFinance ? (
+                <Link className="btn primary" to="/finance/grant-approvals" style={{ marginTop: 10, display: "inline-flex" }}>
+                  Open Grant funding approval
+                </Link>
+              ) : (
+                <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+                  Path: Finance Officer → sidebar → <strong>Grant funding approval</strong> → Authorize budget.
+                </p>
+              )}
+            </div>
+          ) : null}
+
           <div className="card" style={{ marginTop: 12 }}>
             <div style={{ fontWeight: 900, fontSize: 18 }}>{grant.title}</div>
             <div className="muted" style={{ marginTop: 6 }}>

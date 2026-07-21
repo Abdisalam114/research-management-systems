@@ -20,6 +20,7 @@
     "docs:system-pdf": "node src/scripts/generateSystemDocsPdf.js",
     "docs:roles-docx": "node src/scripts/generateRolesStagesDocx.js",
     "docs:example-docx": "node src/scripts/generateRolesStagesDocx.js ../docs/FULL_SYSTEM_REAL_EXAMPLE.txt ../docs/FULL_SYSTEM_REAL_EXAMPLE.docx",
+    "docs:usage-docx": "node src/scripts/generateRolesStagesDocx.js ../docs/HOW_TO_USE_SYSTEM_SOM_EN.txt ../docs/HOW_TO_USE_SYSTEM_SOM_EN.docx && node src/scripts/generateRolesStagesDocx.js ../docs/HOW_TO_USE_SYSTEM_EN.txt ../docs/HOW_TO_USE_SYSTEM_EN.docx && node src/scripts/generateRolesStagesDocx.js ../docs/HOW_TO_USE_SYSTEM_SO.txt ../docs/HOW_TO_USE_SYSTEM_SO.docx && node src/scripts/generateRolesStagesDocx.js ../docs/FULL_SYSTEM_GUIDE_SOM_EN.txt ../docs/FULL_SYSTEM_GUIDE_SOM_EN.docx",
     "docs:pdf": "node src/scripts/generateDatabaseDocsPdf.js && node src/scripts/generateSystemDocsPdf.js",
     "verify:roles": "node ../scripts/verify-all-roles.cjs",
     "verify:stakeholders": "node src/scripts/verifyAllStakeholders.js",

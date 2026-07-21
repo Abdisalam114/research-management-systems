@@ -28,30 +28,6 @@ export function FinanceGrantApprovalsPage() {
     const res = await grantApi.listGrants(accessToken);
     const pending = (res.grants || []).filter((g) => g.status === "pending_finance");
     setGrants(pending);
-    // #region agent log
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify({
-        sessionId: "f558f7",
-        runId: "finance-grant-queue",
-        hypothesisId: "F1",
-        location: "FinanceGrantApprovalsPage.jsx:load",
-        message: "finance grant funding queue",
-        data: {
-          role: user?.role,
-          pendingCount: pending.length,
-          sample: pending.slice(0, 5).map((g) => ({
-            id: g.id,
-            title: g.title,
-            amount: g.amountAwarded || g.amountRequested,
-            callId: g.callId,
-          })),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
   }, [accessToken, user?.role]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
@@ -72,21 +48,6 @@ export function FinanceGrantApprovalsPage() {
       const res = await grantApi.financeDecision(accessToken, id, { decision: "approve", comment });
       const allocated = res?.budget?.totalAllocated;
       const paid = res?.budget?.totalDisbursed ?? 0;
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          runId: "finance-approve-not-paid",
-          hypothesisId: "F2",
-          location: "FinanceGrantApprovalsPage.jsx:approve",
-          message: "UI after finance authorize",
-          data: { grantId: id, allocated, paid, message: res?.message || null },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       setMessage(
         res?.message ||
           `Budget authorized — allocated${allocated != null ? ` (${allocated})` : ""}. Paid so far: ${paid}. Not a disbursement.`

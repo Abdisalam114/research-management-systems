@@ -1,32 +1,7 @@
-const fs = require("fs");
-const path = require("path");
 const { Grant, GRANT_STATUSES } = require("../models/Grant");
 const { FundingCall } = require("../models/FundingCall");
 const { Project } = require("../models/Project");
 const { notifyUsersByRole } = require("./notify");
-
-const DEBUG_LOG = path.join(__dirname, "../../../debug-f558f7.log");
-
-function debugLog(message, data) {
-  // #region agent log
-  try {
-    fs.appendFileSync(
-      DEBUG_LOG,
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "finance-grant-queue",
-        hypothesisId: "F1",
-        location: "ensurePendingFinanceGrantFromProposal.js",
-        message,
-        data,
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-}
 
 /**
  * After a fund-call proposal is accepted, create (or reuse) a Grant in pending_finance
@@ -34,7 +9,6 @@ function debugLog(message, data) {
  */
 async function ensurePendingFinanceGrantFromProposal(proposal, { notify = true } = {}) {
   if (!proposal?._id || !proposal.fundingCallId) {
-    debugLog("skip — not a fund-call proposal", { proposalId: proposal?._id ? String(proposal._id) : null });
     return null;
   }
 
@@ -66,28 +40,33 @@ async function ensurePendingFinanceGrantFromProposal(proposal, { notify = true }
         if (project) existing.projectId = project._id;
       }
       await existing.save();
-      debugLog("promoted existing grant to pending_finance", {
-        grantId: String(existing._id),
-        proposalId: String(proposal._id),
-        amount: existing.amountAwarded,
-      });
+      if (notify) {
+        try {
+          await notifyUsersByRole(
+            "finance_officer",
+            {
+              type: "grant",
+              title: "Funding call award — finance approval needed",
+              body: `${existing.title} (${existing.amountAwarded || 0} ${existing.currency})`,
+              link: "/finance/grant-approvals",
+            },
+            proposal.programTier
+          );
+        } catch {
+          /* best-effort */
+        }
+      }
       return existing;
     }
-    debugLog("grant already exists", {
-      grantId: String(existing._id),
-      status: existing.status,
-    });
     return existing;
   }
 
   if (proposal.status !== "approved") {
-    debugLog("skip — proposal not approved", { status: proposal.status });
     return null;
   }
 
   const call = await FundingCall.findById(proposal.fundingCallId);
   if (!call) {
-    debugLog("skip — funding call missing", { callId: String(proposal.fundingCallId) });
     return null;
   }
 
@@ -116,13 +95,6 @@ async function ensurePendingFinanceGrantFromProposal(proposal, { notify = true }
     programTier: proposal.programTier,
     budgetBreakdown: proposal.budgetBreakdown || [],
     budgetTotal: Number(proposal.budgetTotal) || amount,
-  });
-
-  debugLog("created pending_finance grant from proposal", {
-    grantId: String(grant._id),
-    proposalId: String(proposal._id),
-    callId: String(call._id),
-    amount,
   });
 
   if (notify) {
@@ -159,7 +131,6 @@ async function backfillPendingFinanceGrantsFromProposals(tierWhere = {}) {
     const g = await ensurePendingFinanceGrantFromProposal(p, { notify: false });
     if (g) results.push({ proposalId: String(p._id), grantId: String(g._id), status: g.status });
   }
-  debugLog("backfill complete", { count: results.length, results: results.slice(0, 10) });
   return results;
 }
 

@@ -6,49 +6,38 @@ All documentation lives in the **`docs/`** folder at the project root.
 
 | File | Language | Description |
 |------|----------|-------------|
-| **[FULL_SYSTEM_GUIDE_SOM_EN.md](./FULL_SYSTEM_GUIDE_SOM_EN.md)** | English + Somali | **Qeybta xalay** — sharaxaad buuxa step-by-step |
-| **[FULL_SYSTEM_GUIDE_SOM_EN.docx](./FULL_SYSTEM_GUIDE_SOM_EN.docx)** | English + Somali | Isla qoraalka — **Word** (Microsoft Word) |
-| **[WHATS_NEW_JULY_2026.md](./WHATS_NEW_JULY_2026.md)** | English + Somali | Waxa cusub — Phases 1–4 faahfaahin |
-| **[ROLES_AND_STAGES_GUIDE.docx](./ROLES_AND_STAGES_GUIDE.docx)** | Somali | Roles & stages — open in Microsoft Word |
-| **[ROLES_AND_STAGES_GUIDE.txt](./ROLES_AND_STAGES_GUIDE.txt)** | Somali | Same content as plain text |
-| **[RMS_SYSTEM_DIAGRAM.html](./RMS_SYSTEM_DIAGRAM.html)** | Full system diagram — open in browser |
-| **[SYSTEM_FLOW_SIMPLE.html](./SYSTEM_FLOW_SIMPLE.html)** | **Sawir fudud** — simple flow (EN + SO) |
+| **[HOW_TO_USE_SYSTEM_SOM_EN.docx](./HOW_TO_USE_SYSTEM_SOM_EN.docx)** | **English + Somali** | **Main user guide — how to use the system (Word)** |
+| **[HOW_TO_USE_SYSTEM_EN.docx](./HOW_TO_USE_SYSTEM_EN.docx)** | English | Same guide — English only (Word) |
+| **[HOW_TO_USE_SYSTEM_SO.docx](./HOW_TO_USE_SYSTEM_SO.docx)** | Somali | Same guide — Somali only (Word) |
+| **[FULL_SYSTEM_GUIDE_SOM_EN.docx](./FULL_SYSTEM_GUIDE_SOM_EN.docx)** | English + Somali | Full step-by-step journey (Word) |
+| **[WHATS_NEW_JULY_2026.md](./WHATS_NEW_JULY_2026.md)** | English + Somali | New features — Phases 1–4 |
+| **[ROLES_AND_STAGES_GUIDE.docx](./ROLES_AND_STAGES_GUIDE.docx)** | Somali | Roles & stages (Word) |
+| **[RMS_SYSTEM_DIAGRAM.html](./RMS_SYSTEM_DIAGRAM.html)** | Diagram | Open in browser |
+| **[SYSTEM_FLOW_SIMPLE.html](./SYSTEM_FLOW_SIMPLE.html)** | EN + SO | Simple flow diagram |
+
+## Generate Word docs / Samee Word
+
+```bash
+cd backend
+npm install
+npm run docs:usage-docx
+```
+
+Creates/updates:
+- `docs/HOW_TO_USE_SYSTEM_SOM_EN.docx`
+- `docs/HOW_TO_USE_SYSTEM_EN.docx`
+- `docs/HOW_TO_USE_SYSTEM_SO.docx`
+- `docs/FULL_SYSTEM_GUIDE_SOM_EN.docx`
 
 ## Analysis / Falanqayn
 
 | File | Description |
 |------|-------------|
-| [SYSTEM_GAP_ANALYSIS_SOM_EN.md](./SYSTEM_GAP_ANALYSIS_SOM_EN.md) | Full specification vs built system (Somali + English) |
-| [SPEC_GAP_ANALYSIS.md](./SPEC_GAP_ANALYSIS.md) | Module-by-module technical gap analysis |
-
-## Examples / Tusaalooyin
-
-| File | Description |
-|------|-------------|
-| [FULL_SYSTEM_REAL_EXAMPLE.txt](./FULL_SYSTEM_REAL_EXAMPLE.txt) | Full end-to-end example |
-| [FULL_SYSTEM_REAL_EXAMPLE.docx](./FULL_SYSTEM_REAL_EXAMPLE.docx) | Same in Word |
-| [THESIS_PRESENTATION_SLIDES.txt](./THESIS_PRESENTATION_SLIDES.txt) | Thesis module presentation |
-
-## PDFs (generate first)
-
-These files are **not in git** until you generate them:
-
-```bash
-cd backend
-npm install
-npm run docs:pdf
-```
-
-Then open:
-
-- `docs/DATABASE_STRUCTURE.pdf` — MongoDB collections
-- `docs/SYSTEM_DOCUMENTATION.pdf` — API & system reference
+| [SYSTEM_GAP_ANALYSIS_SOM_EN.md](./SYSTEM_GAP_ANALYSIS_SOM_EN.md) | Specification vs built system |
+| [SPEC_GAP_ANALYSIS.md](./SPEC_GAP_ANALYSIS.md) | Technical module analysis |
 
 ## How to open
 
-**In Cursor:** Click the file in the Explorer → `docs/` folder  
+**Word:** Double-click any `.docx` in `docs/` — opens in Microsoft Word.
 
-**In File Explorer:**  
-`D:\Just\Thesis\research-management-systems\docs\`
-
-**HTML diagram:** Double-click `RMS_SYSTEM_DIAGRAM.html`
+**Folder:** `D:\Just\Thesis\research-management-systems\docs\`

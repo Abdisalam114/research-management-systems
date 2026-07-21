@@ -1,0 +1,77 @@
+================================================================================
+JAMHURIYA RMS — SIDEE LOO ISTICMAALO (SOMALI)
+Tilmaamaha Isticmaalaha — Nidaamka Maamulka Cilmi-baarista Jamhuriya
+Cusbooneysiin: July 21, 2026
+================================================================================
+
+1. GUUD AHAAN
+
+JUST RMS wuxuu maamulaa cilmi-baarista jaamacadda: funding calls, proposals, dib u eegis, project, maaliyad, natiijooyin, iyo xiritaan.
+
+Laba portal ayaa jira: Undergraduate (UG) iyo Postgraduate (PG). Kaliya Research Director ayaa beddeli kara labadooda.
+
+Fur app-ka: http://localhost:5173 (ka dib backend iyo frontend la shido).
+
+2. DOORASHADA (8 ROLES)
+
+• Research Director — ansixinta ugu dambeysa, isticmaalayaasha, departments, ethics, funding calls
+• University Leadership — daabaca funding calls; peer review (score + comment)
+• Faculty Coordinator — dib u eegista faculty-ga, kooxaha thesis
+• Finance Officer — Grant funding approval, miisaaniyad, lacag bixin, xiritaan maaliyadeed
+• Procurement Officer — dib u eegista PO ka hor Director
+• HR Officer — mashruucyada iyo thesis
+• Donor Agency — funding calls dibadda ah (external)
+• Researcher — proposals, grants, projects, publications, thesis
+
+3. GALITAANKA — 15 AKOON DEMO
+
+Run: cd backend && npm run seed
+
+Wadaag: director@rms.edu / Director2024!
+
+Undergraduate: coordinator@, finance@, procurement@, hr@, leadership@, donor@, asha@rms.edu
+Postgraduate: *.pg@rms.edu + mahad@rms.edu / Researcher2024!
+
+Director → dooro UG ama PG. Dadka kale hal portal kaliya.
+
+4. FUNDING CALLS
+
+Director wuxuu abuuraa Internal ama External. Requirements si otomaatig ah ayaa u buuxsamaan. Dooro eligibility (UG / PG / dhammaan).
+
+Leadership ama Director publish → researchers eligible ah waa la ogeysiiyaa link toos ah call-ka.
+
+Researcher: Funding Calls → Apply via this call.
+
+Tusaale PG: mahad@rms.edu wuxuu helaa ogeysiinta haddii call-ku yahay PG ama All.
+
+5. SAFKA DIB U EEGISTA
+
+Admin screening → Leadership peer review (score 1–5 + comment) → Committee → Ethics (Director) → Finance review → Director Approve.
+
+Proposal la aqbalay → Project la abuuraa + Grant finance queue (pending_finance).
+
+6. LACAGTA OGGOLAANSI (FINANCE)
+
+Waddada: Sidebar → Grant funding approval (/finance/grant-approvals)
+
+Gal: finance@rms.edu (UG) ama finance.pg@rms.edu (PG)
+
+Guji Authorize budget. Tani waa ALLOCATE kaliya — ma aha bixin lacag. Lacag bixinta waa Finance & Budgets ka dib.
+
+Muhiim: Marka Director aqbalo award-ka, Finance wuxuu helaa notification.
+
+7. SAFKA BUUXA
+
+Funding call → Grant → Proposal (budget + ethics + docs) → Dib u eegis → Project → Work plan + budgets → Lacag bixin + PO → Publications + Repository → Closure checklist → Archive.
+
+8. MENU-YADA MUHIIMKA AH
+
+Funding Calls, Grants, Proposals, Peer Reviews, Projects, Finance & Budgets, Grant funding approval (Finance), Policies, Notifications, Audit Trail (Director).
+
+9. SOO KOOBID HAL JUMLAD
+
+Director daabaco call → Researcher codsado → Leadership peer review → Director ansixiyo → Finance authorize budget → Project socdo → Xiritaan.
+
+================================================================================
+DHAMAADKA TILMAAMAHA SOMALI
+================================================================================

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
@@ -9,6 +9,25 @@ import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
 import { filterByStatKey, isAwardedItem, statFilterLabel } from "../utils/pageHeaderFilters";
 import "./fundingCalls.css";
+
+function defaultRequiredDocuments(callType) {
+  if (callType === "external") {
+    return [
+      "Signed research proposal (PDF)",
+      "Detailed budget breakdown",
+      "Donor / agency compliance forms",
+      "Ethics clearance (if human subjects)",
+      "CV of Principal Investigator",
+      "Letter of institutional support",
+    ].join("\n");
+  }
+  return [
+    "Signed research proposal (PDF)",
+    "Detailed budget breakdown",
+    "Ethics clearance (if human subjects)",
+    "CV of Principal Investigator",
+  ].join("\n");
+}
 
 function isAcceptedGrant(g) {
   return (
@@ -91,12 +110,14 @@ export function FundingCallsPage() {
   const { accessToken, user } = useAuth();
   const [searchParams] = useSearchParams();
   const projectIdFromUrl = searchParams.get("projectId") || "";
+  const callIdFromUrl = searchParams.get("callId") || "";
   const isDirector = user?.role === "research_director";
   const isDonor = user?.role === "donor_agency";
   const isLeadership = user?.role === "leadership";
   const isResearcher = user?.role === "researcher";
+  const isFinance = user?.role === "finance_officer";
   const canCreate = isDirector || isDonor;
-  const canSeeAllApps = isDirector || isLeadership || isDonor || user?.role === "finance_officer";
+  const canSeeAllApps = isDirector || isLeadership || isDonor || isFinance;
   const [calls, setCalls] = useState([]);
   const [linkedGrants, setLinkedGrants] = useState([]);
   const [linkedProposals, setLinkedProposals] = useState([]);
@@ -106,6 +127,7 @@ export function FundingCallsPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
+  const [highlightedCallId, setHighlightedCallId] = useState("");
 
   const load = useCallback(async () => {
     const res = await fundingCallApi.listFundingCalls(accessToken);
@@ -120,34 +142,6 @@ export function FundingCallsPage() {
       const props = (pRes.proposals || []).filter((p) => p.fundingCallId);
       setLinkedGrants(apps);
       setLinkedProposals(props);
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          runId: "accepted-visibility",
-          hypothesisId: "H4",
-          location: "FundingCalls.jsx:load",
-          message: "funding call grants + proposals visibility",
-          data: {
-            role: user?.role,
-            callsTotal: nextCalls.length,
-            closedCalls: nextCalls.filter((c) => c.status === "closed").length,
-            appsTotal: apps.length,
-            proposalsTotal: props.length,
-            acceptedGrants: apps.filter(isAcceptedGrant).length,
-            acceptedProposals: props.filter(isAcceptedProposal).map((p) => ({
-              id: p.id,
-              title: p.title,
-              status: p.status,
-              callId: p.fundingCallId,
-            })),
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
     } else {
       setLinkedGrants([]);
       setLinkedProposals([]);
@@ -155,6 +149,22 @@ export function FundingCallsPage() {
   }, [accessToken, isResearcher, canSeeAllApps, user?.role]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load, [isResearcher, canSeeAllApps]);
+
+  // Deep-link from notification "Open" → scroll/highlight that funding call
+  useEffect(() => {
+    if (!callIdFromUrl || loading || !calls.length) return;
+    const match = calls.find((c) => String(c.id) === String(callIdFromUrl));
+    if (!match) return;
+    setHighlightedCallId(String(match.id));
+    if (match.status && match.status !== "all") {
+      setStatusFilter(match.status === "open" || match.status === "draft" || match.status === "closed" ? match.status : "all");
+    }
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(`funding-call-${match.id}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [callIdFromUrl, calls, loading, setStatusFilter, user?.role]);
 
   const grantsByCallId = useMemo(() => {
     const map = {};
@@ -196,7 +206,9 @@ export function FundingCallsPage() {
   }
 
   function startCreate() {
-    setForm(isDonor ? EMPTY_EXTERNAL : EMPTY_INTERNAL);
+    const base = isDonor ? { ...EMPTY_EXTERNAL } : { ...EMPTY_INTERNAL };
+    base.requiredDocuments = defaultRequiredDocuments(base.callType);
+    setForm(base);
     setEditingId(null);
     setShowForm(true);
     setMessage("");
@@ -204,33 +216,45 @@ export function FundingCallsPage() {
 
   function startEdit(call) {
     setEditingId(call.id);
+    const callType = isDonor ? "external" : call.callType || "internal";
     setForm({
       title: call.title,
       description: call.description || "",
       fundingSource: call.fundingSource,
-      callType: isDonor ? "external" : isDirector ? "internal" : call.callType || "internal",
+      callType,
       donorRef: call.donorRef || "",
       amountCap: call.amountCap || "",
       currency: call.currency || "USD",
       deadline: call.deadline ? call.deadline.slice(0, 10) : "",
       eligibilityTier: call.eligibilityTier || "all",
-      requiredDocuments: call.requiredDocuments || "",
+      requiredDocuments: call.requiredDocuments || defaultRequiredDocuments(callType),
     });
     setShowForm(true);
     setMessage("");
   }
 
+  function onCallTypeChange(nextType) {
+    setForm((prev) => {
+      const prevDefault = defaultRequiredDocuments(prev.callType);
+      const docsUnchanged = !prev.requiredDocuments.trim() || prev.requiredDocuments.trim() === prevDefault.trim();
+      return {
+        ...prev,
+        callType: nextType,
+        requiredDocuments: docsUnchanged ? defaultRequiredDocuments(nextType) : prev.requiredDocuments,
+      };
+    });
+  }
+
   function canEditCall(call) {
     if (call.status !== "draft") return false;
-    if (isDirector && call.callType !== "external") return true;
+    if (isDirector) return true;
     if (isDonor && call.callType === "external" && String(call.createdBy) === String(user?.id)) return true;
     return false;
   }
 
   function canPublishCall(call) {
     if (call.status !== "draft") return false;
-    if (isLeadership) return true;
-    if (isDirector && call.callType !== "external") return true;
+    if (isLeadership || isDirector) return true;
     return false;
   }
 
@@ -251,7 +275,8 @@ export function FundingCallsPage() {
       setError("Funding source is required.");
       return;
     }
-    if (isDonor && !form.donorRef.trim()) {
+    const resolvedType = isDonor ? "external" : form.callType === "external" ? "external" : "internal";
+    if (resolvedType === "external" && !form.donorRef.trim()) {
       setError("Donor / agency reference is required for external calls.");
       return;
     }
@@ -262,24 +287,24 @@ export function FundingCallsPage() {
     try {
       const payload = {
         ...form,
-        callType: isDonor ? "external" : "internal",
+        callType: resolvedType,
         title: form.title.trim(),
         fundingSource: form.fundingSource.trim(),
         description: form.description.trim(),
         donorRef: form.donorRef.trim(),
-        requiredDocuments: form.requiredDocuments.trim(),
+        requiredDocuments: form.requiredDocuments.trim() || defaultRequiredDocuments(resolvedType),
         amountCap: Number(form.amountCap) || 0,
         deadline: form.deadline || null,
       };
-if (editingId) {
+      if (editingId) {
         await fundingCallApi.updateFundingCall(accessToken, editingId, payload);
         setMessage("Funding call updated successfully.");
       } else {
         await fundingCallApi.createFundingCall(accessToken, payload);
         setMessage(
-          isDonor
-            ? "External funding call draft saved. Leadership must approve before it opens to researchers."
-            : "Internal funding call draft saved. Publish or wait for Leadership approval."
+          resolvedType === "external"
+            ? "External funding call draft saved. Publish or wait for Leadership approval."
+            : "Funding call draft saved. Publish or wait for Leadership approval."
         );
       }
       resetForm();
@@ -323,12 +348,14 @@ await fundingCallApi.publishFundingCall(accessToken, id);
     }
   }
 
+  const pendingFinanceCount = acceptedGrants.filter((g) => g.status === "pending_finance").length;
+
   const subtitle = isDonor
     ? "Create external (donor) funding calls only. Leadership approves before researchers can apply."
     : isLeadership
       ? "Approve draft funding calls for publication, and close open calls when needed."
       : isDirector
-        ? "Create internal institutional seed grants. External calls are created by the Donor Agency."
+        ? "Create Internal or External funding calls. Choose eligible researchers (UG / PG / all)."
         : isResearcher
           ? "Open calls to apply. Accepted applications stay visible here (and under Grants → Awarded)."
           : "Publish institutional grant opportunities. Researchers apply only through an open call (Phase 1).";
@@ -378,6 +405,22 @@ await fundingCallApi.publishFundingCall(accessToken, id);
           Applying from a project — project context stays selected on Apply.{" "}
           <Link to="/funding-calls">clear project filter</Link>
         </p>
+      ) : null}
+
+      {callIdFromUrl && highlightedCallId ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Opened from notification — highlighting this funding call.{" "}
+          <Link to="/funding-calls">show all calls</Link>
+        </p>
+      ) : null}
+
+      {pendingFinanceCount > 0 && (isFinance || isDirector || isLeadership) ? (
+        <div className="fundingCallsBanner fundingCallsBannerOk" style={{ marginTop: 10 }}>
+          {pendingFinanceCount} award{pendingFinanceCount === 1 ? "" : "s"} waiting for budget authorization.{" "}
+          <Link to="/finance/grant-approvals" style={{ fontWeight: 700 }}>
+            Go to Grant funding approval →
+          </Link>
+        </div>
       ) : null}
 
       {message ? <div className="fundingCallsBanner fundingCallsBannerOk">{message}</div> : null}
@@ -448,9 +491,16 @@ await fundingCallApi.publishFundingCall(accessToken, id);
                     {g.fundingCall?.title ? ` · Call: ${g.fundingCall.title}` : ""}
                   </div>
                 </div>
-                <Link className="btn primary" to={`/grants/${g.id}`}>
-                  Open grant
-                </Link>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {g.status === "pending_finance" && isFinance ? (
+                    <Link className="btn primary" to="/finance/grant-approvals">
+                      Authorize budget
+                    </Link>
+                  ) : null}
+                  <Link className="btn primary" to={`/grants/${g.id}`}>
+                    Open grant
+                  </Link>
+                </div>
               </div>
             ))}
           </div>
@@ -466,12 +516,12 @@ await fundingCallApi.publishFundingCall(accessToken, id);
                   ? "Edit draft funding call"
                   : isDonor
                     ? "Create external funding call"
-                    : "Create internal funding call"}
+                    : "Create funding call"}
               </h3>
               <p className="fundingCallFormSub muted">
                 {isDonor
                   ? "External calls are saved as draft until Leadership approves and publishes them."
-                  : "Internal calls are saved as draft until published (Director or Leadership)."}
+                  : "Choose Internal or External. Requirements are filled automatically — edit if needed."}
               </p>
             </div>
             <span className="fundingCallStatus fundingCallStatusDraft">Draft</span>
@@ -512,7 +562,7 @@ await fundingCallApi.publishFundingCall(accessToken, id);
             <p className="fundingCallFormSectionHint muted">
               {isDonor
                 ? "Donor Agency creates external / agency-funded calls only. Call type is locked to External."
-                : "Research Director creates internal university-funded seed grants only."}
+                : "Select Internal (university seed) or External (donor/agency). Eligibility controls who is notified (UG / PG / all)."}
             </p>
             <div className="fundingCallFormGrid">
               <div className="field">
@@ -521,23 +571,32 @@ await fundingCallApi.publishFundingCall(accessToken, id);
                   id="fc-source"
                   required
                   placeholder={
-                    isDonor ? "e.g. UNESCO / World Bank" : "e.g. Jamhuriya University Research Office"
+                    form.callType === "external" || isDonor
+                      ? "e.g. UNESCO / World Bank"
+                      : "e.g. Jamhuriya University Research Office"
                   }
                   value={form.fundingSource}
                   onChange={(e) => setForm({ ...form, fundingSource: e.target.value })}
                 />
               </div>
               <div className="field">
-                <label htmlFor="fc-type">Call type</label>
-                <select id="fc-type" value={isDonor ? "external" : "internal"} disabled>
-                  {isDonor ? (
+                <label htmlFor="fc-type">Call type *</label>
+                {isDonor ? (
+                  <select id="fc-type" value="external" disabled>
                     <option value="external">External / donor-funded grant</option>
-                  ) : (
+                  </select>
+                ) : (
+                  <select
+                    id="fc-type"
+                    value={form.callType || "internal"}
+                    onChange={(e) => onCallTypeChange(e.target.value)}
+                  >
                     <option value="internal">Internal seed grant</option>
-                  )}
-                </select>
+                    <option value="external">External / donor-funded grant</option>
+                  </select>
+                )}
               </div>
-              {isDonor ? (
+              {(isDonor || form.callType === "external") ? (
                 <div className="field">
                   <label htmlFor="fc-donor">Donor / agency reference *</label>
                   <input
@@ -605,12 +664,15 @@ await fundingCallApi.publishFundingCall(accessToken, id);
 
           <section className="fundingCallFormSection">
             <h4 className="fundingCallFormSectionTitle">4. Application requirements</h4>
+            <p className="fundingCallFormSectionHint muted">
+              Filled automatically from call type. Edit lines if your call needs different documents.
+            </p>
             <div className="fundingCallFormGrid">
               <div className="field field--full">
                 <label htmlFor="fc-docs">Required documents (one per line)</label>
                 <textarea
                   id="fc-docs"
-                  rows={4}
+                  rows={5}
                   placeholder={"Signed proposal PDF\nBudget breakdown (Excel or PDF)\nEthics approval letter (if applicable)"}
                   value={form.requiredDocuments}
                   onChange={(e) => setForm({ ...form, requiredDocuments: e.target.value })}
@@ -639,7 +701,16 @@ await fundingCallApi.publishFundingCall(accessToken, id);
 
       <div className="fundingCallList">
         {filteredCalls.map((c) => (
-          <article key={c.id} className="card fundingCallCard">
+          <article
+            key={c.id}
+            id={`funding-call-${c.id}`}
+            className={`card fundingCallCard${highlightedCallId === String(c.id) ? " fundingCallCardHighlight" : ""}`}
+            style={
+              highlightedCallId === String(c.id)
+                ? { outline: "2px solid #38bdf8", boxShadow: "0 0 0 4px rgba(56,189,248,0.25)" }
+                : undefined
+            }
+          >
             <div className="fundingCallCardTop">
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
@@ -794,7 +865,7 @@ await fundingCallApi.publishFundingCall(accessToken, id);
             <div style={{ fontWeight: 800 }}>No funding calls yet</div>
             <p className="muted" style={{ marginTop: 8, fontSize: 14 }}>
               {isDirector
-                ? "Create your first internal call for researchers."
+                ? "Create your first funding call (Internal or External)."
                 : isDonor
                   ? "Create an external funding call draft for Leadership to approve."
                   : isLeadership

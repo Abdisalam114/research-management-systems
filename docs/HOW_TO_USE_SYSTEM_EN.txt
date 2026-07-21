@@ -1,0 +1,70 @@
+================================================================================
+JAMHURIYA RMS — HOW TO USE THE SYSTEM (ENGLISH)
+User Guide — Jamhuriya University Research Management System
+Updated: July 21, 2026
+================================================================================
+
+1. OVERVIEW
+
+JUST RMS manages university research from funding calls through proposals, multi-stage review, project execution, finance, outputs, and formal closure.
+
+Two portals exist: Undergraduate (UG) and Postgraduate (PG). Only the Research Director can switch between them.
+
+Open the app at http://localhost:5173 after starting backend (:5000) and frontend (:5173).
+
+2. ROLES (8)
+
+• Research Director — final approvals, users, departments, ethics, funding calls
+• University Leadership — publish funding calls; peer review (score + comment)
+• Faculty Coordinator — faculty review, thesis groups
+• Finance Officer — Grant funding approval, budgets, payments, finance closure
+• Procurement Officer — purchase order review before Director
+• HR Officer — projects and thesis HR context
+• Donor Agency — external funding call drafts
+• Researcher — proposals, grants, projects, publications, thesis
+
+3. LOGIN — 15 DEMO ACCOUNTS
+
+Run: cd backend && npm run seed
+
+Shared: director@rms.edu / Director2024!
+
+Undergraduate: coordinator@, finance@, procurement@, hr@, leadership@, donor@, asha@rms.edu
+Postgraduate: *.pg@rms.edu equivalents + mahad@rms.edu
+Password pattern: see login page (Coordinator2024!, Finance2024!, Researcher2024!, etc.)
+
+Director → choose UG or PG portal after login. All others use one portal automatically.
+
+4. FUNDING CALLS
+
+Director creates Internal or External calls. Required documents auto-fill. Choose eligibility (UG / PG / all).
+
+Leadership or Director publishes → eligible researchers get notifications with direct link to the call.
+
+Researcher: Funding Calls → Apply via this call.
+
+5. REVIEW WORKFLOW
+
+Admin screening → Leadership peer review (score 1–5 + comment) → Committee → Ethics (Director) → Finance review → Director Approve.
+
+Approved funding-call proposals create a Project and queue a Grant for finance (status: pending_finance).
+
+6. AUTHORIZE BUDGET (FINANCE)
+
+Path: Sidebar → Grant funding approval (/finance/grant-approvals)
+
+Login as finance@rms.edu (UG) or finance.pg@rms.edu (PG).
+
+Click Authorize budget. This ALLOCATES the budget only — it does not pay money. Disburse later under Finance & Budgets.
+
+7. FULL JOURNEY
+
+Funding call → Grant → Proposal (budget + ethics + docs) → Review → Project → Work plan + budgets → Payments + PO → Publications + Repository → Closure checklist → Archived.
+
+8. KEY MENUS
+
+Funding Calls, Grants, Proposals, Peer Reviews, Projects, Finance & Budgets, Grant funding approval (Finance), Policies, Notifications, Audit Trail (Director).
+
+================================================================================
+END OF ENGLISH GUIDE
+================================================================================
