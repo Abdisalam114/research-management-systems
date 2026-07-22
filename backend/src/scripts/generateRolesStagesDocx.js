@@ -1,6 +1,11 @@
 /**
- * Generates docs/ROLES_AND_STAGES_GUIDE.docx from docs/ROLES_AND_STAGES_GUIDE.txt
- * Run: node src/scripts/generateRolesStagesDocx.js
+ * Generates Word (.docx) guides from plain .txt sources.
+ * Run: npm run docs:usage-docx
+ *
+ * Formatting:
+ * - Document title = very large bold
+ * - Section titles = large bold
+ * - Two blank lines between major sections
  */
 const fs = require("fs");
 const path = require("path");
@@ -9,7 +14,6 @@ const {
   Packer,
   Paragraph,
   TextRun,
-  HeadingLevel,
   AlignmentType,
   BorderStyle,
 } = require("docx");
@@ -17,9 +21,29 @@ const {
 const DEFAULT_TXT = path.resolve(__dirname, "../../../docs/ROLES_AND_STAGES_GUIDE.txt");
 const DEFAULT_OUT = path.resolve(__dirname, "../../../docs/ROLES_AND_STAGES_GUIDE.docx");
 
+/** Empty paragraph ≈ one blank line in Word */
+function blankLine() {
+  return new Paragraph({ children: [new TextRun({ text: "" })], spacing: { after: 0, before: 0, line: 276 } });
+}
+
+function twoBlankLines() {
+  return [blankLine(), blankLine()];
+}
+
 function isRuleLine(line) {
   const t = line.trim();
-  return t.length >= 10 && /^[=\-]+$/.test(t);
+  return t.length >= 8 && /^[=\-]+$/.test(t);
+}
+
+function isSectionHeading(trimmed) {
+  return (
+    /^QAYBTA\s+\d+/i.test(trimmed) ||
+    /^DHAMAAD/i.test(trimmed) ||
+    /^END(\s|$)/i.test(trimmed) ||
+    /^\d+\.\s+[A-ZÁÉÍÓÚÄÖÜ]/.test(trimmed) ||
+    /^STEP\s+\d+/i.test(trimmed) ||
+    /^[A-C]\.\d+\s/.test(trimmed)
+  );
 }
 
 function extractTitleBlock(lines) {
@@ -39,10 +63,15 @@ function parseTxtToParagraphs(text) {
   let i = 0;
   const titleLines = extractTitleBlock(lines);
   if (titleLines.length) {
-    while (i < lines.length && (isRuleLine(lines[i].trim()) || !lines[i].trim() || titleLines.includes(lines[i].trim()))) {
+    while (
+      i < lines.length &&
+      (isRuleLine(lines[i].trim()) || !lines[i].trim() || titleLines.includes(lines[i].trim()))
+    ) {
       i += 1;
     }
   }
+
+  let sectionCount = 0;
 
   while (i < lines.length) {
     const line = lines[i];
@@ -54,45 +83,55 @@ function parseTxtToParagraphs(text) {
     }
 
     if (isRuleLine(trimmed)) {
-      const prev = (lines[i - 1] || "").trim();
-      const next = (lines[i + 1] || "").trim();
-      if (prev && !isRuleLine(prev) && isRuleLine(next)) {
-        if (/^QAYBTA |^DHAMAAD|^1\. HORDHAC/.test(prev)) {
-          children.push(new Paragraph({ text: prev, heading: HeadingLevel.HEADING_1, spacing: { before: 240, after: 120 } }));
-        }
+      i += 1;
+      continue;
+    }
+
+    if (isSectionHeading(trimmed)) {
+      if (sectionCount > 0) {
+        children.push(...twoBlankLines());
       }
-      i += 1;
-      continue;
-    }
-
-    if (/^[A-C]\.\d+\s/.test(trimmed)) {
+      sectionCount += 1;
+      const isMainSection = /^QAYBTA\s+\d+/i.test(trimmed) || /^\d+\.\s/.test(trimmed);
       children.push(
         new Paragraph({
-          text: trimmed,
-          heading: HeadingLevel.HEADING_2,
-          spacing: { before: 200, after: 80 },
+          spacing: { before: sectionCount === 1 ? 120 : 200, after: 160 },
+          children: [
+            new TextRun({
+              text: trimmed,
+              bold: true,
+              size: isMainSection ? 36 : 30,
+              color: "0C4A6E",
+            }),
+          ],
         })
       );
       i += 1;
       continue;
     }
 
-    if (/^QAYBTA |^1\. HORDHAC|^DHAMAAD/.test(trimmed)) {
+    if (/^(NOTE|XUSUUSIN|IMPORTANT|MUHIIM|English|Somali|EN:|SO:)/i.test(trimmed) && trimmed.includes(":")) {
+      const colon = trimmed.indexOf(":");
+      const label = trimmed.slice(0, colon + 1);
+      const rest = trimmed.slice(colon + 1).trim();
       children.push(
         new Paragraph({
-          text: trimmed,
-          heading: HeadingLevel.HEADING_1,
-          spacing: { before: 280, after: 120 },
+          spacing: { after: 80 },
+          children: [
+            new TextRun({ text: label + (rest ? " " : ""), bold: true, size: 22 }),
+            ...(rest ? [new TextRun({ text: rest, size: 22 })] : []),
+          ],
         })
       );
       i += 1;
       continue;
     }
 
-    if (/^(Magaca nidaamka|Sharaxaad:|Mas'uuliyadaha|Modules-ka|Ma geli|Xaddidaad:|Yaa |Xaalad|Shuruud:|Noocyada|Proposal ethicsStatus:|Ethics Application|8 Modules|Extension:|Xeerka|Bogga:|Tallaabo kasta|Kani waa)/.test(trimmed)) {
+    if (trimmed.startsWith("•") || trimmed.startsWith("- ")) {
       children.push(
         new Paragraph({
-          children: [new TextRun({ text: trimmed, bold: trimmed.endsWith(":") })],
+          text: trimmed.replace(/^\s*[•\-]\s*/, ""),
+          bullet: { level: 0 },
           spacing: { after: 60 },
         })
       );
@@ -100,36 +139,24 @@ function parseTxtToParagraphs(text) {
       continue;
     }
 
-    if (/^\d+\.\s/.test(trimmed) && trimmed.length < 120) {
+    if (/^\d+\.\s/.test(trimmed) && trimmed.length < 160) {
       children.push(
         new Paragraph({
           text: trimmed,
           bullet: { level: 0 },
-          spacing: { after: 40 },
+          spacing: { after: 60 },
         })
       );
       i += 1;
       continue;
     }
 
-    if (trimmed.startsWith("•") || trimmed.startsWith("  •")) {
-      children.push(
-        new Paragraph({
-          text: trimmed.replace(/^\s*•\s*/, ""),
-          bullet: { level: 0 },
-          spacing: { after: 40 },
-        })
-      );
-      i += 1;
-      continue;
-    }
-
-    if (/^\s{2,}\S/.test(line) && trimmed.includes("—")) {
+    if (/^\s{2,}\S/.test(line)) {
       children.push(
         new Paragraph({
           text: trimmed,
-          bullet: { level: 0 },
-          spacing: { after: 40 },
+          indent: { left: 360 },
+          spacing: { after: 60 },
         })
       );
       i += 1;
@@ -139,49 +166,62 @@ function parseTxtToParagraphs(text) {
     let para = trimmed;
     while (i + 1 < lines.length) {
       const nxt = lines[i + 1].trim();
-      if (!nxt || isRuleLine(nxt) || /^[A-C]\.\d+/.test(nxt) || /^QAYBTA/.test(nxt)) break;
-      if (/^(Magaca|Sharaxaad|Mas'uuliyadaha|Modules|Ma geli|Xaddidaad|Yaa |Xaalad|Shuruud|Noocyada|Proposal|Ethics Application|8 Modules|Extension|Xeerka|Bogga|Tallaabo|Kani)/.test(nxt)) break;
-      if (nxt.startsWith("•") || /^\d+\.\s/.test(nxt)) break;
+      if (!nxt || isRuleLine(nxt) || isSectionHeading(nxt)) break;
+      if (nxt.startsWith("•") || nxt.startsWith("- ") || /^\d+\.\s/.test(nxt)) break;
+      if (/^(NOTE|XUSUUSIN|IMPORTANT|MUHIIM|English|Somali|EN:|SO:)/i.test(nxt)) break;
       i += 1;
       para += ` ${nxt}`;
     }
-    children.push(new Paragraph({ text: para, spacing: { after: 80 } }));
+    children.push(
+      new Paragraph({
+        spacing: { after: 100 },
+        children: [new TextRun({ text: para, size: 22 })],
+      })
+    );
     i += 1;
   }
 
   const header = [];
   if (titleLines.length) {
+    // Main title — very large + bold
     header.push(
       new Paragraph({
         alignment: AlignmentType.CENTER,
-        spacing: { after: 80 },
-        children: [new TextRun({ text: titleLines[0] || "JAMHURIYA RMS", bold: true, size: 32 })],
+        spacing: { after: 120 },
+        children: [
+          new TextRun({
+            text: titleLines[0] || "JAMHURIYA RMS",
+            bold: true,
+            size: 56,
+            color: "0C4A6E",
+          }),
+        ],
       })
     );
-    if (titleLines[1]) {
+    // Subtitles — bold, smaller than main
+    for (let t = 1; t < titleLines.length; t++) {
       header.push(
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          spacing: { after: 40 },
-          children: [new TextRun({ text: titleLines[1], bold: true, size: 28 })],
-        })
-      );
-    }
-    if (titleLines[2]) {
-      header.push(
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 200 },
-          children: [new TextRun({ text: titleLines[2], italics: true, size: 22, color: "64748B" })],
+          spacing: { after: 80 },
+          children: [
+            new TextRun({
+              text: titleLines[t],
+              bold: true,
+              size: t === 1 ? 32 : 24,
+              color: t === 1 ? "0369A1" : "64748B",
+            }),
+          ],
         })
       );
     }
     header.push(
       new Paragraph({
-        border: { bottom: { color: "0369A1", space: 1, style: BorderStyle.SINGLE, size: 12 } },
-        spacing: { after: 240 },
+        border: { bottom: { color: "0369A1", space: 1, style: BorderStyle.SINGLE, size: 18 } },
+        spacing: { after: 200 },
       })
     );
+    header.push(...twoBlankLines());
   }
 
   return [...header, ...children];
@@ -199,11 +239,18 @@ async function main() {
     creator: "Jamhuriya RMS",
     title: path.basename(OUT_PATH, ".docx"),
     description: "Jamhuriya Research Management System documentation",
+    styles: {
+      default: {
+        document: {
+          styles: [{ id: "Normal", run: { font: "Calibri", size: 22 } }],
+        },
+      },
+    },
     sections: [
       {
         properties: {
           page: {
-            margin: { top: 1440, right: 1440, bottom: 1440, left: 1440 },
+            margin: { top: 1080, right: 1080, bottom: 1080, left: 1080 },
           },
         },
         children: parseTxtToParagraphs(text),

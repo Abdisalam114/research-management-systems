@@ -2,65 +2,198 @@
 JAMHURIYA RMS — HOW TO USE THE SYSTEM
 Sida Loo Isticmaalo Nidaamka (ENGLISH + SOMALI)
 Jamhuriya University Research Management System
-Updated: July 21, 2026
+Updated: July 22, 2026
 ================================================================================
 
+
 NOTE / XUSUUSIN:
-  • Fur Word: HOW_TO_USE_SYSTEM_SOM_EN.docx
-  • Bilingual — every section has English and Somali
-  • Demo: http://localhost:5173 (frontend) + http://localhost:5000 (API)
+  • Word file: HOW_TO_USE_SYSTEM_SOM_EN.docx
+  • Bilingual guide — English + Somali in every section
+  • Demo URL: http://localhost:5173 (frontend) · API :5000
+  • Seed first: cd backend && npm run seed
+
 
 ================================================================================
 QAYBTA 1 — OVERVIEW / GUUD AHAAN
 ================================================================================
 
-English: JUST RMS manages research from funding call → proposal → review → project → finance → outputs → closure.
-Somali: JUST RMS wuxuu maamulaa cilmi-baarista: funding call → proposal → dib u eegis → project → maaliyad → natiijo → xiritaan.
+English: JUST RMS manages research from funding call → proposal → multi-stage review → project → finance → publications → closure.
 
-English: Two separate portals — Undergraduate (UG) and Postgraduate (PG). Data does not mix.
+Somali: JUST RMS wuxuu maamulaa cilmi-baarista: funding call → proposal → dib u eegis → project → maaliyad → publications → xiritaan.
+
+English: Two portals — Undergraduate (UG) and Postgraduate (PG). Data never mixes across portals.
+
 Somali: Laba portal — Undergraduate (UG) iyo Postgraduate (PG). Xogtu isma dhex gasho.
 
-English: Only Research Director switches portals. All other users stay on one portal.
+English: Only the Research Director can switch portals. Everyone else stays on one portal.
+
 Somali: Kaliya Research Director ayaa beddela portal. Dadka kale hal portal ayay ku jiraan.
 
-English: UI language is English. This guide is bilingual (English + Somali).
-Somali: Interface-ka waa Ingiriisi. Tilmaamahan waa laba luuqad (English + Somali).
+English: The app UI language is English. This guide is bilingual (English + Somali).
+
+Somali: Interface-ka waa Ingiriisi. Tilmaamahan waa laba luuqad.
+
 
 ================================================================================
-QAYBTA 2 — ROLES / DOORASHADA MAS'UULIYADDA (8 ROLES)
+QAYBTA 2 — USER JOBS / SHAQADA MID KASTA (8 ROLES)
 ================================================================================
 
-1. research_director — Research Director
-   EN: Final approvals, users, departments, analytics, ethics decisions, internal funding calls
-   SO: Ansixinta ugu dambeysa, isticmaalayaasha, departments, funding calls gudaha
+There is no separate Ethics Committee or Peer Reviewer account. Ethics is approved by the Research Director. Peer review is done by University Leadership (score + comment).
 
-2. leadership — University Leadership
-   EN: Approve/publish funding calls; peer review (score + comment) on proposals
-   SO: Daabaca funding calls; peer review (score + comment) proposal-yada
+Ma jiro akoon gooni ah oo Ethics Committee ama Peer Reviewer. Ethics-ka waxaa ansixiya Research Director. Peer review waxaa sameeya University Leadership.
 
-3. faculty_coordinator — Faculty Coordinator
-   EN: Faculty review, thesis groups, coordination reports
-   SO: Dib u eegista faculty-ga, kooxaha thesis-ka
 
-4. finance_officer — Finance Officer
-   EN: Grant funding approval (authorize budget), budgets, payments, finance closure
-   SO: Grant funding approval (authorize budget), miisaaniyad, lacag bixin, xiritaan maaliyadeed
+1. Research Director — director@rms.edu
 
-5. procurement_officer — Procurement Officer
-   EN: Reviews purchase orders before Director
-   SO: Dib u eegista PO ka hor Director
+EN — Job / what they do:
+  • Switch Undergraduate / Postgraduate portals
+  • Create and publish internal funding calls
+  • Final Approve / Reject on proposals
+  • Decide ethics (JUREC) applications
+  • Approve purchase orders after Procurement
+  • Manage Users and Departments
+  • View analytics, KPI, audit trail, all modules
 
-6. hr_officer — HR Officer
-   EN: Projects and thesis HR context
-   SO: Mashruucyada iyo thesis — HR
+SO — Shaqada:
+  • Beddel portal UG / PG
+  • Abuur / daabaca funding calls gudaha
+  • Ansixinta ugu dambeysa ee proposals
+  • Go'aanka ethics (JUREC)
+  • Ansixinta PO ka dib Procurement
+  • Maamul Users iyo Departments
+  • Analytics, KPI, audit trail
 
-7. donor_agency — Donor / Agency
-   EN: Creates external funding calls (draft → Leadership approves)
-   SO: Abuurista funding calls dibadda ah (draft → Leadership ansixiyo)
 
-8. researcher — Researcher / PI
-   EN: Proposals, grants, projects, publications, thesis supervision
-   SO: Proposals, grants, projects, publications, thesis
+2. University Leadership — leadership@rms.edu / leadership.pg@rms.edu
+
+EN — Job:
+  • Approve / publish funding calls (especially external)
+  • Peer review assigned proposals: score 1–5 + comment
+  • Open Peer Reviews and Proposals menus
+  • View KPI dashboard
+
+SO — Shaqada:
+  • Ansixi / daabaca funding calls (gaar ahaan external)
+  • Peer review: score 1–5 + comment
+  • Peer Reviews iyo Proposals
+  • KPI dashboard
+
+
+3. Faculty Coordinator — coordinator@rms.edu / coordinator.pg@rms.edu
+
+EN — Job:
+  • Review faculty proposal queue
+  • Create and manage thesis groups (min 4 students), assign supervisors, accept titles
+  • Advance publication faculty workflow stages
+  • Validate publications (Validate → Published)
+  • Faculty reports / monitoring dashboard
+  • View projects, ethics list, audit trail
+
+SO — Shaqada:
+  • Dib u eegista proposal-yada faculty-ga
+  • Kooxaha thesis (min 4 arday), supervisors, ansixi title
+  • Horumarinta publication workflow
+  • Validate publications → Published
+  • Warbixinta / dashboard faculty
+  • Projects, ethics, audit trail
+
+
+4. Finance Officer — finance@rms.edu / finance.pg@rms.edu
+   (NOT the same as Procurement — see below)
+
+EN — Job (MONEY):
+  • Grant funding approval → Authorize budget (allocate only, not pay)
+  • Finance review of proposal budgets
+  • Manage budgets, payment requests, and pay approved items
+  • Pay purchase orders AFTER Director approved the PO
+  • Finance reports and donor financial reports
+  • Project closure (Finance) approval
+  • Does NOT review whether a purchase is the right item to buy (that is Procurement)
+
+SO — Shaqada (LACAG):
+  • Grant funding approval → Authorize budget (qoondee kaliya, ha bixin weli)
+  • Dib u eegista budget-ka proposal-ka
+  • Budgets, payment requests, bixinta lacagta
+  • Bixi PO ka dib Director ansixiyo
+  • Finance reports / donor reports
+  • Xiritaan maaliyadeed (Project closure Finance)
+  • MA sameeyo dib u eegista “maxaa la iibinayaa” (taasi waa Procurement)
+
+
+5. Procurement Officer — procurement@rms.edu / procurement.pg@rms.edu
+   (NOT the same as Finance — see below)
+
+EN — Job (BUYING / PURCHASE ORDERS):
+  • Review Purchase Orders (PO) created by researchers
+  • Approve or reject PO before Director
+  • Check that the requested goods/services match the project need
+  • Does NOT authorize grant awards
+  • Does NOT pay money (Finance pays after Director approves PO)
+  • Can view Funding Calls, Grants, and Budgets for context
+
+SO — Shaqada (IIBSASHADA / PO):
+  • Dib u eegista Purchase Orders (PO) ee researchers abuureen
+  • Ansixi ama diid PO ka hor Director
+  • Hubi in alaabta/adeegga uu ku habboon yahay mashruuca
+  • MA oggolaado grant / Authorize budget
+  • MA bixiso lacag (Finance ayaa bixisa ka dib Director)
+  • Wuu arki karaa Funding Calls, Grants, Budgets
+
+
+IMPORTANT — Finance vs Procurement / MUHIIM — Finance iyo Procurement isku mid ma aha:
+
+  Finance = lacagta (authorize grant budget, pay, reports, finance closure)
+  Procurement = iibsashada (review PO only)
+
+  Flow: Researcher creates PO → Procurement reviews → Director approves → Finance pays
+
+
+6. HR Officer — hr@rms.edu / hr.pg@rms.edu
+
+EN — Job:
+  • View projects, thesis groups, and research groups for HR context
+  • Support staffing / people side of research projects
+  • Does not approve grants, ethics, or payments
+
+SO — Shaqada:
+  • Arag projects, thesis, groups — dhinaca HR
+  • Taageero dadka / kooxaha mashruuca
+  • Ma ansixiyo grants, ethics, ama lacag bixin
+
+
+7. Donor Agency — donor@rms.edu / donor.pg@rms.edu
+
+EN — Job:
+  • Create external funding call drafts
+  • Wait for Leadership / Director to publish
+  • Monitor open/closed calls and donor reports
+  • Read-only awareness of related grants
+
+SO — Shaqada:
+  • Abuuri funding calls dibadda ah (draft)
+  • Sug Leadership / Director publish
+  • La soco calls iyo donor reports
+  • Arag grants la xiriira
+
+
+8. Researcher / PI — asha@rms.edu (UG) / mahad@rms.edu (PG)
+
+EN — Job:
+  • Apply to funding calls; create proposals (budget + ethics + docs)
+  • Run approved projects: milestones, work plan, progress, communication log
+  • Create budgets and payment requests; create purchase orders
+  • Register publications (Create & submit); upload repository files
+  • Supervise thesis groups (enter title, meetings, chapters)
+  • Submit project closure checklist
+
+SO — Shaqada:
+  • Codso funding calls; abuuri proposals (budget + ethics + docs)
+  • Maamul projects: milestones, work plan, progress, communication log
+  • Abuuri budgets, payment requests, iyo purchase orders
+  • Publications (Create & submit); repository files
+  • Thesis supervision (title, kulamo, chapters)
+  • Gudbi closure checklist
+
 
 ================================================================================
 QAYBTA 3 — LOGIN & DEMO ACCOUNTS / GALITAANKA
@@ -70,7 +203,7 @@ English steps:
   1. Open http://localhost:5173
   2. Enter email + password → Sign in
   3. Director only → choose Undergraduate or Postgraduate portal
-  4. Others → automatic portal from account email (.pg@ = Postgraduate)
+  4. Others → portal is automatic (.pg@ emails = Postgraduate)
 
 Somali steps:
   1. Fur http://localhost:5173
@@ -80,7 +213,7 @@ Somali steps:
 
 All 15 demo accounts (after: cd backend && npm run seed):
 
-SHARED — Both portals:
+SHARED — both portals:
   director@rms.edu / Director2024! — Research Director
 
 UNDERGRADUATE portal:
@@ -90,7 +223,7 @@ UNDERGRADUATE portal:
   hr@rms.edu / Hr2024! — HR Officer
   leadership@rms.edu / Leadership2024! — University Leadership
   donor@rms.edu / Donor2024! — Donor Agency
-  asha@rms.edu / Researcher2024! — Researcher (Ashа)
+  asha@rms.edu / Researcher2024! — Researcher (Dr. Sarah Chen)
 
 POSTGRADUATE portal:
   coordinator.pg@rms.edu / Coordinator2024!
@@ -99,7 +232,10 @@ POSTGRADUATE portal:
   hr.pg@rms.edu / Hr2024!
   leadership.pg@rms.edu / Leadership2024!
   donor.pg@rms.edu / Donor2024!
-  mahad@rms.edu / Researcher2024! — Researcher (Mahad)
+  mahad@rms.edu / Researcher2024! — Researcher (Dr. James Okonkwo)
+
+Removed / not used anymore: ethics@rms.edu, reviewer@rms.edu (roles removed from the system).
+
 
 ================================================================================
 QAYBTA 4 — SIDEBAR MENU / KHARIIDADA MENU-GA
@@ -109,26 +245,33 @@ Dashboard & Analytics — Everyone
 Projects — Director, Coordinator, Researcher, HR
 Research Workflow Status — Director, Coordinator, Researcher
 Publications & Outputs — Director, Coordinator, Researcher
-Ethics — Director, Coordinator, Researcher (Director approves ethics)
+Ethics — Director, Coordinator, Researcher (Director decides ethics)
 Proposals — Director, Coordinator, Researcher, Leadership
 Grant funding approval — Finance Officer ONLY (/finance/grant-approvals)
 Project closure (Finance) — Finance Officer
 Peer Reviews — Director, Leadership
 Thesis — Director, Coordinator, Researcher, HR
-Funding Calls — Director, Finance, Researcher, Leadership, Donor, etc.
-Policies (Siyaasada) — Everyone (all 8 roles)
-Grants — Director, Finance, Researcher, Leadership, Donor, etc.
+Funding Calls — Director, Coordinator, Finance, Researcher, Leadership, Procurement, Donor
+Policies (Siyaasada) — Everyone
+Grants — Director, Coordinator, Finance, Researcher, Leadership, Procurement, Donor
 Finance & Budgets — Director, Finance, Researcher, Procurement
 Finance Reports — Director, Finance
 KPI Dashboard — Director, Coordinator, Leadership
+Search — Director, Coordinator, Researcher, Leadership, HR
 Donor Reports — Director, Finance, Donor
 Audit Trail — Director, Coordinator
 Repository — Director, Coordinator, Researcher
-Messages / Notifications — Everyone
-Users / Departments — Director only
+Collaboration — Director, Coordinator, Researcher
+Groups — Director, Coordinator, Researcher, HR
+Messages — Director, Coordinator, Researcher, HR
+Notifications — Everyone
+Users — Director only
+Departments — Director only
+Profile — Everyone
+
 
 ================================================================================
-QAYBTA 5 — FUNDING CALLS / DEEQAHA (UPDATED JULY 2026)
+QAYBTA 5 — FUNDING CALLS / DEEQAHA
 ================================================================================
 
 A.1 Create a funding call — Director or Donor
@@ -138,50 +281,51 @@ English — Research Director:
   2. Choose Call type: Internal seed grant OR External / donor-funded
   3. Set Eligible researchers: All (UG & PG) / UG only / PG only / PGD
   4. Required documents fill automatically — edit if needed
-  5. Save as draft → Publish (or Leadership approves first)
+  5. Save as draft → Publish (or wait for Leadership approval on external)
 
 Somali — Research Director:
   1. Funding Calls → + New funding call
   2. Dooro Internal ama External
   3. Dooro cidda codsan karta: All / UG / PG / PGD
   4. Requirements si otomaatig ah ayaa u buuxsamaan
-  5. Save draft → Publish (ama Leadership ansixiyo)
+  5. Save draft → Publish (ama Leadership ansixiyo external)
 
 English — Donor Agency:
-  • External calls only. Leadership must approve before researchers see the call.
+  • External calls only. Leadership (or Director) must publish before researchers see the call.
 
 Somali — Donor:
-  • External kaliya. Leadership waa in ay ansixisaa ka hor inta researchers arkaan.
+  • External kaliya. Leadership / Director waa inay daabacaan ka hor inta researchers arkaan.
 
 A.2 Researchers apply
 
 English:
-  1. Login as researcher (asha@ or mahad@)
-  2. Notifications → "New funding call open" → Open (goes to exact call)
-  3. Funding Calls → Apply via this call → Grants apply form
+  1. Login as researcher (asha@ UG or mahad@ PG)
+  2. Notifications → New funding call open → Open (deep-links to that call)
+  3. Funding Calls → Apply via this call
 
 Somali:
   1. Gal researcher ahaan
   2. Notifications → call furan → Open (wuxuu ku geeyaa call-ka saxda ah)
   3. Funding Calls → Apply via this call
 
-A.3 Review proposal (funding call application)
+A.3 Review proposal (funding-call path)
 
 English — review stages:
   1. Admin screening
-  2. Peer review — Leadership assigns reviewers; Leadership submits score (1–5) + comment
+  2. Peer review — Leadership (Director assigns; Leadership submits score 1–5 + comment)
   3. Committee review
-  4. Ethics — Research Director approves JUREC
+  4. Ethics — Research Director approves JUREC (no separate ethics role)
   5. Finance review (proposal budget)
-  6. Director final Approve → Project created + grant queued for finance
+  6. Director final Approve → Project created + grant queued for finance (pending_finance)
 
-Somali — marxaladaha dib u eegista:
+Somali — marxaladaha:
   1. Admin screening
   2. Peer review — Leadership score + comment
   3. Committee review
   4. Ethics — Director ansixiyo
   5. Finance review
   6. Director Approve → Project + grant finance queue
+
 
 ================================================================================
 QAYBTA 6 — AUTHORIZE MONEY (FINANCE) / LACAGTA OGGOLAANSI
@@ -193,10 +337,10 @@ IMPORTANT / MUHIIM:
 
 English — after Director accepts a funding-call award:
   1. Grant status becomes pending_finance
-  2. Finance Officer gets notification → link: Grant funding approval
+  2. Finance Officer gets notification → Grant funding approval
   3. Sidebar → Grant funding approval (/finance/grant-approvals)
-  4. Click Authorize budget on the grant
-  5. Grant becomes active; budget is allocated (Paid = 0 until disbursement)
+  4. Click Authorize budget
+  5. Grant becomes active; budget allocated (Paid = 0 until disbursement)
 
 Somali — ka dib marka Director aqbalo award-ka:
   1. Grant-ku wuxuu noqdaa pending_finance
@@ -205,16 +349,38 @@ Somali — ka dib marka Director aqbalo award-ka:
   4. Authorize budget
   5. Grant active; budget allocated (Paid = 0 ilaa lacag la bixiyo)
 
-English — if you cannot find the authorize button:
-  • You must login as finance@rms.edu (UG) or finance.pg@rms.edu (PG)
-  • Director/Researcher see a banner explaining Finance must authorize
+English — if you cannot find Authorize:
+  • Login as finance@rms.edu (UG) or finance.pg@rms.edu (PG)
+  • Director/Researcher see a banner: Finance must authorize
 
 Somali — haddii aadan helin Authorize:
   • Gal Finance Officer ahaan
   • Director/Researcher waxay arkaan tilmaam: Finance → Grant funding approval
 
+
 ================================================================================
-QAYBTA 7 — FULL RESEARCH JOURNEY / SAFKA BUUXA
+QAYBTA 7 — PUBLICATIONS / NATIJOOYINKA
+================================================================================
+
+English:
+  1. One research output per project (1:1)
+  2. Researcher: Publications → Create & submit (or Save draft then Submit)
+  3. Status becomes submitted → Faculty workflow stage Submitted
+  4. Coordinator/Director: Validate on Publications page → status validated AND workflow Published
+  5. Or advance stages on Research Workflow Status: Submitted → In process → Pipeline → Published
+  6. Use the Published filter tile to see published outputs (not the Submitted filter)
+
+Somali:
+  1. Hal project = hal output
+  2. Researcher: Publications → Create & submit
+  3. Status = submitted → marxalad Submitted
+  4. Coordinator/Director: Validate → validated + Published
+  5. Ama Research Workflow → horumarinta marxaladaha ilaa Published
+  6. Filter Published — ha isticmaalin Submitted haddii aad raadinayso kuwa la daabacay
+
+
+================================================================================
+QAYBTA 8 — FULL RESEARCH JOURNEY / SAFKA BUUXA
 ================================================================================
 
 STEP 1 — Funding Call → Grant application
@@ -222,47 +388,49 @@ STEP 1 — Funding Call → Grant application
   SO: Call furan → researcher codsado
 
 STEP 2 — Proposal
-  EN: Proposals → New → title, abstract, budget lines, compliance docs, supporting docs, ethics form → Submit
+  EN: Proposals → New → title, abstract, budget, compliance docs, supporting docs, ethics form → Submit
   SO: Proposals → cusub → buuxi dhammaan → Submit
 
 STEP 3 — Multi-stage review → Director Approve
-  EN: Creates Project automatically
-  SO: Project si otomaatig ah ayaa la abuuraa
+  EN: Creates Project automatically; funding-call grants go to pending_finance
+  SO: Project si otomaatig ah; grant-ku wuxuu galayaa finance queue
 
 STEP 4 — Project execution
   EN: Milestones, work plan, activities, communication log, progress reports
   SO: Milestones, work plan, hawlaha, communication log, warbixinno
 
 STEP 5 — Finance & procurement
-  EN: Budget → payment requests → PO (Procurement → Director → Finance pay)
-  SO: Budget → lacag bixin → PO (Procurement → Director → Finance)
+  EN: Finance authorizes grant budget → Budget → payment requests → PO (Procurement → Director → Finance pay)
+  SO: Finance authorize → Budget → lacag bixin → PO
 
 STEP 6 — Outputs
-  EN: Publications, Research Workflow, Repository, Thesis (min 4 students per group)
-  SO: Publications, Research Workflow, Repository, Thesis (ugu yaraan 4 arday)
+  EN: Publications (Validate → Published), Research Workflow, Repository, Thesis (min 4 students per group)
+  SO: Publications (Validate → Published), Repository, Thesis (ugu yaraan 4 arday)
 
 STEP 7 — Closure
-  EN: Checklist (5 items) + final report + lessons learned → Director → Finance → Archive
+  EN: Checklist + final report + lessons learned → Director → Finance → Archive
   SO: Checklist + final report + lessons learned → Director → Finance → Archive
 
+
 ================================================================================
-QAYBTA 8 — NOTIFICATIONS / OGEYSIISYADA
+QAYBTA 9 — NOTIFICATIONS / OGEYSIISYADA
 ================================================================================
 
 English:
   • Sidebar → Notifications → Open on each item
-  • Funding call open → links to /funding-calls?callId=... (highlights that call)
-  • Finance approval needed → links to /finance/grant-approvals
-  • Proposal approved → links to project
+  • Funding call open → /funding-calls?callId=... (highlights that call)
+  • Finance approval needed → /finance/grant-approvals
+  • Thesis / publication / proposal items deep-link to the right page
 
 Somali:
   • Notifications → Open
-  • Funding call → wuxuu ku geeyaa call-ka saxda ah
+  • Funding call → call-ka saxda ah
   • Finance approval → Grant funding approval
-  • Proposal approved → project
+  • Thesis / publication / proposal → bogga saxda ah
+
 
 ================================================================================
-QAYBTA 9 — START THE SYSTEM / SIDEE LOO SHIDO
+QAYBTA 10 — START THE SYSTEM / SIDEE LOO SHIDO
 ================================================================================
 
 English:
@@ -277,16 +445,19 @@ Somali:
   3. frontend: npm run dev
   4. Browser → http://localhost:5173
 
+
 ================================================================================
-QAYBTA 10 — ONE-PAGE SUMMARY / SOO KOOBID
+QAYBTA 11 — ONE-PAGE SUMMARY / SOO KOOBID
 ================================================================================
 
-English: Director publishes funding call → Researcher applies → Leadership peer review → Director approves → Finance authorizes budget at Grant funding approval → Project runs → Close with checklist.
+English: Director publishes funding call → Researcher applies → Leadership peer review → Director approves ethics + proposal → Finance authorizes budget at Grant funding approval → Project runs → Publications Validate = Published → Close with checklist.
 
-Somali: Director wuxuu daabacaa funding call → Researcher codsadaa → Leadership peer review → Director ansixiyo → Finance authorize budget (Grant funding approval) → Project socdaa → Xiritaan checklist.
+Somali: Director daabaco funding call → Researcher codsadaa → Leadership peer review → Director ansixiyo ethics + proposal → Finance authorize budget → Project socdaa → Publications Validate = Published → Xiritaan checklist.
+
 
 ================================================================================
 DHAMAAD / END OF GUIDE
 ================================================================================
+
 For technical gap analysis see: docs/SYSTEM_GAP_ANALYSIS_SOM_EN.md
 For what's new see: docs/WHATS_NEW_JULY_2026.md

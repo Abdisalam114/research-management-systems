@@ -1,27 +1,64 @@
 ================================================================================
 JAMHURIYA RMS — SIDEE LOO ISTICMAALO (SOMALI)
 Tilmaamaha Isticmaalaha — Nidaamka Maamulka Cilmi-baarista Jamhuriya
-Cusbooneysiin: July 21, 2026
+Cusbooneysiin: July 22, 2026
 ================================================================================
+
 
 1. GUUD AHAAN
 
-JUST RMS wuxuu maamulaa cilmi-baarista jaamacadda: funding calls, proposals, dib u eegis, project, maaliyad, natiijooyin, iyo xiritaan.
+JUST RMS wuxuu maamulaa cilmi-baarista jaamacadda: funding calls, proposals, dib u eegis, project, maaliyad, publications, iyo xiritaan.
 
-Laba portal ayaa jira: Undergraduate (UG) iyo Postgraduate (PG). Kaliya Research Director ayaa beddeli kara labadooda.
+Laba portal ayaa jira: Undergraduate (UG) iyo Postgraduate (PG). Kaliya Research Director ayaa beddeli kara labadooda. Xogtu isma dhex gasho.
 
 Fur app-ka: http://localhost:5173 (ka dib backend iyo frontend la shido).
 
-2. DOORASHADA (8 ROLES)
 
-• Research Director — ansixinta ugu dambeysa, isticmaalayaasha, departments, ethics, funding calls
-• University Leadership — daabaca funding calls; peer review (score + comment)
-• Faculty Coordinator — dib u eegista faculty-ga, kooxaha thesis
-• Finance Officer — Grant funding approval, miisaaniyad, lacag bixin, xiritaan maaliyadeed
-• Procurement Officer — dib u eegista PO ka hor Director
-• HR Officer — mashruucyada iyo thesis
-• Donor Agency — funding calls dibadda ah (external)
-• Researcher — proposals, grants, projects, publications, thesis
+2. SHAQADA USER-KASTA (8 ROLES)
+
+Ma jiro akoon Ethics Committee ama Peer Reviewer. Ethics = Research Director. Peer review = University Leadership.
+
+Research Director (director@rms.edu)
+  • Beddel portal UG/PG; abuuri/daabaca funding calls gudaha
+  • Ansixinta ugu dambeysa proposals; go'aanka ethics (JUREC)
+  • Ansixi PO ka dib Procurement; maamul Users & Departments
+  • Analytics, KPI, audit trail
+
+University Leadership (leadership@ / leadership.pg@)
+  • Ansixi/daabaca funding calls
+  • Peer review: score 1–5 + comment
+  • Peer Reviews + Proposals; KPI
+
+Faculty Coordinator (coordinator@ / coordinator.pg@)
+  • Proposal queue faculty; thesis groups (min 4 arday), titles, supervisors
+  • Publication workflow; Validate → Published
+  • Warbixin / monitoring faculty
+
+Finance Officer (finance@ / finance.pg@) — LACAG (ma aha Procurement)
+  • Grant funding approval → Authorize budget (qoondee kaliya, ha bixin weli)
+  • Finance review proposal; budgets; payments; bixi wax la ansixiyay
+  • Bixi PO ka dib Director; finance reports; xiritaan maaliyadeed
+  • MA go'aamin waxa la iibinayo (taasi waa Procurement)
+
+Procurement Officer (procurement@ / procurement.pg@) — IIBSASHADA / PO (ma aha Finance)
+  • Dib u eegis Purchase Orders ee researchers
+  • Ansixi/diid PO ka hor Director
+  • MA authorize grant; MA bixin lacag
+  • Safka: Researcher PO → Procurement → Director → Finance bixisaa
+
+HR Officer (hr@ / hr.pg@)
+  • Arag projects, thesis, groups — dhinaca HR
+  • Ma ansixiyo grants/ethics/lacag
+
+Donor Agency (donor@ / donor.pg@)
+  • Draft funding calls external; sug Leadership/Director publish
+  • Donor reports; la soco grants
+
+Researcher (asha@ UG / mahad@ PG)
+  • Codso calls; abuuri proposals (budget + ethics + docs)
+  • Maamul projects; budgets; payments; abuuri PO
+  • Publications Create & submit; repository; thesis; closure checklist
+
 
 3. GALITAANKA — 15 AKOON DEMO
 
@@ -34,9 +71,12 @@ Postgraduate: *.pg@rms.edu + mahad@rms.edu / Researcher2024!
 
 Director → dooro UG ama PG. Dadka kale hal portal kaliya.
 
+Ha isticmaalin ethics@ ama reviewer@ — doorarkaas waa laga saaray nidaamka.
+
+
 4. FUNDING CALLS
 
-Director wuxuu abuuraa Internal ama External. Requirements si otomaatig ah ayaa u buuxsamaan. Dooro eligibility (UG / PG / dhammaan).
+Director wuxuu abuuraa Internal ama External. Requirements si otomaatig ah ayaa u buuxsamaan. Dooro eligibility (UG / PG / dhammaan / PGD).
 
 Leadership ama Director publish → researchers eligible ah waa la ogeysiiyaa link toos ah call-ka.
 
@@ -44,11 +84,13 @@ Researcher: Funding Calls → Apply via this call.
 
 Tusaale PG: mahad@rms.edu wuxuu helaa ogeysiinta haddii call-ku yahay PG ama All.
 
+
 5. SAFKA DIB U EEGISTA
 
-Admin screening → Leadership peer review (score 1–5 + comment) → Committee → Ethics (Director) → Finance review → Director Approve.
+Admin screening → Leadership peer review (score 1–5 + comment) → Committee → Ethics (Research Director) → Finance review → Director Approve.
 
 Proposal la aqbalay → Project la abuuraa + Grant finance queue (pending_finance).
+
 
 6. LACAGTA OGGOLAANSI (FINANCE)
 
@@ -60,17 +102,32 @@ Guji Authorize budget. Tani waa ALLOCATE kaliya — ma aha bixin lacag. Lacag bi
 
 Muhiim: Marka Director aqbalo award-ka, Finance wuxuu helaa notification.
 
-7. SAFKA BUUXA
 
-Funding call → Grant → Proposal (budget + ethics + docs) → Dib u eegis → Project → Work plan + budgets → Lacag bixin + PO → Publications + Repository → Closure checklist → Archive.
+7. PUBLICATIONS
 
-8. MENU-YADA MUHIIMKA AH
+Hal project = hal output. Researcher: Create & submit → submitted.
 
-Funding Calls, Grants, Proposals, Peer Reviews, Projects, Finance & Budgets, Grant funding approval (Finance), Policies, Notifications, Audit Trail (Director).
+Coordinator/Director: Validate → validated iyo Published.
 
-9. SOO KOOBID HAL JUMLAD
+Ama Research Workflow: Submitted → In process → Pipeline → Published.
 
-Director daabaco call → Researcher codsado → Leadership peer review → Director ansixiyo → Finance authorize budget → Project socdo → Xiritaan.
+Filter Published — ha isticmaalin Submitted haddii aad raadinayso kuwa la daabacay.
+
+
+8. SAFKA BUUXA
+
+Funding call → Grant → Proposal (budget + ethics + docs) → Dib u eegis → Project → Finance authorize → Work plan + budgets → Lacag bixin + PO → Publications (Validate = Published) → Closure checklist → Archive.
+
+
+9. MENU-YADA MUHIIMKA AH
+
+Funding Calls, Grants, Proposals, Peer Reviews, Projects, Publications, Research Workflow, Finance & Budgets, Grant funding approval (Finance), Policies, Search, Notifications, Audit Trail.
+
+
+10. SOO KOOBID HAL JUMLAD
+
+Director daabaco call → Researcher codsado → Leadership peer review → Director ansixiyo ethics + proposal → Finance authorize budget → Project socdo → Validate = Published → Xiritaan.
+
 
 ================================================================================
 DHAMAADKA TILMAAMAHA SOMALI
