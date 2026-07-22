@@ -45,6 +45,7 @@ async function adminScreening(req, res) {
   };
   proposal.status = PROPOSAL_STATUSES.UNDER_REVIEW;
   proposal.reviewerComments.push({ role: req.user.role, comment: `[Admin screening: ${decision}] ${comment}` });
+  proposal.markModified("reviewPipeline");
   await proposal.save();
 
   await recordAudit({
@@ -65,7 +66,7 @@ async function adminScreening(req, res) {
           type: "proposal",
           title: "Proposal ready for peer review",
           body: `Admin screening passed: ${proposal.title}`,
-          link: `/review-assignments`,
+          link: `/proposals/${proposal._id}`,
           programTier: req.programTier,
         });
       } catch (_) {
@@ -107,6 +108,8 @@ async function submitPeerReview(req, res) {
 
   const pipe = ensureReviewPipeline(proposal);
   pipe.peerReview.status = STAGE_STATUS.IN_PROGRESS;
+  proposal.markModified("reviewPipeline");
+  proposal.markModified("peerReviews");
   await proposal.save();
 
   // #region agent log
@@ -160,6 +163,7 @@ async function completePeerReview(req, res) {
   pipe.peerReview.status = STAGE_STATUS.PASSED;
   pipe.peerReview.completedAt = new Date();
   pipe.peerReview.reviews = reviews.map((r) => ({ userId: r.userId, score: r.score, at: r.at }));
+  proposal.markModified("reviewPipeline");
   await proposal.save();
 
   res.json({ message: "Peer review stage completed", proposal: sanitizeProposalBrief(proposal) });
@@ -193,6 +197,7 @@ async function committeeReview(req, res) {
     proposal.status = PROPOSAL_STATUSES.REJECTED;
   }
   proposal.reviewerComments.push({ role: req.user.role, comment: `[Committee: ${decision}] ${comment}` });
+  proposal.markModified("reviewPipeline");
   await proposal.save();
 
   await recordAudit({
@@ -229,6 +234,7 @@ async function financeProposalReview(req, res) {
     comment: String(comment),
   };
   proposal.reviewerComments.push({ role: "finance_officer", comment: `[Finance: ${decision}] ${comment}` });
+  proposal.markModified("reviewPipeline");
   await proposal.save();
 
   await recordAudit({

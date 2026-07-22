@@ -62,8 +62,11 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         setPeerReviewers(res.users || []);
         const current = (proposal.assignedReviewers || []).map((r) => reviewerRefId(r.userId));
         setSelectedReviewerIds(current.filter(Boolean));
-      } catch {
-        if (!cancelled) setPeerReviewers([]);
+      } catch (e) {
+        if (!cancelled) {
+          setPeerReviewers([]);
+          setErr(e?.response?.data?.message || "Could not load leadership reviewers");
+        }
       }
     })();
     return () => {

@@ -67,6 +67,8 @@ export function FacultyResearchWorkflowModule({
     setError("");
     try {
       await publicationApi.updateWorkflowStage(accessToken, pub.id, next);
+      // Follow the item into its new stage so it doesn't look stuck on Submitted
+      setStageFilter(next);
       await load();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to update workflow");

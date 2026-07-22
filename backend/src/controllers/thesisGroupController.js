@@ -1,18 +1,50 @@
 const { ThesisGroup, THESIS_STATUSES } = require("../models/ThesisGroup");
 const { User, ROLES } = require("../models/User");
-const { FACULTIES, matchFacultyByName } = require("../utils/facultyMatcher");
+const { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } = require("../utils/facultyMatcher");
+const fs = require("fs");
+const path = require("path");
+const DEBUG_LOG = path.join(__dirname, "../../../debug-f558f7.log");
+
+function debugLog(hypothesisId, message, data) {
+  // #region agent log
+  try {
+    fs.appendFileSync(
+      DEBUG_LOG,
+      `${JSON.stringify({
+        sessionId: "f558f7",
+        runId: "thesis-fix",
+        hypothesisId,
+        location: "thesisGroupController.js",
+        message,
+        data,
+        timestamp: Date.now(),
+      })}\n`
+    );
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+}
+
+function canonicalFaculty(value, fallbackName) {
+  const raw = String(value || "").trim();
+  if (raw && FACULTIES.includes(raw)) return raw;
+  return matchFacultyByName(raw || fallbackName || "") || DEFAULT_FACULTY;
+}
+
+function facultiesMatch(a, b, fallbackName) {
+  return canonicalFaculty(a, fallbackName) === canonicalFaculty(b, fallbackName);
+}
 const { AppError } = require("../utils/AppError");
 const { ResearchGroup, GROUP_MEMBER_ROLES, GROUP_KINDS } = require("../models/ResearchGroup");
 const { Department } = require("../models/Department");
 const { notifyUser } = require("../utils/notify");
-const { THESIS_GROUPS } = require("../scripts/seedRecords");
 const {
   CHAPTER_STATUSES,
   TITLE_PROPOSAL_STATUSES,
   defaultChapters,
   emptyTitleProposal,
   buildActivityTimeline,
-  normalizeStudentRows,
   assertMinThesisStudents,
   MIN_THESIS_GROUP_STUDENTS,
 } = require("../utils/thesisDefaults");
@@ -92,40 +124,29 @@ async function syncLegacyTitleProposal(group) {
   return true;
 }
 
-async function syncThesisGroupStudents(group) {
-  const count = group.students?.length || 0;
-  if (count >= MIN_THESIS_GROUP_STUDENTS) return false;
-
-  const title = (group.title || "").trim();
-  const tpl = THESIS_GROUPS.find((t) => t.title === title);
-  if (!tpl?.students?.length) return false;
-
-  group.students = tpl.students.map((s) => ({
-    fullName: String(s.fullName || "").trim(),
-    studentId: String(s.studentId || "").trim(),
-    email: String(s.email || "").trim().toLowerCase(),
-  }));
-  await group.save();
-  return true;
-}
-
 function sanitize(g) {
   const plain = g.toObject ? g.toObject() : g;
   const chapters = plain.chapters?.length ? plain.chapters : defaultChapters();
   const titleProposal = resolveTitleProposal(plain);
   const enriched = { ...plain, chapters, titleProposal };
+  const rg = plain.researchGroupId;
+  const departmentId =
+    rg && typeof rg === "object" && rg.departmentId
+      ? rg.departmentId
+      : plain.departmentId || null;
   return {
     id: plain._id,
     title: plain.title,
     titleProposal,
     students: plain.students,
     researchGroupId: plain.researchGroupId,
+    departmentId: departmentId ? String(departmentId) : null,
     supervisorId: plain.supervisorId,
     supervisorAssignedAt: plain.supervisorAssignedAt || null,
     chapters,
     coordinatorId: plain.coordinatorId,
     department: plain.department,
-    faculty: plain.faculty,
+    faculty: canonicalFaculty(plain.faculty, plain.department),
     facultyResearchArea: plain.facultyResearchArea,
     status: plain.status,
     meetingSchedule: plain.meetingSchedule,
@@ -152,20 +173,20 @@ async function resolveThesisDepartment(req, { departmentId, department, faculty 
   if (departmentId) {
     const deptDoc = await Department.findOne(req.tierWhere({ _id: departmentId }));
     if (!deptDoc) throw new AppError("Department not found", 404);
-    if (facultyInput && deptDoc.faculty && deptDoc.faculty !== facultyInput) {
+    if (facultyInput && deptDoc.faculty && !facultiesMatch(deptDoc.faculty, facultyInput, deptDoc.name)) {
       throw new AppError("Department does not belong to the selected faculty", 400);
     }
     cleanDepartment = deptDoc.name;
     linkedDepartmentId = deptDoc._id;
-    facultyValue = deptDoc.faculty || resolveFaculty(facultyInput, cleanDepartment);
+    facultyValue = canonicalFaculty(deptDoc.faculty || facultyInput, cleanDepartment);
   } else if (cleanDepartment) {
     const deptDoc = await Department.findOne(req.tierWhere({ name: cleanDepartment }));
     if (deptDoc) {
       linkedDepartmentId = deptDoc._id;
-      if (facultyInput && deptDoc.faculty && deptDoc.faculty !== facultyInput) {
+      if (facultyInput && deptDoc.faculty && !facultiesMatch(deptDoc.faculty, facultyInput, deptDoc.name)) {
         throw new AppError("Department does not belong to the selected faculty", 400);
       }
-      facultyValue = deptDoc.faculty || resolveFaculty(facultyInput, cleanDepartment);
+      facultyValue = canonicalFaculty(deptDoc.faculty || facultyInput, cleanDepartment);
     } else {
       facultyValue = resolveFaculty(facultyInput, cleanDepartment);
     }
@@ -174,6 +195,7 @@ async function resolveThesisDepartment(req, { departmentId, department, faculty 
   }
 
   if (!facultyValue) facultyValue = resolveFaculty("", cleanDepartment);
+  facultyValue = canonicalFaculty(facultyValue, cleanDepartment);
   return { cleanDepartment, linkedDepartmentId, facultyValue };
 }
 
@@ -200,6 +222,16 @@ function applyStudentTitleProposal(group, title, userId) {
   };
 }
 
+async function loadSanitizedGroup(id) {
+  const populated = await ThesisGroup.findById(id)
+    .populate("researchGroupId", "name departmentId members createdAt")
+    .populate("supervisorId", "fullName email department")
+    .populate("coordinatorId", "fullName email")
+    .populate("createdBy", "fullName email role")
+    .populate("meetings.loggedBy", "fullName email");
+  return sanitize(populated);
+}
+
 async function notifySupervisorAssignment(group, programTier) {
   if (!group.supervisorId) return;
   const studentNames = (group.students || []).map((s) => s.fullName).filter(Boolean).join(", ");
@@ -207,7 +239,7 @@ async function notifySupervisorAssignment(group, programTier) {
     type: "system",
     title: "Thesis supervision assignment",
     body: `You have been assigned to supervise a thesis group${studentNames ? ` (${studentNames})` : ""}. When students choose their thesis title, enter it on the Thesis page.`,
-    link: "/thesis",
+    link: `/thesis?groupId=${group._id}`,
     programTier,
   });
 }
@@ -225,15 +257,23 @@ async function listGroups(req, res) {
     .populate("researchGroupId", "name departmentId members createdAt")
     .populate("supervisorId", "fullName email department")
     .populate("coordinatorId", "fullName email")
-    .populate("createdBy", "fullName email role");
+    .populate("createdBy", "fullName email role")
+    .populate("meetings.loggedBy", "fullName email");
 
+  // One-time legacy title sync only — do not rewrite students from seed templates on every list
   await Promise.all(groups.map((g) => syncLegacyTitleProposal(g)));
-  await Promise.all(groups.map((g) => syncThesisGroupStudents(g)));
+
+  debugLog("H3", "listGroups", {
+    role,
+    count: groups.length,
+    valid: groups.filter((g) => (g.students || []).length >= MIN_THESIS_GROUP_STUDENTS).length,
+  });
 
   res.json({ groups: groups.map(sanitize) });
 }
 
 async function getGroup(req, res) {
+  const { role, id: userId } = req.user;
   const { id } = req.params;
   const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }))
     .populate("researchGroupId", "name departmentId members createdAt")
@@ -244,6 +284,12 @@ async function getGroup(req, res) {
     .populate("titleProposal.proposedBy", "fullName email")
     .populate("titleProposal.reviewedBy", "fullName email");
   if (!group) throw new AppError("Thesis group not found", 404);
+
+  if (role === ROLES.RESEARCHER) {
+    const isSupervisor = group.supervisorId && String(group.supervisorId._id || group.supervisorId) === String(userId);
+    if (!isSupervisor) throw new AppError("Forbidden", 403);
+  }
+
   res.json({ group: sanitize(group) });
 }
 
@@ -330,7 +376,22 @@ async function createGroup(req, res) {
     await notifySupervisorAssignment(group, req.programTier);
   }
 
-  res.status(201).json({ group: sanitize(group) });
+  debugLog("H1", "createGroup ok", {
+    groupId: String(group._id),
+    faculty: group.faculty,
+    department: group.department,
+    students: (group.students || []).length,
+    supervisorId: resolvedSupervisorId ? String(resolvedSupervisorId) : null,
+    role,
+  });
+
+  const populated = await ThesisGroup.findById(group._id)
+    .populate("researchGroupId", "name departmentId members createdAt")
+    .populate("supervisorId", "fullName email department")
+    .populate("coordinatorId", "fullName email")
+    .populate("createdBy", "fullName email role");
+
+  res.status(201).json({ group: sanitize(populated || group) });
 }
 
 async function updateGroup(req, res) {
@@ -404,8 +465,32 @@ async function updateGroup(req, res) {
     await notifySupervisorAssignment(group, req.programTier);
   }
 
+  // Keep linked research group membership in sync with supervisor
+  if (group.researchGroupId && (supervisorId !== undefined || newSupervisorId !== prevSupervisorId)) {
+    const leadId = newSupervisorId || String(userId);
+    const memberIds = new Set([String(leadId), String(userId)]);
+    await ResearchGroup.updateOne(
+      req.tierWhere({ _id: group.researchGroupId }),
+      {
+        $set: {
+          members: Array.from(memberIds).map((mid) => ({
+            userId: mid,
+            role: String(mid) === String(leadId) ? GROUP_MEMBER_ROLES.LEAD : GROUP_MEMBER_ROLES.MEMBER,
+          })),
+        },
+      }
+    );
+  }
+
   await group.save();
-  res.json({ group: sanitize(group) });
+
+  const populated = await ThesisGroup.findById(group._id)
+    .populate("researchGroupId", "name departmentId members createdAt")
+    .populate("supervisorId", "fullName email department")
+    .populate("coordinatorId", "fullName email")
+    .populate("createdBy", "fullName email role");
+
+  res.json({ group: sanitize(populated || group) });
 }
 
 async function proposeTitle(req, res) {
@@ -435,12 +520,12 @@ async function proposeTitle(req, res) {
       type: "system",
       title: "Thesis title submitted for review",
       body: `Supervisor submitted the student-chosen thesis title: "${trimmed}". Please review and accept on the Thesis page.`,
-      link: "/thesis",
+      link: `/thesis?groupId=${group._id}`,
       programTier: req.programTier,
     });
   }
 
-  res.json({ group: sanitize(group) });
+  res.json({ group: await loadSanitizedGroup(group._id) });
 }
 
 async function reviewTitleProposal(req, res) {
@@ -452,13 +537,31 @@ async function reviewTitleProposal(req, res) {
   const { id } = req.params;
   const { decision, note } = req.body || {};
   const normalized = String(decision || "").toLowerCase();
-  if (!["accept", "accepted", "reject", "rejected"].includes(normalized)) {
-    throw new AppError("decision must be accept or reject", 400);
+  if (!["accept", "accepted", "reject", "rejected", "unlock", "reset"].includes(normalized)) {
+    throw new AppError("decision must be accept, reject, or unlock", 400);
   }
 
   const accepting = normalized === "accept" || normalized === "accepted";
+  const unlocking = normalized === "unlock" || normalized === "reset";
   const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }));
   if (!group) throw new AppError("Thesis group not found", 404);
+
+  // Coordinator/Director may unlock an accepted title so supervisor can re-submit
+  if (unlocking) {
+    group.title = "";
+    group.titleProposal = emptyTitleProposal();
+    await group.save();
+    if (group.supervisorId) {
+      await notifyUser(group.supervisorId, {
+        type: "system",
+        title: "Thesis title unlocked",
+        body: "The accepted thesis title was unlocked. Please enter a new student-chosen title.",
+        link: `/thesis?groupId=${group._id}`,
+        programTier: req.programTier,
+      });
+    }
+    return res.json({ message: "Title unlocked", group: await loadSanitizedGroup(group._id) });
+  }
 
   if (!group.titleProposal?.title?.trim()) {
     throw new AppError("No student title proposal to review", 400);
@@ -488,12 +591,12 @@ async function reviewTitleProposal(req, res) {
       body: accepting
         ? `The thesis title "${group.titleProposal.title}" has been accepted. You may begin supervision.`
         : `The proposed thesis title was rejected.${note ? ` Note: ${note}` : ""}`,
-      link: "/thesis",
+      link: `/thesis?groupId=${group._id}`,
       programTier: req.programTier,
     });
   }
 
-  res.json({ group: sanitize(group) });
+  res.json({ group: await loadSanitizedGroup(group._id) });
 }
 
 async function updateChapter(req, res) {
@@ -525,7 +628,7 @@ async function updateChapter(req, res) {
 
   await group.save();
 
-  res.json({ group: sanitize(group) });
+  res.json({ group: await loadSanitizedGroup(group._id) });
 }
 
 async function addMeeting(req, res) {
@@ -548,17 +651,37 @@ async function addMeeting(req, res) {
     ? chaptersDiscussed.map((k) => String(k).trim()).filter((k) => validKeys.has(k))
     : [];
 
+  const dateStr = String(date).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    throw new AppError("Invalid meeting date", 400);
+  }
+
   group.meetings.push({
-    date: new Date(date),
+    date: new Date(`${dateStr}T12:00:00.000Z`),
     location: location ? String(location).trim() : "",
     agenda: agenda ? String(agenda) : "",
     notes: notes ? String(notes) : "",
     chaptersDiscussed: chapterKeys,
     loggedBy: userId,
   });
+  group.markModified("meetings");
   await group.save();
 
-  res.status(201).json({ group: sanitize(group) });
+  debugLog("M1", "addMeeting saved", {
+    groupId: String(group._id),
+    meetingsCount: (group.meetings || []).length,
+    date: dateStr,
+    role,
+  });
+
+  const populated = await ThesisGroup.findById(group._id)
+    .populate("researchGroupId", "name departmentId members createdAt")
+    .populate("supervisorId", "fullName email department")
+    .populate("coordinatorId", "fullName email")
+    .populate("createdBy", "fullName email role")
+    .populate("meetings.loggedBy", "fullName email");
+
+  res.status(201).json({ message: "Meeting logged", group: sanitize(populated || group) });
 }
 
 async function deleteGroup(req, res) {
@@ -568,6 +691,9 @@ async function deleteGroup(req, res) {
   const { id } = req.params;
   const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }));
   if (!group) throw new AppError("Thesis group not found", 404);
+  if (group.researchGroupId) {
+    await ResearchGroup.deleteOne(req.tierWhere({ _id: group.researchGroupId, kind: GROUP_KINDS.THESIS }));
+  }
   await ThesisGroup.deleteOne({ _id: group._id });
   res.json({ message: "Thesis group deleted" });
 }

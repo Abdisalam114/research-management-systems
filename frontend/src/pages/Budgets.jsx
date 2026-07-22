@@ -141,34 +141,56 @@ export function BudgetsPage() {
   }, [projectIdFromUrl, accessToken]);
 
   const load = useCallback(async () => {
-    const [b, p, po, fr] = await Promise.all([
-      budgetApi.listBudgets(accessToken),
-      paymentApi.listPayments(accessToken).catch(() => ({ payments: [] })),
-      procurementApi.listPurchaseOrders(accessToken).catch(() => ({ purchaseOrders: [] })),
-      canSeeFinanceReport
-        ? analyticsApi.financeReport(accessToken).catch(() => null)
-        : Promise.resolve(null),
-    ]);
-    setBudgets(b.budgets || []);
-    setPayments(p.payments || []);
-    setPOs(po.purchaseOrders || []);
-    setFinanceReport(fr);
+    let nextBudgets = [];
+    let nextPayments = [];
+    let nextPOs = [];
+    let nextReport = null;
+    try {
+      const b = await budgetApi.listBudgets(accessToken);
+      nextBudgets = b.budgets || [];
+    } catch (e) {
+      throw e;
+    }
+    try {
+      const p = await paymentApi.listPayments(accessToken);
+      nextPayments = p.payments || [];
+    } catch {
+      nextPayments = [];
+    }
+    try {
+      const po = await procurementApi.listPurchaseOrders(accessToken);
+      nextPOs = po.purchaseOrders || [];
+    } catch {
+      nextPOs = [];
+    }
+    if (canSeeFinanceReport) {
+      try {
+        nextReport = await analyticsApi.financeReport(accessToken);
+      } catch {
+        nextReport = null;
+      }
+    }
+    setBudgets(nextBudgets);
+    setPayments(nextPayments);
+    setPOs(nextPOs);
+    setFinanceReport(nextReport);
     // #region agent log
     fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
       body: JSON.stringify({
         sessionId: "f558f7",
+        runId: "systemic-pass",
         hypothesisId: "H3",
         location: "Budgets.jsx:load",
         message: "finance budgets page loaded",
         data: {
           role: user?.role,
-          budgets: (b.budgets || []).length,
-          payments: (p.payments || []).length,
-          pos: (po.purchaseOrders || []).length,
-          reportPaid: fr?.summary?.totalPaid ?? null,
-          itemCount: (b.budgets || []).reduce((n, x) => n + (x.items?.length || 0), 0),
+          budgets: nextBudgets.length,
+          payments: nextPayments.length,
+          pos: nextPOs.length,
+          reportPaid: nextReport?.summary?.totalPaid ?? null,
+          itemCount: nextBudgets.reduce((n, x) => n + (x.items?.length || 0), 0),
         },
         timestamp: Date.now(),
       }),

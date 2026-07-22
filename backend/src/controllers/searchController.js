@@ -40,11 +40,9 @@ async function globalSearch(req, res) {
     Proposal.find(proposalFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title status updatedAt"),
     Project.find(projectFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title status updatedAt"),
     Grant.find(grantFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title status updatedAt"),
-    Publication.find(pubFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title status updatedAt"),
+    Publication.find(pubFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title status projectId updatedAt"),
     FundingCall.find(callFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title status deadline"),
-    isResearcher
-      ? RepositoryItem.find(repoFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title type updatedAt")
-      : RepositoryItem.find(repoFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title type updatedAt"),
+    RepositoryItem.find(repoFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title type projectId updatedAt"),
   ]);
 
   res.json({
@@ -53,11 +51,50 @@ async function globalSearch(req, res) {
       proposals: proposals.map((p) => ({ id: p._id, title: p.title, status: p.status, type: "proposal", link: `/proposals/${p._id}` })),
       projects: projects.map((p) => ({ id: p._id, title: p.title, status: p.status, type: "project", link: `/projects/${p._id}` })),
       grants: grants.map((g) => ({ id: g._id, title: g.title, status: g.status, type: "grant", link: `/grants/${g._id}` })),
-      publications: publications.map((p) => ({ id: p._id, title: p.title, status: p.status, type: "publication", link: "/publications" })),
-      fundingCalls: calls.map((c) => ({ id: c._id, title: c.title, status: c.status, type: "funding_call", link: `/grants/apply?callId=${c._id}` })),
-      repository: repository.map((r) => ({ id: r._id, title: r.title, type: r.type, link: "/repository" })),
+      publications: publications.map((p) => ({
+        id: p._id,
+        title: p.title,
+        status: p.status,
+        type: "publication",
+        link: p.projectId ? `/publications?projectId=${p.projectId}` : "/publications",
+      })),
+      fundingCalls: calls.map((c) => ({
+        id: c._id,
+        title: c.title,
+        status: c.status,
+        type: "funding_call",
+        link: `/funding-calls?callId=${c._id}`,
+      })),
+      repository: repository.map((r) => ({
+        id: r._id,
+        title: r.title,
+        type: r.type,
+        link: r.projectId ? `/repository?projectId=${r.projectId}` : "/repository",
+      })),
     },
   });
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(__dirname, "../../../debug-f558f7.log"),
+      JSON.stringify({
+        sessionId: "f558f7",
+        runId: "systemic-pass",
+        hypothesisId: "S3",
+        location: "searchController.js:globalSearch",
+        message: "search deep-links",
+        data: {
+          qLen: q.length,
+          pubLinks: publications.slice(0, 3).map((p) => (p.projectId ? `projectId` : "bare")),
+          callLinks: calls.slice(0, 2).map((c) => `/funding-calls?callId=${c._id}`),
+        },
+        timestamp: Date.now(),
+      }) + "\n"
+    );
+  } catch (_) {}
+  // #endregion
 }
 
 module.exports = { globalSearch };

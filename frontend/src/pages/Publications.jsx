@@ -219,7 +219,11 @@ export function PublicationsPage() {
   );
 
   const filtered = useMemo(() => {
-    let list = filterByStatKey(publications, statusFilter);
+    let list = filterByStatKey(publications, statusFilter, {
+      customFilters: {
+        published: (p) => p.workflowStage === "published",
+      },
+    });
     return list.filter((p) => matchesTrackingFilter(p, typeFilter));
   }, [publications, statusFilter, typeFilter]);
 
@@ -243,8 +247,9 @@ export function PublicationsPage() {
       });
     }
 
-    // Researcher: also show My Projects that have no outputs yet (source = Projects)
-    if (user?.role === "researcher" && !projectIdFromUrl) {
+    // Researcher: show My Projects without outputs only on "all" / draft — never under Submitted/Validated
+    // (otherwise published outputs disappear and empty cards look like they still need Submit)
+    if (user?.role === "researcher" && !projectIdFromUrl && (statusFilter === "all" || statusFilter === "draft")) {
       for (const proj of projects) {
         const key = String(proj.id);
         if (!map.has(key)) {
@@ -259,16 +264,23 @@ export function PublicationsPage() {
     }
 
     return [...map.values()].sort((a, b) => String(a.title).localeCompare(String(b.title)));
-  }, [filtered, projects, user?.role, projectIdFromUrl]);
+  }, [filtered, projects, user?.role, projectIdFromUrl, statusFilter]);
 
   const stats = useMemo(() => {
     const by = (s) => publications.filter((p) => p.status === s).length;
+    const publishedCount = publications.filter((p) => p.workflowStage === "published").length;
     const totalCitations = publications.reduce((acc, p) => acc + Number(p.citationCount || 0), 0);
     return [
       { label: "Total outputs", value: publications.length, filterKey: "all" },
       { label: "Draft", value: by("draft"), filterKey: "draft" },
       { label: "Submitted", value: by("submitted"), filterKey: "submitted", accent: "#38bdf8" },
       { label: "Validated", value: by("validated"), filterKey: "validated", accent: "#1d4ed8" },
+      {
+        label: "Published",
+        value: publishedCount,
+        filterKey: "published",
+        accent: "#22c55e",
+      },
       { label: "Citations", value: totalCitations.toLocaleString(), accent: "#7dd3fc" },
     ];
   }, [publications]);
@@ -310,6 +322,7 @@ export function PublicationsPage() {
       const created = await publicationApi.createPublication(accessToken, payload);
       resetForm();
       if (!projectLocked) setShowForm(false);
+      setStatusFilter("all");
       await reload();
       const linkedId = projectIdFromUrl || form.projectId || created?.publication?.projectId;
       // Return to project so Research workflow / awards / activity refresh
@@ -563,7 +576,7 @@ export function PublicationsPage() {
                   <Link className="btn" to={`/projects/${group.projectId}#project-outputs`}>
                     Open project
                   </Link>
-                  {canCreate ? (
+                  {canCreate && group.items.length === 0 ? (
                     <Link className="btn primary" to={`/publications?projectId=${group.projectId}`}>
                       + Output
                     </Link>
@@ -638,9 +651,10 @@ export function PublicationsPage() {
                         try {
                           setError("");
                           await publicationApi.submitPublication(accessToken, p.id);
+                          setStatusFilter("all");
                           await reload();
                           if (p.projectId) {
-                        navigate(`/projects/${p.projectId}#project-outputs`, {
+                            navigate(`/projects/${p.projectId}#project-outputs`, {
                               replace: true,
                               state: { workflowHint: "publication_submitted" },
                             });
@@ -667,6 +681,7 @@ export function PublicationsPage() {
                               decision: "validated",
                               comment,
                             });
+                            setStatusFilter("all");
                             await reload();
                           } catch (e) {
                             setError(e?.response?.data?.message || "Failed to validate");

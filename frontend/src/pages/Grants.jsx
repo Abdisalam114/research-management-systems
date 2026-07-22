@@ -114,14 +114,17 @@ export function GrantsPage() {
       headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
       body: JSON.stringify({
         sessionId: "f558f7",
-        runId: "visibility",
-        hypothesisId: "B",
+        runId: "systemic-pass",
+        hypothesisId: "S2",
         location: "Grants.jsx:load",
         message: "grants list for visibility",
         data: {
           totalFromApi: all.length,
           withCallId: withCall.length,
           drafts: withCall.filter((g) => g.status === "draft").length,
+          acceptedStat: withCall.filter((g) =>
+            ["pending_finance", "active", "approved"].includes(g.status)
+          ).length,
           sample: withCall.slice(0, 3).map((g) => ({
             id: g.id,
             title: g.title,
@@ -154,7 +157,7 @@ export function GrantsPage() {
       {
         label: "Accepted",
         value: by("pending_finance") + by("active") + by("approved"),
-        filterKey: "awarded",
+        filterKey: "accepted",
         accent: "#22c55e",
         sub: "Director accepted",
       },
@@ -166,7 +169,11 @@ export function GrantsPage() {
   }, [grants]);
 
   const filteredGrants = useMemo(() => {
-    let list = filterByStatKey(grants, statusFilter);
+    let list = filterByStatKey(grants, statusFilter, {
+      customFilters: {
+        accepted: (g) => ["pending_finance", "active", "approved"].includes(g.status),
+      },
+    });
     if (donorFilter) list = list.filter((g) => g.donorRef && g.donorRef.trim());
     return list;
   }, [grants, statusFilter, donorFilter]);

@@ -241,7 +241,7 @@ async function directorDecision(req, res) {
         type: "ethics",
         title: "Ethics application rejected",
         body: a.projectTitle,
-        link: "/ethics",
+        link: `/ethics?applicationId=${a._id}`,
         programTier: a.programTier,
       });
     } catch { /* best-effort */ }

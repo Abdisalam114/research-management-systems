@@ -27,7 +27,8 @@ router.get(
   "/",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("research_director"),
+  // Director: full directory. Coordinator/Leadership: researchers only (thesis / peer assign).
+  authorizeRoles("research_director", "faculty_coordinator", "leadership"),
   asyncHandler(userController.listUsers)
 );
 

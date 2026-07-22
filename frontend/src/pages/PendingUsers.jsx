@@ -33,12 +33,22 @@ export function PendingUsersPage() {
 
   async function load() {
     setError("");
-    const [pendingRes, usersRes] = await Promise.all([
-      userApi.listPendingUsers(accessToken),
-      userApi.listUsers(accessToken),
-    ]);
-    setPending(pendingRes.users || []);
-    setAllUsers(usersRes.users || []);
+    let firstErr = "";
+    try {
+      const pendingRes = await userApi.listPendingUsers(accessToken);
+      setPending(pendingRes.users || []);
+    } catch (e) {
+      setPending([]);
+      firstErr = e?.response?.data?.message || "Failed to load pending users";
+    }
+    try {
+      const usersRes = await userApi.listUsers(accessToken);
+      setAllUsers(usersRes.users || []);
+    } catch (e) {
+      setAllUsers([]);
+      if (!firstErr) firstErr = e?.response?.data?.message || "Failed to load users";
+    }
+    if (firstErr) setError(firstErr);
   }
 
   useEffect(() => {

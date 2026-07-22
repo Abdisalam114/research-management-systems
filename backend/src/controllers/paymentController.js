@@ -155,7 +155,7 @@ try {
       type: "payment",
       title: "New payment request awaiting director approval",
       body: `${payment.payee}: ${payment.purpose}`,
-      link: "/budgets",
+      link: payment.projectId ? `/budgets?projectId=${payment.projectId}` : "/budgets",
     });
   } catch {
     /* best-effort */
@@ -191,14 +191,14 @@ try {
       type: "payment",
       title: `Payment ${decision === "approve" ? "approved by director" : "rejected by director"}`,
       body: `${payment.payee} — ${payment.purpose}`,
-      link: "/budgets",
+      link: payment.projectId ? `/budgets?projectId=${payment.projectId}` : "/budgets",
     });
     if (decision === "approve") {
       await notifyUsersByRole("finance_officer", {
         type: "payment",
         title: "Director-approved payment awaiting disbursement",
         body: `${payment.payee} — ${payment.purpose}`,
-        link: "/budgets",
+        link: payment.projectId ? `/budgets?projectId=${payment.projectId}` : "/budgets",
       });
     }
   } catch {
@@ -279,7 +279,7 @@ async function financePay(req, res) {
       type: "payment",
       title: "Payment disbursed by finance",
       body: `${payment.payee} — ${payment.purpose} via ${paymentMethod}`,
-      link: "/budgets",
+      link: payment.projectId ? `/budgets?projectId=${payment.projectId}` : "/budgets",
     });
   } catch {
     /* best-effort */

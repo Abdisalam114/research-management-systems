@@ -52,11 +52,16 @@ export function MessagesPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setError("");
       try {
-        setError("");
-        await Promise.all([loadList(), loadUsers()]);
+        await loadList();
       } catch (e) {
         if (!cancelled) setError(e?.response?.data?.message || "Failed to load messages");
+      }
+      try {
+        await loadUsers();
+      } catch {
+        /* users list optional for compose — do not wipe inbox */
       }
     })();
     return () => {

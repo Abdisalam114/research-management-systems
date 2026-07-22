@@ -31,7 +31,7 @@ async function afterPublicationSubmitted(req, pub) {
         type: "publication",
         title: "Publication submitted for validation",
         body: pub.title,
-        link: "/publications",
+        link: projectId ? `/publications?projectId=${projectId}` : "/publications",
       },
       programTier
     );

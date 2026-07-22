@@ -81,10 +81,17 @@ async function createUserByDirector(req, res) {
 async function listUsers(req, res) {
   const { status, role, q } = req.query || {};
   const filter = {};
+  const isDirector = req.user?.role === ROLES.RESEARCH_DIRECTOR;
 
-  if (status && Object.values(USER_STATUSES).includes(status)) filter.status = status;
-  if (role && Object.values(ROLES).includes(role)) filter.role = role;
-  else filter.role = { $ne: ROLES.RESEARCH_DIRECTOR };
+  // Non-directors may only list active researchers (for supervisor / peer assignment).
+  if (!isDirector) {
+    filter.role = ROLES.RESEARCHER;
+    filter.status = USER_STATUSES.ACTIVE;
+  } else {
+    if (status && Object.values(USER_STATUSES).includes(status)) filter.status = status;
+    if (role && Object.values(ROLES).includes(role)) filter.role = role;
+    else filter.role = { $ne: ROLES.RESEARCH_DIRECTOR };
+  }
 
   if (q) {
     const qq = String(q).trim().toLowerCase();

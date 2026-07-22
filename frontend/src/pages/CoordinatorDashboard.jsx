@@ -17,18 +17,49 @@ export function CoordinatorDashboardPage() {
 
   useEffect(() => {
     (async () => {
+      setError("");
+      let queueLen = 0;
+      let metricsOk = false;
+      let facultyOk = false;
+      // Isolate each load so one failure does not wipe the queue
       try {
-        const [m, p, fr] = await Promise.all([
-          analyticsApi.dashboardMetrics(accessToken),
-          proposalApi.listProposals(accessToken),
-          analyticsApi.facultyReport(accessToken).catch(() => null),
-        ]);
-        setMetrics(m.metrics);
-        setFacultyReport(fr);
-        setQueue(p.proposals || []);
+        const p = await proposalApi.listProposals(accessToken);
+        const list = p.proposals || [];
+        setQueue(list);
+        queueLen = list.length;
       } catch (e) {
-        setError(e?.response?.data?.message || "Failed to load faculty dashboard");
+        setError(e?.response?.data?.message || "Failed to load proposal queue");
+        setQueue([]);
       }
+      try {
+        const m = await analyticsApi.dashboardMetrics(accessToken);
+        setMetrics(m.metrics);
+        metricsOk = true;
+      } catch {
+        setMetrics(null);
+      }
+      try {
+        const fr = await analyticsApi.facultyReport(accessToken);
+        setFacultyReport(fr);
+        facultyOk = true;
+      } catch {
+        setFacultyReport(null);
+      }
+      // #region agent log
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+        body: JSON.stringify({
+          sessionId: "f558f7",
+          runId: "systemic-pass",
+          hypothesisId: "S1",
+          location: "CoordinatorDashboard.jsx:load",
+          message: "coordinator dashboard isolated load",
+          data: { queueLen, metricsOk, facultyOk },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
     })();
   }, [accessToken, user?.department]);
 
@@ -64,7 +95,7 @@ export function CoordinatorDashboardPage() {
             <SystemModulesGrid role="faculty_coordinator" metrics={metrics} title="System modules" />
           </section>
           <div className="overviewGrid">
-            <Link to="/proposals?filter=submitted" className="overviewTile" style={{ textDecoration: "none" }}>
+            <Link to="/proposals?filter=all" className="overviewTile" style={{ textDecoration: "none" }}>
               <div className="label">Proposals (queue)</div>
               <div className="value">{queue.length}</div>
             </Link>

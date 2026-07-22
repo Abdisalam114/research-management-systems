@@ -522,7 +522,7 @@ async function submitGrant(req, res) {
       type: "grant",
       title: "Grant submitted for review",
       body: grant.title,
-      link: "/grants",
+      link: `/grants/${grant._id}`,
     }, req.programTier);
   } catch { /* best-effort */ }
 
@@ -727,7 +727,7 @@ async function financeDecision(req, res) {
         type: "grant",
         title: "Grant rejected by finance",
         body: grant.title,
-        link: "/grants",
+        link: `/grants/${grant._id}`,
         programTier: req.programTier,
       });
     } catch { /* best-effort */ }

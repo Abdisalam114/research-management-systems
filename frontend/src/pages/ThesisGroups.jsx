@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as thesisApi from "../services/thesisGroupApi";
@@ -7,7 +8,7 @@ import * as departmentApi from "../services/departmentApi";
 import { PageHeader } from "../components/PageHeader";
 import { GroupsModuleNav } from "../components/GroupsModuleNav";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
-import { FACULTIES, matchFacultyByName } from "../constants/faculties";
+import { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } from "../constants/faculties";
 import "./groups.css";
 
 const MANAGE_ROLES = ["faculty_coordinator", "research_director"];
@@ -49,14 +50,25 @@ const EMPTY_FORM = {
   students: defaultStudentRows(),
 };
 
+function facultyKeyForDepartment(d) {
+  if (d?.faculty && FACULTIES.some((f) => f.value === d.faculty)) return d.faculty;
+  const inferred = matchFacultyByName(d?.name || d?.faculty || "");
+  if (inferred && FACULTIES.some((f) => f.value === inferred)) return inferred;
+  return DEFAULT_FACULTY;
+}
+
 function departmentFieldsFromGroup(g, departments) {
   const match =
-    departments.find((d) => d.id === g.departmentId) ||
+    departments.find((d) => String(d.id) === String(g.departmentId)) ||
     departments.find((d) => d.name === g.department);
-  const faculty = g.faculty || match?.faculty || matchFacultyByName(g.department) || FACULTIES[0].value;
+  const faculty =
+    (g.faculty && FACULTIES.some((f) => f.value === g.faculty) ? g.faculty : null) ||
+    (match ? facultyKeyForDepartment(match) : null) ||
+    matchFacultyByName(g.department) ||
+    FACULTIES[0].value;
   return {
     faculty,
-    departmentId: match?.id || "",
+    departmentId: match?.id || g.departmentId || "",
     department: match?.name || g.department || "",
   };
 }
@@ -117,6 +129,8 @@ function titleProposalStatus(g) {
 
 export function ThesisGroupsPage() {
   const { accessToken, user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const groupIdFromUrl = searchParams.get("groupId") || "";
   const [groups, setGroups] = useState([]);
   const [researchers, setResearchers] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -128,6 +142,8 @@ export function ThesisGroupsPage() {
   const [titleForm, setTitleForm] = useState({ title: "", reviewNote: "" });
   const [statusFilter, setStatusFilter] = useState("all");
 
+  const [message, setMessage] = useState("");
+
   const canManage = MANAGE_ROLES.includes(user?.role);
 
   const load = useCallback(async () => {
@@ -138,22 +154,75 @@ export function ThesisGroupsPage() {
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
+  // Deep-link from notification → expand that thesis group
+  useEffect(() => {
+    if (!groupIdFromUrl || loading || !groups.length) return;
+    const match = groups.find((g) => String(g.id) === String(groupIdFromUrl));
+    if (!match) return;
+    setExpandedId(String(match.id));
+    setTitleForm({ title: formTitleValue(match), reviewNote: "" });
+    const t = window.setTimeout(() => {
+      const el = document.getElementById(`thesis-group-${match.id}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [groupIdFromUrl, groups, loading]);
+
   useEffect(() => {
     if (!accessToken) return;
     (async () => {
+      // Load separately so a users 403 does not wipe departments
       try {
-        const [usersRes, deptRes] = await Promise.all([
-          userApi.listUsers(accessToken, { role: "researcher", status: "active" }),
-          departmentApi.listDepartments(accessToken),
-        ]);
-        setResearchers(usersRes.users || []);
+        const deptRes = await departmentApi.listDepartments(accessToken);
         setDepartments(deptRes.departments || []);
       } catch (_) {
-        setResearchers([]);
         setDepartments([]);
       }
+      try {
+        const usersRes = await userApi.listUsers(accessToken, { role: "researcher", status: "active" });
+        setResearchers(usersRes.users || []);
+        // #region agent log
+        fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+          body: JSON.stringify({
+            sessionId: "f558f7",
+            runId: "thesis-fix",
+            hypothesisId: "H1",
+            location: "ThesisGroups.jsx:loadMeta",
+            message: "thesis meta loaded",
+            data: {
+              role: user?.role,
+              researchers: (usersRes.users || []).length,
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+      } catch (err) {
+        setResearchers([]);
+        // #region agent log
+        fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+          body: JSON.stringify({
+            sessionId: "f558f7",
+            runId: "thesis-fix",
+            hypothesisId: "H1",
+            location: "ThesisGroups.jsx:loadMeta",
+            message: "researchers load failed",
+            data: {
+              role: user?.role,
+              status: err?.response?.status || null,
+              msg: err?.response?.data?.message || String(err?.message || ""),
+            },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {});
+        // #endregion
+      }
     })();
-  }, [accessToken]);
+  }, [accessToken, user?.role]);
 
   const departmentsByFaculty = useMemo(() => {
     const map = {};
@@ -161,7 +230,7 @@ export function ThesisGroupsPage() {
       map[f.value] = [];
     });
     departments.forEach((d) => {
-      const key = d.faculty || matchFacultyByName(d.name);
+      const key = facultyKeyForDepartment(d);
       if (!map[key]) map[key] = [];
       map[key].push(d);
     });
@@ -178,12 +247,17 @@ export function ThesisGroupsPage() {
 
   const stats = useMemo(() => {
     const validGroups = groups.filter(isValidThesisGroup);
-    const titleAccepted = groups.filter(isTitleAccepted).length;
+    const titleAccepted = validGroups.filter(isTitleAccepted).length;
     const totalStudents = validGroups.reduce((acc, g) => acc + (g.students?.length || 0), 0);
     return [
-      { label: "Thesis groups", value: validGroups.length, filterKey: "all", accent: "#0ea5e9" },
+      { label: "Thesis groups", value: validGroups.length, filterKey: "validGroups", accent: "#0ea5e9" },
       { label: "Title accepted", value: titleAccepted, filterKey: "titleAccepted", accent: "#22c55e" },
-      { label: "With supervisor", value: groups.filter((g) => g.supervisorId).length, filterKey: "hasSupervisor", accent: "#1d4ed8" },
+      {
+        label: "With supervisor",
+        value: validGroups.filter((g) => g.supervisorId).length,
+        filterKey: "hasSupervisor",
+        accent: "#1d4ed8",
+      },
       { label: "Total students", value: totalStudents, filterKey: "hasStudents", accent: "#7dd3fc" },
     ];
   }, [groups]);
@@ -192,10 +266,11 @@ export function ThesisGroupsPage() {
     () =>
       filterByStatKey(groups, statusFilter, {
         customFilters: {
+          validGroups: isValidThesisGroup,
           hasTitle: (g) => Boolean(g.title?.trim()),
-          hasSupervisor: (g) => Boolean(g.supervisorId),
+          hasSupervisor: (g) => Boolean(g.supervisorId) && isValidThesisGroup(g),
           hasStudents: isValidThesisGroup,
-          titleAccepted: isTitleAccepted,
+          titleAccepted: (g) => isTitleAccepted(g) && isValidThesisGroup(g),
         },
       }),
     [groups, statusFilter]
@@ -302,12 +377,38 @@ export function ThesisGroupsPage() {
     e.preventDefault();
     try {
       setError("");
+      setMessage("");
       if (!meetingForm.date) {
         setError("Meeting date is required");
         return;
       }
-      await thesisApi.addThesisMeeting(accessToken, groupId, meetingForm);
+      const res = await thesisApi.addThesisMeeting(accessToken, groupId, meetingForm);
+      // #region agent log
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+        body: JSON.stringify({
+          sessionId: "f558f7",
+          runId: "thesis-meetings-ui",
+          hypothesisId: "M6",
+          location: "ThesisGroups.jsx:submitMeeting",
+          message: "meeting logged from UI",
+          data: {
+            groupId: String(groupId),
+            meetingsInResponse: res?.group?.meetings?.length ?? null,
+            date: meetingForm.date,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+      // Keep meetings visible immediately (avoid “disappeared” flash on reload)
+      if (res?.group) {
+        setGroups((prev) => prev.map((g) => (String(g.id) === String(groupId) ? res.group : g)));
+      }
       setMeetingForm(EMPTY_MEETING);
+      setExpandedId(groupId);
+      setMessage("Meeting saved — it stays on this thesis group.");
       await reload();
     } catch (e2) {
       setError(e2?.response?.data?.message || "Failed to log meeting");
@@ -317,11 +418,17 @@ export function ThesisGroupsPage() {
   async function submitTitleProposal(groupId) {
     try {
       setError("");
+      setMessage("");
       if (!titleForm.title?.trim()) {
         setError("Student thesis title is required");
         return;
       }
-      await thesisApi.proposeThesisTitle(accessToken, groupId, { title: titleForm.title.trim() });
+      const res = await thesisApi.proposeThesisTitle(accessToken, groupId, { title: titleForm.title.trim() });
+      if (res?.group) {
+        setGroups((prev) => prev.map((g) => (String(g.id) === String(groupId) ? res.group : g)));
+      }
+      setMessage("Title submitted for coordinator/director approval.");
+      setExpandedId(groupId);
       await reload();
     } catch (e2) {
       setError(e2?.response?.data?.message || "Failed to save title proposal");
@@ -331,10 +438,22 @@ export function ThesisGroupsPage() {
   async function reviewTitle(groupId, decision) {
     try {
       setError("");
-      await thesisApi.reviewThesisTitle(accessToken, groupId, {
+      setMessage("");
+      const res = await thesisApi.reviewThesisTitle(accessToken, groupId, {
         decision,
         note: titleForm.reviewNote?.trim(),
       });
+      if (res?.group) {
+        setGroups((prev) => prev.map((g) => (String(g.id) === String(groupId) ? res.group : g)));
+      }
+      setMessage(
+        decision === "unlock"
+          ? "Title unlocked — supervisor can enter a new title."
+          : decision === "accept" || decision === "accepted"
+            ? "Title accepted."
+            : "Title rejected."
+      );
+      setExpandedId(groupId);
       await reload();
     } catch (e2) {
       setError(e2?.response?.data?.message || "Failed to review title");
@@ -344,7 +463,11 @@ export function ThesisGroupsPage() {
   async function updateChapter(groupId, chapterKey, status) {
     try {
       setError("");
-      await thesisApi.updateThesisChapter(accessToken, groupId, chapterKey, { status });
+      const res = await thesisApi.updateThesisChapter(accessToken, groupId, chapterKey, { status });
+      if (res?.group) {
+        setGroups((prev) => prev.map((g) => (String(g.id) === String(groupId) ? res.group : g)));
+      }
+      setExpandedId(groupId);
       await reload();
     } catch (e2) {
       setError(e2?.response?.data?.message || "Failed to update chapter");
@@ -388,6 +511,17 @@ export function ThesisGroupsPage() {
     return THESIS_STATUSES.find((x) => x.value === s)?.label || s || "—";
   }
 
+  function formatMeetingDate(value) {
+    if (!value) return "—";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "—";
+    // Use UTC calendar date so YYYY-MM-DD stored at noon UTC does not shift day
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(d.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
   function formatTimelineDate(at) {
     if (!at) return "—";
     return new Date(at).toLocaleString();
@@ -418,6 +552,9 @@ export function ThesisGroupsPage() {
         </p>
       ) : null}
       {loading ? <p className="muted">Loading thesis groups…</p> : null}
+      {message ? (
+        <div className="card" style={{ borderColor: "rgba(34,197,94,0.45)", marginBottom: 10 }}>{message}</div>
+      ) : null}
       {error ? (
         <div className="card" style={{ borderColor: "rgba(239,68,68,0.55)", marginBottom: 10 }}>{error}</div>
       ) : null}
@@ -484,6 +621,14 @@ export function ThesisGroupsPage() {
 
           <p className="muted" style={{ fontSize: 13, margin: 0 }}>
             Thesis title is entered later by the assigned supervisor after students choose it.
+            {researchers.length === 0 ? (
+              <>
+                {" "}
+                <strong style={{ color: "#b45309" }}>
+                  No researchers loaded — you cannot assign a supervisor until researchers are available on this portal.
+                </strong>
+              </>
+            ) : null}
           </p>
 
           <div className="row">
@@ -508,7 +653,12 @@ export function ThesisGroupsPage() {
                   <div className="row">
                     <div className="field">
                       <label>Full name</label>
-                      <input value={s.fullName} onChange={(e) => updateStudent(idx, "fullName", e.target.value)} required placeholder="Student full name" />
+                      <input
+                        value={s.fullName}
+                        onChange={(e) => updateStudent(idx, "fullName", e.target.value)}
+                        required={idx < MIN_THESIS_GROUP_STUDENTS}
+                        placeholder="Student full name"
+                      />
                     </div>
                     <div className="field">
                       <label>Student ID</label>
@@ -553,7 +703,17 @@ export function ThesisGroupsPage() {
           const shownTitle = displayTitle(g);
 
           return (
-            <div key={g.id} className="card" style={{ borderColor: "rgba(56,189,248,0.25)" }}>
+            <div
+              key={g.id}
+              id={`thesis-group-${g.id}`}
+              className="card"
+              style={{
+                borderColor: "rgba(56,189,248,0.25)",
+                ...(expandedId === g.id && groupIdFromUrl === String(g.id)
+                  ? { outline: "2px solid #38bdf8", boxShadow: "0 0 0 4px rgba(56,189,248,0.2)" }
+                  : null),
+              }}
+            >
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -566,7 +726,17 @@ export function ThesisGroupsPage() {
                     {g.faculty || "—"} • {g.department || "—"} • Status: {statusLabel(g.status)}
                   </div>
                   <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
-                    Supervisor: <strong>{supervisorLabel(g)}</strong> • Students: <strong>{g.students?.length || 0}</strong> • Meetings: <strong>{g.meetings?.length || 0}</strong>
+                    Supervisor: <strong>{supervisorLabel(g)}</strong> • Students:{" "}
+                    <strong>{g.students?.length || 0}</strong> • Meetings:{" "}
+                    <strong>{g.meetings?.length || 0}</strong>
+                    {g.meetings?.length ? (
+                      <>
+                        {" "}
+                        (last: {formatMeetingDate(
+                          [...g.meetings].sort((a, b) => new Date(b.date) - new Date(a.date))[0]?.date
+                        )})
+                      </>
+                    ) : null}
                   </div>
                   <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
                     Linked research group: <strong>{researchGroupLabel(g)}</strong>
@@ -642,6 +812,24 @@ export function ThesisGroupsPage() {
                         <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
                           Accepted: {formatTimelineDate(g.titleProposal.reviewedAt)}
                         </div>
+                      ) : null}
+                      {canManage ? (
+                        <button
+                          type="button"
+                          className="btn"
+                          style={{ marginTop: 8 }}
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                "Unlock this title so the supervisor can enter a new student-chosen title?"
+                              )
+                            ) {
+                              reviewTitle(g.id, "unlock");
+                            }
+                          }}
+                        >
+                          Unlock title
+                        </button>
                       ) : null}
                     </div>
                   ) : null}
@@ -747,16 +935,27 @@ export function ThesisGroupsPage() {
                           {g.meetings
                             .slice()
                             .sort((a, b) => new Date(b.date) - new Date(a.date))
-                            .map((m, i) => {
+                            .map((m) => {
                               const chapterNames = (m.chaptersDiscussed || [])
                                 .map((key) => g.chapters?.find((c) => c.key === key)?.title || key)
                                 .join(", ");
+                              const loggedBy =
+                                typeof m.loggedBy === "object" && m.loggedBy
+                                  ? m.loggedBy.fullName
+                                  : null;
                               return (
-                                <tr key={i}>
-                                  <td>{new Date(m.date).toLocaleDateString()}</td>
+                                <tr key={m._id || m.id || `${m.date}-${m.agenda}`}>
+                                  <td>{formatMeetingDate(m.date)}</td>
                                   <td>{m.location || "—"}</td>
                                   <td>{chapterNames || "—"}</td>
-                                  <td>{m.agenda || "—"}</td>
+                                  <td>
+                                    {m.agenda || "—"}
+                                    {loggedBy ? (
+                                      <div className="muted" style={{ fontSize: 11 }}>
+                                        by {loggedBy}
+                                      </div>
+                                    ) : null}
+                                  </td>
                                   <td>{m.notes || "—"}</td>
                                 </tr>
                               );
@@ -831,6 +1030,9 @@ export function ThesisGroupsPage() {
         })}
         {groups.length === 0 ? (
           <div className="card muted">No thesis groups yet.{canManage ? " Click + New thesis group to create one." : ""}</div>
+        ) : null}
+        {!loading && groups.length > 0 && filteredGroups.length === 0 ? (
+          <div className="card muted">No thesis groups match this filter.</div>
         ) : null}
       </div>
     </div>

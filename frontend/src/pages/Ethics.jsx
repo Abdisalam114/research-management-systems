@@ -99,8 +99,9 @@ export function EthicsPage() {
             proposalKind: kind,
           });
         }
-      } catch {
+      } catch (e) {
         proposalLoadedRef.current = true;
+        setError(e?.response?.data?.message || "Could not load ethics application for this proposal");
       }
     })();
   }, [accessToken, proposalIdFromUrl]);

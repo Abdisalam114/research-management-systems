@@ -27,12 +27,18 @@ export function GroupsPage() {
 
   const load = useCallback(async () => {
     const res = await groupApi.listGroups(accessToken);
-    setGroups(res.groups || []);
+    const list = res.groups || [];
+    setGroups(list);
     try {
       const st = await groupApi.groupStats(accessToken);
-      setStats(st.stats || { total: 0, thesis: 0, collaboration: 0 });
+      setStats(st.stats || { total: list.length, thesis: 0, collaboration: list.length });
     } catch (_) {
-      setStats({ total: 0, thesis: 0, collaboration: 0 });
+      // Keep list-derived counts — do not wipe to zeros when stats API fails
+      setStats({
+        total: list.length,
+        thesis: list.filter((g) => g.kind === "thesis").length,
+        collaboration: list.filter((g) => g.kind !== "thesis").length || list.length,
+      });
     }
   }, [accessToken]);
 
@@ -41,10 +47,10 @@ export function GroupsPage() {
   const headerStats = useMemo(() => {
     const mine = groups.filter((g) => isMember(g, user?.id)).length;
     return [
-      { label: "Research groups", value: stats.collaboration, filterKey: "all", accent: "#0ea5e9" },
+      { label: "Research groups", value: groups.length, filterKey: "all", accent: "#0ea5e9" },
       { label: "My groups", value: mine, filterKey: "mine", accent: "#7dd3fc" },
     ];
-  }, [groups, user?.id, stats]);
+  }, [groups, user?.id]);
 
   const filteredGroups = useMemo(
     () =>

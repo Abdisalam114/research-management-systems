@@ -173,7 +173,7 @@ async function addBudgetItem(req, res) {
       type: "budget",
       title: "New budget item pending",
       body: String(description).trim(),
-      link: "/budgets",
+      link: budget.projectId ? `/budgets?projectId=${budget.projectId}` : `/budgets?budgetId=${budget._id}`,
     }, req.programTier);
   } catch {
     /* notifications are best-effort */
@@ -214,7 +214,7 @@ async function financeUpdateItemStatus(req, res) {
         type: "budget",
         title: `Budget item ${status}`,
         body: freshItem.description,
-        link: "/budgets",
+        link: budget.projectId ? `/budgets?projectId=${budget.projectId}` : "/budgets",
         programTier: req.programTier,
       });
     } catch {
@@ -235,7 +235,7 @@ async function financeUpdateItemStatus(req, res) {
       type: "budget",
       title: `Budget item ${status}`,
       body: item.description,
-      link: "/budgets",
+      link: budget.projectId ? `/budgets?projectId=${budget.projectId}` : "/budgets",
       programTier: req.programTier,
     });
   } catch {

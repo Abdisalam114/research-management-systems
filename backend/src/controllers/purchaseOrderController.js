@@ -59,7 +59,7 @@ async function procurementDecision(req, res) {
         type: "procurement",
         title: "PO procurement-approved — director review",
         body: `${po.vendorName} — ${po.currency} ${po.totalAmount}`,
-        link: "/budgets",
+        link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
       }, req.programTier);
     } catch { /* best-effort */ }
   } else {
@@ -117,13 +117,13 @@ async function createPurchaseOrder(req, res) {
       type: "procurement",
       title: "New purchase order awaiting procurement review",
       body: `${po.vendorName} — ${po.currency} ${po.totalAmount}`,
-      link: "/budgets",
+      link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
     }, req.programTier);
     await notifyUsersByRole("research_director", {
       type: "procurement",
       title: "New purchase order awaiting director approval",
       body: `${po.vendorName} — ${po.currency} ${po.totalAmount}`,
-      link: "/budgets",
+      link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
     }, req.programTier);
   } catch {
     /* best-effort */
@@ -160,14 +160,14 @@ async function directorDecision(req, res) {
       type: "procurement",
       title: `PO ${decision === "approve" ? "approved by director" : "rejected by director"}`,
       body: po.vendorName,
-      link: "/budgets",
+      link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
     });
     if (decision === "approve") {
       await notifyUsersByRole("finance_officer", {
         type: "procurement",
         title: "Director-approved PO awaiting payment",
         body: `${po.vendorName} — ${po.currency} ${po.totalAmount}`,
-        link: "/budgets",
+        link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
       });
     }
   } catch {
@@ -246,7 +246,7 @@ async function financePay(req, res) {
       type: "procurement",
       title: "PO paid by finance",
       body: `${po.vendorName} via ${paymentMethod}`,
-      link: "/budgets",
+      link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
     });
   } catch {
     /* best-effort */

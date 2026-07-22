@@ -450,8 +450,9 @@ async function validatePublication(req, res) {
   pub.validatedBy = req.user.id;
   pub.validatedAt = new Date();
   pub.validationComment = String(comment);
+  // Validate = institutional acceptance → Published (not stuck on Submitted / In process)
   if (decision === "validated") {
-    pub.workflowStage = WORKFLOW_STAGES.IN_PROCESS;
+    pub.workflowStage = WORKFLOW_STAGES.PUBLISHED;
   } else {
     pub.workflowStage = WORKFLOW_STAGES.SUBMITTED;
   }
@@ -472,7 +473,7 @@ async function validatePublication(req, res) {
       type: "publication",
       title: `Publication ${decision === "validated" ? "validated" : "rejected"}`,
       body: pub.title,
-      link: "/publications",
+      link: pub.projectId ? `/publications?projectId=${pub.projectId}` : "/publications",
     });
   } catch {
     /* notifications are best-effort */
@@ -587,7 +588,7 @@ async function updateWorkflowStage(req, res) {
       type: "publication",
       title: `Research output: ${workflowStageLabel(stage)}`,
       body: pub.title,
-      link: "/publications",
+      link: pub.projectId ? `/publications?projectId=${pub.projectId}` : "/publications",
     });
   } catch {
     /* best-effort */
