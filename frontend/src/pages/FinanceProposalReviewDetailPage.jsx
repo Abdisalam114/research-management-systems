@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as proposalApi from "../services/proposalApi";
 import { ProposalMultiStageReview } from "../components/ProposalMultiStageReview";
 
@@ -8,6 +9,7 @@ import { ProposalMultiStageReview } from "../components/ProposalMultiStageReview
 export function FinanceProposalReviewDetailPage() {
   const { id } = useParams();
   const { accessToken } = useAuth();
+  const { programTier } = useProgramTier();
   const [proposal, setProposal] = useState(null);
   const [error, setError] = useState("");
 
@@ -19,13 +21,20 @@ export function FinanceProposalReviewDetailPage() {
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load proposal for finance review"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, accessToken, programTier]);
 
   if (!proposal) return <div style={{ padding: 8 }}>{error || "Loading finance review…"}</div>;
 
   const kind = proposal.proposalKind || (proposal.fundingCallId ? "grant_fund_call" : "voluntary");
-  const amount = proposal.budgetTotal ?? proposal.amountRequested ?? proposal.requestedAmount;
+  const amount =
+    Number(proposal.requestedAmount) > 0
+      ? Number(proposal.requestedAmount)
+      : Number(proposal.budgetTotal) > 0
+        ? Number(proposal.budgetTotal)
+        : Number(proposal.fundingCall?.amountCap) > 0
+          ? Number(proposal.fundingCall.amountCap)
+          : 0;
+  const currency = proposal.budgetCurrency || proposal.fundingCall?.currency || "USD";
 
   return (
     <div>
@@ -49,12 +58,21 @@ export function FinanceProposalReviewDetailPage() {
           <div>Status: <strong>{proposal.status}</strong> • Stage: {proposal.currentReviewStage || "—"}</div>
           <div>Department: {proposal.department || "—"}</div>
           {proposal.researcherName ? <div>PI: {proposal.researcherName}</div> : null}
-          {amount != null ? (
+          <div>
+            Requested amount:{" "}
+            <strong>
+              {currency} {Number(amount).toLocaleString()}
+            </strong>
+            {proposal.fundingCall?.amountCap && Number(proposal.budgetTotal) <= 0 ? (
+              <span className="muted"> (from funding call ceiling)</span>
+            ) : null}
+          </div>
+          {proposal.fundingCall?.title ? (
             <div>
-                Requested amount:{" "}
-                <strong>
-                  {proposal.budgetCurrency || proposal.currency || "USD"} {Number(amount).toLocaleString()}
-                </strong>
+              Funding call: {proposal.fundingCall.title}
+              {proposal.fundingCall.amountCap
+                ? ` • Cap: ${proposal.fundingCall.currency || currency} ${Number(proposal.fundingCall.amountCap).toLocaleString()}`
+                : ""}
             </div>
           ) : null}
           {proposal.fundingSource ? <div>Funding source: {proposal.fundingSource}</div> : null}

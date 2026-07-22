@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
@@ -8,6 +9,7 @@ import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 
 export function ProposalsListPage() {
   const { accessToken, user } = useAuth();
+  const { programTier } = useProgramTier();
   const [proposals, setProposals] = useState([]);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
@@ -52,14 +54,16 @@ export function ProposalsListPage() {
 
   async function load() {
     setError("");
-    const res = await proposalApi.listProposals(accessToken);
+    const res =
+      user?.role === "research_director"
+        ? await proposalApi.listProposalsAll(accessToken)
+        : await proposalApi.listProposals(accessToken);
     setProposals(res.proposals || []);
   }
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load proposals"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [accessToken, programTier, user?.role]);
 
   function kindLabel(p) {
     const kind = p.proposalKind || (p.fundingCallId ? "grant_fund_call" : "voluntary");

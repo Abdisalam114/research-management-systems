@@ -1,6 +1,7 @@
 /** Routes and menu items finance_officer may use — nothing else. */
 export const FINANCE_MENU_PATHS = [
   "/dashboard",
+  "/finance/reviews",
   "/finance/grant-approvals",
   "/finance/closures",
   "/funding-calls",
@@ -16,9 +17,14 @@ export const FINANCE_MENU_PATHS = [
 /** Map legacy / general paths to finance-scoped pages. */
 export function financeRedirectPath(pathname) {
   if (!pathname) return null;
-  // Proposals stay out of finance — funding approvals instead
-  if (pathname === "/proposals" || pathname === "/proposals/" || pathname.startsWith("/proposals/")) {
-    return "/finance/grant-approvals";
+  // General proposals list → finance proposal review queue (stage 4)
+  if (pathname === "/proposals" || pathname === "/proposals/") {
+    return "/finance/reviews";
+  }
+  // Proposal detail/review deep links → finance review detail when possible
+  const proposalReview = pathname.match(/^\/proposals\/([^/]+)(?:\/review)?\/?$/);
+  if (proposalReview) {
+    return `/finance/reviews/${proposalReview[1]}`;
   }
   // General projects → finance closure queue (not grant approvals)
   if (pathname === "/projects" || pathname === "/projects/") {
@@ -26,10 +32,7 @@ export function financeRedirectPath(pathname) {
   }
   const projectId = pathname.match(/^\/projects\/([^/]+)\/?$/);
   if (projectId) return `/finance/closures/${projectId[1]}`;
-  // Do NOT remap /finance/closures or /finance/grant-approvals
-  if (pathname.startsWith("/finance/reviews")) {
-    return "/finance/grant-approvals";
-  }
+  // Keep /finance/reviews, /finance/closures, /finance/grant-approvals as-is
   return null;
 }
 

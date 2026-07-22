@@ -4,6 +4,7 @@ import { PROGRAM_TIERS } from "../constants/programTier";
 
 export function defaultProjectLevelFromTier(programTier) {
   if (programTier === PROGRAM_TIERS.UNDERGRADUATE) return "undergraduate";
+  if (programTier === PROGRAM_TIERS.POSTGRADUATE) return "master";
   return "";
 }
 

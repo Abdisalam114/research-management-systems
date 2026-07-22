@@ -48,6 +48,52 @@ const budgetSchema = new mongoose.Schema(
 
 budgetSchema.index({ grantId: 1, projectId: 1 });
 
+/** System-wide: allocated budgets must never be deleted. */
+async function assertNoAllocatedBudgetDelete(filter, model) {
+  const docs = await model.find(filter).select("_id totalAllocated").lean();
+  const blocked = docs.filter((d) => Number(d.totalAllocated || 0) > 0);
+  if (blocked.length) {
+    const err = new Error(
+      "Budget allocated cannot be deleted. Allocated project/grant budgets are protected system-wide."
+    );
+    err.statusCode = 400;
+    err.code = "BUDGET_ALLOCATED_LOCKED";
+    throw err;
+  }
+}
+
+budgetSchema.pre("deleteOne", { document: false, query: true }, async function budgetDeleteOneGuard() {
+  await assertNoAllocatedBudgetDelete(this.getFilter(), this.model);
+});
+
+budgetSchema.pre("findOneAndDelete", async function budgetFindOneAndDeleteGuard() {
+  await assertNoAllocatedBudgetDelete(this.getFilter(), this.model);
+});
+
+budgetSchema.pre("deleteMany", async function budgetDeleteManyGuard() {
+  await assertNoAllocatedBudgetDelete(this.getFilter(), this.model);
+});
+
+budgetSchema.pre("save", async function budgetAllocatedLock(next) {
+  try {
+    if (this.isNew) return next();
+    if (!this.isModified("totalAllocated")) return next();
+    const prior = await this.constructor.findById(this._id).select("totalAllocated").lean();
+    const prev = Number(prior?.totalAllocated || 0);
+    const nextVal = Number(this.totalAllocated || 0);
+    // Never clear or reduce an existing allocation (system-managed)
+    if (prev > 0 && nextVal < prev) {
+      const err = new Error("Budget allocated cannot be reduced or cleared once set.");
+      err.statusCode = 400;
+      err.code = "BUDGET_ALLOCATED_LOCKED";
+      return next(err);
+    }
+    return next();
+  } catch (e) {
+    return next(e);
+  }
+});
+
 const Budget = mongoose.model("Budget", budgetSchema);
 
 module.exports = { Budget, BUDGET_ITEM_TYPES, BUDGET_ITEM_STATUSES };

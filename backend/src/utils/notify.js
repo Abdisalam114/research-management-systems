@@ -21,11 +21,21 @@ async function notifyUser(userId, { title, body, link, type = "info", programTie
   sendEmailToUser(userId, title || "Jamhuriya RMS", emailBody).catch(() => {});
 }
 
+/**
+ * Notify all active users with a role.
+ * Research Director is shared across UG/PG — never filter director accounts by programTier.
+ * Still store programTier on the notification so Open can switch the Director portal.
+ */
 async function notifyUsersByRole(role, payload, programTier) {
   const filter = { role, status: USER_STATUSES.ACTIVE };
-  if (programTier) filter.programTier = programTier;
+  const isDirectorRole = role === "research_director";
+  if (programTier && !isDirectorRole) {
+    filter.programTier = programTier;
+  }
   const users = await User.find(filter).select("_id");
-  await Promise.all(users.map((u) => notifyUser(u._id, { ...payload, programTier })));
+  // Prefer explicit payload.programTier, then the caller's tier arg
+  const notifyTier = payload?.programTier || programTier;
+  await Promise.all(users.map((u) => notifyUser(u._id, { ...payload, programTier: notifyTier })));
 }
 
 module.exports = { notifyUser, notifyUsersByRole };

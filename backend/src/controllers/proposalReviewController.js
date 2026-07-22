@@ -77,6 +77,22 @@ async function adminScreening(req, res) {
 res.json({ message: "Admin screening saved", proposal: sanitizeProposalBrief(proposal) });
 }
 
+function reviewerUserId(ref) {
+  if (ref == null) return "";
+  if (typeof ref === "object") {
+    if (ref._id != null) return String(ref._id);
+    // ObjectId.id is a Buffer — never use it for comparisons
+    if (typeof ref.toHexString === "function") return ref.toHexString();
+    if (typeof ref.id === "string" || typeof ref.id === "number") return String(ref.id);
+    return String(ref);
+  }
+  return String(ref);
+}
+
+function proposalScopeFilter(req, base = {}) {
+  return req.tierWhere(base);
+}
+
 async function submitPeerReview(req, res) {
   const { score, comment } = req.body || {};
   if (typeof score !== "number" || score < 1 || score > 5) {
@@ -86,11 +102,11 @@ async function submitPeerReview(req, res) {
     throw new AppError("comment is required", 400);
   }
 
-  const proposal = await Proposal.findOne(req.tierWhere({ _id: req.params.id }));
+  const proposal = await Proposal.findOne(proposalScopeFilter(req, { _id: req.params.id }));
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const assigned = (proposal.assignedReviewers || []).some(
-    (r) => String(r.userId?.id || r.userId?._id || r.userId) === String(req.user.id)
+    (r) => reviewerUserId(r.userId) === String(req.user.id)
   );
   const isDirector = req.user.role === "research_director";
   if (!assigned && !isDirector) throw new AppError("You are not assigned as reviewer", 403);
@@ -108,6 +124,31 @@ async function submitPeerReview(req, res) {
 
   const pipe = ensureReviewPipeline(proposal);
   pipe.peerReview.status = STAGE_STATUS.IN_PROGRESS;
+
+  const assignedIds = (proposal.assignedReviewers || [])
+    .map((r) => reviewerUserId(r.userId))
+    .filter(Boolean);
+  const reviewedIds = new Set(
+    (proposal.peerReviews || []).map((r) => reviewerUserId(r.userId)).filter(Boolean)
+  );
+  const allAssignedDone =
+    assignedIds.length > 0 && assignedIds.every((id) => reviewedIds.has(id));
+  // Single leadership review (or director review) is enough to complete the stage
+  const peerComplete =
+    allAssignedDone ||
+    (assignedIds.length === 0 && (proposal.peerReviews || []).length > 0) ||
+    (isDirector && (proposal.peerReviews || []).length > 0);
+
+  if (peerComplete) {
+    pipe.peerReview.status = STAGE_STATUS.PASSED;
+    pipe.peerReview.completedAt = new Date();
+    pipe.peerReview.reviews = (proposal.peerReviews || []).map((r) => ({
+      userId: r.userId,
+      score: r.score,
+      at: r.at,
+    }));
+  }
+
   proposal.markModified("reviewPipeline");
   proposal.markModified("peerReviews");
   await proposal.save();
@@ -116,44 +157,122 @@ async function submitPeerReview(req, res) {
   try {
     const fs = require("fs");
     const path = require("path");
-    const line = `${JSON.stringify({
+    const payload = {
       sessionId: "f558f7",
-      runId: "peer-flow",
-      hypothesisId: "PF1",
+      hypothesisId: "H1",
       location: "proposalReviewController.submitPeerReview",
-      message: "peer review submitted",
+      message: "peer submit after save",
       data: {
-        role: req.user.role,
         proposalId: String(proposal._id),
-        score,
-        hasComment: Boolean(String(comment).trim()),
-        totalReviews: (proposal.peerReviews || []).length,
+        peerComplete,
+        peerStatus: pipe.peerReview?.status,
+        committeeStatus: pipe.committeeReview?.status,
+        assignedCount: assignedIds.length,
+        reviewedCount: reviewedIds.size,
+        role: req.user.role,
       },
       timestamp: Date.now(),
-    })}\n`;
-    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
-  } catch {
-    /* ignore */
-  }
+      runId: "pre-fix",
+    };
+    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  } catch (_) { /* debug */ }
   // #endregion
 
   await recordAudit({
     entityType: "proposal",
     entityId: proposal._id,
     action: "peer_review",
-    label: "Peer review submitted",
+    label: peerComplete ? "Peer review submitted — stage complete" : "Peer review submitted",
     detail: `Score ${score}`,
     actorId: req.user.id,
     actorRole: req.user.role,
     programTier: req.programTier,
   });
 
-  res.json({ message: "Peer review saved", proposal: sanitizeProposalBrief(proposal) });
+  // Always notify Director so Open works (Director inbox is cross-portal)
+  try {
+    const { notifyUsersByRole } = require("../utils/notify");
+    await notifyUsersByRole(
+      "research_director",
+      {
+        type: "proposal",
+        title: peerComplete
+          ? "Peer review complete — continue proposal review"
+          : "Peer review submitted — awaiting remaining reviewers",
+        body: `${proposal.title} (score ${score}/5)`,
+        link: `/proposals/${proposal._id}/review`,
+      },
+      req.programTier
+    );
+  } catch {
+    /* best-effort */
+  }
+
+  res.json({
+    message: peerComplete
+      ? "Peer review saved — stage complete; Director notified"
+      : "Peer review saved — Director notified",
+    proposal: sanitizeProposalBrief(proposal),
+  });
 }
 
 async function completePeerReview(req, res) {
-  const proposal = await Proposal.findOne(req.tierWhere({ _id: req.params.id }));
-  if (!proposal) throw new AppError("Proposal not found", 404);
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const payload = {
+      sessionId: "f558f7",
+      hypothesisId: "H1",
+      location: "proposalReviewController.completePeerReview",
+      message: "complete peer entry",
+      data: {
+        proposalId: req.params.id,
+        reqTier: req.programTier || null,
+        role: req.user.role,
+      },
+      timestamp: Date.now(),
+      runId: "complete-debug",
+    };
+    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  } catch (_) { /* debug */ }
+  // #endregion
+
+  const proposal = await Proposal.findOne(proposalScopeFilter(req, { _id: req.params.id }));
+  if (!proposal) {
+    // #region agent log
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      const payload = {
+        sessionId: "f558f7",
+        hypothesisId: "H1",
+        location: "proposalReviewController.completePeerReview",
+        message: "proposal not found for tier",
+        data: { proposalId: req.params.id, reqTier: req.programTier || null },
+        timestamp: Date.now(),
+        runId: "complete-debug",
+      };
+      fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+        body: JSON.stringify(payload),
+      }).catch(() => {});
+    } catch (_) { /* debug */ }
+    // #endregion
+    throw new AppError("Proposal not found", 404);
+  }
   if (req.user.role !== "research_director") throw new AppError("Forbidden", 403);
 
   const reviews = proposal.peerReviews || [];
@@ -166,6 +285,53 @@ async function completePeerReview(req, res) {
   proposal.markModified("reviewPipeline");
   await proposal.save();
 
+  const fresh = await Proposal.findById(proposal._id).select("reviewPipeline programTier peerReviews");
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const payload = {
+      sessionId: "f558f7",
+      hypothesisId: "H2",
+      location: "proposalReviewController.completePeerReview",
+      message: "complete peer after save",
+      data: {
+        proposalId: String(proposal._id),
+        docTier: proposal.programTier || null,
+        reqTier: req.programTier || null,
+        savedPeer: pipe.peerReview?.status || null,
+        dbPeer: fresh?.reviewPipeline?.peerReview?.status || null,
+        peerReviewCount: reviews.length,
+        currentStage: getCurrentReviewStage(fresh || proposal),
+      },
+      timestamp: Date.now(),
+      runId: "complete-debug",
+    };
+    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  } catch (_) { /* debug */ }
+  // #endregion
+
+  try {
+    const { notifyUsersByRole } = require("../utils/notify");
+    await notifyUsersByRole(
+      "research_director",
+      {
+        type: "proposal",
+        title: "Peer review complete — continue proposal review",
+        body: proposal.title,
+        link: `/proposals/${proposal._id}/review`,
+      },
+      req.programTier
+    );
+  } catch {
+    /* best-effort */
+  }
+
   res.json({ message: "Peer review stage completed", proposal: sanitizeProposalBrief(proposal) });
 }
 
@@ -176,7 +342,7 @@ async function committeeReview(req, res) {
     throw new AppError("Invalid decision", 400);
   }
 
-  const proposal = await Proposal.findOne(req.tierWhere({ _id: req.params.id }));
+  const proposal = await Proposal.findOne(proposalScopeFilter(req, { _id: req.params.id }));
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const pipe = ensureReviewPipeline(proposal);
@@ -199,6 +365,60 @@ async function committeeReview(req, res) {
   proposal.reviewerComments.push({ role: req.user.role, comment: `[Committee: ${decision}] ${comment}` });
   proposal.markModified("reviewPipeline");
   await proposal.save();
+
+  if (committeeStatus === STAGE_STATUS.PASSED) {
+    try {
+      const { notifyFinanceProposalReviewReady } = require("../utils/notifyFinanceProposalReview");
+      const sent = await notifyFinanceProposalReviewReady(proposal, { force: true });
+      // #region agent log
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        const payload = {
+          sessionId: "f558f7",
+          hypothesisId: "F1",
+          location: "proposalReviewController.committeeReview",
+          message: "finance notify after committee pass",
+          data: { proposalId: String(proposal._id), sent, programTier: proposal.programTier || null },
+          timestamp: Date.now(),
+          runId: "post-fix",
+        };
+        fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
+      } catch (_) { /* debug */ }
+      // #endregion
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const payload = {
+      sessionId: "f558f7",
+      hypothesisId: "H2",
+      location: "proposalReviewController.committeeReview",
+      message: "committee after save",
+      data: {
+        proposalId: String(proposal._id),
+        decision,
+        savedCommitteeStatus: pipe.committeeReview?.status,
+        peerStatus: pipe.peerReview?.status,
+        role: req.user.role,
+        programTier: req.programTier || null,
+      },
+      timestamp: Date.now(),
+      runId: "pre-fix",
+    };
+    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  } catch (_) { /* debug */ }
+  // #endregion
 
   await recordAudit({
     entityType: "proposal",

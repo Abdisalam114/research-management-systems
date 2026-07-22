@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { listRecentAudit } from "../services/searchApi";
 import { formatRole } from "../utils/roleLabels";
 import { PageHeader } from "../components/PageHeader";
@@ -16,6 +17,7 @@ const ENTITY_TYPES = [
 
 export function AuditTrailPage() {
   const { accessToken } = useAuth();
+  const { programTier } = useProgramTier();
   const [events, setEvents] = useState([]);
   const [entityType, setEntityType] = useState("");
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ export function AuditTrailPage() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, entityType]);
+  }, [accessToken, entityType, programTier]);
 
   useEffect(() => {
     load();

@@ -19,15 +19,15 @@ Fur app-ka: http://localhost:5173 (ka dib backend iyo frontend la shido).
 Ma jiro akoon Ethics Committee ama Peer Reviewer. Ethics = Research Director. Peer review = University Leadership.
 
 Research Director (director@rms.edu)
-  • Beddel portal UG/PG; abuuri/daabaca funding calls gudaha
+  • Beddel portal UG/PG; abuuri/daabaca funding calls (Leadership uma baahna)
   • Ansixinta ugu dambeysa proposals; go'aanka ethics (JUREC)
   • Ansixi PO ka dib Procurement; maamul Users & Departments
   • Analytics, KPI, audit trail
 
 University Leadership (leadership@ / leadership.pg@)
-  • Ansixi/daabaca funding calls
   • Peer review: score 1–5 + comment
   • Peer Reviews + Proposals; KPI
+  • MA daabaco funding calls
 
 Faculty Coordinator (coordinator@ / coordinator.pg@)
   • Proposal queue faculty; thesis groups (min 4 arday), titles, supervisors
@@ -78,7 +78,7 @@ Ha isticmaalin ethics@ ama reviewer@ — doorarkaas waa laga saaray nidaamka.
 
 Director wuxuu abuuraa Internal ama External. Requirements si otomaatig ah ayaa u buuxsamaan. Dooro eligibility (UG / PG / dhammaan / PGD).
 
-Leadership ama Director publish → researchers eligible ah waa la ogeysiiyaa link toos ah call-ka.
+Director ayaa daabaca call-ka — Leadership uma baahna. Researchers eligible ah waa la ogeysiiyaa link toos ah.
 
 Researcher: Funding Calls → Apply via this call.
 

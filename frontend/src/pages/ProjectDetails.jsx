@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as projectApi from "../services/projectApi";
 import * as analyticsApi from "../services/analyticsApi";
 import { ProjectWorkflowPanel } from "../components/ProjectWorkflowPanel";
@@ -15,6 +16,7 @@ export function ProjectDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { accessToken, user } = useAuth();
+  const { programTier } = useProgramTier();
   const [project, setProject] = useState(null);
   const [milestones, setMilestones] = useState([emptyMilestone]);
   const [teamMembers, setTeamMembers] = useState([emptyMember]);
@@ -62,8 +64,7 @@ export function ProjectDetailsPage() {
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load project"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, accessToken, programTier]);
 
   useEffect(() => {
     if (location.state?.workflowHint === "publication_submitted") {
@@ -108,7 +109,7 @@ export function ProjectDetailsPage() {
               style={{ borderColor: "rgba(248,113,113,0.6)", color: "#f87171" }}
               onClick={async () => {
                 const ok = window.confirm(
-                  `Delete project "${project.title}"?\n\nLinked outputs, repository files, and budgets for this project will be removed. This cannot be undone.`
+                  `Delete project "${project.title}"?\n\nIf Budget allocated exists, delete will be blocked (allocated budgets are locked system-wide).`
                 );
                 if (!ok) return;
                 try {
@@ -136,6 +137,22 @@ export function ProjectDetailsPage() {
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800, fontSize: 18 }}>{project.title}</div>
         <div className="muted" style={{ marginTop: 6 }}>Status: {project.status}</div>
+        {project.budgetSummary?.totalAllocated > 0 ? (
+          <div className="muted" style={{ marginTop: 6 }}>
+            Budget allocated:{" "}
+            <strong>
+              {project.budgetSummary.currency || "USD"}{" "}
+              {Number(project.budgetSummary.totalAllocated).toLocaleString()}
+            </strong>
+            {project.budgetSummary.totalDisbursed != null ? (
+              <span>
+                {" "}
+                · Paid: {project.budgetSummary.currency || "USD"}{" "}
+                {Number(project.budgetSummary.totalDisbursed || 0).toLocaleString()}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         {project.principalInvestigator ? (
           <div
             style={{
@@ -253,6 +270,7 @@ export function ProjectDetailsPage() {
         canDeleteOutput={isOwner || user?.role === "research_director"}
         canManage={["faculty_coordinator", "research_director"].includes(user?.role)}
         departmentLabel={project.title}
+        onPublicationValidated={() => load().catch(() => {})}
       />
 
       {isOwner ? (

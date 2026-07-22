@@ -12,6 +12,7 @@ import {
   Tooltip,
 } from "recharts";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as analyticsApi from "../services/analyticsApi";
 import * as grantApi from "../services/grantApi";
 import { SystemModulesGrid } from "./SystemModulesGrid";
@@ -28,6 +29,7 @@ function formatMoney(n) {
 
 export function FinanceDashboard() {
   const { accessToken, user } = useAuth();
+  const { programTier } = useProgramTier();
   const [report, setReport] = useState(null);
   const [metrics, setMetrics] = useState(null);
   const [pendingFinanceCount, setPendingFinanceCount] = useState(0);
@@ -74,7 +76,7 @@ export function FinanceDashboard() {
       cancelled = true;
       clearInterval(t);
     };
-  }, [accessToken]);
+  }, [accessToken, programTier]);
 
   const utilizationPie = useMemo(() => {
     if (!report) return [];
@@ -314,7 +316,10 @@ export function FinanceDashboard() {
       </section>
 
       <div className="dashboardQuickLinks">
-        <Link className="btn primary" to="/finance/grant-approvals">
+        <Link className="btn primary" to="/finance/reviews">
+          Proposal finance review
+        </Link>
+        <Link className="btn" to="/finance/grant-approvals">
           Grant funding approval
         </Link>
         <Link className="btn" to="/budgets">

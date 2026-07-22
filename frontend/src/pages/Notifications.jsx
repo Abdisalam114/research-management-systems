@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as notificationApi from "../services/notificationApi";
 
@@ -14,7 +15,9 @@ function formatWhen(at) {
 }
 
 export function NotificationsPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
+  const navigate = useNavigate();
+  const { programTier, selectProgramTier } = useProgramTier();
   const [notifications, setNotifications] = useState([]);
 
   const load = useCallback(async () => {
@@ -31,6 +34,27 @@ export function NotificationsPage() {
     return () => clearInterval(timer);
   }, [reload]);
 
+  async function openNotification(n) {
+    try {
+      if (!n.readAt) {
+        await notificationApi.markNotificationRead(accessToken, n.id);
+      }
+    } catch {
+      /* still navigate */
+    }
+    const needsPortalSwitch =
+      n.programTier && n.programTier !== programTier && user?.role === "research_director";
+    if (needsPortalSwitch) {
+      selectProgramTier(n.programTier);
+    }
+    if (n.link) {
+      // Persist tier before the review/detail page fetches
+      window.setTimeout(() => navigate(n.link), needsPortalSwitch ? 80 : 0);
+    } else {
+      await reload().catch(() => {});
+    }
+  }
+
   return (
     <div className="dashboardPage">
       <header className="dashPageHeader">
@@ -42,6 +66,9 @@ export function NotificationsPage() {
       {error ? (
         <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>
           {error}
+          <button type="button" className="btn" style={{ marginLeft: 8 }} onClick={() => setError("")}>
+            Dismiss
+          </button>
         </div>
       ) : null}
 
@@ -67,9 +94,9 @@ export function NotificationsPage() {
               </div>
               <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
                 {n.link ? (
-                  <Link className="btn" to={n.link}>
+                  <button type="button" className="btn primary" onClick={() => openNotification(n)}>
                     {n.type === "message" ? "Open chat" : "Open"}
-                  </Link>
+                  </button>
                 ) : null}
                 {!n.readAt ? (
                   <button

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as proposalApi from "../services/proposalApi";
 import { ProposalEthicsWorkflow } from "../components/ProposalEthicsWorkflow";
 import { SubmitValidationAlert, SubmitSuccessAlert } from "../components/SubmitValidationAlert";
@@ -14,6 +15,7 @@ export function ProposalDetailsPage() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { accessToken, user } = useAuth();
+  const { programTier } = useProgramTier();
   const [proposal, setProposal] = useState(null);
   const [ethics, setEthics] = useState(null);
   const [error, setError] = useState("");
@@ -45,8 +47,7 @@ export function ProposalDetailsPage() {
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load proposal"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, accessToken, programTier]);
 
   async function submitCombined() {
     setValidationIssues([]);

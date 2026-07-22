@@ -26,9 +26,31 @@ function resolveProposalKind(doc) {
   return doc.fundingCallId ? PROPOSAL_KINDS.GRANT_FUND_CALL : PROPOSAL_KINDS.VOLUNTARY;
 }
 
+function sumBudgetBreakdown(rows = []) {
+  return (rows || []).reduce((sum, row) => sum + (Number(row?.amount) || 0), 0);
+}
+
+/** Effective requested amount: proposal budget, else breakdown sum, else funding-call cap. */
+function resolveRequestedAmount(p) {
+  const fromTotal = Number(p.budgetTotal) || 0;
+  if (fromTotal > 0) return fromTotal;
+  const fromBreakdown = sumBudgetBreakdown(p.budgetBreakdown);
+  if (fromBreakdown > 0) return fromBreakdown;
+  const call = p.fundingCallId;
+  const fromCall = Number(call?.amountCap) || 0;
+  return fromCall > 0 ? fromCall : 0;
+}
+
 function refId(ref) {
   if (ref == null) return null;
-  if (typeof ref === "object") return String(ref._id || ref.id || "");
+  if (typeof ref === "object") {
+    // Populated doc
+    if (ref._id != null) return String(ref._id);
+    // Mongoose ObjectId — String(oid) is hex; oid.id is a Buffer (never use it)
+    if (typeof ref.toHexString === "function") return ref.toHexString();
+    if (typeof ref.id === "string" || typeof ref.id === "number") return String(ref.id);
+    return String(ref);
+  }
   return String(ref);
 }
 
@@ -44,6 +66,9 @@ function sanitizeAssignedReviewers(list = []) {
 
 function sanitizeProposal(p) {
   const researcher = p.researcherId;
+  const breakdownSum = sumBudgetBreakdown(p.budgetBreakdown);
+  const requestedAmount = resolveRequestedAmount(p);
+  const callCap = Number(p.fundingCallId?.amountCap) || null;
   return {
     id: p._id,
     title: p.title,
@@ -54,8 +79,10 @@ function sanitizeProposal(p) {
     version: p.version,
     versionHistory: p.versionHistory || [],
     budgetBreakdown: p.budgetBreakdown || [],
-    budgetTotal: p.budgetTotal || 0,
-    budgetCurrency: p.budgetCurrency || "USD",
+    budgetTotal: Number(p.budgetTotal) > 0 ? Number(p.budgetTotal) : breakdownSum || requestedAmount || 0,
+    budgetCurrency: p.budgetCurrency || p.fundingCallId?.currency || "USD",
+    requestedAmount,
+    amountRequested: requestedAmount,
     complianceDocuments: p.complianceDocuments || [],
     supportingDocuments: p.supportingDocuments || [],
     researcherId: researcher?._id ? researcher._id : researcher,
@@ -86,8 +113,12 @@ function sanitizeProposal(p) {
           id: String(p.fundingCallId._id),
           title: p.fundingCallId.title || "",
           status: p.fundingCallId.status || null,
+          amountCap: Number(p.fundingCallId.amountCap) || 0,
+          currency: p.fundingCallId.currency || "USD",
         }
-      : null,
+      : callCap != null
+        ? { amountCap: callCap }
+        : null,
     submittedAt: p.submittedAt,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
@@ -133,8 +164,8 @@ async function attachEthicsSummary(proposal) {
 
 async function createLinkedEthicsApplication(proposal, user) {
   const parts = (user.fullName || "").trim().split(/\s+/);
-  const defaultLevel =
-    proposal.programTier === "undergraduate" ? "undergraduate" : "";
+  const { defaultEthicsProjectLevel } = require("../utils/ethicsDefaults");
+  const defaultLevel = defaultEthicsProjectLevel(proposal.programTier);
   const ethics = await EthicsApplication.create({
     proposalId: proposal._id,
     researcherId: proposal.researcherId,
@@ -245,6 +276,8 @@ async function createProposal(req, res) {
 
   let linkedCallId = null;
   let kind = PROPOSAL_KINDS.VOLUNTARY;
+  let initialBudgetTotal = 0;
+  let initialBudgetCurrency = "USD";
 
   if (wantsGrantCall) {
     if (!fundingCallId) {
@@ -258,6 +291,8 @@ async function createProposal(req, res) {
     if (req.user.role === ROLES.RESEARCHER) assertEligibleForCall(req, call);
     linkedCallId = call._id;
     kind = PROPOSAL_KINDS.GRANT_FUND_CALL;
+    initialBudgetTotal = Number(call.amountCap) || 0;
+    initialBudgetCurrency = call.currency || "USD";
   } else {
     // Voluntary path: research only, no funding — must not carry a funding call id
     if (fundingCallId) {
@@ -273,8 +308,8 @@ async function createProposal(req, res) {
     researchArea,
     document,
     budgetBreakdown: [],
-    budgetTotal: 0,
-    budgetCurrency: "USD",
+    budgetTotal: initialBudgetTotal,
+    budgetCurrency: initialBudgetCurrency,
     researcherId: req.user.id,
     status: PROPOSAL_STATUSES.DRAFT,
     version: 1,
@@ -575,7 +610,7 @@ async function listProposals(req, res) {
     status: { $in: [PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW, PROPOSAL_STATUSES.REVISION_REQUESTED] },
   }))
     .populate("researcherId", "fullName email department")
-    .populate("fundingCallId", "title status deadline")
+    .populate("fundingCallId", "title status deadline amountCap currency")
     .sort({ submittedAt: -1, createdAt: -1 });
 
   res.json({ proposals: proposals.map(sanitizeProposal) });
@@ -585,7 +620,8 @@ async function getProposal(req, res) {
   const { id } = req.params;
   const proposal = await Proposal.findOne(req.tierWhere({ _id: id }))
     .populate("assignedReviewers.userId", "fullName email role department")
-    .populate("peerReviews.userId", "fullName email role");
+    .populate("peerReviews.userId", "fullName email role")
+    .populate("fundingCallId", "title status amountCap currency deadline");
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const isOwner = String(proposal.researcherId) === String(req.user.id);
@@ -595,13 +631,159 @@ async function getProposal(req, res) {
   );
   if (!isOwner && !isStaff && !isAssignedReviewer) throw new AppError("Forbidden", 403);
 
+  // Repair: ethics already approved but Committee stage left pending
+  try {
+    const ethicsDoc = await getEthicsForProposal(proposal._id);
+    const ethicsOk =
+      proposal.ethicsStatus === ETHICS_STATUSES.APPROVED || ethicsDoc?.status === "approved";
+    if (ethicsOk) {
+      const pipe = ensureReviewPipeline(proposal);
+      if (
+        pipe.committeeReview?.status === STAGE_STATUS.PENDING ||
+        pipe.committeeReview?.status === STAGE_STATUS.IN_PROGRESS
+      ) {
+        pipe.committeeReview = {
+          status: STAGE_STATUS.PASSED,
+          completedAt: new Date(),
+          completedBy: null,
+          decision: "recommend_approval",
+          comment: "Completed with JUREC ethics approval",
+        };
+        proposal.ethicsStatus = ETHICS_STATUSES.APPROVED;
+        proposal.markModified("reviewPipeline");
+        await proposal.save();
+        try {
+          const { notifyFinanceProposalReviewReady } = require("../utils/notifyFinanceProposalReview");
+          await notifyFinanceProposalReviewReady(proposal, { force: true });
+        } catch {
+          /* best-effort */
+        }
+        // #region agent log
+        try {
+          const payload = {
+            sessionId: "f558f7",
+            hypothesisId: "H6",
+            location: "proposalController.getProposal",
+            message: "repaired committee after ethics approved",
+            data: {
+              proposalId: String(id),
+              committee: pipe.committeeReview.status,
+              ethicsStatus: proposal.ethicsStatus,
+            },
+            timestamp: Date.now(),
+            runId: "post-fix",
+          };
+          fs.appendFileSync(
+            path.join(__dirname, "..", "..", "..", "debug-f558f7.log"),
+            `${JSON.stringify(payload)}\n`
+          );
+          fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+            body: JSON.stringify(payload),
+          }).catch(() => {});
+        } catch (_) { /* debug */ }
+        // #endregion
+      } else {
+        // Already committee-passed — ensure finance was notified (deduped)
+        try {
+          const { notifyFinanceProposalReviewReady } = require("../utils/notifyFinanceProposalReview");
+          const sent = await notifyFinanceProposalReviewReady(proposal);
+          // #region agent log
+          if (sent) {
+            const payload = {
+              sessionId: "f558f7",
+              hypothesisId: "F1",
+              location: "proposalController.getProposal",
+              message: "finance notify for ready proposal",
+              data: { proposalId: String(id), sent: true },
+              timestamp: Date.now(),
+              runId: "post-fix",
+            };
+            fs.appendFileSync(
+              path.join(__dirname, "..", "..", "..", "debug-f558f7.log"),
+              `${JSON.stringify(payload)}\n`
+            );
+          }
+          // #endregion
+        } catch {
+          /* best-effort */
+        }
+      }
+    }
+  } catch (_) { /* best-effort repair */ }
+
+  // Backfill budgetTotal from funding-call cap when proposal has no amount
+  try {
+    if (!(Number(proposal.budgetTotal) > 0) && proposal.fundingCallId) {
+      let call = proposal.fundingCallId;
+      if (!call?.amountCap && call?._id) {
+        call = await FundingCall.findById(call._id || call).select("amountCap currency");
+      } else if (!call?.amountCap) {
+        call = await FundingCall.findById(proposal.fundingCallId).select("amountCap currency");
+      }
+      const cap = Number(call?.amountCap) || 0;
+      if (cap > 0) {
+        proposal.budgetTotal = cap;
+        if (!proposal.budgetCurrency) proposal.budgetCurrency = call.currency || "USD";
+        await proposal.save();
+        // #region agent log
+        try {
+          const payload = {
+            sessionId: "f558f7",
+            hypothesisId: "B2",
+            location: "proposalController.getProposal",
+            message: "backfilled budgetTotal from call amountCap",
+            data: {
+              proposalId: String(id),
+              budgetTotal: proposal.budgetTotal,
+              amountCap: cap,
+              currency: proposal.budgetCurrency,
+            },
+            timestamp: Date.now(),
+            runId: "post-fix",
+          };
+          fs.appendFileSync(
+            path.join(__dirname, "..", "..", "..", "debug-f558f7.log"),
+            `${JSON.stringify(payload)}\n`
+          );
+        } catch (_) { /* debug */ }
+        // #endregion
+      }
+    }
+  } catch (_) { /* best-effort */ }
+
   // #region agent log
   try {
-    const p = require("path");
-    const fs = require("fs");
-    const line = `${JSON.stringify({ sessionId: "f558f7", hypothesisId: "H1", location: "proposalController.getProposal", message: "proposal access ok", data: { role: req.user.role, proposalId: String(id) }, timestamp: Date.now() })}\n`;
-    fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
-    fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
+    const _pipe = proposal.reviewPipeline || {};
+    const payload = {
+      sessionId: "f558f7",
+      hypothesisId: "B1",
+      location: "proposalController.getProposal",
+      message: "pipeline on load",
+      data: {
+        proposalId: String(id),
+        role: req.user.role,
+        programTier: req.programTier || null,
+        admin: _pipe.adminScreening?.status || null,
+        peer: _pipe.peerReview?.status || null,
+        committee: _pipe.committeeReview?.status || null,
+        finance: _pipe.financeReview?.status || null,
+        peerReviewCount: (proposal.peerReviews || []).length,
+        ethicsStatus: proposal.ethicsStatus || null,
+        budgetTotal: proposal.budgetTotal || 0,
+        requestedAmount: resolveRequestedAmount(proposal),
+        callCap: Number(proposal.fundingCallId?.amountCap) || 0,
+      },
+      timestamp: Date.now(),
+      runId: "post-fix",
+    };
+    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
   } catch (_) { /* debug */ }
   // #endregion
 
@@ -662,39 +844,60 @@ async function directorDecision(req, res) {
     throw new AppError("Ethics must be approved before final proposal decision", 400);
   }
 
-  // Soft-pass incomplete oversight stages after ethics clearance so Director can create the project.
+  // Soft-pass incomplete oversight stages (except Finance — Finance Officer must act).
   // Never soft-pass a FAILED stage.
   if (decision === PROPOSAL_STATUSES.APPROVED) {
     const pipe = ensureReviewPipeline(proposal);
-    const criticalStages = [pipe.adminScreening, pipe.peerReview, pipe.committeeReview];
-    if (!isVoluntaryProposal(proposal)) criticalStages.push(pipe.financeReview);
-    const failed = criticalStages.filter((s) => s?.status === STAGE_STATUS.FAILED);
+    const softPassStages = [pipe.adminScreening, pipe.peerReview, pipe.committeeReview];
+    const failedCheck = [...softPassStages];
+    if (!isVoluntaryProposal(proposal)) failedCheck.push(pipe.financeReview);
+    const failed = failedCheck.filter((s) => s?.status === STAGE_STATUS.FAILED);
     if (failed.length) {
       throw new AppError(
         "Cannot approve: a review stage failed. Request revision or reject the proposal.",
         400
       );
     }
+    if (!isVoluntaryProposal(proposal)) {
+      const fr = pipe.financeReview?.status;
+      if (fr !== STAGE_STATUS.PASSED && fr !== STAGE_STATUS.SKIPPED) {
+        throw new AppError(
+          "Finance review must be completed by the Finance Officer before final proposal approval.",
+          400
+        );
+      }
+    }
+    const now = new Date();
+    for (const stage of softPassStages) {
+      if (!stage) continue;
+      if (stage.status === STAGE_STATUS.PENDING || stage.status === STAGE_STATUS.IN_PROGRESS) {
+        stage.status = STAGE_STATUS.PASSED;
+        stage.completedAt = stage.completedAt || now;
+        if (stage.decision === "" || stage.decision == null) {
+          stage.decision = "soft_passed_on_director_approval";
+        }
+        if (stage.comment === "" || stage.comment == null) {
+          stage.comment = "Soft-passed when Director approved the proposal";
+        }
+      }
+    }
+    proposal.markModified("reviewPipeline");
     // #region agent log
     try {
-      const fs = require("fs");
-      const path = require("path");
-      fs.appendFileSync(
-        path.join(process.cwd(), "..", ".cursor", "debug-f558f7.log"),
-        `${JSON.stringify({
-          sessionId: "f558f7",
-          hypothesisId: "L1",
-          location: "proposalController.js:directorDecision",
-          message: "soft-pass check",
-          data: {
-            voluntary: isVoluntaryProposal(proposal),
-            stageStatuses: criticalStages.map((s) => s?.status),
-            blockedFailed: false,
-          },
-          timestamp: Date.now(),
-          runId: "post-fix",
-        })}\n`
-      );
+      const payload = {
+        sessionId: "f558f7",
+        hypothesisId: "F3",
+        location: "proposalController.js:directorDecision",
+        message: "soft-pass applied (finance excluded)",
+        data: {
+          voluntary: isVoluntaryProposal(proposal),
+          softPass: softPassStages.map((s) => s?.status),
+          finance: pipe.financeReview?.status,
+        },
+        timestamp: Date.now(),
+        runId: "post-fix",
+      };
+      fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
     } catch { /* ignore */ }
     // #endregion
   }
@@ -764,6 +967,39 @@ async function directorDecision(req, res) {
         });
       } catch { /* best-effort */ }
     }
+
+    // Auto-allocate project budget from proposal / grant / call amount
+    try {
+      const { ensureBudgetForProject } = require("../utils/ensureBudgetForProject");
+      const projectDoc =
+        (await Project.findOne({ proposalId: proposal._id })) ||
+        existing ||
+        null;
+      if (projectDoc) {
+        const result = await ensureBudgetForProject(projectDoc, { proposal });
+        // #region agent log
+        try {
+          const payload = {
+            sessionId: "f558f7",
+            hypothesisId: "BA1",
+            location: "proposalController.directorDecision",
+            message: "auto budget allocate on project create",
+            data: {
+              proposalId: String(proposal._id),
+              projectId: String(projectDoc._id),
+              created: result.created,
+              updated: result.updated,
+              amount: result.amount || 0,
+              totalAllocated: result.budget?.totalAllocated || 0,
+            },
+            timestamp: Date.now(),
+            runId: "post-fix",
+          };
+          fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
+        } catch { /* ignore */ }
+        // #endregion
+      }
+    } catch { /* best-effort */ }
   }
 
   const populated = await Proposal.findById(proposal._id).populate("fundingCallId", "title status deadline");

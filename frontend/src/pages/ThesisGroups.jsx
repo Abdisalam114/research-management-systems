@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as thesisApi from "../services/thesisGroupApi";
 import * as userApi from "../services/userApi";
@@ -129,6 +130,7 @@ function titleProposalStatus(g) {
 
 export function ThesisGroupsPage() {
   const { accessToken, user } = useAuth();
+  const { programTier } = useProgramTier();
   const [searchParams] = useSearchParams();
   const groupIdFromUrl = searchParams.get("groupId") || "";
   const [groups, setGroups] = useState([]);
@@ -222,7 +224,7 @@ export function ThesisGroupsPage() {
         // #endregion
       }
     })();
-  }, [accessToken, user?.role]);
+  }, [accessToken, user?.role, programTier]);
 
   const departmentsByFaculty = useMemo(() => {
     const map = {};

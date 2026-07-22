@@ -248,9 +248,10 @@ async function getProject(req, res) {
     const isVoluntary = proposalKind === "voluntary" || (!fundingCallId && proposalKind !== "grant_fund_call");
     let budgetSummary = null;
     try {
-      const { Budget } = require("../models/Budget");
+      const { ensureBudgetForProject } = require("../utils/ensureBudgetForProject");
       const { remainingOf } = require("../utils/budgetDisbursement");
-      const budget = await Budget.findOne(req.tierWhere({ projectId: project._id })).select("totalAllocated totalDisbursed currency");
+      const ensured = await ensureBudgetForProject(project);
+      const budget = ensured.budget;
       if (budget) {
         budgetSummary = {
           totalAllocated: budget.totalAllocated,
@@ -259,6 +260,30 @@ async function getProject(req, res) {
           currency: budget.currency || "USD",
         };
       }
+      // #region agent log
+      try {
+        const fs = require("fs");
+        const path = require("path");
+        fs.appendFileSync(
+          path.join(__dirname, "..", "..", "..", "debug-f558f7.log"),
+          `${JSON.stringify({
+            sessionId: "f558f7",
+            hypothesisId: "BA1",
+            location: "projectController.getProject:finance",
+            message: "ensure budget on project open",
+            data: {
+              projectId: String(id),
+              created: ensured.created,
+              updated: ensured.updated,
+              amount: ensured.amount || 0,
+              totalAllocated: budget?.totalAllocated || 0,
+            },
+            timestamp: Date.now(),
+            runId: "post-fix",
+          })}\n`
+        );
+      } catch (_) { /* debug */ }
+      // #endregion
     } catch (_) { /* optional */ }
 
     // #region agent log
@@ -349,6 +374,50 @@ async function getProject(req, res) {
       amountAwarded: g.amountAwarded, currency: g.currency, fundingSource: g.fundingSource,
     })), canViewAwards, project);
 
+  // Auto-allocate Budget when opening a funded project (proposal/grant amount → totalAllocated)
+  if (!isVoluntary) {
+    try {
+      const { ensureBudgetForProject } = require("../utils/ensureBudgetForProject");
+      const { remainingOf } = require("../utils/budgetDisbursement");
+      const ensured = await ensureBudgetForProject(project, {
+        grant: grantDocs[0] || null,
+      });
+      if (ensured.budget) {
+        out.budgetSummary = {
+          totalAllocated: ensured.budget.totalAllocated,
+          totalDisbursed: ensured.budget.totalDisbursed || 0,
+          remainingBalance: remainingOf(ensured.budget),
+          currency: ensured.budget.currency || "USD",
+          budgetId: String(ensured.budget._id),
+        };
+      }
+      // #region agent log
+      try {
+        const fs = require("fs");
+        const pth = require("path");
+        fs.appendFileSync(
+          pth.join(__dirname, "..", "..", "..", "debug-f558f7.log"),
+          `${JSON.stringify({
+            sessionId: "f558f7",
+            hypothesisId: "BA1",
+            location: "projectController.getProject",
+            message: "ensure budget on project open",
+            data: {
+              projectId: String(id),
+              created: ensured.created,
+              updated: ensured.updated,
+              amount: ensured.amount || 0,
+              totalAllocated: ensured.budget?.totalAllocated || 0,
+            },
+            timestamp: Date.now(),
+            runId: "post-fix",
+          })}\n`
+        );
+      } catch (_) { /* debug */ }
+      // #endregion
+    } catch (_) { /* best-effort */ }
+  }
+
   // #region agent log
   try {
     const p = require("path");
@@ -366,6 +435,7 @@ async function getProject(req, res) {
         grantsVisible: out.grantsVisible,
         linkedGrantCount: out.linkedGrants?.length || 0,
         grantIds: grantDocs.map((g) => String(g._id)),
+        totalAllocated: out.budgetSummary?.totalAllocated || 0,
       },
       timestamp: Date.now(),
     })}\n`;
@@ -894,7 +964,39 @@ async function deleteProject(req, res) {
   const projectId = project._id;
   const title = project.title;
 
-  const budgets = await Budget.find({ projectId }).select("_id");
+  const budgets = await Budget.find({ projectId }).select("_id totalAllocated");
+  const allocatedBudgets = budgets.filter((b) => Number(b.totalAllocated || 0) > 0);
+  if (allocatedBudgets.length) {
+    // #region agent log
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      fs.appendFileSync(
+        path.join(__dirname, "../../..", "debug-f558f7.log"),
+        `${JSON.stringify({
+          sessionId: "f558f7",
+          hypothesisId: "DEL3",
+          location: "projectController.deleteProject",
+          message: "blocked delete — budget allocated",
+          data: {
+            id: String(projectId),
+            allocatedCount: allocatedBudgets.length,
+            amounts: allocatedBudgets.map((b) => Number(b.totalAllocated || 0)),
+          },
+          timestamp: Date.now(),
+          runId: "post-fix",
+        })}\n`
+      );
+    } catch {
+      /* ignore */
+    }
+    // #endregion
+    throw new AppError(
+      "Cannot delete project: Budget allocated is locked system-wide. Allocated budgets cannot be deleted.",
+      400
+    );
+  }
+
   const budgetIds = budgets.map((b) => b._id);
   if (budgetIds.length) {
     await Payment.deleteMany({ budgetId: { $in: budgetIds } });

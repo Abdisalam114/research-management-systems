@@ -47,7 +47,7 @@ Ma jiro akoon gooni ah oo Ethics Committee ama Peer Reviewer. Ethics-ka waxaa an
 
 EN — Job / what they do:
   • Switch Undergraduate / Postgraduate portals
-  • Create and publish internal funding calls
+  • Create and publish funding calls (Internal / External) — no Leadership step
   • Final Approve / Reject on proposals
   • Decide ethics (JUREC) applications
   • Approve purchase orders after Procurement
@@ -56,7 +56,7 @@ EN — Job / what they do:
 
 SO — Shaqada:
   • Beddel portal UG / PG
-  • Abuur / daabaca funding calls gudaha
+  • Abuuri oo daabaca funding calls (Internal / External) — Leadership uma baahna
   • Ansixinta ugu dambeysa ee proposals
   • Go'aanka ethics (JUREC)
   • Ansixinta PO ka dib Procurement
@@ -67,16 +67,16 @@ SO — Shaqada:
 2. University Leadership — leadership@rms.edu / leadership.pg@rms.edu
 
 EN — Job:
-  • Approve / publish funding calls (especially external)
   • Peer review assigned proposals: score 1–5 + comment
   • Open Peer Reviews and Proposals menus
-  • View KPI dashboard
+  • View KPI dashboard and funding calls (read — does not publish calls)
+  • Does NOT approve/publish funding calls
 
 SO — Shaqada:
-  • Ansixi / daabaca funding calls (gaar ahaan external)
   • Peer review: score 1–5 + comment
   • Peer Reviews iyo Proposals
-  • KPI dashboard
+  • KPI dashboard; funding calls wuu arki karaa (ma daabaco)
+  • MA ansixiyo / daabaco funding calls
 
 
 3. Faculty Coordinator — coordinator@rms.edu / coordinator.pg@rms.edu
@@ -165,13 +165,13 @@ SO — Shaqada:
 
 EN — Job:
   • Create external funding call drafts
-  • Wait for Leadership / Director to publish
+  • Wait for Research Director to publish (Leadership not required)
   • Monitor open/closed calls and donor reports
   • Read-only awareness of related grants
 
 SO — Shaqada:
   • Abuuri funding calls dibadda ah (draft)
-  • Sug Leadership / Director publish
+  • Sug Research Director publish (Leadership uma baahna)
   • La soco calls iyo donor reports
   • Arag grants la xiriira
 
@@ -281,20 +281,20 @@ English — Research Director:
   2. Choose Call type: Internal seed grant OR External / donor-funded
   3. Set Eligible researchers: All (UG & PG) / UG only / PG only / PGD
   4. Required documents fill automatically — edit if needed
-  5. Save as draft → Publish (or wait for Leadership approval on external)
+  5. Save as draft → Publish yourself (Leadership is not required)
 
 Somali — Research Director:
   1. Funding Calls → + New funding call
   2. Dooro Internal ama External
   3. Dooro cidda codsan karta: All / UG / PG / PGD
   4. Requirements si otomaatig ah ayaa u buuxsamaan
-  5. Save draft → Publish (ama Leadership ansixiyo external)
+  5. Save draft → Publish adiga (Leadership uma baahna)
 
 English — Donor Agency:
-  • External calls only. Leadership (or Director) must publish before researchers see the call.
+  • External calls only (draft). Research Director publishes — no Leadership step.
 
 Somali — Donor:
-  • External kaliya. Leadership / Director waa inay daabacaan ka hor inta researchers arkaan.
+  • External kaliya (draft). Research Director ayaa daabaca — Leadership uma baahna.
 
 A.2 Researchers apply
 

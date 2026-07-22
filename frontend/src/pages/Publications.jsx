@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as publicationApi from "../services/publicationApi";
@@ -46,6 +47,7 @@ function authorsFromProject(project, user) {
 
 export function PublicationsPage() {
   const { accessToken, user } = useAuth();
+  const { programTier, programTierLabel } = useProgramTier();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const projectIdFromUrl = searchParams.get("projectId") || "";
@@ -58,6 +60,7 @@ export function PublicationsPage() {
   const [busy, setBusy] = useState(false);
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
+  const [successMsg, setSuccessMsg] = useState("");
 
   const canCreate = user?.role === "researcher";
   const canValidate = ["faculty_coordinator", "research_director"].includes(user?.role);
@@ -146,7 +149,7 @@ export function PublicationsPage() {
     }).catch(() => {});
     // #endregion
     setPublications(list);
-  }, [accessToken, projectIdFromUrl, user?.role, user?.id]);
+  }, [accessToken, projectIdFromUrl, user?.role, user?.id, programTier]);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -168,7 +171,7 @@ export function PublicationsPage() {
         }
       })
       .catch(() => setProjects([]));
-  }, [accessToken, canCreate, projectIdFromUrl]);
+  }, [accessToken, canCreate, projectIdFromUrl, programTier]);
 
   // When project is selected, auto-fill title + authors from that project
   useEffect(() => {
@@ -205,7 +208,7 @@ export function PublicationsPage() {
     return () => {
       cancelled = true;
     };
-  }, [form.projectId, accessToken, canCreate, user]);
+  }, [form.projectId, accessToken, canCreate, user, programTier]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
@@ -388,6 +391,11 @@ export function PublicationsPage() {
       {error ? (
         <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>
           {error}
+        </div>
+      ) : null}
+      {successMsg ? (
+        <div className="card" style={{ borderColor: "rgba(34,197,94,0.45)", background: "rgba(34,197,94,0.08)" }}>
+          {successMsg}
         </div>
       ) : null}
 
@@ -673,22 +681,51 @@ export function PublicationsPage() {
                         type="button"
                         className="btn primary"
                         onClick={async () => {
-                          const comment = prompt("Validation comment (required):");
+                          const comment = prompt(
+                            "Validation comment (required) — approve as complete publication:"
+                          );
                           if (!comment) return;
                           try {
                             setError("");
-                            await publicationApi.validatePublication(accessToken, p.id, {
+                            setSuccessMsg("");
+                            const res = await publicationApi.validatePublication(accessToken, p.id, {
                               decision: "validated",
                               comment,
                             });
-                            setStatusFilter("all");
+                            // #region agent log
+                            fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+                              body: JSON.stringify({
+                                sessionId: "f558f7",
+                                hypothesisId: "UG1",
+                                location: "Publications.jsx:approveComplete",
+                                message: "validated from publications page",
+                                data: {
+                                  pubId: p.id,
+                                  programTier,
+                                  status: res?.publication?.status,
+                                  workflowStage: res?.publication?.workflowStage,
+                                  projectCompletion: res?.projectCompletion || null,
+                                },
+                                timestamp: Date.now(),
+                                runId: "pub-validate",
+                              }),
+                            }).catch(() => {});
+                            // #endregion
+                            setStatusFilter("validated");
+                            setSuccessMsg(
+                              res?.projectCompletion?.completed
+                                ? `Publication approved — project marked completed (${programTierLabel} portal).`
+                                : "Publication approved as complete (validated → Published)."
+                            );
                             await reload();
                           } catch (e) {
-                            setError(e?.response?.data?.message || "Failed to validate");
+                            setError(e?.response?.data?.message || "Failed to approve publication");
                           }
                         }}
                       >
-                        Validate
+                        Approve complete publication
                       </button>
                       <button
                         type="button"

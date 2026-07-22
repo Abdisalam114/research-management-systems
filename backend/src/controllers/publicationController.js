@@ -439,11 +439,52 @@ async function submitPublication(req, res) {
 async function validatePublication(req, res) {
   const { id } = req.params;
   const { decision, comment } = req.body || {};
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const payload = {
+      sessionId: "f558f7",
+      hypothesisId: "P1",
+      location: "publicationController.validatePublication",
+      message: "validate entry",
+      data: { pubId: id, decision, reqTier: req.programTier || null, role: req.user.role },
+      timestamp: Date.now(),
+      runId: "pub-validate",
+    };
+    fs.appendFileSync(path.join(__dirname, "../../../debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  } catch (_) { /* debug */ }
+  // #endregion
   if (!comment) throw new AppError("comment is required", 400);
   if (!["validated", "rejected"].includes(decision)) throw new AppError("Invalid decision", 400);
 
   const pub = await Publication.findOne(req.tierWhere({ _id: id }));
-  if (!pub) throw new AppError("Publication not found", 404);
+  if (!pub) {
+    // #region agent log
+    try {
+      const fs = require("fs");
+      const path = require("path");
+      fs.appendFileSync(
+        path.join(__dirname, "../../../debug-f558f7.log"),
+        `${JSON.stringify({
+          sessionId: "f558f7",
+          hypothesisId: "P1",
+          location: "publicationController.validatePublication",
+          message: "publication not found for tier",
+          data: { pubId: id, reqTier: req.programTier || null },
+          timestamp: Date.now(),
+          runId: "pub-validate",
+        })}\n`
+      );
+    } catch (_) { /* debug */ }
+    // #endregion
+    throw new AppError("Publication not found", 404);
+  }
   if (pub.status !== PUBLICATION_STATUSES.SUBMITTED) throw new AppError("Publication is not validation-ready", 400);
 
   pub.status = decision === "validated" ? PUBLICATION_STATUSES.VALIDATED : PUBLICATION_STATUSES.REJECTED;
@@ -468,12 +509,42 @@ async function validatePublication(req, res) {
     }
   }
 
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const payload = {
+      sessionId: "f558f7",
+      hypothesisId: "P2",
+      location: "publicationController.validatePublication",
+      message: "validate saved",
+      data: {
+        pubId: String(pub._id),
+        status: pub.status,
+        workflowStage: pub.workflowStage,
+        projectId: pub.projectId ? String(pub.projectId) : null,
+        projectCompletion,
+        reqTier: req.programTier || null,
+      },
+      timestamp: Date.now(),
+      runId: "pub-validate",
+    };
+    fs.appendFileSync(path.join(__dirname, "../../../debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  } catch (_) { /* debug */ }
+  // #endregion
+
   try {
     await notifyUser(pub.researcherId, {
       type: "publication",
       title: `Publication ${decision === "validated" ? "validated" : "rejected"}`,
       body: pub.title,
       link: pub.projectId ? `/publications?projectId=${pub.projectId}` : "/publications",
+      programTier: req.programTier,
     });
   } catch {
     /* notifications are best-effort */

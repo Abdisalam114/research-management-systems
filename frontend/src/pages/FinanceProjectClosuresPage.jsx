@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
 
@@ -13,6 +14,7 @@ export function FinanceProjectClosuresPage() {
 
 function FinanceClosureList() {
   const { accessToken } = useAuth();
+  const { programTier } = useProgramTier();
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState("");
 
@@ -21,7 +23,7 @@ function FinanceClosureList() {
       .listProjects(accessToken)
       .then((res) => setProjects(res.projects || []))
       .catch((e) => setError(e?.response?.data?.message || "Failed to load closure queue"));
-  }, [accessToken]);
+  }, [accessToken, programTier]);
 
   const awaiting = useMemo(
     () => (projects || []).filter((p) => p.closure?.status === "director_approved"),
@@ -80,6 +82,7 @@ function FinanceClosureList() {
 
 function FinanceClosureDetail({ id }) {
   const { accessToken } = useAuth();
+  const { programTier } = useProgramTier();
   const navigate = useNavigate();
   const [project, setProject] = useState(null);
   const [error, setError] = useState("");
@@ -89,7 +92,7 @@ function FinanceClosureDetail({ id }) {
   const load = useCallback(async () => {
     const res = await projectApi.getProject(accessToken, id);
     setProject(res.project || null);
-  }, [accessToken, id]);
+  }, [accessToken, id, programTier]);
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load closure"));

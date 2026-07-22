@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as departmentApi from "../services/departmentApi";
 import { PageHeader } from "../components/PageHeader";
 import { statFilterLabel } from "../utils/pageHeaderFilters";
@@ -7,6 +8,7 @@ import { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } from "../constants/fac
 
 export function DepartmentsPage() {
   const { accessToken } = useAuth();
+  const { programTier } = useProgramTier();
   const [departments, setDepartments] = useState([]);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", code: "", faculty: FACULTIES[0].value });
@@ -26,8 +28,7 @@ export function DepartmentsPage() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [accessToken, programTier]);
 
   async function submit(e) {
     e.preventDefault();

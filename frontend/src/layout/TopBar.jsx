@@ -39,7 +39,7 @@ export function TopBar({ title = "Dashboard" }) {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [accessToken, user?.id]);
+  }, [accessToken, user?.id, programTier]);
 
   return (
     <header className="topBar">

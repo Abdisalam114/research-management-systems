@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as conversationApi from "../services/conversationApi";
 import "./messages.css";
 
@@ -15,6 +16,7 @@ function formatWhen(at) {
 
 export function MessagesPage() {
   const { accessToken, user } = useAuth();
+  const { programTier } = useProgramTier();
   const [searchParams, setSearchParams] = useSearchParams();
   const [conversations, setConversations] = useState([]);
   const [users, setUsers] = useState([]);
@@ -30,12 +32,12 @@ export function MessagesPage() {
   const loadList = useCallback(async () => {
     const res = await conversationApi.listConversations(accessToken);
     setConversations(res.conversations || []);
-  }, [accessToken]);
+  }, [accessToken, programTier]);
 
   const loadUsers = useCallback(async () => {
     const res = await conversationApi.listMessageableUsers(accessToken);
     setUsers(res.users || []);
-  }, [accessToken]);
+  }, [accessToken, programTier]);
 
   const loadActive = useCallback(
     async (id) => {
@@ -46,8 +48,13 @@ export function MessagesPage() {
       const res = await conversationApi.getConversation(accessToken, id);
       setActive(res.conversation);
     },
-    [accessToken]
+    [accessToken, programTier]
   );
+
+  useEffect(() => {
+    setActiveId("");
+    setActive(null);
+  }, [programTier]);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,13 +68,13 @@ export function MessagesPage() {
       try {
         await loadUsers();
       } catch {
-        /* users list optional for compose — do not wipe inbox */
+        /* users list optional for compose */
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [loadList, loadUsers]);
+  }, [loadList, loadUsers, programTier]);
 
   useEffect(() => {
     loadActive(activeId).catch((e) => setError(e?.response?.data?.message || "Failed to load conversation"));

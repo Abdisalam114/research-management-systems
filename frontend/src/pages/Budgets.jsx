@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as budgetApi from "../services/budgetApi";
@@ -65,6 +66,7 @@ function formatMoney(n, currency = "USD") {
 
 export function BudgetsPage() {
   const { accessToken, user } = useAuth();
+  const { programTier } = useProgramTier();
   const [searchParams] = useSearchParams();
   const projectIdFromUrl = searchParams.get("projectId") || "";
   const projectLocked = Boolean(projectIdFromUrl);
@@ -103,7 +105,7 @@ export function BudgetsPage() {
       .listProjects(accessToken)
       .then((res) => setProjects(res.projects || []))
       .catch(() => setProjects([]));
-  }, [accessToken, isResearcher]);
+  }, [accessToken, isResearcher, programTier]);
 
   useEffect(() => {
     if (!projectIdFromUrl || !accessToken) {
@@ -138,7 +140,7 @@ export function BudgetsPage() {
     return () => {
       cancelled = true;
     };
-  }, [projectIdFromUrl, accessToken]);
+  }, [projectIdFromUrl, accessToken, programTier]);
 
   const load = useCallback(async () => {
     let nextBudgets = [];
@@ -196,7 +198,7 @@ export function BudgetsPage() {
       }),
     }).catch(() => {});
     // #endregion
-  }, [accessToken, canSeeFinanceReport, user?.role]);
+  }, [accessToken, canSeeFinanceReport, user?.role, programTier]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
@@ -591,74 +593,42 @@ export function BudgetsPage() {
 
       {isResearcher ? (
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800 }}>Create budget (link to Grant or Project)</div>
-          <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
-            <div className="row">
-              <div className="field">
-                <label>Grant ID (optional)</label>
-                <input value={newBudget.grantId} onChange={(e) => setNewBudget((s) => ({ ...s, grantId: e.target.value }))} />
-              </div>
-              <div className="field">
-                <label>Research project</label>
-                <select
-                  value={newBudget.projectId}
-                  disabled={projectLocked}
-                  onChange={(e) => setNewBudget((s) => ({ ...s, projectId: e.target.value }))}
-                >
-                  <option value="">Select project…</option>
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.title}
-                    </option>
-                  ))}
-                </select>
-                {projectLocked ? (
-                  <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                    Taken from the project you opened — no manual ID entry.
-                  </div>
-                ) : null}
-              </div>
+          <div style={{ fontWeight: 800 }}>Budget allocated (system-managed)</div>
+          <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+            Total allocated is created automatically from the funding call / grant when the project is approved.
+            It is locked system-wide and cannot be deleted or cleared.
+          </p>
+          {projectLocked && linkedProject?.budgetSummary?.totalAllocated > 0 ? (
+            <div style={{ marginTop: 10, fontWeight: 700 }}>
+              Allocated: {linkedProject.budgetSummary.currency || "USD"}{" "}
+              {Number(linkedProject.budgetSummary.totalAllocated).toLocaleString()}
             </div>
-            <div className="row">
-              <div className="field">
-                <label>Total allocated</label>
-                <input
-                  type="number"
-                  value={newBudget.totalAllocated}
-                  onChange={(e) => setNewBudget((s) => ({ ...s, totalAllocated: Number(e.target.value) }))}
-                />
-              </div>
-              <div className="field">
-                <label>Currency</label>
-                <input value={newBudget.currency} onChange={(e) => setNewBudget((s) => ({ ...s, currency: e.target.value }))} />
-              </div>
-            </div>
+          ) : null}
+          {projectIdFromUrl ? (
             <button
               type="button"
-              className="btn primary"
+              className="btn"
+              style={{ marginTop: 10 }}
               onClick={async () => {
                 try {
                   setError("");
                   await budgetApi.createBudget(accessToken, {
-                    ...newBudget,
+                    projectId: projectIdFromUrl,
                     grantId: newBudget.grantId || null,
-                    projectId: newBudget.projectId || null,
-                  });
-                  setNewBudget({
-                    grantId: "",
-                    projectId: projectIdFromUrl || "",
-                    totalAllocated: 0,
-                    currency: "USD",
                   });
                   await reload();
                 } catch (e) {
-                  setError(e?.response?.data?.message || "Failed to create budget");
+                  setError(e?.response?.data?.message || "Budget allocate failed");
                 }
               }}
             >
-              Create budget
+              Sync allocated from award
             </button>
-          </div>
+          ) : (
+            <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+              Open Budgets from a project to sync allocation if missing.
+            </p>
+          )}
         </div>
       ) : null}
 

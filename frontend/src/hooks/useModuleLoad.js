@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
+import { useProgramTier } from "./useProgramTier";
 
 /** Load module data only when accessToken is ready; avoids 401 race on mount. */
 export function useModuleLoad(accessToken, loader, deps = []) {
+  const { programTier } = useProgramTier();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -19,7 +21,7 @@ export function useModuleLoad(accessToken, loader, deps = []) {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, loader, ...deps]);
+  }, [accessToken, loader, programTier, ...deps]);
 
   useEffect(() => {
     reload();

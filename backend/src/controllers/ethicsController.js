@@ -13,6 +13,7 @@ const {
   renderJurecCertificatePdf,
   JUREC_CHAIRPERSON_OPTIONS,
 } = require("../utils/jurecCertificate");
+const { ensureReviewPipeline, STAGE_STATUS } = require("../utils/proposalReviewPipeline");
 
 function sanitize(a) {
   return {
@@ -94,6 +95,82 @@ function applyPayload(target, payload) {
   }
 }
 
+/** Active portal tier only (Director included). */
+function ethicsScopeFilter(req, base = {}) {
+  return req.tierWhere(base);
+}
+
+async function syncLinkedProposalEthics(proposalId, ethicsStatus, ethicsAppId) {
+  let linked = null;
+  if (proposalId) linked = await Proposal.findById(proposalId);
+  if (!linked && ethicsAppId) {
+    linked = await Proposal.findOne({ ethicsApplicationId: ethicsAppId });
+  }
+  if (!linked) return;
+  linked.ethicsStatus = ethicsStatus;
+  // Director issues JUREC as the ethics committee ù keep stage 3 Committee in sync
+  if (ethicsStatus === PROPOSAL_ETHICS_STATUSES.APPROVED) {
+    const pipe = ensureReviewPipeline(linked);
+    if (
+      pipe.committeeReview?.status === STAGE_STATUS.PENDING ||
+      pipe.committeeReview?.status === STAGE_STATUS.IN_PROGRESS
+    ) {
+      pipe.committeeReview = {
+        status: STAGE_STATUS.PASSED,
+        completedAt: new Date(),
+        completedBy: null,
+        decision: "recommend_approval",
+        comment: "Completed with JUREC ethics approval",
+      };
+      linked.markModified("reviewPipeline");
+    }
+  } else if (ethicsStatus === PROPOSAL_ETHICS_STATUSES.REJECTED) {
+    const pipe = ensureReviewPipeline(linked);
+    if (pipe.committeeReview?.status !== STAGE_STATUS.FAILED) {
+      pipe.committeeReview = {
+        status: STAGE_STATUS.FAILED,
+        completedAt: new Date(),
+        completedBy: null,
+        decision: "reject",
+        comment: "Failed with JUREC ethics rejection",
+      };
+      linked.markModified("reviewPipeline");
+    }
+  }
+  await linked.save();
+  // #region agent log
+  try {
+    const payload = {
+      sessionId: "f558f7",
+      hypothesisId: "H6",
+      location: "ethicsController.syncLinkedProposalEthics",
+      message: "ethics synced to proposal + committee",
+      data: {
+        proposalId: String(linked._id),
+        ethicsStatus,
+        committee: linked.reviewPipeline?.committeeReview?.status || null,
+      },
+      timestamp: Date.now(),
+      runId: "post-fix",
+    };
+    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  } catch (_) { /* debug */ }
+  // #endregion
+  if (ethicsStatus === PROPOSAL_ETHICS_STATUSES.APPROVED) {
+    try {
+      const { notifyFinanceProposalReviewReady } = require("../utils/notifyFinanceProposalReview");
+      await notifyFinanceProposalReviewReady(linked, { force: true });
+    } catch {
+      /* best-effort */
+    }
+  }
+}
+
 async function listEthicsApplications(req, res) {
   const { role, id } = req.user;
   const filter = req.tierWhere({});
@@ -103,7 +180,7 @@ async function listEthicsApplications(req, res) {
 }
 
 async function getEthicsApplication(req, res) {
-  const a = await EthicsApplication.findOne(req.tierWhere({ _id: req.params.id }));
+  const a = await EthicsApplication.findOne(ethicsScopeFilter(req, { _id: req.params.id }));
   if (!a) throw new AppError("Application not found", 404);
   const isOwner = String(a.researcherId) === String(req.user.id);
   const isStaff = ["research_director", "faculty_coordinator"].includes(req.user.role);
@@ -153,6 +230,7 @@ async function submitEthicsApplication(req, res) {
     };
   }
   await a.save();
+  await syncLinkedProposalEthics(a.proposalId, PROPOSAL_ETHICS_STATUSES.PENDING, a._id);
 
   try {
     await notifyUsersByRole("research_director", {
@@ -212,7 +290,7 @@ async function directorDecision(req, res) {
   if (!["approve", "reject"].includes(decision)) {
     throw new AppError("decision must be 'approve' or 'reject'", 400);
   }
-  const a = await EthicsApplication.findOne(req.tierWhere({ _id: req.params.id }));
+  const a = await EthicsApplication.findOne(ethicsScopeFilter(req, { _id: req.params.id }));
   if (!a) throw new AppError("Application not found", 404);
 
   if (req.user.role !== "research_director") throw new AppError("Forbidden", 403);
@@ -231,9 +309,7 @@ async function directorDecision(req, res) {
       signedAt: new Date(),
       rejectionReason: rejectionReason ? String(rejectionReason) : "Rejected by Research Director",
     };
-    if (a.proposalId) {
-      await Proposal.updateOne({ _id: a.proposalId }, { ethicsStatus: PROPOSAL_ETHICS_STATUSES.REJECTED });
-    }
+    await syncLinkedProposalEthics(a.proposalId, PROPOSAL_ETHICS_STATUSES.REJECTED, a._id);
     await a.save();
 
     try {
@@ -249,7 +325,7 @@ async function directorDecision(req, res) {
     return res.json({ message: "Application rejected", application: sanitize(a) });
   }
 
-  // ‚Äî‚Äî APPROVE (Director issues certificate) ‚Äî‚Äî
+  // ù APPROVE (Director issues certificate) ù
   const canIssueCert =
     a.status === ETHICS_STATUSES.SUBMITTED ||
     (a.status === ETHICS_STATUSES.APPROVED && !hasCertificate);
@@ -267,7 +343,7 @@ async function directorDecision(req, res) {
 const issueDate = parseOptionalDate(signedAt, new Date());
   const jurec = await buildJurecApprovalMeta(a, {
     EthicsApplication,
-    tierFilter: req.tierWhere({}),
+    tierFilter: a.programTier ? { programTier: a.programTier } : req.tierWhere({}),
     issueDate,
     reviewedAt: reviewedAt ? parseOptionalDate(reviewedAt, null) : undefined,
   });
@@ -297,9 +373,7 @@ const issueDate = parseOptionalDate(signedAt, new Date());
     displayProjectTitle: projectTitle ? String(projectTitle).trim() : "",
     rejectionReason: "",
   };
-  if (a.proposalId) {
-    await Proposal.updateOne({ _id: a.proposalId }, { ethicsStatus: PROPOSAL_ETHICS_STATUSES.APPROVED });
-  }
+  await syncLinkedProposalEthics(a.proposalId, PROPOSAL_ETHICS_STATUSES.APPROVED, a._id);
   await a.save();
 
   try {
@@ -317,9 +391,9 @@ const issueDate = parseOptionalDate(signedAt, new Date());
 }
 
 async function previewCertificate(req, res) {
-  const a = await EthicsApplication.findOne(req.tierWhere({ _id: req.params.id }));
+  const a = await EthicsApplication.findOne(ethicsScopeFilter(req, { _id: req.params.id }));
   if (!a) throw new AppError("Application not found", 404);
-  // Certificate issuance preview ‚Äî Research Director only
+  // Certificate issuance preview ù Research Director only
   if (req.user.role !== "research_director") {
     throw new AppError("Only the Research Director can preview/issue certificates", 403);
   }
@@ -357,7 +431,7 @@ res.json({
 }
 
 async function downloadCertificate(req, res) {
-  const a = await EthicsApplication.findOne(req.tierWhere({ _id: req.params.id }));
+  const a = await EthicsApplication.findOne(ethicsScopeFilter(req, { _id: req.params.id }));
   if (!a) throw new AppError("Application not found", 404);
   if (a.status !== ETHICS_STATUSES.APPROVED) {
     throw new AppError("Certificate is only available for approved applications", 400);

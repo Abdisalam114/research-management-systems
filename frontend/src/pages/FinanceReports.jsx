@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as analyticsApi from "../services/analyticsApi";
 
 import { PageHeader } from "../components/PageHeader";
 
 export function FinanceReportsPage() {
   const { accessToken } = useAuth();
+  const { programTier } = useProgramTier();
   const [report, setReport] = useState(null);
   const [error, setError] = useState("");
 
@@ -14,7 +16,7 @@ export function FinanceReportsPage() {
       .financeReport(accessToken)
       .then(setReport)
       .catch((e) => setError(e?.response?.data?.message || "Failed to load finance report"));
-  }, [accessToken]);
+  }, [accessToken, programTier]);
 
   if (error) {
     return (

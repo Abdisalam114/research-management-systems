@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
 
 /** Finance-only queue: grant proposals waiting on finance review (not general proposals). */
 export function FinanceProposalReviewsPage() {
   const { accessToken } = useAuth();
+  const { programTier } = useProgramTier();
   const [proposals, setProposals] = useState([]);
   const [error, setError] = useState("");
 
@@ -15,7 +17,7 @@ export function FinanceProposalReviewsPage() {
       .listProposals(accessToken)
       .then((res) => setProposals(res.proposals || []))
       .catch((e) => setError(e?.response?.data?.message || "Failed to load finance review queue"));
-  }, [accessToken]);
+  }, [accessToken, programTier]);
 
   const queue = useMemo(() => {
     return (proposals || []).filter((p) => {
@@ -68,7 +70,11 @@ export function FinanceProposalReviewsPage() {
                   <div className="muted" style={{ fontSize: 13 }}>
                     Grant fund call • {p.department || "—"}
                     {p.researcherName ? ` • PI: ${p.researcherName}` : ""}
-                    {p.budgetTotal ? ` • Requested: ${p.budgetCurrency || "USD"} ${Number(p.budgetTotal).toLocaleString()}` : ""}
+                    {p.budgetTotal || p.requestedAmount || p.fundingCall?.amountCap
+                      ? ` • Requested: ${p.budgetCurrency || p.fundingCall?.currency || "USD"} ${Number(
+                          p.requestedAmount || p.budgetTotal || p.fundingCall?.amountCap || 0
+                        ).toLocaleString()}`
+                      : ""}
                   </div>
                 </div>
                 <Link className="btn primary" to={`/finance/reviews/${p.id}`}>

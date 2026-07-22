@@ -37,12 +37,12 @@ There is no separate Ethics Committee or Peer Reviewer account.
 Ma jiro akoon gooni ah oo Ethics Committee ama Peer Reviewer.
 
 Research Director
-  EN: Portal switch; funding calls; final proposal approve; ethics decide; PO after Procurement; Users/Departments; analytics
-  SO: Portal; funding calls; ansixinta ugu dambeysa; ethics; PO ka dib Procurement; Users; analytics
+  EN: Portal switch; create/publish funding calls (no Leadership); final proposal approve; ethics; PO after Procurement; Users; analytics
+  SO: Portal; abuuri/daabaca funding calls (Leadership uma baahna); ansixinta ugu dambeysa; ethics; PO; Users; analytics
 
 University Leadership
-  EN: Publish funding calls; peer review score 1–5 + comment; KPI
-  SO: Daabaca funding calls; peer review; KPI
+  EN: Peer review score 1–5 + comment; KPI — does NOT publish funding calls
+  SO: Peer review; KPI — MA daabaco funding calls
 
 Faculty Coordinator
   EN: Faculty proposal queue; thesis groups; Validate publications → Published; faculty reports

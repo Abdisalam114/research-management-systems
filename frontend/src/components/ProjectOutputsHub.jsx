@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import * as publicationApi from "../services/publicationApi";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { FacultyResearchWorkflowModule } from "./FacultyResearchWorkflowModule";
 import { publicationTypeLabel } from "../constants/publicationTypes";
 
@@ -15,10 +16,14 @@ export function ProjectOutputsHub({
   canAddOutput = false,
   canDeleteOutput = false,
   departmentLabel = "",
+  onPublicationValidated,
 }) {
+  const { programTier } = useProgramTier();
   const [pubs, setPubs] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+  const [workflowKey, setWorkflowKey] = useState(0);
 
   const load = useCallback(async () => {
     if (!accessToken || !projectId) return;
@@ -37,7 +42,7 @@ export function ProjectOutputsHub({
           hypothesisId: "PH1",
           location: "ProjectOutputsHub.jsx:load",
           message: "project-scoped outputs on project hub",
-          data: { projectId, count: (res.publications || []).length },
+          data: { projectId, count: (res.publications || []).length, programTier },
           timestamp: Date.now(),
         }),
       }).catch(() => {});
@@ -48,7 +53,49 @@ export function ProjectOutputsHub({
     } finally {
       setLoading(false);
     }
-  }, [accessToken, projectId]);
+  }, [accessToken, projectId, programTier]);
+
+  async function approveCompletePublication(pub) {
+    const comment = window.prompt("Validation comment (required) — approve as complete publication:");
+    if (!comment?.trim()) return;
+    setBusyId(pub.id);
+    setError("");
+    try {
+      const res = await publicationApi.validatePublication(accessToken, pub.id, {
+        decision: "validated",
+        comment: comment.trim(),
+      });
+      // #region agent log
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+        body: JSON.stringify({
+          sessionId: "f558f7",
+          hypothesisId: "P3",
+          location: "ProjectOutputsHub.jsx:approveCompletePublication",
+          message: "director validated from project hub",
+          data: {
+            pubId: pub.id,
+            projectId,
+            status: res?.publication?.status || null,
+            workflowStage: res?.publication?.workflowStage || null,
+            projectCompletion: res?.projectCompletion || null,
+            programTier,
+          },
+          timestamp: Date.now(),
+          runId: "pub-validate",
+        }),
+      }).catch(() => {});
+      // #endregion
+      await load();
+      setWorkflowKey((k) => k + 1);
+      onPublicationValidated?.(res);
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to approve publication");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   useEffect(() => {
     load().catch(() => {});
@@ -99,6 +146,29 @@ export function ProjectOutputsHub({
                     {p.workflowStageLabel ? ` • ${p.workflowStageLabel}` : ""}
                   </div>
                 </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignSelf: "start" }}>
+                  {p.status === "validated" ? (
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: "#22c55e",
+                        fontWeight: 700,
+                        alignSelf: "start",
+                      }}
+                    >
+                      ✓ Complete publication approved
+                    </span>
+                  ) : null}
+                  {canManage && p.status === "submitted" ? (
+                    <button
+                      type="button"
+                      className="btn primary"
+                      disabled={busyId === p.id}
+                      onClick={() => approveCompletePublication(p)}
+                    >
+                      {busyId === p.id ? "…" : "Approve complete publication"}
+                    </button>
+                  ) : null}
                 {canDeleteOutput &&
                 (p.status === "draft" || p.status === "rejected" || canManage) ? (
                   <button
@@ -120,6 +190,7 @@ export function ProjectOutputsHub({
                     Delete
                   </button>
                 ) : null}
+                </div>
               </div>
             </div>
           ))}
@@ -127,6 +198,7 @@ export function ProjectOutputsHub({
       </div>
 
       <FacultyResearchWorkflowModule
+        key={workflowKey}
         accessToken={accessToken}
         departmentLabel={departmentLabel || "This project"}
         canManage={canManage}

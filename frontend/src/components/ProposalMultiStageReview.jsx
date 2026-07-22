@@ -17,7 +17,11 @@ function StageBadge({ status }) {
 
 function reviewerRefId(ref) {
   if (ref == null) return "";
-  if (typeof ref === "object") return String(ref._id || ref.id || "");
+  if (typeof ref === "object") {
+    if (ref._id != null) return String(ref._id);
+    if (typeof ref.id === "string" || typeof ref.id === "number") return String(ref.id);
+    return String(ref);
+  }
   return String(ref);
 }
 
@@ -33,6 +37,9 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
 
   const pipe = proposal.reviewPipeline || {};
   const stage = proposal.currentReviewStage || "admin_screening";
+  // #region agent log
+  fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'H4',location:'ProposalMultiStageReview.jsx:render',message:'UI pipeline statuses',data:{proposalId:proposal?.id,role:user?.role,stage,admin:pipe.adminScreening?.status||null,peer:pipe.peerReview?.status||null,committee:pipe.committeeReview?.status||null,peerReviewCount:(proposal.peerReviews||[]).length,showCommitteeButtons:Boolean((user?.role==='research_director'||user?.role==='faculty_coordinator')&&pipe.peerReview?.status==='passed'&&pipe.committeeReview?.status==='pending')},timestamp:Date.now(),runId:'pre-fix'})}).catch(()=>{});
+  // #endregion
   const isDirector = user?.role === "research_director";
   const isCoordinator = user?.role === "faculty_coordinator";
   const isFinance = user?.role === "finance_officer";
@@ -78,10 +85,19 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
     setErr("");
     setAssignMsg("");
     try {
-      await fn();
+      // #region agent log
+      fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'H5',location:'ProposalMultiStageReview.jsx:run',message:'action starting',data:{proposalId:proposal?.id,peerBefore:proposal?.reviewPipeline?.peerReview?.status||null,committeeBefore:proposal?.reviewPipeline?.committeeReview?.status||null},timestamp:Date.now(),runId:'pre-fix'})}).catch(()=>{});
+      // #endregion
+      const result = await fn();
+      // #region agent log
+      fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'H5',location:'ProposalMultiStageReview.jsx:run',message:'action ok before reload',data:{proposalId:proposal?.id,apiCommittee:result?.proposal?.reviewPipeline?.committeeReview?.status||null,apiPeer:result?.proposal?.reviewPipeline?.peerReview?.status||null,apiMsg:result?.message||null},timestamp:Date.now(),runId:'pre-fix'})}).catch(()=>{});
+      // #endregion
       setComment("");
       await onReload();
     } catch (e) {
+      // #region agent log
+      fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'H2',location:'ProposalMultiStageReview.jsx:run',message:'action failed',data:{proposalId:proposal?.id,err:e?.response?.data?.message||e?.message||'fail',status:e?.response?.status||null},timestamp:Date.now(),runId:'pre-fix'})}).catch(()=>{});
+      // #endregion
       setErr(e?.response?.data?.message || "Action failed");
     } finally {
       setBusy(false);

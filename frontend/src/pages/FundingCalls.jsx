@@ -254,13 +254,12 @@ export function FundingCallsPage() {
 
   function canPublishCall(call) {
     if (call.status !== "draft") return false;
-    if (isLeadership || isDirector) return true;
-    return false;
+    return isDirector;
   }
 
   function canCloseCall(call) {
     if (call.status !== "open") return false;
-    if (isLeadership || isDirector) return true;
+    if (isDirector) return true;
     if (isDonor && call.callType === "external" && String(call.createdBy) === String(user?.id)) return true;
     return false;
   }
@@ -303,8 +302,8 @@ export function FundingCallsPage() {
         await fundingCallApi.createFundingCall(accessToken, payload);
         setMessage(
           resolvedType === "external"
-            ? "External funding call draft saved. Publish or wait for Leadership approval."
-            : "Funding call draft saved. Publish or wait for Leadership approval."
+            ? "External funding call draft saved. Research Director can Publish (no Leadership step)."
+            : "Funding call draft saved. Click Publish when ready — Leadership is not required."
         );
       }
       resetForm();
@@ -321,11 +320,7 @@ export function FundingCallsPage() {
     setError("");
     try {
 await fundingCallApi.publishFundingCall(accessToken, id);
-      setMessage(
-        isLeadership
-          ? "Funding call approved and published — eligible researchers have been notified."
-          : "Funding call published — eligible researchers have been notified."
-      );
+      setMessage("Funding call published — eligible researchers have been notified.");
       await reload();
     } catch (err) {
       setError(err?.response?.data?.message || "Publish failed.");
@@ -351,14 +346,14 @@ await fundingCallApi.publishFundingCall(accessToken, id);
   const pendingFinanceCount = acceptedGrants.filter((g) => g.status === "pending_finance").length;
 
   const subtitle = isDonor
-    ? "Create external (donor) funding calls only. Leadership approves before researchers can apply."
+    ? "Create external (donor) funding call drafts. Research Director publishes — Leadership is not required."
     : isLeadership
-      ? "Approve draft funding calls for publication, and close open calls when needed."
+      ? "View funding calls. Peer review is under Proposals / Peer Reviews (you do not publish calls)."
       : isDirector
-        ? "Create Internal or External funding calls. Choose eligible researchers (UG / PG / all)."
+        ? "Create and Publish Internal or External funding calls yourself — no Leadership approval needed."
         : isResearcher
           ? "Open calls to apply. Accepted applications stay visible here (and under Grants → Awarded)."
-          : "Publish institutional grant opportunities. Researchers apply only through an open call (Phase 1).";
+          : "Open institutional grant opportunities. Researchers apply through an open call.";
 
   return (
     <div className="fundingCallsPage">
@@ -520,8 +515,8 @@ await fundingCallApi.publishFundingCall(accessToken, id);
               </h3>
               <p className="fundingCallFormSub muted">
                 {isDonor
-                  ? "External calls are saved as draft until Leadership approves and publishes them."
-                  : "Choose Internal or External. Requirements are filled automatically — edit if needed."}
+                  ? "External calls are saved as draft. Research Director publishes them (no Leadership step)."
+                  : "Choose Internal or External. Save draft, then Publish yourself — Leadership is not required."}
               </p>
             </div>
             <span className="fundingCallStatus fundingCallStatusDraft">Draft</span>
@@ -690,8 +685,8 @@ await fundingCallApi.publishFundingCall(accessToken, id);
             </button>
             <span className="muted" style={{ fontSize: 12 }}>
               {isDonor
-                ? "Leadership will be notified to approve this external call."
-                : "Publishing notifies eligible researchers in this portal."}
+                ? "Director will be notified to Publish this external call."
+                : "After Save, click Publish call — Leadership is not needed."}
             </span>
           </div>
         </form>
@@ -783,7 +778,7 @@ await fundingCallApi.publishFundingCall(accessToken, id);
                 ) : null}
                 {canPublishCall(c) ? (
                   <button type="button" className="btn primary" disabled={busy} onClick={() => publish(c.id)}>
-                    {isLeadership ? "Approve & publish" : "Publish call"}
+                    Publish call
                   </button>
                 ) : null}
                 {canCloseCall(c) ? (
@@ -865,11 +860,11 @@ await fundingCallApi.publishFundingCall(accessToken, id);
             <div style={{ fontWeight: 800 }}>No funding calls yet</div>
             <p className="muted" style={{ marginTop: 8, fontSize: 14 }}>
               {isDirector
-                ? "Create your first funding call (Internal or External)."
+                ? "Create your first funding call (Internal or External), then Publish."
                 : isDonor
-                  ? "Create an external funding call draft for Leadership to approve."
+                  ? "Create an external funding call draft — Director publishes it."
                   : isLeadership
-                    ? "When Director or Donor saves a draft, approve it here to open applications."
+                    ? "Funding calls are published by the Research Director. Your peer-review work is under Peer Reviews."
                     : "When the Research Office publishes a call, it will appear here for application."}
             </p>
             {canCreate ? (

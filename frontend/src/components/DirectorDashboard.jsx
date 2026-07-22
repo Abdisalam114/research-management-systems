@@ -14,6 +14,7 @@ import {
   Bar,
 } from "recharts";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as analyticsApi from "../services/analyticsApi";
 import { InstitutionalAnalyticsSections } from "./InstitutionalAnalyticsSections";
 import { FacultyAnalyticsSection } from "./FacultyAnalyticsSection";
@@ -33,6 +34,7 @@ function formatMoney(n) {
 
 export function DirectorDashboard() {
   const { accessToken } = useAuth();
+  const { programTier } = useProgramTier();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [downloadingPdf, setDownloadingPdf] = useState(false);
@@ -79,7 +81,7 @@ export function DirectorDashboard() {
       cancelled = true;
       clearInterval(t);
     };
-  }, [accessToken]);
+  }, [accessToken, programTier]);
 
   const pieData = useMemo(() => {
     if (!data) return [];

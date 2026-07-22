@@ -22,7 +22,7 @@ const emptyForm = {
 
 export function PendingUsersPage() {
   const { accessToken } = useAuth();
-  const { programTierLabel } = useProgramTier();
+  const { programTier, programTierLabel } = useProgramTier();
   const [pending, setPending] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [form, setForm] = useState(emptyForm);
@@ -53,8 +53,7 @@ export function PendingUsersPage() {
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load users"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [accessToken, programTier]);
 
   async function handleCreate(e) {
     e.preventDefault();

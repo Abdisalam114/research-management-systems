@@ -19,15 +19,15 @@ Open the app at http://localhost:5173 after starting backend (:5000) and fronten
 There is no separate Ethics Committee or Peer Reviewer login. Ethics = Research Director. Peer review = University Leadership.
 
 Research Director (director@rms.edu)
-  • Switch UG/PG portals; create/publish internal funding calls
+  • Switch UG/PG portals; create/publish funding calls (no Leadership step)
   • Final Approve/Reject proposals; decide ethics (JUREC)
   • Approve POs after Procurement; manage Users & Departments
   • Analytics, KPI, audit trail
 
 University Leadership (leadership@ / leadership.pg@)
-  • Approve/publish funding calls
   • Peer review: score 1–5 + comment on assigned proposals
   • Peer Reviews + Proposals menus; KPI
+  • Does NOT publish funding calls
 
 Faculty Coordinator (coordinator@ / coordinator.pg@)
   • Faculty proposal queue; thesis groups (min 4 students), titles, supervisors
@@ -79,7 +79,7 @@ Do not use ethics@ or reviewer@ — those roles were removed.
 
 Director creates Internal or External calls. Required documents auto-fill. Choose eligibility (UG / PG / all / PGD).
 
-Leadership or Director publishes → eligible researchers get notifications with a direct link to the call.
+Director publishes the call themselves — Leadership is not required. Eligible researchers get notifications with a direct link.
 
 Researcher: Funding Calls → Apply via this call.
 

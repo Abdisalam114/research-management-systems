@@ -256,7 +256,7 @@ async function listGrants(req, res) {
   // Prefer linking legacy grants to calls (seed data often missing callId)
   try {
     const { linkGrantsMissingCallId } = require("../utils/linkGrantsToFundingCalls");
-    await linkGrantsMissingCallId();
+    await linkGrantsMissingCallId(req.programTier);
   } catch {
     /* best-effort */
   }

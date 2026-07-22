@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { DirectorDashboard } from "../components/DirectorDashboard";
 import { FinanceDashboard } from "../components/FinanceDashboard";
 import { CoordinatorDashboardPage } from "./CoordinatorDashboard";
@@ -11,6 +12,7 @@ import "./dashboard.css";
 
 function RoleDashboard({ role, user }) {
   const { accessToken } = useAuth();
+  const { programTier } = useProgramTier();
   const [metrics, setMetrics] = useState(null);
   const [error, setError] = useState("");
 
@@ -27,7 +29,7 @@ function RoleDashboard({ role, user }) {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, programTier]);
 
   const roleHints = {
     faculty_coordinator: { title: "Department (Faculty Coordinator)", focus: "Support and approve internal department priority." },

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as proposalApi from "../services/proposalApi";
 import * as ethicsApi from "../services/ethicsApi";
 import { ProposalEthicsReviewPanel } from "../components/ProposalEthicsReviewPanel";
@@ -11,6 +12,7 @@ import { apiOrigin } from "../config/apiBase";
 export function ProposalReviewPage() {
   const { id } = useParams();
   const { accessToken, user } = useAuth();
+  const { programTier } = useProgramTier();
   const [proposal, setProposal] = useState(null);
   const [ethics, setEthics] = useState(null);
   const [comment, setComment] = useState("");
@@ -43,20 +45,65 @@ export function ProposalReviewPage() {
 
   async function load() {
     setError("");
-    const res = await proposalApi.getProposal(accessToken, id);
-    setProposal(res.proposal);
-    if (res.proposal?.requiresEthics) {
-      const eth = await proposalApi.getProposalEthicsApplication(accessToken, id);
-      setEthics(eth.application);
-    } else {
-      setEthics(null);
+    try {
+      const res = await proposalApi.getProposal(accessToken, id);
+      // #region agent log
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+        body: JSON.stringify({
+          sessionId: "f558f7",
+          hypothesisId: "H3",
+          location: "ProposalReview.jsx:load",
+          message: "proposal reloaded in UI",
+          data: {
+            proposalId: id,
+            programTier,
+            peer: res.proposal?.reviewPipeline?.peerReview?.status || null,
+            committee: res.proposal?.reviewPipeline?.committeeReview?.status || null,
+            stage: res.proposal?.currentReviewStage || null,
+            status: res.proposal?.status || null,
+          },
+          timestamp: Date.now(),
+          runId: "complete-debug",
+        }),
+      }).catch(() => {});
+      // #endregion
+      setProposal(res.proposal);
+      if (res.proposal?.requiresEthics) {
+        const eth = await proposalApi.getProposalEthicsApplication(accessToken, id);
+        setEthics(eth.application);
+      } else {
+        setEthics(null);
+      }
+    } catch (e) {
+      // #region agent log
+      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+        body: JSON.stringify({
+          sessionId: "f558f7",
+          hypothesisId: "H4",
+          location: "ProposalReview.jsx:load",
+          message: "proposal reload failed",
+          data: {
+            proposalId: id,
+            programTier,
+            err: e?.response?.data?.message || e?.message || "fail",
+            httpStatus: e?.response?.status || null,
+          },
+          timestamp: Date.now(),
+          runId: "complete-debug",
+        }),
+      }).catch(() => {});
+      // #endregion
+      throw e;
     }
   }
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load proposal"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, accessToken, programTier]);
 
   useEffect(() => {
     setSelected((prev) => prev || actions[0]?.id || "");

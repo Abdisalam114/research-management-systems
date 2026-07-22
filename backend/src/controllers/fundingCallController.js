@@ -245,14 +245,23 @@ async function createFundingCall(req, res) {
     programTier: portalTier,
   });
 
-  try {
-    await notifyUsersByRole("leadership", {
-      type: "grant",
-      title: "Funding call awaiting approval",
-      body: `${call.title} (${resolvedType}) — ready for Leadership to approve/publish`,
-      link: `/funding-calls?callId=${call._id}`,
-    }, portalTier);
-  } catch { /* best-effort */ }
+  // Donor drafts notify Director to publish — Leadership is not required for funding calls
+  if (role === "donor_agency") {
+    try {
+      await notifyUsersByRole(
+        "research_director",
+        {
+          type: "grant",
+          title: "External funding call draft ready",
+          body: `${call.title} — open Funding Calls and Publish when ready (no Leadership step).`,
+          link: `/funding-calls?callId=${call._id}`,
+        },
+        portalTier
+      );
+    } catch {
+      /* best-effort */
+    }
+  }
 
   res.status(201).json({ call: sanitizeCall(call) });
 }
@@ -266,10 +275,8 @@ async function updateFundingCall(req, res) {
   if (role === "donor_agency") {
     if (call.callType !== "external") throw new AppError("Donors may only edit external funding calls", 403);
     if (!isCallOwner(call, req.user.id)) throw new AppError("You can only edit funding calls you created", 403);
-  } else if (role === "research_director") {
-    // Director may edit internal or external institutional drafts
-  } else if (role !== "leadership") {
-    throw new AppError("Forbidden", 403);
+  } else if (role !== "research_director") {
+    throw new AppError("Only Research Director or the donor owner can edit draft funding calls", 403);
   }
 
   const fields = ["title", "description", "fundingSource", "donorRef", "amountCap", "currency", "deadline", "eligibilityTier", "requiredDocuments", "callType"];
@@ -301,16 +308,14 @@ async function updateFundingCall(req, res) {
   res.json({ call: sanitizeCall(call) });
 }
 
-/** Leadership (and Director for internal) approve & publish a draft call */
+/** Research Director publishes draft calls (Leadership is not required). */
 async function publishFundingCall(req, res) {
   const call = await FundingCall.findOne(req.tierWhere({ _id: req.params.id }));
   if (!call) throw new AppError("Funding call not found", 404);
   if (call.status !== CALL_STATUSES.DRAFT) throw new AppError("Only draft calls can be published", 400);
 
-  const role = req.user.role;
-  const canPublish = role === "leadership" || role === "research_director";
-  if (!canPublish) {
-    throw new AppError("Only Leadership or Research Director can publish funding calls", 403);
+  if (req.user.role !== "research_director") {
+    throw new AppError("Only Research Director can publish funding calls", 403);
   }
 
   call.status = CALL_STATUSES.OPEN;
@@ -347,7 +352,7 @@ async function publishFundingCall(req, res) {
     if (call.createdBy) {
       await notifyUser(call.createdBy, {
         type: "grant",
-        title: "Funding call approved & published",
+        title: "Funding call published",
         body: call.title,
         link: callLink,
         programTier: call.programTier || req.programTier,
@@ -359,14 +364,14 @@ async function publishFundingCall(req, res) {
     entityType: "funding_call",
     entityId: call._id,
     action: "published",
-    label: "Funding call approved/published",
+    label: "Funding call published",
     detail: call.title,
     actorId: req.user.id,
     actorRole: req.user.role,
     programTier: call.programTier || req.programTier,
   });
 
-  res.json({ message: "Funding call approved and published", call: sanitizeCall(call) });
+  res.json({ message: "Funding call published", call: sanitizeCall(call) });
 }
 
 async function closeFundingCall(req, res) {
@@ -376,7 +381,6 @@ async function closeFundingCall(req, res) {
 
   const role = req.user.role;
   const allowed =
-    role === "leadership" ||
     role === "research_director" ||
     (role === "donor_agency" && call.callType === "external" && isCallOwner(call, req.user.id));
   if (!allowed) throw new AppError("Forbidden", 403);

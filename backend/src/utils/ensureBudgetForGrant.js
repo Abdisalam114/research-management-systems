@@ -20,8 +20,10 @@ async function ensureBudgetForGrant(grant) {
   if (existing) {
     let changed = false;
     if (Number(existing.totalAllocated || 0) !== awarded) {
-      existing.totalAllocated = awarded;
-      changed = true;
+      if (!(Number(existing.totalAllocated || 0) > 0 && awarded < Number(existing.totalAllocated || 0))) {
+        existing.totalAllocated = awarded;
+        changed = true;
+      }
     }
     if (grant.projectId && String(existing.projectId || "") !== String(grant.projectId)) {
       existing.projectId = grant.projectId;

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import * as publicationApi from "../services/publicationApi";
 import { PageHeader } from "./PageHeader";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { statFilterLabel } from "../utils/pageHeaderFilters";
 import { FACULTY_WORKFLOW_STAGES, nextWorkflowStage, workflowStageMeta } from "../constants/facultyWorkflow";
 import { publicationTypeLabel } from "../constants/publicationTypes";
@@ -15,6 +16,7 @@ export function FacultyResearchWorkflowModule({
   embedded = false,
   projectId: projectIdProp = "",
 }) {
+  const { programTier } = useProgramTier();
   const [searchParams] = useSearchParams();
   const projectIdFromUrl = projectIdProp || searchParams.get("projectId") || "";
   const [data, setData] = useState(null);
@@ -54,7 +56,7 @@ export function FacultyResearchWorkflowModule({
       }),
     }).catch(() => {});
     // #endregion
-  }, [accessToken, projectIdFromUrl, projectIdProp]);
+  }, [accessToken, projectIdFromUrl, projectIdProp, programTier]);
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load faculty workflow"));

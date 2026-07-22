@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as analyticsApi from "../services/analyticsApi";
 import { PageHeader } from "../components/PageHeader";
 
 export function DonorReportsPage() {
   const { accessToken, user } = useAuth();
+  const { programTier } = useProgramTier();
   const isDonor = user?.role === "donor_agency";
   const [report, setReport] = useState(null);
   const [error, setError] = useState("");
@@ -14,7 +16,7 @@ export function DonorReportsPage() {
       .donorReport(accessToken)
       .then(setReport)
       .catch((e) => setError(e?.response?.data?.message || "Failed to load donor report"));
-  }, [accessToken]);
+  }, [accessToken, programTier]);
 
   if (error) {
     return (

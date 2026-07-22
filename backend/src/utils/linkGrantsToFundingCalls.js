@@ -48,18 +48,22 @@ function debugLog(message, data) {
 /**
  * Link legacy/seed grants that have no callId to a FundingCall with a matching title + tier.
  */
-async function linkGrantsMissingCallId() {
+async function linkGrantsMissingCallId(programTier) {
   // Missing / null callId only (do not query "" — ObjectId cast fails)
-  const unlinked = await Grant.find({
+  const unlinkedFilter = {
     $or: [{ callId: null }, { callId: { $exists: false } }],
-  }).select("_id title programTier callId");
+  };
+  if (programTier) unlinkedFilter.programTier = programTier;
+
+  const unlinked = await Grant.find(unlinkedFilter).select("_id title programTier callId");
 
   if (!unlinked.length) {
     debugLog("no unlinked grants", { count: 0 });
     return { linked: 0 };
   }
 
-  const calls = await FundingCall.find({}).select("_id title programTier");
+  const callFilter = programTier ? { programTier } : {};
+  const calls = await FundingCall.find(callFilter).select("_id title programTier");
   let linked = 0;
   const samples = [];
   const unmatched = [];
@@ -67,8 +71,10 @@ async function linkGrantsMissingCallId() {
   for (const grant of unlinked) {
     const sameTier = calls.filter((c) => String(c.programTier) === String(grant.programTier));
     let match = sameTier.find((c) => titlesMatch(grant.title, c.title));
-    // Fallback: title match across tiers (seed titles often shared)
-    if (!match) match = calls.find((c) => titlesMatch(grant.title, c.title));
+    // Same portal only — never link UG grant to PG call (or vice versa)
+    if (!match && !programTier) {
+      match = calls.find((c) => titlesMatch(grant.title, c.title));
+    }
     if (!match) {
       if (unmatched.length < 8) unmatched.push(grant.title);
       continue;

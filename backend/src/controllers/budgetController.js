@@ -112,10 +112,10 @@ async function getBudget(req, res) {
 }
 
 async function createBudget(req, res) {
-  let { grantId, projectId, totalAllocated, currency } = req.body || {};
+  let { grantId, projectId } = req.body || {};
   if (!grantId && !projectId) throw new AppError("grantId or projectId is required", 400);
 
-  // If grantId provided, ensure it exists and belongs to owner (or staff creating on behalf—kept simple: researcher only).
+  // Manual totalAllocated is not accepted — allocation is system-managed from grant/proposal/call.
   if (grantId) {
     const grant = await Grant.findOne(req.tierWhere({ _id: grantId }));
     if (!grant) throw new AppError("Grant not found", 404);
@@ -128,23 +128,62 @@ async function createBudget(req, res) {
     }
   }
 
-  if (projectId) {
-    const project = await Project.findOne(req.tierWhere({ _id: projectId, researcherId: req.user.id }));
-    if (!project) throw new AppError("Research project not found", 404);
-  } else if (grantId) {
-    throw new AppError("projectId is required when linking a budget to a grant", 400);
+  if (!projectId) {
+    throw new AppError("projectId is required — budgets are auto-allocated on the project", 400);
   }
 
-  const budget = await Budget.create(req.tierAssign({
-    grantId: grantId || null,
-    projectId: projectId || null,
-    ownerResearcherId: req.user.id,
-    totalAllocated: typeof totalAllocated === "number" && totalAllocated >= 0 ? totalAllocated : 0,
-    currency: currency ? String(currency).trim().toUpperCase() : "USD",
-    items: [],
-  }));
+  const project = await Project.findOne(req.tierWhere({ _id: projectId, researcherId: req.user.id }));
+  if (!project) throw new AppError("Research project not found", 404);
 
-  res.status(201).json({ budget: sanitizeBudget(budget) });
+  const existing = await Budget.findOne(req.tierWhere({ projectId: project._id }));
+  if (existing && Number(existing.totalAllocated || 0) > 0) {
+    throw new AppError(
+      "This project already has a locked Budget allocated. It cannot be recreated or deleted.",
+      400
+    );
+  }
+
+  const { ensureBudgetForProject } = require("../utils/ensureBudgetForProject");
+  const grant = grantId ? await Grant.findOne(req.tierWhere({ _id: grantId })) : null;
+  const result = await ensureBudgetForProject(project, { grant });
+  if (!result.budget || !(Number(result.budget.totalAllocated || 0) > 0)) {
+    throw new AppError(
+      "No award amount available to allocate. Budget allocated is created automatically from the funding call / grant.",
+      400
+    );
+  }
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    fs.appendFileSync(
+      path.join(__dirname, "..", "..", "..", "debug-f558f7.log"),
+      `${JSON.stringify({
+        sessionId: "f558f7",
+        hypothesisId: "DEL3",
+        location: "budgetController.createBudget",
+        message: "system allocate only (no manual totalAllocated)",
+        data: {
+          projectId: String(project._id),
+          created: result.created,
+          totalAllocated: result.budget.totalAllocated,
+        },
+        timestamp: Date.now(),
+        runId: "post-fix",
+      })}\n`
+    );
+  } catch {
+    /* ignore */
+  }
+  // #endregion
+
+  res.status(result.created ? 201 : 200).json({
+    message: result.created
+      ? "Budget allocated automatically from award amount"
+      : "Budget allocated already exists (locked)",
+    budget: sanitizeBudget(result.budget),
+  });
 }
 
 async function addBudgetItem(req, res) {

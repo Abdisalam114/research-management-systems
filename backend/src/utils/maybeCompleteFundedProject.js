@@ -16,6 +16,15 @@ function normalize(s) {
     .replace(/\s+/g, " ");
 }
 
+/** Project title vs output title — exact or contained (UG/PG: "CPU Scheduling" / "CPU Scheduling output test"). */
+function titlesAlign(projectTitle, pubTitle) {
+  const a = normalize(projectTitle);
+  const b = normalize(pubTitle);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  return b.includes(a) || a.includes(b);
+}
+
 function isFundingNamedTitle(title) {
   return /\b(fund|grant|award|fellowship|scholarship|challenge|call|seed)\b/i.test(title || "");
 }
@@ -88,7 +97,14 @@ async function maybeCompleteFundedProject(projectId) {
     Grant.findOne({
       projectId: project._id,
       amountAwarded: { $gt: 0 },
-      status: { $in: [GRANT_STATUSES.ACTIVE, GRANT_STATUSES.APPROVED, GRANT_STATUSES.CLOSED] },
+      status: {
+        $in: [
+          GRANT_STATUSES.ACTIVE,
+          GRANT_STATUSES.APPROVED,
+          GRANT_STATUSES.CLOSED,
+          GRANT_STATUSES.PENDING_FINANCE,
+        ],
+      },
     }),
     project.proposalId ? Proposal.findById(project.proposalId).select("proposalKind fundingCallId") : null,
   ]);
@@ -112,7 +128,7 @@ async function maybeCompleteFundedProject(projectId) {
     if (isFundingNamedTitle(project.title)) {
       return { skipped: true, reason: "funding_named_project_blocked" };
     }
-    if (normalize(project.title) !== normalize(pub.title)) {
+    if (!titlesAlign(project.title, pub.title)) {
       debugLog("C2", "voluntary skip — title mismatch", {
         projectId: String(project._id),
         projectTitle: project.title,
@@ -134,15 +150,32 @@ async function maybeCompleteFundedProject(projectId) {
     return { completed: true, kind: "voluntary", projectId: String(project._id) };
   }
 
-  // --- Funded: pub + repo + matching grant title ---
+  // --- Funded: pub + repo + awarded grant + matching project/output title ---
   if (!pub || !repo || !grant) {
+    debugLog("CARE3", "funded skip — missing piece", {
+      projectId: String(project._id),
+      hasPub: Boolean(pub),
+      pubFinished: publicationLooksFinished(pub),
+      hasRepo: Boolean(repo),
+      hasGrant: Boolean(grant),
+      grantStatus: grant?.status || null,
+    });
     return { skipped: true, reason: "missing_outputs_or_grant" };
   }
   if (isFundingNamedTitle(project.title)) {
     return { skipped: true, reason: "funding_named_project_blocked" };
   }
-  if (normalize(project.title) !== normalize(grant.title)) {
-    return { skipped: true, reason: "title_mismatch_seed_safe" };
+  if (!publicationLooksFinished(pub)) {
+    debugLog("CARE3", "funded skip — publication not finished", {
+      projectId: String(project._id),
+      pubStatus: pub?.status || null,
+      workflowStage: pub?.workflowStage || null,
+    });
+    return { skipped: true, reason: "publication_not_finished" };
+  }
+  // Match research output title to project (grant/call title is often the seed fund name)
+  if (!titlesAlign(project.title, pub.title)) {
+    return { skipped: true, reason: "title_mismatch_project_pub" };
   }
 
   await markProjectCompleted(
@@ -159,6 +192,7 @@ async function maybeCompleteFundedProject(projectId) {
     projectId: String(project._id),
     grantId: String(grant._id),
     title: project.title,
+    programTier: project.programTier || null,
   });
 
   return { completed: true, kind: "funded", projectId: String(project._id), grantId: String(grant._id) };

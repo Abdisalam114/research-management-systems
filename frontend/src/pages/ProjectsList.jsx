@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
@@ -135,6 +136,7 @@ export function ProjectsListPage({
   showExtraActions = true,
 } = {}) {
   const { accessToken, user } = useAuth();
+  const { programTier } = useProgramTier();
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
@@ -190,8 +192,7 @@ export function ProjectsListPage({
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load projects"));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [accessToken, programTier]);
 
   const title =
     pageTitle || (user?.role === "researcher" ? "My Projects" : "Projects");
