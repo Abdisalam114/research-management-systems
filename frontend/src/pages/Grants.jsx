@@ -5,36 +5,8 @@ import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as grantApi from "../services/grantApi";
 import { PageHeader } from "../components/PageHeader";
+import { StatusBadge } from "../components/StatusBadge";
 import { filterByStatKey, isAwardedItem, statFilterLabel } from "../utils/pageHeaderFilters";
-
-const GRANT_STATUS_STYLES = {
-  draft: { bg: "rgba(148,163,184,0.2)", color: "#cbd5e1", label: "Draft" },
-  submitted: { bg: "rgba(56,189,248,0.2)", color: "#7dd3fc", label: "Submitted" },
-  pending_finance: { bg: "rgba(251,191,36,0.2)", color: "#fcd34d", label: "Pending finance" },
-  approved: { bg: "rgba(29,78,216,0.25)", color: "#93c5fd", label: "Approved" },
-  active: { bg: "rgba(34,197,94,0.2)", color: "#86efac", label: "Awarded" },
-  rejected: { bg: "rgba(239,68,68,0.2)", color: "#fca5a5", label: "Rejected" },
-  closed: { bg: "rgba(100,116,139,0.25)", color: "#94a3b8", label: "Closed" },
-};
-
-function GrantStatusBadge({ status }) {
-  const s = GRANT_STATUS_STYLES[status] || { bg: "rgba(148,163,184,0.2)", color: "#cbd5e1", label: status };
-  return (
-    <span
-      style={{
-        background: s.bg,
-        color: s.color,
-        padding: "3px 10px",
-        borderRadius: 999,
-        fontSize: 12,
-        fontWeight: 700,
-        whiteSpace: "nowrap",
-      }}
-    >
-      {s.label}
-    </span>
-  );
-}
 
 function GrantAmounts({ grant }) {
   const requested = Number(grant.amountRequested || 0);
@@ -245,7 +217,10 @@ export function GrantsPage() {
                 <div style={{ flex: "1 1 240px", minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                     <div style={{ fontWeight: 800 }}>{g.title}</div>
-                    <GrantStatusBadge status={g.status} />
+                    <StatusBadge
+                      status={g.status === "active" ? "awarded" : g.status}
+                      label={g.status === "active" ? "Awarded" : undefined}
+                    />
                   </div>
                   <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
                     {g.fundingSource}

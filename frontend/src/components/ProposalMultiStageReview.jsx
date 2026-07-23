@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import * as proposalApi from "../services/proposalApi";
 import * as userApi from "../services/userApi";
+import { StatusBadge } from "./StatusBadge";
 
 const STAGE_LABELS = {
   admin_screening: "Admin screening",
@@ -12,7 +13,7 @@ const STAGE_LABELS = {
 };
 
 function StageBadge({ status }) {
-  return <span className="badge" style={{ marginLeft: 8 }}>{status || "pending"}</span>;
+  return <StatusBadge status={status || "pending"} style={{ marginLeft: 8 }} />;
 }
 
 function reviewerRefId(ref) {

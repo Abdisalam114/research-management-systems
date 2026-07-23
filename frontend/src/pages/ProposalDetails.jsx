@@ -8,6 +8,7 @@ import { SubmitValidationAlert, SubmitSuccessAlert } from "../components/SubmitV
 import { collectSubmitValidationIssues, SUBMIT_SUCCESS_MESSAGE } from "../utils/proposalSubmitValidation";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
 import { apiOrigin } from "../config/apiBase";
+import { StatusBadge } from "../components/StatusBadge";
 
 export function ProposalDetailsPage() {
   const { id } = useParams();
@@ -122,7 +123,7 @@ export function ProposalDetailsPage() {
               ? "Voluntary"
               : "Grant Fund Call"}
           </span>
-          Status: {proposal.status} • Version: {proposal.version}
+          Status: <StatusBadge status={proposal.status} /> • Version: {proposal.version}
         </div>
         {(proposal.proposalKind || (proposal.fundingCallId ? "grant_fund_call" : "voluntary")) === "voluntary" ? (
           <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>

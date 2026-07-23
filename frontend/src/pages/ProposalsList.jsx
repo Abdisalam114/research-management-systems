@@ -5,6 +5,7 @@ import { useProgramTier } from "../hooks/useProgramTier";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
+import { StatusBadge } from "../components/StatusBadge";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 
 export function ProposalsListPage() {
@@ -36,7 +37,7 @@ export function ProposalsListPage() {
         { label: "Submitted", value: by("submitted"), filterKey: "submitted", accent: "#38bdf8" },
         { label: "Under review", value: by("under_review"), filterKey: "under_review", accent: "#fcd34d" },
         { label: "Revision", value: by("revision_requested"), filterKey: "revision_requested", accent: "#fb923c" },
-        { label: "Approved", value: by("approved"), filterKey: "approved", accent: "#1d4ed8" },
+        { label: "Approved", value: by("approved"), filterKey: "approved", accent: "#16a34a" },
         { label: "Rejected", value: by("rejected"), filterKey: "rejected" },
       ];
     }
@@ -45,7 +46,7 @@ export function ProposalsListPage() {
       { label: "Draft", value: by("draft"), filterKey: "draft" },
       { label: "Submitted", value: by("submitted"), filterKey: "submitted", accent: "#38bdf8" },
       { label: "Under review", value: by("under_review"), filterKey: "under_review", accent: "#fcd34d" },
-      { label: "Approved", value: by("approved"), filterKey: "approved", accent: "#1d4ed8" },
+      { label: "Approved", value: by("approved"), filterKey: "approved", accent: "#16a34a" },
       { label: "Rejected", value: by("rejected"), filterKey: "rejected" },
     ];
   }, [proposals, isStaffQueue]);
@@ -119,10 +120,10 @@ export function ProposalsListPage() {
           <div style={{ display: "grid", gap: 10 }}>
             {filtered.map((p) => (
               <div key={p.id} className="card">
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-                  <div>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 800 }}>{p.title}</div>
-                    <div className="muted">
+                    <div className="muted" style={{ marginTop: 4 }}>
                       <span
                         style={{
                           display: "inline-block",
@@ -140,29 +141,39 @@ export function ProposalsListPage() {
                       >
                         {kindLabel(p)}
                       </span>
-                      Status: {p.status} • v{p.version} • {p.department}
+                      v{p.version} • {p.department}
                       {p.researcherName ? ` • PI: ${p.researcherName}` : ""}
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <Link className="btn" to={`/proposals/${p.id}`}>
-                      Details
-                    </Link>
-                    {isReviewer ? (
-                      <Link className="btn primary" to={`/proposals/${p.id}/review`}>
-                        Review
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-end",
+                      gap: 8,
+                    }}
+                  >
+                    <StatusBadge status={p.status} />
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <Link className="btn" to={`/proposals/${p.id}`}>
+                        Details
                       </Link>
-                    ) : null}
-                    {isFinance ? (
-                      <Link className="btn primary" to={`/proposals/${p.id}/review`}>
-                        Finance review
-                      </Link>
-                    ) : null}
-                    {isLeadershipReviewer ? (
-                      <Link className="btn primary" to={`/proposals/${p.id}/review`}>
-                        Peer review
-                      </Link>
-                    ) : null}
+                      {isReviewer ? (
+                        <Link className="btn primary" to={`/proposals/${p.id}/review`}>
+                          Review
+                        </Link>
+                      ) : null}
+                      {isFinance ? (
+                        <Link className="btn primary" to={`/proposals/${p.id}/review`}>
+                          Finance review
+                        </Link>
+                      ) : null}
+                      {isLeadershipReviewer ? (
+                        <Link className="btn primary" to={`/proposals/${p.id}/review`}>
+                          Peer review
+                        </Link>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </div>

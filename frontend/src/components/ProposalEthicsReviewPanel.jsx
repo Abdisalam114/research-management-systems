@@ -21,6 +21,8 @@ export function ProposalEthicsReviewPanel({
   onApproveEthics,
   onRejectEthics,
   onIssueCertificate,
+  onViewEthics,
+  onDownloadCertificate,
   busy,
 }) {
   if (!ethics) {
@@ -33,13 +35,19 @@ export function ProposalEthicsReviewPanel({
   }
 
   const approved = ethics.status === "approved";
-  const hasCert = Boolean(ethics.approval?.certificateNumber || ethics.approval?.certificateId);
+  const hasCert = Boolean(ethics.approval?.certificateNumber || ethics.approval?.certificateId || ethics.approval?.refNumber);
   const canDirectorIssueCert =
     isDirector &&
     (ethics.status === "submitted" || (ethics.status === "approved" && !hasCert));
 
   return (
-    <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.35)" }}>
+    <div
+      className="card"
+      style={{
+        marginTop: 12,
+        borderColor: "rgba(56,189,248,0.35)",
+      }}
+    >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
         <div style={{ fontWeight: 800 }}>Ethics application (REC) — submitted with proposal</div>
         <span style={{ fontSize: 13 }}>
@@ -72,7 +80,35 @@ export function ProposalEthicsReviewPanel({
         {ethics.approval?.refNumber ? <Row label="JUREC Ref" value={ethics.approval.refNumber} /> : null}
       </div>
 
-      {canDirectorIssueCert ? (
+      {approved && hasCert ? (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, marginTop: 14 }}>
+          <span
+            style={{
+              background: "#16a34a",
+              color: "#fff",
+              padding: "2px 10px",
+              borderRadius: 999,
+              fontSize: 12,
+              textTransform: "capitalize",
+              fontWeight: 600,
+            }}
+          >
+            approved
+          </span>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {onViewEthics ? (
+              <button type="button" className="btn" disabled={busy} onClick={onViewEthics}>
+                View
+              </button>
+            ) : null}
+            {onDownloadCertificate ? (
+              <button type="button" className="btn primary" disabled={busy} onClick={onDownloadCertificate}>
+                Download certificate
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : canDirectorIssueCert ? (
         <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
           <button type="button" className="btn primary" disabled={busy} onClick={onIssueCertificate || onApproveEthics}>
             {ethics.status === "approved" ? "Issue JUREC certificate" : "Approve ethics & issue certificate"}
@@ -82,12 +118,6 @@ export function ProposalEthicsReviewPanel({
               Reject ethics
             </button>
           ) : null}
-        </div>
-      ) : null}
-
-      {approved && hasCert ? (
-        <div className="muted" style={{ marginTop: 12, color: "#1d4ed8" }}>
-          ✓ Ethics approved with certificate — Director may approve the proposal to create the project.
         </div>
       ) : ethics.status === "submitted" && !isDirector ? (
         <div className="muted" style={{ marginTop: 12 }}>Awaiting Research Director ethics review.</div>

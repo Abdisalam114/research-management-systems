@@ -6,6 +6,7 @@ import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
 import { ProjectWorkflowSummary } from "../components/ProjectWorkflowPanel";
+import { StatusBadge } from "../components/StatusBadge";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 
 function projectKind(p) {
@@ -18,31 +19,10 @@ function kindLabel(p) {
   return projectKind(p) === "grant_fund_call" ? "Grant Fund Call" : "Voluntary";
 }
 
-function statusBadgeStyle(status) {
-  if (["completed", "closed"].includes(status)) {
-    return { background: "rgba(29, 78, 216, 0.18)", color: "#93c5fd" };
-  }
-  if (status === "closing") {
-    return { background: "rgba(252, 211, 77, 0.2)", color: "#fcd34d" };
-  }
-  if (status === "active") {
-    return { background: "rgba(56, 189, 248, 0.15)", color: "#7dd3fc" };
-  }
-  return { background: "rgba(148, 163, 184, 0.18)", color: "#cbd5e1" };
-}
-
-function statusLabel(status) {
-  if (status === "completed" || status === "closed") return "Completed / Closed";
-  if (status === "closing") return "Closing";
-  if (status === "on_hold") return "On hold";
-  if (status === "active") return "Active";
-  return status || "—";
-}
-
 function ProjectCard({ p }) {
   return (
     <div className="card">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <Link
             to={`/projects/${p.id}#workflow`}
@@ -68,24 +48,9 @@ function ProjectCard({ p }) {
             >
               {kindLabel(p)}
             </span>
-            <span
-              style={{
-                display: "inline-block",
-                marginRight: 8,
-                padding: "2px 8px",
-                borderRadius: 6,
-                fontSize: 12,
-                fontWeight: 700,
-                ...statusBadgeStyle(p.status),
-              }}
-            >
-              {statusLabel(p.status)}
-            </span>
-            Status: {p.status}
             {p.principalInvestigatorName || p.principalInvestigator?.fullName ? (
               <>
-                {" "}
-                • PI:{" "}
+                PI:{" "}
                 <strong>{p.principalInvestigatorName || p.principalInvestigator?.fullName}</strong>
                 {p.principalInvestigator?.department ? ` (${p.principalInvestigator.department})` : ""}
               </>
@@ -93,13 +58,21 @@ function ProjectCard({ p }) {
           </div>
           <ProjectWorkflowSummary workflow={p.workflow} projectId={p.id} />
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
-          <Link className="btn primary" to={`/projects/${p.id}#workflow`}>
-            Open workflow
-          </Link>
-          <Link className="btn" to={`/research-workflow?projectId=${p.id}`}>
-            Publish pipeline
-          </Link>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+          <StatusBadge
+            status={p.status === "closed" ? "completed" : p.status}
+            label={
+              p.status === "completed" || p.status === "closed" ? "Completed / Closed" : undefined
+            }
+          />
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <Link className="btn primary" to={`/projects/${p.id}#workflow`}>
+              Open workflow
+            </Link>
+            <Link className="btn" to={`/research-workflow?projectId=${p.id}`}>
+              Publish pipeline
+            </Link>
+          </div>
         </div>
       </div>
     </div>

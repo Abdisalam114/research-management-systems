@@ -7,6 +7,7 @@ import * as ethicsApi from "../services/ethicsApi";
 import { ProposalEthicsReviewPanel } from "../components/ProposalEthicsReviewPanel";
 import { EthicsDirectorDecisionModal } from "../components/EthicsDirectorDecisionModal";
 import { ProposalMultiStageReview } from "../components/ProposalMultiStageReview";
+import { StatusBadge } from "../components/StatusBadge";
 import { apiOrigin } from "../config/apiBase";
 
 export function ProposalReviewPage() {
@@ -149,12 +150,13 @@ export function ProposalReviewPage() {
 
       <div className="card" style={{ marginTop: 12, borderColor: "rgba(14,165,233,0.25)" }}>
         <div style={{ fontWeight: 800, fontSize: 18 }}>{proposal.title}</div>
-        <div className="muted" style={{ marginTop: 6 }}>
-          Proposal status: <strong>{proposal.status}</strong> • v{proposal.version}
+        <div className="muted" style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <StatusBadge status={proposal.status} />
+          <span>v{proposal.version}</span>
           {proposal.requiresEthics ? (
             <>
-              {" "}
-              • Ethics: <strong>{ethics?.status || proposal.ethicsStatus || "—"}</strong>
+              <span className="muted">Ethics:</span>
+              <StatusBadge status={ethics?.status || proposal.ethicsStatus || "pending"} />
             </>
           ) : null}
         </div>
@@ -190,6 +192,30 @@ export function ProposalReviewPage() {
           onApproveEthics={() => setEthicsDecisionModal("approve")}
           onIssueCertificate={() => setEthicsDecisionModal("approve")}
           onRejectEthics={() => setEthicsDecisionModal("reject")}
+          onViewEthics={() => {
+            if (ethics?.id) window.location.assign(`/ethics?applicationId=${ethics.id}`);
+          }}
+          onDownloadCertificate={async () => {
+            if (!ethics?.id) return;
+            try {
+              setBusy(true);
+              setError("");
+              const blob = await ethicsApi.downloadCertificate(accessToken, ethics.id);
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement("a");
+              link.href = url;
+              link.download = `JUREC-certificate-${ethics.approval?.refNumber || ethics.approval?.certificateNumber || ethics.id}.pdf`.replace(
+                /[^\w.-]+/g,
+                "-"
+              );
+              link.click();
+              URL.revokeObjectURL(url);
+            } catch (e) {
+              setError(e?.message || "Failed to download certificate");
+            } finally {
+              setBusy(false);
+            }
+          }}
           busy={busy}
         />
       ) : null}

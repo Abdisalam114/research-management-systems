@@ -16,29 +16,10 @@ import { getEthicsMissingFields } from "../utils/proposalSubmitValidation";
 import { ethicsApplicationToForm, emptyEthicsForm } from "../utils/ethicsFormState";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
-
-const STATUS_BADGE = {
-  draft: "#7dd3fc",
-  submitted: "#38bdf8",
-  approved: "#1d4ed8",
-  rejected: "#1e3a8a",
-};
+import { StatusBadge } from "../components/StatusBadge";
 
 function Badge({ status }) {
-  return (
-    <span
-      style={{
-        background: STATUS_BADGE[status] || "#64748b",
-        color: "#fff",
-        padding: "2px 10px",
-        borderRadius: 999,
-        fontSize: 12,
-        textTransform: "capitalize",
-      }}
-    >
-      {status}
-    </span>
-  );
+  return <StatusBadge status={status} />;
 }
 
 const emptyForm = emptyEthicsForm;
@@ -416,36 +397,44 @@ export function EthicsPage() {
                     <div className="muted" style={{ color: "#1d4ed8" }}>{a.approval.rejectionReason}</div>
                   ) : null}
                 </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    gap: 8,
+                  }}
+                >
                   <Badge status={a.status} />
-                  {(isResearcher && ["draft", "rejected"].includes(a.status)) || isStaff ? (
-                    <AppButton onClick={() => (isStaff && !isResearcher ? openViewApplication(a) : openEdit(a))}>
-                      {isResearcher && a.status !== "approved" ? "Edit" : "View"}
-                    </AppButton>
-                  ) : null}
-                  {canDecideEthics && a.status === "submitted" ? (
-                    <>
-                      <AppButton variant="primary" onClick={() => openDecideModal(a, "approve")}>
-                        Approve
+                  {a.status === "approved" ? (
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      <AppButton onClick={() => openViewApplication(a)}>View</AppButton>
+                      <AppButton variant="primary" onClick={() => downloadCert(a)}>
+                        Download certificate
                       </AppButton>
-                      <AppButton onClick={() => openDecideModal(a, "reject")}>Reject</AppButton>
-                    </>
-                  ) : null}
-                  {a.proposalId && isResearcher ? (
-                    <Link className="btn" to={`/proposals/${a.proposalId}/edit`}>
-                      Proposal
-                    </Link>
-                  ) : null}
-                  {a.status === "approved" && (a.approval?.certificateNumber || a.approval?.certificateId || a.approval?.refNumber) ? (
-                    <AppButton variant="primary" onClick={() => downloadCert(a)}>
-                      📄 Download certificate
-                    </AppButton>
-                  ) : null}
-                  {isDirector && a.status === "approved" && !(a.approval?.certificateNumber || a.approval?.certificateId) ? (
-                    <AppButton variant="primary" onClick={() => openDecideModal(a, "approve")}>
-                      Issue certificate
-                    </AppButton>
-                  ) : null}
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                      {(isResearcher && ["draft", "rejected"].includes(a.status)) || isStaff ? (
+                        <AppButton onClick={() => (isStaff && !isResearcher ? openViewApplication(a) : openEdit(a))}>
+                          {isResearcher ? "Edit" : "View"}
+                        </AppButton>
+                      ) : null}
+                      {canDecideEthics && a.status === "submitted" ? (
+                        <>
+                          <AppButton variant="primary" onClick={() => openDecideModal(a, "approve")}>
+                            Approve
+                          </AppButton>
+                          <AppButton onClick={() => openDecideModal(a, "reject")}>Reject</AppButton>
+                        </>
+                      ) : null}
+                      {a.proposalId && isResearcher ? (
+                        <Link className="btn" to={`/proposals/${a.proposalId}/edit`}>
+                          Proposal
+                        </Link>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -466,6 +455,7 @@ export function EthicsPage() {
           onSave={() => save(false)}
           onSubmit={() => save(true)}
           onClose={closeEditor}
+          onDownloadCertificate={() => downloadCert(editing)}
           readOnly={
             isResearcher
               ? ["approved", "submitted"].includes(editing.status)
@@ -511,6 +501,7 @@ function EthicsEditor({
   onSave,
   onSubmit,
   onClose,
+  onDownloadCertificate,
   readOnly,
   isDirector,
   onDirectorApprove,
@@ -528,9 +519,16 @@ function EthicsEditor({
 }) {
   const { form } = editing;
   const showDirectorActions = isDirector && editing.status === "submitted";
+  const isApproved = editing.status === "approved";
 
   return (
-    <div className="card" style={{ marginTop: 16, border: "1px solid rgba(56,189,248,0.3)" }}>
+    <div
+      className="card"
+      style={{
+        marginTop: 16,
+        border: "1px solid rgba(56,189,248,0.3)",
+      }}
+    >
       <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
         <AppButton onClick={onClose}>Close</AppButton>
       </div>
@@ -545,13 +543,22 @@ function EthicsEditor({
             form: typeof updater === "function" ? updater(s.form) : updater,
           }))
         }
-        readOnly={readOnly || showDirectorActions}
+        readOnly={readOnly || showDirectorActions || isApproved}
         formComplete={formComplete}
         embeddedInProposal={linkedToProposal}
         hideFundingFields={hideFundingFields}
       />
 
-      {showDirectorActions ? (
+      {isApproved ? (
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, marginTop: 12 }}>
+          <Badge status="approved" />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <AppButton variant="primary" onClick={onDownloadCertificate}>
+              Download certificate
+            </AppButton>
+          </div>
+        </div>
+      ) : showDirectorActions ? (
         <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
           <AppButton variant="primary" loading={decisionBusy} onClick={onDirectorApprove}>
             Approve & certificate

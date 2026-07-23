@@ -1,5 +1,7 @@
 import { api } from "./api";
 import { apiOrigin } from "../config/apiBase";
+import { PROGRAM_TIER_HEADER } from "../constants/programTier";
+import { getProgramTier } from "../utils/programTierStorage";
 
 function auth(t) { return { headers: { Authorization: `Bearer ${t}` } }; }
 
@@ -39,11 +41,20 @@ export async function previewCertificate(t, id) {
 }
 
 export async function downloadCertificate(t, id) {
-  const res = await fetch(`${apiOrigin()}/api/ethics/${id}/certificate.pdf`, {
-    headers: { Authorization: `Bearer ${t}` },
-  });
+  const headers = { Authorization: `Bearer ${t}` };
+  const tier = getProgramTier();
+  if (tier) headers[PROGRAM_TIER_HEADER] = tier;
+  const res = await fetch(`${apiOrigin()}/api/ethics/${id}/certificate.pdf`, { headers });
   if (!res.ok) {
-    const msg = await res.text().catch(() => "Failed to download certificate");
+    let msg = "Failed to download certificate";
+    try {
+      const text = await res.text();
+      const parsed = JSON.parse(text);
+      if (parsed?.message) msg = parsed.message;
+      else if (text) msg = text.slice(0, 200);
+    } catch {
+      /* keep default */
+    }
     throw new Error(msg);
   }
   return res.blob();
