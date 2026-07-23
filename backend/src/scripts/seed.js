@@ -24,6 +24,8 @@ const { EthicsApplication, ETHICS_STATUSES } = require("../models/EthicsApplicat
 const { Payment, PAYMENT_CATEGORIES, PAYMENT_STATUSES } = require("../models/Payment");
 const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
 const { AuditEvent } = require("../models/AuditEvent");
+const { PurchaseOrder } = require("../models/PurchaseOrder");
+const { Conversation } = require("../models/Conversation");
 const { recordAudit } = require("../utils/audit");
 const { writeSimplePdf } = require("../utils/pdf");
 const { syncGrantAwards } = require("../utils/syncGrantAwards");
@@ -1025,6 +1027,19 @@ async function seedAuditTrail(ctx) {
 async function seedPortal(ctx) {
   console.log(`\n--- Portal: ${ctx.programTier} ---`);
 
+  /**
+   * Demo sample research is OFF by default for both portals so user-entered data is never mixed/replaced.
+   * Set SEED_DEMO_RESEARCH=1 to fill empty slots with seedRecords templates.
+   */
+  const demoOn = String(process.env.SEED_DEMO_RESEARCH || "").trim() === "1";
+  if (!demoOn) {
+    const dept = await seedDepartments(ctx);
+    console.log(
+      `  ${ctx.programTier}: departments +${dept}; demo research skipped (SEED_DEMO_RESEARCH!=1). Existing data untouched.`
+    );
+    return;
+  }
+
   const dept = await seedDepartments(ctx);
   const p = await seedProposals(ctx);
   const eth = await seedEthics(ctx);
@@ -1048,6 +1063,42 @@ async function seedPortal(ctx) {
   if (linkSync.updated) console.log(`  linked ${linkSync.updated} grant(s) to project(s)`);
 }
 
+/**
+ * Optional wipe of ALL portal research (destructive). Not used by default seed.
+ * Prefer: node src/scripts/clearSeedDemoData.js [postgraduate|undergraduate|both]
+ */
+async function clearPortalDemoResearch(programTier) {
+  const filter = { programTier };
+  const models = [
+    PurchaseOrder,
+    Payment,
+    Budget,
+    Publication,
+    ThesisGroup,
+    ResearchGroup,
+    RepositoryItem,
+    Notification,
+    AuditEvent,
+    FundingCall,
+    EthicsApplication,
+    Proposal,
+    Project,
+    Grant,
+    Conversation,
+  ];
+
+  let total = 0;
+  for (const Model of models) {
+    try {
+      const res = await Model.collection.deleteMany(filter);
+      total += res.deletedCount || 0;
+    } catch (err) {
+      console.warn(`  warn clear ${Model.modelName}:`, err.message);
+    }
+  }
+  return total;
+}
+
 async function repairRepositoryAccess() {
   const result = await RepositoryItem.updateMany(
     { access: REPOSITORY_ACCESS.PRIVATE },
@@ -1066,7 +1117,8 @@ async function run() {
   await User.updateMany({ role: { $ne: ROLES.RESEARCH_DIRECTOR } }, { $unset: { programTiers: "" } });
   console.log(`     ${INSTITUTIONAL_USERS.length} accounts upserted`);
 
-  console.log("2/3 Research records (English, realistic, audit trail)...");
+  console.log("2/3 Research records...");
+  console.log("     Demo sample research is OFF unless SEED_DEMO_RESEARCH=1. User data is never wiped.\n");
   for (const tier of PORTAL_ORDER) {
     const ctx = await portalContext(users, tier);
     if (ctx.researchers.length < 1) {

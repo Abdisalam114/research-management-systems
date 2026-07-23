@@ -30,7 +30,8 @@ jaamacadda.
 Mas’uuliyadaha ugu muhiimsan:
   • Ansixinta isticmaaleyaasha cusub (User Approval — /pending-users)
   • Maamulka faculties & departments (/departments)
-  • Ansixinta anshaxa REC (Ethics approval) marka proposal la gudbiyo
+  • Ansixinta anshaxa REC (Ethics approval) — Director kaliya
+  • Ansixinta PO ka dib Finance review
   • Go’aanka ugu dambeeya ee proposal-ka (approve / reject / revision)
   • Maamulka deeqaha (grants) — ansixin ama diidid
   • Aragtida analytics-ka guud ee jaamacadda (Dashboard)
@@ -77,21 +78,23 @@ A.3 FINANCE OFFICER (Sarkaalka Maaliyadda)
 Magaca nidaamka: finance_officer
 
 Sharaxaad:
-Sarkaalka maaliyaddu wuxuu maamulaa dhinaca lacagta, miisaaniyadda, iyo bixinta 
-deeqaha la ansixiyay.
+Sarkaalka maaliyaddu wuxuu maamulaa lacagta, miisaaniyadda, bixinta, iyo dib u eegista
+Purchase Orders ka hor Director.
 
 Mas’uuliyadaha ugu muhiimsan:
-  • Maamulka budgets-ka (Budget allocated marka grant la siiyo)
-  • Raadraaca bixinta lacagaha (payments / disbursements)
-  • Warbixinnada maaliyadeed
-  • Eegista grants-ka la ansixiyay
+  • Grant funding approval → Authorize budget (qoondee, ha bixin weli)
+  • Maamulka budgets-ka iyo payment requests
+  • Dib u eegista Purchase Orders (ansixi/diid) ka hor Director
+  • Bixinta lacagaha / PO ka dib Director ansixiyo
+  • Finance reports iyo donor reports
+  • Project closure (finance sign-off)
 
 Modules-ka uu geli karo:
-Dashboard, Grants, Finance & Budgets, Collaboration, Messages, Notifications, Profile.
+Dashboard, Funding Calls, Grants, Finance & Budgets, Finance Reports, Donor Reports,
+Collaboration, Messages, Notifications, Profile.
 
-Ma geli karo:
-Proposals, Ethics, Projects, Publications, Research Workflow Status, Thesis, 
-Repository (ma aha shaqadiisa asaasiga ah).
+Socodka PO:
+  Researcher → Finance (review) → Director → Finance (pay)
 
 --------------------------------------------------------------------------------
 A.4 RESEARCHER (Cilmi-baaraha)
@@ -121,23 +124,10 @@ Wuxuu arkaa kaliya xogtiisa (My proposals, My projects, My outputs). Ma beddeli
 karo publication workflow stage — taasi waa Coordinator/Director.
 
 --------------------------------------------------------------------------------
-A.5 ETHICS COMMITTEE (Guddiga Anshaxa) — CUSUB July 2026
+A.5 ETHICS — LA SAARAY (Director ayaa qabata)
 --------------------------------------------------------------------------------
-Magaca nidaamka: ethics_committee
-
-Sharaxaad:
-Xubin ka tirsan Guddiga Anshaxa (JUREC/REC). Wuxuu ansixin ama diidi karaa 
-codsiyada anshaxa isla awoodda Director-ka ee bogga Ethics.
-
-Mas’uuliyadaha:
-  • Eegista liiska ethics applications (/ethics)
-  • Ansixinta / diidmada / revision JUREC
-  • Daawashada shahaadada JUREC ka hor ansixinta
-
-Modules-ka uu geli karo:
-Ethics, Profile.
-
-Tijaabo login: ethics@rms.edu / Ethics2024!
+Doorarka ethics_committee waa laga saaray nidaamka.
+Research Director ayaa ansixiya / diida ethics (JUREC) bogga /ethics.
 
 --------------------------------------------------------------------------------
 A.6 PROCUREMENT — LA SAARAY (Finance ayaa qabata)
@@ -147,6 +137,30 @@ Finance Officer ayaa hadda sameeya dib u eegista Purchase Orders.
 
 Socodka PO:
   Researcher (codsiga) → Finance Officer (review) → Director → Finance Officer (pay)
+
+--------------------------------------------------------------------------------
+A.7 UNIVERSITY LEADERSHIP
+--------------------------------------------------------------------------------
+Magaca nidaamka: leadership
+
+Sharaxaad: Peer review (score 1–5 + comment), KPI, policies. MA daabaco funding calls
+(Director ayaa daabaca). Login: leadership@rms.edu / Leadership2024!
+
+--------------------------------------------------------------------------------
+A.8 HR OFFICER
+--------------------------------------------------------------------------------
+Magaca nidaamka: hr_officer
+
+Sharaxaad: Arag projects, thesis groups, research groups — dhinaca HR.
+Ma ansixiyo grants, ethics, ama lacag. Login: hr@rms.edu / Hr2024!
+
+--------------------------------------------------------------------------------
+A.9 DONOR AGENCY
+--------------------------------------------------------------------------------
+Magaca nidaamka: donor_agency
+
+Sharaxaad: Draft external funding calls; sug Director publish; donor reports.
+Login: donor@rms.edu / Donor2024!
 
 ================================================================================
 QAYBTA B: RESEARCH WORKFLOW STATUS — PIPELINE-KA GUUD (11 TALLAABO)
@@ -174,11 +188,11 @@ Xaalad marka la bilaabo: Done (marka proposal la abuuro)
 --------------------------------------------------------------------------------
 B.2 Ethics (REC) approval
 --------------------------------------------------------------------------------
-Sharaxaad: Research Ethics Committee (REC) waa in ay ansixisaa cilmi-baarista ka 
+Sharaxaad: Research Ethics (JUREC/REC) waa in Director ansixiyo cilmi-baarista ka 
 hor inta aan la gudbin si rasmi ah. Foomka REC wuxuu ka kooban yahay PI name, 
 project level, aims, design, signature, iwm.
 
-Yaa ansixiyaa: Research Director ama Ethics Committee (ethics_committee)
+Yaa ansixiyaa: Research Director (ethics_committee role waa laga saaray)
 Xaaladaha ethicsStatus: pending → approved / rejected
 Haddii requiresEthics = false: Skipped
 

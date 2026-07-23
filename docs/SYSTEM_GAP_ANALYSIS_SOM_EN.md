@@ -39,18 +39,17 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 | Researchers / PI | `researcher` | ✅ |
 | Department | `faculty_coordinator` (faculty-scoped) | ✅ |
 | Research Office | `research_director` | ✅ |
-| Finance Office | `finance_officer` | ✅ |
-| Finance Office | `finance_officer` — budgets, PO review before director, payments | ✅ |
+| Finance Office | `finance_officer` — budgets, PO review, payments | ✅ |
 | HR Office | `hr_officer` | ⚠️ User + project/thesis access; no payroll module |
-| Ethics Committee | `ethics_committee` + Director JUREC (`/ethics`) | ✅ |
-| Reviewers | `peer_reviewer` + assign reviewers API | ⚠️ Peer review UI; not full standalone portal |
+| Ethics Committee | Handled by `research_director` on `/ethics` (no separate login) | ✅ |
+| Reviewers | University `leadership` peer review (score + comment) | ✅ |
 | Leadership | `leadership` + Director analytics | ✅ |
 | Donors | `donor_agency` + `donorRef` on grants | ⚠️ Donor reports page; not full external portal |
 
 ### Somali — Sharaxaad
 
-- **Cilmi-baaraha, Isku-duwaha, Agaasimaha, Maaliyadda** — dhammaan waa la dhisay.
-- **Ethics Committee, Procurement, HR, Reviewer, Leadership, Donor** — roles cusub la dhisay (2026).
+- **Cilmi-baaraha, Isku-duwaha, Agaasimaha, Maaliyadda, Leadership, HR, Donor** — dhammaan waa la dhisay.
+- **Ethics Committee, Peer Reviewer, Procurement** — doorarka gooni ah waa laga saaray (Ethics = Director; peer review = Leadership; PO = Finance).
 - **HR payroll sync, Donor portal buuxa** — weli ma jiraan.
 
 ---
@@ -95,12 +94,12 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 | Review stage | Status | RMS implementation |
 |--------------|--------|---------------------|
 | 1. Administrative screening | ✅ | `ProposalMultiStageReview.jsx`, admin screening API |
-| 2. Peer review | ⚠️ | Assign reviewers + scoring UI; `peer_reviewer` role |
+| 2. Peer review | ✅ | University Leadership score + comment (`/review-assignments`) |
 | 3. Committee review | ⚠️ | Committee review API + UI |
-| 4. Ethics review & approval | ✅ | JUREC + `ethics_committee` role |
-| 5. Finance review | ⚠️ | Finance proposal review API; grant finance gate ✅ |
+| 4. Ethics review & approval | ✅ | JUREC — Research Director on `/ethics` |
+| 5. Finance review | ✅ | Finance proposal review + grant Authorize budget |
 | 6. Final approval (Director) | ✅ | `POST /api/proposals/:id/director-decision` |
-| Grant final approval (Leadership) | ✅ | `leadership` role on grant decision |
+| Grant final approval (Leadership) | ⚠️ | Leadership peer review; Director publishes funding calls |
 
 **Somali:** Anshaxa iyo ansixinta ugu dambeysa waa adag yihiin. Peer/committee/finance review — qayb ahaan waa jira.
 
@@ -243,7 +242,7 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 | Dual-tab authentication | sessionStorage per browser tab | Labo user isla browser kala tabs |
 | UG / PG portals | Data separated by `programTier` | UG iyo PG gooni gooni |
 | Research policies | Director `/policies` (themes, programs) | Siyaasadaha cilmi-baarista |
-| Procurement (PO) | Full PO lifecycle | Purchase Orders |
+| Purchase Orders (Finance) | Full PO lifecycle: Finance review → Director → Finance pay | Purchase Orders (Finance) |
 | Payments module | RA, travel, equipment, publication fees | Bixinta lacagaha |
 
 ---
@@ -276,8 +275,8 @@ Features deferred to **future work** (not required for 90%+ thesis defense):
 | Repository | `/repository` | Phase 5 & 6 |
 | Groups | `/groups` | Phase 4 (collaboration) |
 | Thesis | `/thesis` | Extension |
-| Payments | `/payments` | Phase 4 & 5 |
-| Procurement | `/procurement` | Phase 4 |
+| Payments | `/budgets` (payment requests) | Phase 4 & 5 |
+| Purchase Orders | `/budgets` (Finance PO review queue) | Phase 4 |
 | Finance Reports | `/finance-reports` | Phase 5 |
 | KPI Dashboard | `/kpi-dashboard` | Phase 5 (leadership) |
 | Global Search | `/search` | Shared |

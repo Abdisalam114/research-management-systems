@@ -53,10 +53,14 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
   const peerDone = (proposal.peerReviews || []).some(
     (r) => reviewerRefId(r.userId) === String(user?.id)
   );
-  // Peer reviewer (Leadership): assigned → can score + comment
-  const canSubmitPeerReview = assigned && !peerDone && (isLeadershipReviewer || isDirector);
-  // Director may also submit if assigned; unassigned directors manage stage only
-  const canDirectorSubmitPeer = isDirector && !peerDone && !isLeadershipReviewer;
+  const peerStageOpen = pipe.peerReview?.status !== "passed";
+  const hasPeerReviews = (proposal.peerReviews || []).length > 0;
+  // Leadership (or assigned director): score once while stage is open
+  const canSubmitPeerReview =
+    assigned && !peerDone && peerStageOpen && (isLeadershipReviewer || isDirector);
+  // Director fallback score only if nobody has reviewed yet — otherwise manage stage only
+  const canDirectorSubmitPeer =
+    isDirector && !peerDone && peerStageOpen && !hasPeerReviews && !isLeadershipReviewer;
   const showPeerSubmitForm = canSubmitPeerReview || canDirectorSubmitPeer;
   const canAssignReviewers = isDirector;
   useEffect(() => {

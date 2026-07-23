@@ -250,9 +250,11 @@ export function ThesisGroupsPage() {
   const stats = useMemo(() => {
     const validGroups = groups.filter(isValidThesisGroup);
     const titleAccepted = validGroups.filter(isTitleAccepted).length;
+    const titlePending = validGroups.filter((g) => titleProposalStatus(g) === "pending").length;
     const totalStudents = validGroups.reduce((acc, g) => acc + (g.students?.length || 0), 0);
     return [
       { label: "Thesis groups", value: validGroups.length, filterKey: "validGroups", accent: "#0ea5e9" },
+      { label: "Titles pending", value: titlePending, filterKey: "titlePending", accent: "#f59e0b" },
       { label: "Title accepted", value: titleAccepted, filterKey: "titleAccepted", accent: "#22c55e" },
       {
         label: "With supervisor",
@@ -273,6 +275,7 @@ export function ThesisGroupsPage() {
           hasSupervisor: (g) => Boolean(g.supervisorId) && isValidThesisGroup(g),
           hasStudents: isValidThesisGroup,
           titleAccepted: (g) => isTitleAccepted(g) && isValidThesisGroup(g),
+          titlePending: (g) => titleProposalStatus(g) === "pending" && isValidThesisGroup(g),
         },
       }),
     [groups, statusFilter]
@@ -535,7 +538,7 @@ export function ThesisGroupsPage() {
 
       <PageHeader
         title="Thesis"
-        subtitle="Students choose the title; the supervisor enters it; the coordinator or director accepts it."
+        subtitle="Students choose the title; the supervisor enters it; the Faculty Coordinator accepts or rejects it."
         stats={stats}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
@@ -744,7 +747,30 @@ export function ThesisGroupsPage() {
                     Linked research group: <strong>{researchGroupLabel(g)}</strong>
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 6 }}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                  {canReviewTitle ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn primary"
+                        onClick={() => reviewTitle(g.id, "accept")}
+                        title="Accept thesis title"
+                      >
+                        Accept title
+                      </button>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => {
+                          setExpandedId(g.id);
+                          setTitleForm({ title: "", reviewNote: "" });
+                        }}
+                        title="Open reject form"
+                      >
+                        Reject title
+                      </button>
+                    </>
+                  ) : null}
                   <button type="button" className="btn" onClick={() => toggleView(g)}>
                     {open ? "Hide" : "View"}
                   </button>
@@ -783,12 +809,14 @@ export function ThesisGroupsPage() {
 
                   {canReviewTitle ? (
                     <div className="card" style={{ background: "rgba(14,165,233,0.06)" }}>
-                      <div style={{ fontWeight: 800, marginBottom: 8 }}>Review supervisor-submitted title</div>
+                      <div style={{ fontWeight: 800, marginBottom: 8 }}>
+                        Faculty Coordinator — Accept or Reject title
+                      </div>
                       <p className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
                         Supervisor submitted: <strong>{g.titleProposal?.title}</strong>
                       </p>
                       <div className="field" style={{ marginBottom: 8 }}>
-                        <label>Review note (optional)</label>
+                        <label>Review note (optional — useful when rejecting)</label>
                         <input
                           value={titleForm.reviewNote}
                           onChange={(e) => setTitleForm({ ...titleForm, reviewNote: e.target.value })}

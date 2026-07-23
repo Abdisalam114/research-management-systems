@@ -22,7 +22,7 @@ Recent additions mapping to your 8 modules / 4 roles:
 | Projects | Timeline dates, milestones UI, research team UI, `PUT /api/projects/:id` |
 | Director | Strategic policies (`/policies`), faculty analytics table, grant success %, annual report JSON + PDF |
 | Coordinator | Faculty dashboard on `/dashboard`, faculty research report JSON + PDF |
-| Finance | `/finance-reports`, payments module (`/payments`), procurement / PO module (`/procurement`) |
+| Finance | `/finance-reports`, budgets + payments + PO review on `/budgets` (`/api/procurement` API) |
 | Publications | Book/chapter type, `communityImpact` field, director can also validate, CrossRef DOI citation refresh |
 | Profile | Research interests + publication list |
 | Repository | OAI-PMH style export endpoint (`/api/repository/oai/export`) |
@@ -36,7 +36,9 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 ## What this MVP already delivers (summary)
 
 - MERN stack: Express + MongoDB + React (Vite)
-- JWT auth, four roles, route guards (`frontend/src/App.jsx`, `backend/src/middleware/auth.js`)
+- JWT auth, seven active roles, route guards (`frontend/src/App.jsx`, `backend/src/middleware/auth.js`)
+  Active: research_director, faculty_coordinator, finance_officer, researcher, hr_officer, leadership, donor_agency
+  Removed separate logins: ethics_committee, peer_reviewer, procurement_officer
 - Unified seed: `backend/src/scripts/seed.js` + `backend/src/scripts/seedData.js`
 - Director creates users only (`POST /api/users`); public register disabled
 - Director dashboard with charts + institutional analytics section on `/dashboard`
@@ -122,9 +124,9 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | Research budget allocation | ⚠️ | `totalAllocated` on budget; researcher creates budget |
 | Expense tracking | ✅ | Budget line items type `expense` |
 | Budget approval workflow | ✅ | Finance `PATCH` item status; `Budgets.jsx` queue |
-| Procurement for research | ✅ | `PurchaseOrder` model + `/api/procurement` + `Procurement.jsx` (vendor, items, PO statuses) |
+| Purchase Orders for research | ✅ | `PurchaseOrder` model + `/api/procurement` + Finance PO queue on `/budgets` |
 | Financial reports (export / formal) | ✅ | `FinanceReports.jsx` + `GET /api/analytics/finance-report` |
-| Payment processing (RA, travel, equipment) | ✅ | `Payment` model + `/api/payments` + `Payments.jsx` (categories: research_assistant, equipment, travel, publication_fee, other) |
+| Payment processing (RA, travel, equipment) | ✅ | `Payment` model + payment flows on `/budgets` |
 
 ---
 
@@ -200,8 +202,8 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 |---------------------|--------|-----|
 | Research budget management | ✅ | View all budgets; approve/pay/reject items |
 | Grant financial tracking | ⚠️ | View grants; director still approves; finance can see donor-funded |
-| Payment processing | ✅ | `/payments` page (RA, equipment, travel, publication fee, other) — request, approve, mark paid |
-| Procurement / Purchase Orders | ✅ | `/procurement` page (vendor, items, PO lifecycle: submitted → approved → ordered → received → closed) |
+| Payment processing | ✅ | `/budgets` — payment requests (RA, equipment, travel, publication fee, other) — request, approve, mark paid |
+| Purchase Orders | ✅ | `/budgets` Finance PO queue (vendor, items; flow: requested → finance-reviewed → director_approved → paid) |
 | Financial reporting | ✅ | `/finance-reports` page + finance-report API |
 
 **No access:** proposals, projects (not in `App.jsx` or sidebar).
@@ -216,7 +218,7 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | Project management (timeline, team, milestones) | ✅ | `ProjectDetails.jsx` editing |
 | Publication submission + CrossRef citations | ✅ | Full CRUD + submit + DOI refresh |
 | Grant applications + donor reference | ✅ | Create/submit grants |
-| Budget + payment + procurement requests | ✅ | Own budgets + payment requests + PO requests |
+| Budget + payment + PO requests | ✅ | Own budgets + payment requests + PO requests (Finance reviews PO) |
 | Research profile | ✅ | `Profile.jsx` with research interests + publication portfolio |
 
 ---
@@ -233,7 +235,7 @@ Re-run `npm run seed` after pulling. Existing DB documents get new fields on nex
 | `/proposals`, `/proposals/new`, `/proposals/:id`, `/proposals/:id/review` | Researcher + coordinator + director (review: coordinator + director) |
 | `/projects`, `/projects/:id`, `/projects/:id/progress` | Researcher + coordinator + director + finance officer (progress: researcher) |
 | `/grants`, `/budgets`, `/publications`, `/repository`, `/groups` | See `App.jsx` |
-| `/payments`, `/procurement` | Researcher, finance officer, director |
+| `/budgets` (payments + PO) | Researcher, finance officer, director |
 | `/finance-reports` | Finance officer, director |
 | `/faculty-dashboard` | Coordinator |
 | `/notifications`, `/messages`, `/profile` | All authenticated |

@@ -113,9 +113,9 @@ Procurement Officer (`procurement_officer`) was removed — Finance owns PO revi
 **Order / Taxane:**
 
 1. Admin screening  
-2. Peer review (Peer Reviews page)  
+2. Peer review (University Leadership — Peer Reviews page)  
 3. Committee review  
-4. Ethics (Ethics page — Ethics Committee or Director)  
+4. Ethics (Research Director on Ethics page)  
 5. Finance review (proposal budget)  
 6. Director final decision → **Approved** creates **Project**
 
@@ -141,14 +141,14 @@ Procurement Officer (`procurement_officer`) was removed — Finance owns PO revi
 
 ---
 
-### Step 5 — Finance & procurement / Maaliyad
+### Step 5 — Finance & purchase orders / Maaliyad & PO
 
 **EN:**
 1. Budget for project/grant  
 2. Payment request → Director → Finance pays  
-3. Purchase order: Researcher → **Procurement** → **Director** → **Finance**
+3. Purchase order: Researcher → **Finance review** → **Director** → **Finance pays**
 
-**SO:** PO: Researcher → Procurement → Director → Finance.
+**SO:** PO: Researcher → Finance dib-u-eegis → Director → Finance bixisaa.
 
 **Menu:** Finance & Budgets · Finance Reports · Donor Reports
 
@@ -194,17 +194,17 @@ Procurement Officer (`procurement_officer`) was removed — Finance owns PO revi
 |------|------------|
 | Dashboard | Everyone |
 | Research Workflow | Researcher, Coordinator, Director |
-| Ethics | Researcher, Ethics Committee, staff |
-| Proposals | Researcher, staff |
-| Peer Reviews | Reviewers |
-| Projects | Researcher, staff |
-| Publications | Researcher, staff |
-| Thesis | Supervisor, Coordinator, Director |
-| Funding Calls / Grants | Researcher, Finance, Director |
-| Finance & Budgets | Researcher, Finance, Procurement, Director |
-| Finance Reports / Donor Reports | Finance, Director |
+| Ethics | Researcher, Director (approves JUREC) |
+| Proposals | Researcher, Coordinator, Director, Leadership, Finance |
+| Peer Reviews | University Leadership |
+| Projects | Researcher, Coordinator, Director, HR |
+| Publications | Researcher, Coordinator, Director |
+| Thesis | Researcher (supervisor), Coordinator, Director, HR |
+| Funding Calls / Grants | Researcher, Finance, Director, Leadership, Donor |
+| Finance & Budgets | Researcher, Finance, Director |
+| Finance Reports / Donor Reports | Finance, Director, Donor |
 | Audit Trail | Director, Coordinator |
-| Repository | Researcher, staff |
+| Repository | Researcher, Coordinator, Director |
 | Users / Departments | Director only |
 
 ---
@@ -254,14 +254,20 @@ On **Proposals → New proposal**:
 - **Compliance docs** — data protection, environmental, institutional, other
 - **Supporting docs** — CV, letter of support, MoU, other
 
-### Phase 3 — Roles & procurement
+### Phase 3 — Roles (current)
+
+Active roles: Director, Coordinator, Finance, Researcher, HR, Leadership, Donor.
+
+Removed: Ethics Committee, Peer Reviewer, Procurement Officer accounts.
 
 | Role | Login | Main page |
 |------|-------|-----------|
-| Ethics Committee | ethics@rms.edu | Ethics — approve JUREC |
 | Finance Officer | finance@rms.edu | Budgets — PO review + pay |
+| University Leadership | leadership@rms.edu | Peer Reviews |
 
-**PO flow:** Researcher → **Procurement** → Director → Finance
+**PO flow:** Researcher → **Finance review** → Director → Finance pays
+
+**Ethics:** Research Director only (`/ethics`)
 
 **Donor Reports** (`/donor-reports`) — grants grouped by donor reference
 

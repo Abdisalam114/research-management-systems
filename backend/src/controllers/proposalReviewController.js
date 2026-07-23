@@ -111,8 +111,18 @@ async function submitPeerReview(req, res) {
   const isDirector = req.user.role === "research_director";
   if (!assigned && !isDirector) throw new AppError("You are not assigned as reviewer", 403);
 
+  const pipe = ensureReviewPipeline(proposal);
+  if (pipe.peerReview?.status === STAGE_STATUS.PASSED) {
+    throw new AppError("Peer review stage already completed", 400);
+  }
+
   const existing = (proposal.peerReviews || []).find((r) => String(r.userId) === String(req.user.id));
   if (existing) throw new AppError("You already submitted a peer review", 400);
+
+  // Director may only submit a score when no peer reviews exist yet (otherwise complete stage)
+  if (isDirector && !assigned && (proposal.peerReviews || []).length > 0) {
+    throw new AppError("Peer reviews already submitted; complete the peer review stage instead", 400);
+  }
 
   proposal.peerReviews = proposal.peerReviews || [];
   proposal.peerReviews.push({
@@ -122,7 +132,6 @@ async function submitPeerReview(req, res) {
     at: new Date(),
   });
 
-  const pipe = ensureReviewPipeline(proposal);
   pipe.peerReview.status = STAGE_STATUS.IN_PROGRESS;
 
   const assignedIds = (proposal.assignedReviewers || [])

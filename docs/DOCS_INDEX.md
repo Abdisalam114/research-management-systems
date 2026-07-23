@@ -2,6 +2,10 @@
 
 All documentation lives in the **`docs/`** folder at the project root.
 
+**Current system (accurate):** 7 active roles — Director, Coordinator, Finance, Researcher, HR, Leadership, Donor.  
+Ethics = Research Director. Peer review = University Leadership. Purchase orders = Finance review → Director → Finance pay.  
+Removed logins: `ethics@`, `reviewer@`, `procurement@`.
+
 ## Start here / Ka bilow halkan
 
 | File | Language | Description |

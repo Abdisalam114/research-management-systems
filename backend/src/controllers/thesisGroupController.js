@@ -38,7 +38,7 @@ function facultiesMatch(a, b, fallbackName) {
 const { AppError } = require("../utils/AppError");
 const { ResearchGroup, GROUP_MEMBER_ROLES, GROUP_KINDS } = require("../models/ResearchGroup");
 const { Department } = require("../models/Department");
-const { notifyUser } = require("../utils/notify");
+const { notifyUser, notifyUsersByRole } = require("../utils/notify");
 const {
   CHAPTER_STATUSES,
   TITLE_PROPOSAL_STATUSES,
@@ -242,6 +242,39 @@ async function notifySupervisorAssignment(group, programTier) {
     link: `/thesis?groupId=${group._id}`,
     programTier,
   });
+}
+
+/** Notify Research Director + Faculty Coordinator when the supervisor updates a thesis group. */
+async function notifyStaffOfSupervisorUpdate(group, programTier, { title, body }) {
+  const link = `/thesis?groupId=${group._id}`;
+  const payload = {
+    type: "system",
+    title: title || "Thesis supervisor update",
+    body: body || "The thesis supervisor made an update.",
+    link,
+  };
+  try {
+    await notifyUsersByRole(ROLES.RESEARCH_DIRECTOR, payload, programTier);
+  } catch {
+    /* best-effort */
+  }
+  try {
+    await notifyUsersByRole(ROLES.FACULTY_COORDINATOR, payload, programTier);
+  } catch {
+    /* best-effort */
+  }
+  if (group.coordinatorId) {
+    try {
+      await notifyUser(group.coordinatorId, { ...payload, programTier });
+    } catch {
+      /* best-effort */
+    }
+  }
+}
+
+function thesisGroupLabel(group) {
+  const t = String(group?.titleProposal?.title || group?.title || "").trim();
+  return t || "Untitled thesis group";
 }
 
 async function listGroups(req, res) {
@@ -514,16 +547,10 @@ async function proposeTitle(req, res) {
   applyStudentTitleProposal(group, trimmed, userId);
   await group.save();
 
-  const notifyTarget = group.coordinatorId || group.createdBy;
-  if (notifyTarget) {
-    await notifyUser(notifyTarget, {
-      type: "system",
-      title: "Thesis title submitted for review",
-      body: `Supervisor submitted the student-chosen thesis title: "${trimmed}". Please review and accept on the Thesis page.`,
-      link: `/thesis?groupId=${group._id}`,
-      programTier: req.programTier,
-    });
-  }
+  await notifyStaffOfSupervisorUpdate(group, req.programTier, {
+    title: "Thesis title submitted for acceptance",
+    body: `Supervisor submitted title "${trimmed}" for ${thesisGroupLabel(group)}. Coordinator: Accept or Reject on Thesis.`,
+  });
 
   res.json({ group: await loadSanitizedGroup(group._id) });
 }
@@ -628,6 +655,14 @@ async function updateChapter(req, res) {
 
   await group.save();
 
+  if (isSupervisor) {
+    const chapterLabel = chapter.title || chapter.key || chapterKey;
+    await notifyStaffOfSupervisorUpdate(group, req.programTier, {
+      title: "Thesis chapter updated by supervisor",
+      body: `Supervisor updated "${chapterLabel}" → ${chapter.status} on ${thesisGroupLabel(group)}.`,
+    });
+  }
+
   res.json({ group: await loadSanitizedGroup(group._id) });
 }
 
@@ -666,6 +701,13 @@ async function addMeeting(req, res) {
   });
   group.markModified("meetings");
   await group.save();
+
+  if (isSupervisor) {
+    await notifyStaffOfSupervisorUpdate(group, req.programTier, {
+      title: "Thesis meeting logged by supervisor",
+      body: `Supervisor logged a meeting (${dateStr}) for ${thesisGroupLabel(group)}${agenda ? `: ${String(agenda).slice(0, 80)}` : ""}.`,
+    });
+  }
 
   debugLog("M1", "addMeeting saved", {
     groupId: String(group._id),

@@ -125,19 +125,17 @@ Upload PDF/DOC per type.
 
 ---
 
-## Phase 3 — New roles & procurement / Doorashooyin cusub
+## Phase 3 — Roles update / Doorashooyin (current)
 
-### 3.1 Ethics Committee (`ethics_committee`)
+### 3.1 Ethics = Research Director (no separate Ethics Committee login)
 
-**EN:** Dedicated role — can view ethics queue and **approve/reject/revise** JUREC applications (same powers as Director on ethics page).
+**EN:** Ethics / JUREC decisions are made by the **Research Director** on `/ethics`. The separate `ethics_committee` account was removed.
 
-**SO:** Guddiga anshaxa — wuxuu ansixin/diidi karaa foomka JUREC.
+**SO:** Ethics / JUREC waxaa go’aamiya **Research Director**. Akoonka `ethics_committee` waa laga saaray.
 
-**Login:** `ethics@rms.edu` / `Ethics2024!` (after seed)
+**Login:** `director@rms.edu` / `Director2024!`
 
-**Menu visible:** Ethics (+ Profile if enabled)
-
-**Note:** Director still has full ethics access.
+**Menu:** Ethics (+ full Director menus)
 
 ---
 
@@ -200,7 +198,7 @@ Click **+ Phase** to add rows. Save execution panel.
 
 **SO:** Diiwaanka isgaarsiinta mashruuca — cidda la hadlay, mawduuca, taariikhda.
 
-**Who can log:** Project owner (researcher) + staff roles (director, coordinator, finance, procurement, ethics)
+**Who can log:** Project owner (researcher) + staff roles (director, coordinator, finance)
 
 ---
 

@@ -96,18 +96,18 @@ Procurement Officer was removed — Finance reviews purchase orders before Direc
 
 **English — order:**
 1. **Admin screening** — Director/Coordinator
-2. **Peer review** — assigned reviewers
+2. **Peer review** — University Leadership (score 1–5 + comment)
 3. **Committee review** — scientific committee
-4. **Ethics review** — Ethics Committee or Director (`/ethics`)
+4. **Ethics review** — Research Director (`/ethics`)
 5. **Finance review** — Finance Officer (proposal budget)
 6. **Final decision** — Director **Approve** or **Reject**
 7. If approved → **Project** is created automatically
 
 **Somali — taxanaha:**
 1. **Admin screening**
-2. **Peer review** — reviewers la magacaabay
+2. **Peer review** — University Leadership
 3. **Committee review**
-4. **Ethics** — Ethics Committee ama Director
+4. **Ethics** — Research Director
 5. **Finance review** — Finance Officer
 6. **Go'aanka ugu dambeeya** — Director **Approve/Reject**
 7. Haddii la aqbalo → **Project** si otomaatig ah ayaa loo abuuraa
@@ -140,14 +140,14 @@ Procurement Officer was removed — Finance reviews purchase orders before Direc
 
 ---
 
-### STEP 5 — Finance & procurement / Maaliyad & iibsashada
+### STEP 5 — Finance & purchase orders / Maaliyad & PO
 
 **English:**
 1. Researcher creates **budget** for project/grant
 2. **Payment requests** — Director approves → Finance pays
 3. **Purchase orders (PO):**
    - Researcher creates PO
-   - **Procurement Officer** reviews
+   - **Finance Officer** reviews (approve/reject)
    - **Director** approves
    - **Finance** pays
 
@@ -156,7 +156,7 @@ Procurement Officer was removed — Finance reviews purchase orders before Direc
 2. **Payment requests** — Director → Finance
 3. **Purchase orders:**
    - Researcher abuuraa PO
-   - **Procurement** dib u eegis
+   - **Finance** dib u eegis
    - **Director** ansixiyo
    - **Finance** bixisaa
 
@@ -224,17 +224,17 @@ Procurement Officer was removed — Finance reviews purchase orders before Direc
 |------|-------------------|
 | Dashboard | Everyone |
 | Research Workflow | Researcher, Coordinator, Director |
-| Ethics | Researcher, Ethics Committee, Coordinator, Director |
-| Proposals | Researcher (create), staff (review) |
-| Peer Reviews | Reviewers, staff |
-| Projects | Researcher, staff |
-| Publications | Researcher, staff |
-| Thesis | Researcher (supervisor), Coordinator, Director |
-| Funding Calls / Grants | Researcher, Finance, Director |
-| Finance & Budgets | Researcher, Finance, Procurement, Director |
-| Finance Reports / Donor Reports | Finance, Director |
+| Ethics | Researcher, Director (JUREC decide) |
+| Proposals | Researcher (create), Coordinator, Director, Leadership, Finance |
+| Peer Reviews | University Leadership |
+| Projects | Researcher, Coordinator, Director, HR |
+| Publications | Researcher, Coordinator, Director |
+| Thesis | Researcher (supervisor), Coordinator, Director, HR |
+| Funding Calls / Grants | Researcher, Finance, Director, Leadership, Donor |
+| Finance & Budgets | Researcher, Finance, Director |
+| Finance Reports / Donor Reports | Finance, Director, Donor |
 | Audit Trail | Director, Coordinator |
-| Repository | Researcher, staff |
+| Repository | Researcher, Coordinator, Director |
 | Messages / Notifications | Everyone |
 | Users / Departments | Director only |
 
@@ -253,7 +253,7 @@ Director Approves → Project Created
         ↓
 Work Plan + Activities + Budget
         ↓
-Payments + Procurement
+Payments + Purchase Orders (Finance review → Director → Finance pay)
         ↓
 Publications + Repository + Progress Reports
         ↓

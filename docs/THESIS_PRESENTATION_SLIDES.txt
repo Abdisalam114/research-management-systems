@@ -46,7 +46,7 @@ Design and implement a digital Research Management System for Jamhuriya Universi
 OBJECTIVES
 1. Digitize proposal submission and review workflow
 2. Automate project creation after director approval
-3. Manage grants, budgets, payments, and procurement
+3. Manage grants, budgets, payments, and purchase orders (Finance)
 4. Track publications and institutional repository assets
 5. Provide role-based dashboards and PDF reports
 6. Support Undergraduate (UG) and Postgraduate (PG) portals
