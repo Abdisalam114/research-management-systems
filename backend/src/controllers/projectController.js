@@ -229,7 +229,7 @@ async function getProject(req, res) {
   if (!project) throw new AppError("Project not found", 404);
 
   const isOwner = String(project.researcherId?._id || project.researcherId) === String(req.user.id);
-  const isStaff = ["faculty_coordinator", "research_director", "finance_officer", "procurement_officer", "hr_officer"].includes(req.user.role);
+  const isStaff = ["faculty_coordinator", "research_director", "finance_officer", "hr_officer"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
   // Finance: return closure/finance payload only — never general project dossier.
@@ -876,7 +876,7 @@ async function addCommunicationLog(req, res) {
   if (!project) throw new AppError("Project not found", 404);
 
   const isOwner = String(project.researcherId) === String(req.user.id);
-  const isStaff = ["research_director", "faculty_coordinator", "finance_officer", "procurement_officer", "hr_officer"].includes(req.user.role);
+  const isStaff = ["research_director", "faculty_coordinator", "finance_officer", "hr_officer"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
   project.communicationLog.unshift({

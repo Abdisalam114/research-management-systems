@@ -24,10 +24,10 @@
 |------|-------------|------------------|
 | **Research Director** | Runs the whole office; final approvals | Maamulka guud; ansixinta ugu dambeysa |
 | **Faculty Coordinator** | Faculty-level review, thesis groups, reports | Daraasaadka faculty-ga; thesis groups |
-| **Finance Officer** | Budgets, payments, procurement payment, finance closure | Miisaaniyad, lacag bixin, xiritaanka maaliyadeed |
-| **Ethics Committee** | Ethics (JUREC) approve/reject | Ansixinta anshaxa (JUREC) |
-| **Procurement Officer** | Reviews purchase orders before director | Dib u eegista PO ka hor director |
+| **Finance Officer** | Budgets, PO review, payments, finance closure | Miisaaniyad, dib-u-eegis PO, lacag bixin, xiritaan |
 | **Researcher** | Proposals, projects, grants, publications, thesis supervision | Proposal, project, grant, publication, thesis |
+
+Procurement Officer was removed — Finance reviews purchase orders before Director.
 
 ---
 
@@ -49,9 +49,7 @@
 |-------|----------|------|
 | `director@rms.edu` | `Director2024!` | Director |
 | `coordinator@rms.edu` | `Coordinator2024!` | Coordinator |
-| `finance@rms.edu` | `Finance2024!` | Finance |
-| `ethics@rms.edu` | `Ethics2024!` | Ethics Committee |
-| `procurement@rms.edu` | `Procurement2024!` | Procurement |
+| `finance@rms.edu` | `Finance2024!` | Finance (PO review + pay) |
 | `asha@rms.edu` | `Researcher2024!` | Researcher |
 
 ---

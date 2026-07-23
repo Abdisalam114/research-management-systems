@@ -32,6 +32,7 @@ const { defaultChapters, TITLE_PROPOSAL_STATUSES, MIN_THESIS_GROUP_STUDENTS } = 
 const { INSTITUTIONAL_POLICY_CATALOG } = require("../constants/institutionalPolicyCatalog");
 const { InstitutionalPolicy } = require("../models/InstitutionalPolicy");
 const { INSTITUTIONAL_USERS, PORTAL_ORDER, PROGRAM_TIERS, REMOVED_INSTITUTIONAL_EMAILS } = require("./seedData");
+const {
   RECORDS_PER_TIER,
   MAX_SAMPLE_RECORDS,
   GRANT_TEMPLATES,

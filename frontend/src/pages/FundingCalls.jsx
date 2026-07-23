@@ -152,9 +152,33 @@ export function FundingCallsPage() {
 
   // Deep-link from notification "Open" → scroll/highlight that funding call
   useEffect(() => {
-    if (!callIdFromUrl || loading || !calls.length) return;
+    if (!callIdFromUrl || loading) return;
     const match = calls.find((c) => String(c.id) === String(callIdFromUrl));
-    if (!match) return;
+    // #region agent log
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify({
+        sessionId: "f558f7",
+        hypothesisId: "FC3",
+        location: "FundingCalls.jsx:deepLink",
+        message: "funding call deep-link resolve",
+        data: {
+          callIdFromUrl,
+          found: Boolean(match),
+          callsCount: calls.length,
+          role: user?.role,
+        },
+        timestamp: Date.now(),
+        runId: "fund-call-notify",
+      }),
+    }).catch(() => {});
+    // #endregion
+    if (!match) {
+      if (!calls.length) return;
+      setMessage(`Funding call not found on this portal list (id ${callIdFromUrl}). Switch portal or check eligibility.`);
+      return;
+    }
     setHighlightedCallId(String(match.id));
     if (match.status && match.status !== "all") {
       setStatusFilter(match.status === "open" || match.status === "draft" || match.status === "closed" ? match.status : "all");

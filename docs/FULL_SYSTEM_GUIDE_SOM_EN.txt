@@ -37,7 +37,7 @@ There is no separate Ethics Committee or Peer Reviewer account.
 Ma jiro akoon gooni ah oo Ethics Committee ama Peer Reviewer.
 
 Research Director
-  EN: Portal switch; create/publish funding calls (no Leadership); final proposal approve; ethics; PO after Procurement; Users; analytics
+  EN: Portal switch; create/publish funding calls (no Leadership); final proposal approve; ethics; PO after Finance review; Users; analytics
   SO: Portal; abuuri/daabaca funding calls (Leadership uma baahna); ansixinta ugu dambeysa; ethics; PO; Users; analytics
 
 University Leadership
@@ -48,17 +48,11 @@ Faculty Coordinator
   EN: Faculty proposal queue; thesis groups; Validate publications → Published; faculty reports
   SO: Proposal faculty; thesis; Validate → Published; warbixin faculty
 
-Finance Officer — MONEY (not Procurement)
-  EN: Authorize grant budget; pay budgets/payments; pay PO after Director; finance reports; finance closure
-  SO: Authorize budget; bixi lacag; bixi PO ka dib Director; reports; xiritaan maaliyadeed
-  EN: Does NOT review what to buy
-  SO: MA sameeyo dib u eegista iibsashada (Procurement)
-
-Procurement Officer — BUYING / PO (not Finance)
-  EN: Review/approve Purchase Orders before Director; does not authorize grants or pay
-  SO: Dib u eegis PO ka hor Director; ma authorize grant; ma bixin lacag
-  EN: Flow: Researcher PO → Procurement → Director → Finance pays
-  SO: Safka: Researcher PO → Procurement → Director → Finance bixisaa
+Finance Officer — MONEY + PO REVIEW
+  EN: Authorize grant budget; review PO before Director; pay budgets/payments; pay PO after Director; finance reports; finance closure
+  SO: Authorize budget; dib u eegis PO ka hor Director; bixi lacag; bixi PO ka dib Director; reports; xiritaan
+  EN: Flow: Researcher PO → Finance review → Director → Finance pays
+  SO: Safka: Researcher PO → Finance review → Director → Finance bixisaa
 
 HR Officer
   EN: Projects, thesis, groups — HR view only (no money/ethics approvals)
@@ -87,25 +81,23 @@ Somali steps:
   2. Haddii Director → dooro Undergraduate ama Postgraduate
   3. Dadka kale → hal portal kaliya
 
-Demo accounts (npm run seed) — 15 accounts:
+Demo accounts (npm run seed):
 
   director@rms.edu            Director2024!       Research Director
   coordinator@rms.edu         Coordinator2024!    Coordinator (UG)
   finance@rms.edu             Finance2024!        Finance (UG)
-  procurement@rms.edu         Procurement2024!    Procurement (UG)
   hr@rms.edu                  Hr2024!             HR (UG)
   leadership@rms.edu          Leadership2024!     Leadership (UG)
   donor@rms.edu               Donor2024!          Donor (UG)
   asha@rms.edu                Researcher2024!     Researcher UG
   coordinator.pg@rms.edu      Coordinator2024!    Coordinator (PG)
   finance.pg@rms.edu          Finance2024!        Finance (PG)
-  procurement.pg@rms.edu      Procurement2024!    Procurement (PG)
   hr.pg@rms.edu               Hr2024!             HR (PG)
   leadership.pg@rms.edu       Leadership2024!     Leadership (PG)
   donor.pg@rms.edu            Donor2024!          Donor (PG)
   mahad@rms.edu               Researcher2024!     Researcher PG
 
-Removed: ethics@rms.edu, reviewer@rms.edu
+Removed: ethics@rms.edu, reviewer@rms.edu, procurement@rms.edu, procurement.pg@rms.edu
 
 
 ================================================================================
@@ -152,17 +144,17 @@ EN: Projects → timeline, milestones, team, work plan, activities, communicatio
 SO: Projects → milestones, work plan, hawlaha, communication log, warbixinno
 Menu: Projects, Finance & Budgets
 
-STEP 5 — Finance & Procurement / Maaliyad & Iibsashada
+STEP 5 — Finance & Purchase Orders / Maaliyad & PO
 
 EN:
   1. Finance authorizes grant budget (Grant funding approval) — allocate only
   2. Researcher uses Budget / payment requests
-  3. Purchase orders: Researcher → Procurement → Director → Finance pays
+  3. Purchase orders: Researcher → Finance review → Director → Finance pays
 
 SO:
   1. Finance Authorize budget
   2. Budget / lacag bixin
-  3. PO: Researcher → Procurement → Director → Finance
+  3. PO: Researcher → Finance review → Director → Finance
 
 Menu: Grant funding approval, Finance & Budgets, Finance Reports
 
@@ -197,10 +189,10 @@ Grant funding approval — Finance only
 Project closure (Finance) — Finance only
 Peer Reviews — Director, Leadership
 Thesis — Director, Coordinator, Researcher, HR
-Funding Calls — Director, Coordinator, Finance, Researcher, Leadership, Procurement, Donor
+Funding Calls — Director, Coordinator, Finance, Researcher, Leadership, Donor
 Policies — Everyone
-Grants — Director, Coordinator, Finance, Researcher, Leadership, Procurement, Donor
-Finance & Budgets — Director, Finance, Researcher, Procurement
+Grants — Director, Coordinator, Finance, Researcher, Leadership, Donor
+Finance & Budgets — Director, Finance, Researcher
 Finance Reports — Director, Finance
 KPI Dashboard — Director, Coordinator, Leadership
 Search — Director, Coordinator, Researcher, Leadership, HR
@@ -229,7 +221,7 @@ Director Approves → Project Created · Grant pending_finance
         ↓
 Finance Authorize budget → Work Plan + Activities + Budget
         ↓
-Payments + Procurement
+Payments + Purchase Orders
         ↓
 Publications (Validate = Published) + Repository + Progress
         ↓

@@ -118,7 +118,7 @@ export function FinanceDashboard() {
         <div className="dashWelcomeCard">
           <h1 className="dashWelcomeTitle">💼 Finance Office</h1>
           <p className="dashWelcomeSub">
-            Welcome {user?.fullName} — manage budgets, payments, procurement, and grant funding.
+            Welcome {user?.fullName} — manage budgets, payments, purchase orders, and grant funding.
           </p>
         </div>
       </header>

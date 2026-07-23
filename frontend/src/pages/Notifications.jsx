@@ -47,6 +47,28 @@ export function NotificationsPage() {
     if (needsPortalSwitch) {
       selectProgramTier(n.programTier);
     }
+    // #region agent log
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify({
+        sessionId: "f558f7",
+        hypothesisId: "FC2",
+        location: "Notifications.jsx:openNotification",
+        message: "open funding/other notification",
+        data: {
+          type: n.type,
+          link: n.link || null,
+          nTier: n.programTier || null,
+          activeTier: programTier || null,
+          switched: needsPortalSwitch,
+          role: user?.role,
+        },
+        timestamp: Date.now(),
+        runId: "fund-call-notify",
+      }),
+    }).catch(() => {});
+    // #endregion
     if (n.link) {
       // Persist tier before the review/detail page fetches
       window.setTimeout(() => navigate(n.link), needsPortalSwitch ? 80 : 0);

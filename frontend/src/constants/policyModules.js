@@ -16,7 +16,7 @@ export const POLICY_MODULE_META = {
   peer_review: { label: "Peer review", route: "/review-assignments" },
   funding_calls: { label: "Funding calls", route: "/funding-calls" },
   grants_finance: { label: "Grants & finance approval", route: "/finance/grant-approvals" },
-  budgets_procurement: { label: "Budgets & procurement", route: "/budgets" },
+  budgets_procurement: { label: "Budgets & purchase orders", route: "/budgets" },
   project_closure: { label: "Project closure", route: "/finance/closures" },
   donor_reporting: { label: "Donor reporting", route: "/donor-reports" },
   kpi_analytics: { label: "KPI & analytics", route: "/kpi-dashboard" },

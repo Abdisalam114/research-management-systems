@@ -14,14 +14,15 @@ Two portals exist: Undergraduate (UG) and Postgraduate (PG). Only the Research D
 Open the app at http://localhost:5173 after starting backend (:5000) and frontend (:5173).
 
 
-2. USER JOBS — WHAT EACH ROLE DOES (8)
+2. USER JOBS — WHAT EACH ROLE DOES (7)
 
-There is no separate Ethics Committee or Peer Reviewer login. Ethics = Research Director. Peer review = University Leadership.
+There is no separate Ethics Committee, Peer Reviewer, or Procurement login.
+Ethics = Research Director. Peer review = University Leadership. Purchase orders = Finance.
 
 Research Director (director@rms.edu)
   • Switch UG/PG portals; create/publish funding calls (no Leadership step)
   • Final Approve/Reject proposals; decide ethics (JUREC)
-  • Approve POs after Procurement; manage Users & Departments
+  • Approve POs after Finance review; manage Users & Departments
   • Analytics, KPI, audit trail
 
 University Leadership (leadership@ / leadership.pg@)
@@ -34,24 +35,19 @@ Faculty Coordinator (coordinator@ / coordinator.pg@)
   • Publication workflow; Validate → Published
   • Faculty monitoring / reports
 
-Finance Officer (finance@ / finance.pg@) — MONEY (not Procurement)
+Finance Officer (finance@ / finance.pg@) — MONEY + PO REVIEW
   • Grant funding approval → Authorize budget (allocate only, not pay)
   • Proposal finance review; budgets; payment requests; pay approved items
+  • Review Purchase Orders (approve/reject) before Director
   • Pay POs after Director approval; finance reports; finance closure
-  • Does NOT decide what to buy (that is Procurement)
-
-Procurement Officer (procurement@ / procurement.pg@) — BUYING / PO (not Finance)
-  • Review Purchase Orders from researchers
-  • Approve/reject PO before Director
-  • Does NOT authorize grants; does NOT pay money
-  • Flow: Researcher PO → Procurement → Director → Finance pays
+  • Flow: Researcher PO → Finance review → Director → Finance pays
 
 HR Officer (hr@ / hr.pg@)
   • View projects, thesis, groups for HR context
   • No grant/ethics/payment approvals
 
 Donor Agency (donor@ / donor.pg@)
-  • Draft external funding calls; wait for Leadership/Director publish
+  • Draft external funding calls; wait for Director publish
   • Donor reports; monitor related grants
 
 Researcher (asha@ UG / mahad@ PG)
@@ -60,19 +56,19 @@ Researcher (asha@ UG / mahad@ PG)
   • Publications Create & submit; repository; thesis supervision; closure checklist
 
 
-3. LOGIN — 15 DEMO ACCOUNTS
+3. LOGIN — DEMO ACCOUNTS
 
 Run: cd backend && npm run seed
 
 Shared: director@rms.edu / Director2024!
 
-Undergraduate: coordinator@, finance@, procurement@, hr@, leadership@, donor@, asha@rms.edu
+Undergraduate: coordinator@, finance@, hr@, leadership@, donor@, asha@rms.edu
 Postgraduate: *.pg@rms.edu equivalents + mahad@rms.edu
-Passwords: Coordinator2024!, Finance2024!, Procurement2024!, Hr2024!, Leadership2024!, Donor2024!, Researcher2024!
+Passwords: Coordinator2024!, Finance2024!, Hr2024!, Leadership2024!, Donor2024!, Researcher2024!
 
 Director chooses UG or PG after login. All others use one portal automatically.
 
-Do not use ethics@ or reviewer@ — those roles were removed.
+Do not use ethics@, reviewer@, or procurement@ — those roles were removed.
 
 
 4. FUNDING CALLS

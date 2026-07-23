@@ -14,14 +14,15 @@ Laba portal ayaa jira: Undergraduate (UG) iyo Postgraduate (PG). Kaliya Research
 Fur app-ka: http://localhost:5173 (ka dib backend iyo frontend la shido).
 
 
-2. SHAQADA USER-KASTA (8 ROLES)
+2. SHAQADA USER-KASTA (7 ROLES)
 
-Ma jiro akoon Ethics Committee ama Peer Reviewer. Ethics = Research Director. Peer review = University Leadership.
+Ma jiro akoon Ethics Committee, Peer Reviewer, ama Procurement.
+Ethics = Research Director. Peer review = University Leadership. Purchase Orders = Finance.
 
 Research Director (director@rms.edu)
   • Beddel portal UG/PG; abuuri/daabaca funding calls (Leadership uma baahna)
   • Ansixinta ugu dambeysa proposals; go'aanka ethics (JUREC)
-  • Ansixi PO ka dib Procurement; maamul Users & Departments
+  • Ansixi PO ka dib Finance dib-u-eegis; maamul Users & Departments
   • Analytics, KPI, audit trail
 
 University Leadership (leadership@ / leadership.pg@)
@@ -34,24 +35,19 @@ Faculty Coordinator (coordinator@ / coordinator.pg@)
   • Publication workflow; Validate → Published
   • Warbixin / monitoring faculty
 
-Finance Officer (finance@ / finance.pg@) — LACAG (ma aha Procurement)
+Finance Officer (finance@ / finance.pg@) — LACAG + DIB U EEGISTA PO
   • Grant funding approval → Authorize budget (qoondee kaliya, ha bixin weli)
   • Finance review proposal; budgets; payments; bixi wax la ansixiyay
+  • Dib u eegis Purchase Orders (ansixi/diid) ka hor Director
   • Bixi PO ka dib Director; finance reports; xiritaan maaliyadeed
-  • MA go'aamin waxa la iibinayo (taasi waa Procurement)
-
-Procurement Officer (procurement@ / procurement.pg@) — IIBSASHADA / PO (ma aha Finance)
-  • Dib u eegis Purchase Orders ee researchers
-  • Ansixi/diid PO ka hor Director
-  • MA authorize grant; MA bixin lacag
-  • Safka: Researcher PO → Procurement → Director → Finance bixisaa
+  • Safka: Researcher PO → Finance review → Director → Finance bixisaa
 
 HR Officer (hr@ / hr.pg@)
   • Arag projects, thesis, groups — dhinaca HR
   • Ma ansixiyo grants/ethics/lacag
 
 Donor Agency (donor@ / donor.pg@)
-  • Draft funding calls external; sug Leadership/Director publish
+  • Draft funding calls external; sug Director publish
   • Donor reports; la soco grants
 
 Researcher (asha@ UG / mahad@ PG)
@@ -60,18 +56,18 @@ Researcher (asha@ UG / mahad@ PG)
   • Publications Create & submit; repository; thesis; closure checklist
 
 
-3. GALITAANKA — 15 AKOON DEMO
+3. GALITAANKA — AKOON DEMO
 
 Run: cd backend && npm run seed
 
 Wadaag: director@rms.edu / Director2024!
 
-Undergraduate: coordinator@, finance@, procurement@, hr@, leadership@, donor@, asha@rms.edu
+Undergraduate: coordinator@, finance@, hr@, leadership@, donor@, asha@rms.edu
 Postgraduate: *.pg@rms.edu + mahad@rms.edu / Researcher2024!
 
 Director → dooro UG ama PG. Dadka kale hal portal kaliya.
 
-Ha isticmaalin ethics@ ama reviewer@ — doorarkaas waa laga saaray nidaamka.
+Ha isticmaalin ethics@, reviewer@, ama procurement@ — doorarkaas waa laga saaray nidaamka.
 
 
 4. FUNDING CALLS

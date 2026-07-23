@@ -286,7 +286,8 @@ async function createProposal(req, res) {
         400
       );
     }
-    const call = await FundingCall.findOne(req.tierWhere({ _id: fundingCallId, status: CALL_STATUSES.OPEN }));
+    const { findOpenEligibleCall } = require("../utils/fundingCallEligibility");
+    const call = await findOpenEligibleCall(req, fundingCallId);
     if (!call) throw new AppError("Funding call not found or not open", 404);
     if (req.user.role === ROLES.RESEARCHER) assertEligibleForCall(req, call);
     linkedCallId = call._id;

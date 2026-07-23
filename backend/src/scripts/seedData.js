@@ -38,15 +38,6 @@ const PORTAL_USER_SPECS = {
       status: USER_STATUSES.ACTIVE,
     },
     {
-      fullName: "Samira Noor",
-      email: "procurement@rms.edu",
-      password: process.env.SEED_PROCUREMENT_PASSWORD || "Procurement2024!",
-      role: ROLES.PROCUREMENT_OFFICER,
-      department: "Procurement Office",
-      rank: "Officer",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
       fullName: "Fatima Ahmed",
       email: "hr@rms.edu",
       password: process.env.SEED_HR_PASSWORD || "Hr2024!",
@@ -99,15 +90,6 @@ const PORTAL_USER_SPECS = {
       password: process.env.SEED_FINANCE_PASSWORD || "Finance2024!",
       role: ROLES.FINANCE_OFFICER,
       department: "Finance Office",
-      rank: "Officer",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
-      fullName: "Omar Said",
-      email: "procurement.pg@rms.edu",
-      password: process.env.SEED_PROCUREMENT_PASSWORD || "Procurement2024!",
-      role: ROLES.PROCUREMENT_OFFICER,
-      department: "Procurement Office",
       rank: "Officer",
       status: USER_STATUSES.ACTIVE,
     },
@@ -170,6 +152,8 @@ const REMOVED_INSTITUTIONAL_EMAILS = [
   "ethics.pg@rms.edu",
   "reviewer@rms.edu",
   "reviewer.pg@rms.edu",
+  "procurement@rms.edu",
+  "procurement.pg@rms.edu",
 ];
 
 const PORTAL_ORDER = [PROGRAM_TIERS.UNDERGRADUATE, PROGRAM_TIERS.POSTGRADUATE];

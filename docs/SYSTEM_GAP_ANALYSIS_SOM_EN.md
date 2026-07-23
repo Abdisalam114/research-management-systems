@@ -40,7 +40,7 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 | Department | `faculty_coordinator` (faculty-scoped) | ✅ |
 | Research Office | `research_director` | ✅ |
 | Finance Office | `finance_officer` | ✅ |
-| Procurement Office | `procurement_officer` — PO queue before director | ✅ |
+| Finance Office | `finance_officer` — budgets, PO review before director, payments | ✅ |
 | HR Office | `hr_officer` | ⚠️ User + project/thesis access; no payroll module |
 | Ethics Committee | `ethics_committee` + Director JUREC (`/ethics`) | ✅ |
 | Reviewers | `peer_reviewer` + assign reviewers API | ⚠️ Peer review UI; not full standalone portal |

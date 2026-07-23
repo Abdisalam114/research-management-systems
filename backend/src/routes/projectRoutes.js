@@ -53,7 +53,7 @@ router.post(
   "/:id/communication",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("researcher", "research_director", "faculty_coordinator", "finance_officer", "procurement_officer"),
+  authorizeRoles("researcher", "research_director", "faculty_coordinator", "finance_officer"),
   asyncHandler(projectController.addCommunicationLog)
 );
 

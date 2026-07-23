@@ -140,25 +140,13 @@ Ethics, Profile.
 Tijaabo login: ethics@rms.edu / Ethics2024!
 
 --------------------------------------------------------------------------------
-A.6 PROCUREMENT OFFICER (Sarkaalka Iibsiga) — CUSUB July 2026
+A.6 PROCUREMENT — LA SAARAY (Finance ayaa qabata)
 --------------------------------------------------------------------------------
-Magaca nidaamka: procurement_officer
-
-Sharaxaad:
-Wuxuu dib u eegaa Purchase Orders (PO) ka hor inta aan Director u gudbin.
-
-Mas’uuliyadaha:
-  • Eegista PO-yada status = requested
-  • Approve / reject → status procurement_approved
-  • Ka dib Director → Finance bixinta
+Doorarka procurement_officer waa laga saaray nidaamka.
+Finance Officer ayaa hadda sameeya dib u eegista Purchase Orders.
 
 Socodka PO:
-  Researcher (codsiga) → Procurement Officer → Director → Finance Officer
-
-Modules-ka uu geli karo:
-Finance & Budgets (Procurement review queue), Profile.
-
-Tijaabo login: procurement@rms.edu / Procurement2024!
+  Researcher (codsiga) → Finance Officer (review) → Director → Finance Officer (pay)
 
 ================================================================================
 QAYBTA B: RESEARCH WORKFLOW STATUS — PIPELINE-KA GUUD (11 TALLAABO)
@@ -435,8 +423,8 @@ K.5 Proposal budget + compliance + supporting docs
 K.6 Work plan, activities, communication log
   Projects → execution panel — qorshe shaqo, hawlaha, isgaarsiinta.
 
-K.7 Procurement queue (Finance & Budgets)
-  procurement_officer → Director → finance_officer (PO workflow)
+K.7 Finance PO review queue (Finance & Budgets)
+  finance_officer (review) → Director → finance_officer (pay)
 
 ================================================================================
 DHAMAAD

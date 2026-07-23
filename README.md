@@ -92,13 +92,12 @@ New routes: `/kpi-dashboard` (director, coordinator, finance, leadership), `/sea
 | Researchers / PI | `researcher` | `asha@rms.edu` (UG), `mahad@rms.edu` (PG) |
 | Department | `faculty_coordinator` | `coordinator@rms.edu` |
 | Research Office | `research_director` | `director@rms.edu` |
-| Finance Office | `finance_officer` | `finance@rms.edu` |
-| Procurement Office | `procurement_officer` | `procurement@rms.edu` |
+| Finance Office | `finance_officer` | `finance@rms.edu` (also owns PO review) |
 | HR Office | `hr_officer` | `hr@rms.edu` |
-| Ethics Committee | `ethics_committee` | `ethics@rms.edu` |
-| Reviewers (peer review) | `peer_reviewer` | `reviewer@rms.edu` |
-| Leadership (final award) | `leadership` | `leadership@rms.edu` |
+| Leadership (peer review / KPI) | `leadership` | `leadership@rms.edu` |
 | Donor / External Agency | `donor_agency` | `donor@rms.edu` |
+
+Procurement Officer was removed — Finance reviews purchase orders before Director approval.
 
 ### Undergraduate (UG)
 
@@ -107,9 +106,6 @@ New routes: `/kpi-dashboard` (director, coordinator, finance, leadership), `/sea
 | Research Director | `director@rms.edu` | `Director2024!` | Dr. Catherine Morrison |
 | Faculty Coordinator | `coordinator@rms.edu` | `Coordinator2024!` | Dr. Emma Richardson |
 | Finance Officer | `finance@rms.edu` | `Finance2024!` | Michael Brooks |
-| Ethics Committee | `ethics@rms.edu` | `Ethics2024!` | Dr. Hassan Ali |
-| Procurement Officer | `procurement@rms.edu` | `Procurement2024!` | Samira Noor |
-| Peer Reviewer | `reviewer@rms.edu` | `Reviewer2024!` | Dr. Omar Khaled |
 | HR Officer | `hr@rms.edu` | `Hr2024!` | Fatima Ahmed |
 | Leadership | `leadership@rms.edu` | `Leadership2024!` | Prof. Ibrahim Warsame |
 | Donor Agency | `donor@rms.edu` | `Donor2024!` | UNESCO Program Liaison |
@@ -121,17 +117,14 @@ New routes: `/kpi-dashboard` (director, coordinator, finance, leadership), `/sea
 |------|-------|----------|------|
 | Faculty Coordinator | `coordinator.pg@rms.edu` | `Coordinator2024!` | Dr. Robert Clarke |
 | Finance Officer | `finance.pg@rms.edu` | `Finance2024!` | Linda Martinez |
-| Ethics Committee | `ethics.pg@rms.edu` | `Ethics2024!` | Dr. Amina Farah |
-| Procurement Officer | `procurement.pg@rms.edu` | `Procurement2024!` | Omar Said |
-| Peer Reviewer | `reviewer.pg@rms.edu` | `Reviewer2024!` | Dr. Layla Hassan |
 | HR Officer | `hr.pg@rms.edu` | `Hr2024!` | Yusuf Ali |
 | Leadership | `leadership.pg@rms.edu` | `Leadership2024!` | Prof. Halima Nur |
 | Donor Agency | `donor.pg@rms.edu` | `Donor2024!` | WHO EMRO Liaison |
 | Researcher | `mahad@rms.edu` | `Researcher2024!` | Dr. James Okonkwo |
 
-**Login shortcuts:** Ethics → `/ethics` · Procurement → `/budgets` · Peer Reviewer → `/review-assignments` · HR → `/projects` · Leadership → `/grants` · Donor → `/donor-reports`
+**Login shortcuts:** Finance (PO review + pay) → `/budgets` · HR → `/projects` · Leadership → `/grants` · Donor → `/donor-reports`
 
-Default passwords can be overridden via `backend/.env`: `SEED_DIRECTOR_PASSWORD`, `SEED_COORDINATOR_PASSWORD`, `SEED_FINANCE_PASSWORD`, `SEED_ETHICS_PASSWORD`, `SEED_PROCUREMENT_PASSWORD`, `SEED_REVIEWER_PASSWORD`, `SEED_HR_PASSWORD`, `SEED_LEADERSHIP_PASSWORD`, `SEED_DONOR_PASSWORD`, `SEED_RESEARCHER_PASSWORD`.
+Default passwords can be overridden via `backend/.env`: `SEED_DIRECTOR_PASSWORD`, `SEED_COORDINATOR_PASSWORD`, `SEED_FINANCE_PASSWORD`, `SEED_HR_PASSWORD`, `SEED_LEADERSHIP_PASSWORD`, `SEED_DONOR_PASSWORD`, `SEED_RESEARCHER_PASSWORD`.
 
 ## Scripts
 

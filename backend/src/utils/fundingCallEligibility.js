@@ -1,4 +1,5 @@
 const { AppError } = require("./AppError");
+const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
 
 function tierMatchesCall(req, call) {
   if (!call || call.eligibilityTier === "all") return true;
@@ -18,4 +19,20 @@ function assertEligibleForCall(req, call) {
   }
 }
 
-module.exports = { tierMatchesCall, assertEligibleForCall };
+/**
+ * Open funding call for the active portal, or (researchers only) an eligible
+ * call published on the other portal when eligibilityTier is all/ug/pg/pgd.
+ */
+async function findOpenEligibleCall(req, callId) {
+  if (!callId) return null;
+  let call = await FundingCall.findOne(req.tierWhere({ _id: callId, status: CALL_STATUSES.OPEN }));
+  if (!call && req.user?.role === "researcher") {
+    call = await FundingCall.findOne({ _id: callId, status: CALL_STATUSES.OPEN });
+    if (call && !tierMatchesCall(req, call)) {
+      throw new AppError("You are not eligible for this funding call (portal tier mismatch)", 403);
+    }
+  }
+  return call;
+}
+
+module.exports = { tierMatchesCall, assertEligibleForCall, findOpenEligibleCall };

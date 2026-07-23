@@ -16,8 +16,8 @@
 | 4 | **Project closure** | Projects → open project | Researcher → Director → Finance |
 | 5 | **Proposal budget at apply** | Proposals → New | Researcher |
 | 6 | **Compliance + supporting docs** | Proposals → New | Researcher |
-| 7 | **Ethics Committee role** | `/ethics` | `ethics_committee` |
-| 8 | **Procurement Officer role** | `/budgets` PO queue | `procurement_officer` |
+| 7 | **Ethics = Research Director** | `/ethics` | `research_director` |
+| 8 | **Finance owns PO review** | `/budgets` PO queue | `finance_officer` |
 | 9 | **Work plan + activities** | Projects → execution panel | Researcher, staff |
 | 10 | **Communication log** | Projects → execution panel | Researcher, staff |
 | 11 | **Thesis min 4 students** | `/thesis` | Coordinator, Director |
@@ -141,24 +141,24 @@ Upload PDF/DOC per type.
 
 ---
 
-### 3.2 Procurement Officer (`procurement_officer`)
+### 3.2 Finance Officer owns Purchase Order review (Procurement removed)
 
-**EN:** Reviews **Purchase Orders** before Director.
+**EN:** Finance reviews **Purchase Orders** before Director. The separate Procurement Officer role was removed.
 
-**SO:** Sarkaalka iibsiga — PO wuxuu eegaa ka hor Director.
+**SO:** Finance ayaa eega PO ka hor Director. Doorarka Procurement waa laga saaray.
 
-**Login:** `procurement@rms.edu` / `Procurement2024!`
+**Login:** `finance@rms.edu` / `Finance2024!` (UG) · `finance.pg@rms.edu` (PG)
 
 **PO workflow (updated):**
 
 ```
 Researcher creates PO (status: requested)
-    → Procurement Officer approves/rejects (procurement_approved)
+    → Finance Officer approves/rejects (status: procurement_approved — legacy status name)
     → Director approves/rejects
     → Finance pays or rejects
 ```
 
-**Where:** Finance & Budgets → **Procurement review queue** (procurement role only)
+**Where:** Finance & Budgets → **Finance PO review queue** (finance role)
 
 ---
 
@@ -224,16 +224,16 @@ Seed data updated so demo groups have 4 students each.
 
 ---
 
-## Seed accounts for new roles
+## Seed accounts (current)
 
-Run `cd backend && npm run seed` then login:
+Run `cd backend && npm run seed` then login with Finance for PO review:
 
 | Email | Password | Role |
 |-------|----------|------|
-| ethics@rms.edu | Ethics2024! | Ethics Committee |
-| procurement@rms.edu | Procurement2024! | Procurement Officer |
+| finance@rms.edu | Finance2024! | Finance Officer (UG) — PO review + pay |
+| finance.pg@rms.edu | Finance2024! | Finance Officer (PG) |
 
-(PG portal variants also seeded: `ethics.pg@…`, `procurement.pg@…`)
+Removed: `ethics@`, `reviewer@`, `procurement@` (and `.pg` variants).
 
 ---
 

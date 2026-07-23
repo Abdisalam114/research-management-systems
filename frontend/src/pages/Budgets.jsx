@@ -40,7 +40,7 @@ const STATUS_BADGE = {
 
 const BUDGET_ITEM_TYPES = [
   { value: "expense", label: "Expense" },
-  { value: "procurement", label: "Procurement" },
+  { value: "procurement", label: "Supplies / PO" },
 ];
 
 function Badge({ status }) {
@@ -91,7 +91,6 @@ export function BudgetsPage() {
   const isResearcher = user?.role === "researcher";
   const isDirector = user?.role === "research_director";
   const isFinance = user?.role === "finance_officer";
-  const isProcurement = user?.role === "procurement_officer";
   const canSeeFinanceReport = isDirector || isFinance;
 
   useEffect(() => {
@@ -266,12 +265,12 @@ export function BudgetsPage() {
   }, [payments, pos]);
 
   const directorQueuePayments = payments.filter((p) => p.status === "requested");
-  const procurementQueuePOs = pos.filter((p) => p.status === "requested");
-  const directorQueuePOs = pos.filter((p) => p.status === "procurement_approved" || p.status === "requested");
+  const financePoReviewQueue = pos.filter((p) => p.status === "requested");
+  const directorQueuePOs = pos.filter((p) => p.status === "procurement_approved");
   const financeQueuePayments = payments.filter((p) => p.status === "director_approved");
   const financeQueuePOs = pos.filter((p) => p.status === "director_approved");
 
-  async function decideProcurementPO(id, decision) {
+  async function decideFinancePoReview(id, decision) {
     if (actionBusy) return;
     let rejectedReason;
     if (decision === "reject") {
@@ -286,7 +285,7 @@ export function BudgetsPage() {
       await procurementApi.procurementDecision(accessToken, id, { decision, rejectedReason });
       await reload();
     } catch (e) {
-      setError(e?.response?.data?.message || "Failed to record procurement decision");
+      setError(e?.response?.data?.message || "Failed to record finance PO review");
     } finally {
       setActionBusy("");
     }
@@ -479,21 +478,24 @@ export function BudgetsPage() {
         />
       ) : null}
 
-      {isProcurement && procurementQueuePOs.length ? (
+      {isFinance && financePoReviewQueue.length ? (
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800 }}>Procurement review queue</div>
+          <div style={{ fontWeight: 800 }}>Finance PO review queue</div>
+          <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+            Review purchase orders before Director approval. Payment comes after Director approves.
+          </p>
           <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
-            {procurementQueuePOs.map((p) => (
+            {financePoReviewQueue.map((p) => (
               <div key={p.id} className="card" style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
                 <div>
                   <div style={{ fontWeight: 700 }}>🛒 PO: {p.vendorName}</div>
                   <div className="muted">{p.currency} {p.totalAmount} • {p.items?.length || 0} item(s)</div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button type="button" className="btn primary" disabled={Boolean(actionBusy)} onClick={() => decideProcurementPO(p.id, "approve")}>
-                    {actionBusy === `po-proc-${p.id}` ? "…" : "Approve"}
+                  <button type="button" className="btn primary" disabled={Boolean(actionBusy)} onClick={() => decideFinancePoReview(p.id, "approve")}>
+                    {actionBusy === `po-proc-${p.id}` ? "…" : "Approve for Director"}
                   </button>
-                  <button type="button" className="btn" disabled={Boolean(actionBusy)} onClick={() => decideProcurementPO(p.id, "reject")}>
+                  <button type="button" className="btn" disabled={Boolean(actionBusy)} onClick={() => decideFinancePoReview(p.id, "reject")}>
                     Reject
                   </button>
                 </div>

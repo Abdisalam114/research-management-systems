@@ -50,8 +50,7 @@ Role responsibilities:
 • Faculty Coordinator — department proposal pre-review, publication validation support, faculty-level oversight.
 • Research Director — final proposal approval (project creation), ethics review & JUREC certificate, user management, departments, institutional analytics.
 • University Leadership — peer review assignments, funding-call approval, grant awards, KPI review, institutional policy maintenance.
-• Finance Officer — grant funding approval, budgets, finance reports, project closure (finance).
-• Procurement Officer — budget-linked procurement and purchase orders.
+• Finance Officer — grant funding approval, budgets, purchase-order review (before Director), payments, finance reports, project closure (finance).
 • HR Officer — project teams, thesis groups, staff coordination modules.
 • Donor / External Agency — external funding calls and donor reporting.
 
@@ -222,18 +221,18 @@ Rules:
 Workflow:
 • Upon proposal acceptance, finance review confirms budget alignment.
 • Finance Officer approves grant funding release via Grant funding approval.
-• Grant status must be active before procurement and payment modules consume budget.
+• Grant status must be active before purchase-order and payment modules consume budget.
 • Leadership may participate in award visibility; financial authority remains with Finance and Research Director.`,
   },
   {
     moduleKey: "budgets_procurement",
     category: "funding",
-    title: "Budgets, Payments & Procurement",
+    title: "Budgets, Payments & Purchase Orders",
     body: `Budgets track allocated funds, line items, payments, and purchase orders per grant/project.
 
 Policy:
-• Researchers view budgets for owned projects; Finance and Procurement process disbursements.
-• Procurement Officer reviews purchase orders against approved budget lines before director-level clearance where required.
+• Researchers view budgets for owned projects; Finance processes disbursements and purchase-order review.
+• Finance Officer reviews purchase orders against approved budget lines before director-level clearance where required.
 • Unbudgeted expenditure requires prior written approval from Finance and the Research Director.`,
   },
   {
@@ -243,7 +242,7 @@ Policy:
     body: `Projects entering closure require finance confirmation that obligations are settled.
 
 Finance Officer:
-• Reviews remaining budget, pending payments, and procurement queues.
+• Reviews remaining budget, pending payments, and purchase-order queues.
 • Completes finance closure step before the project is marked completed institutionally.
 
 PIs must submit final progress and outputs before requesting closure.`,

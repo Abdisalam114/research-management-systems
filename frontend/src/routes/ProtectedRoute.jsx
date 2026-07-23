@@ -40,7 +40,6 @@ export function ProtectedRoute({ roles }) {
     // #endregion
     const homeByRole = {
       finance_officer: "/budgets",
-      procurement_officer: "/budgets",
       hr_officer: "/projects",
       leadership: "/grants",
       donor_agency: "/donor-reports",

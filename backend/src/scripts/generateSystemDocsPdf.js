@@ -19,9 +19,8 @@ const COLORS = {
 const ROLES = [
   ["Research Director", "research_director", "Institutional oversight, ethics review/approval, grants, user management, departments, analytics"],
   ["Faculty Coordinator", "faculty_coordinator", "Faculty proposal pre-review, publication validation, faculty reports, audit trail"],
-  ["Finance Officer", "finance_officer", "Budgets, payment disbursement, finance reports, donor reports, closure finance approval"],
+  ["Finance Officer", "finance_officer", "Budgets, PO review before director, payment disbursement, finance reports, donor reports, closure finance approval"],
   ["University Leadership", "leadership", "Peer review assignments, funding call approval, KPIs, institutional policies"],
-  ["Procurement Officer", "procurement_officer", "Purchase order review before director (/budgets queue)"],
   ["Researcher", "researcher", "Proposals (budget, compliance docs), ethics forms, projects, publications, groups, repository uploads"],
 ];
 
@@ -38,7 +37,7 @@ const FRONTEND_PAGES = [
   ["/thesis", "Thesis Groups (min 4 students)", "Director, Coordinator, Researcher"],
   ["/funding-calls", "Funding Calls", "Director, Coordinator, Finance, Researcher"],
   ["/grants", "Grants", "Director, Coordinator, Finance, Researcher"],
-  ["/budgets", "Finance & Budgets + Procurement PO queue", "Director, Finance, Researcher, Procurement Officer"],
+  ["/budgets", "Finance & Budgets + Finance PO review queue", "Director, Finance, Researcher"],
   ["/finance-reports", "Finance Reports", "Director, Finance"],
   ["/donor-reports", "Donor Reports", "Director, Finance"],
   ["/audit-trail", "Audit Trail", "Director, Coordinator"],

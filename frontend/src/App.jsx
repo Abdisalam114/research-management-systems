@@ -143,7 +143,7 @@ export default function App() {
             <Route path="/thesis-groups" element={<Navigate to="/thesis" replace />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "finance_officer", "leadership", "procurement_officer", "donor_agency"]} />}>
+          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director", "finance_officer", "leadership", "donor_agency"]} />}>
             <Route element={<ProtectedRoute roles={["researcher"]} />}>
               <Route path="/grants/apply" element={<GrantApplyPage />} />
             </Route>
@@ -160,7 +160,7 @@ export default function App() {
             <Route path="/proposals/:id/review" element={<ProposalReviewPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={["researcher", "finance_officer", "research_director", "procurement_officer"]} />}>
+          <Route element={<ProtectedRoute roles={["researcher", "finance_officer", "research_director"]} />}>
             <Route path="/budgets" element={<BudgetsPage />} />
             <Route path="/payments/:id" element={<PaymentDetailsPage />} />
           </Route>

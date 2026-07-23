@@ -55,10 +55,10 @@ Creates: `docs/DATABASE_STRUCTURE.pdf`, `docs/SYSTEM_DOCUMENTATION.pdf`
 |------|---------|--------|
 | `research_director` | Research Director — final approvals, users, analytics | Agaasimaha cilmi-baarista |
 | `faculty_coordinator` | Faculty Coordinator — faculty review, thesis | Isku-duwaha faculty-ga |
-| `finance_officer` | Finance — budgets, payments, PO payment | Sarkaalka maaliyadda |
-| `ethics_committee` | Ethics Committee — JUREC approve/reject | Guddiga anshaxa |
-| `procurement_officer` | Procurement — PO review before director | Sarkaalka iibsiga |
+| `finance_officer` | Finance — budgets, PO review, payments | Sarkaalka maaliyadda |
 | `researcher` | Researcher / PI — proposals, projects, supervision | Cilmi-baarista |
+
+Procurement Officer (`procurement_officer`) was removed — Finance owns PO review.
 
 ---
 
@@ -75,8 +75,6 @@ Creates: `docs/DATABASE_STRUCTURE.pdf`, `docs/SYSTEM_DOCUMENTATION.pdf`
 | director@rms.edu | Director2024! | Director |
 | coordinator@rms.edu | Coordinator2024! | Coordinator |
 | finance@rms.edu | Finance2024! | Finance |
-| ethics@rms.edu | Ethics2024! | Ethics Committee |
-| procurement@rms.edu | Procurement2024! | Procurement |
 | asha@rms.edu | Researcher2024! | Researcher |
 
 ---
@@ -261,7 +259,7 @@ On **Proposals → New proposal**:
 | Role | Login | Main page |
 |------|-------|-----------|
 | Ethics Committee | ethics@rms.edu | Ethics — approve JUREC |
-| Procurement Officer | procurement@rms.edu | Budgets — PO queue |
+| Finance Officer | finance@rms.edu | Budgets — PO review + pay |
 
 **PO flow:** Researcher → **Procurement** → Director → Finance
 

@@ -10,7 +10,7 @@ const { notifyUser, notifyUsersByRole } = require("../utils/notify");
 const { recordAudit } = require("../utils/audit");
 
 const { normalizeBudgetBreakdown } = require("../utils/budgetBreakdown");
-const { assertEligibleForCall } = require("../utils/fundingCallEligibility");
+const { assertEligibleForCall, findOpenEligibleCall } = require("../utils/fundingCallEligibility");
 const { buildRequirementChecklist, assertRequirementsMet } = require("../utils/fundingCallRequirements");
 const { closeExpiredOpenCalls, closeCallAfterGrantAccepted } = require("../utils/fundingCallAutoClose");
 const { ROLES } = require("../models/User");
@@ -210,11 +210,12 @@ async function resolveOpenCall(req, callId) {
     actorRole: req.user.role,
     programTier: req.programTier,
   });
-  const call = await FundingCall.findOne(req.tierWhere({ _id: callId, status: CALL_STATUSES.OPEN }));
+  const call = await findOpenEligibleCall(req, callId);
   if (!call) throw new AppError("Funding call not found or not open", 404);
   if (call.deadline && new Date(call.deadline) < new Date()) {
     throw new AppError("Funding call deadline has passed", 400);
   }
+  if (req.user.role === "researcher") assertEligibleForCall(req, call);
   return call;
 }
 
@@ -337,7 +338,6 @@ async function getGrant(req, res) {
     "faculty_coordinator",
     "leadership",
     "donor_agency",
-    "procurement_officer",
   ].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 

@@ -74,23 +74,18 @@ budgetSchema.pre("deleteMany", async function budgetDeleteManyGuard() {
   await assertNoAllocatedBudgetDelete(this.getFilter(), this.model);
 });
 
-budgetSchema.pre("save", async function budgetAllocatedLock(next) {
-  try {
-    if (this.isNew) return next();
-    if (!this.isModified("totalAllocated")) return next();
-    const prior = await this.constructor.findById(this._id).select("totalAllocated").lean();
-    const prev = Number(prior?.totalAllocated || 0);
-    const nextVal = Number(this.totalAllocated || 0);
-    // Never clear or reduce an existing allocation (system-managed)
-    if (prev > 0 && nextVal < prev) {
-      const err = new Error("Budget allocated cannot be reduced or cleared once set.");
-      err.statusCode = 400;
-      err.code = "BUDGET_ALLOCATED_LOCKED";
-      return next(err);
-    }
-    return next();
-  } catch (e) {
-    return next(e);
+budgetSchema.pre("save", async function budgetAllocatedLock() {
+  if (this.isNew) return;
+  if (!this.isModified("totalAllocated")) return;
+  const prior = await this.constructor.findById(this._id).select("totalAllocated").lean();
+  const prev = Number(prior?.totalAllocated || 0);
+  const nextVal = Number(this.totalAllocated || 0);
+  // Never clear or reduce an existing allocation (system-managed)
+  if (prev > 0 && nextVal < prev) {
+    const err = new Error("Budget allocated cannot be reduced or cleared once set.");
+    err.statusCode = 400;
+    err.code = "BUDGET_ALLOCATED_LOCKED";
+    throw err;
   }
 });
 

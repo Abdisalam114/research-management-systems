@@ -325,8 +325,9 @@ async function publishFundingCall(req, res) {
   }
   await call.save();
 
-  const callLink = `/funding-calls?callId=${call._id}`;
-  // Notify by eligibility — PG researchers (e.g. Mahad) when eligibility is pg/pgd/all
+  const listLink = `/funding-calls?callId=${call._id}`;
+  const applyLink = `/grants/apply?callId=${call._id}`;
+  // Notify by eligibility — each portal gets its own researchers with that portal's programTier
   let tiersToNotify = [call.programTier || req.programTier];
   if (call.eligibilityTier === "all") {
     tiersToNotify = [PROGRAM_TIERS.UNDERGRADUATE, PROGRAM_TIERS.POSTGRADUATE];
@@ -336,29 +337,84 @@ async function publishFundingCall(req, res) {
     tiersToNotify = [PROGRAM_TIERS.POSTGRADUATE];
   }
 
+  const notifyStats = { tiers: tiersToNotify, researcherNotified: 0, creatorNotified: false };
   try {
     for (const tier of tiersToNotify) {
+      const before = await require("../models/User").User.countDocuments({
+        role: "researcher",
+        status: "active",
+        programTier: tier,
+      });
       await notifyUsersByRole(
         "researcher",
         {
           type: "grant",
           title: "New funding call open — apply now",
-          body: `${call.title} (${call.callType === "external" ? "External" : "Internal"})`,
-          link: callLink,
+          body: `${call.title} (${call.callType === "external" ? "External" : "Internal"}) · Open to apply`,
+          link: applyLink,
+          programTier: tier,
         },
         tier
       );
+      notifyStats.researcherNotified += before;
     }
     if (call.createdBy) {
       await notifyUser(call.createdBy, {
         type: "grant",
         title: "Funding call published",
         body: call.title,
-        link: callLink,
+        link: listLink,
         programTier: call.programTier || req.programTier,
       });
+      notifyStats.creatorNotified = true;
+    }
+    // Also notify faculty coordinators on the same portal(s) so staff see the new call
+    for (const tier of tiersToNotify) {
+      await notifyUsersByRole(
+        "faculty_coordinator",
+        {
+          type: "grant",
+          title: "New funding call published",
+          body: call.title,
+          link: listLink,
+          programTier: tier,
+        },
+        tier
+      );
     }
   } catch { /* best-effort */ }
+
+  // #region agent log
+  try {
+    const fs = require("fs");
+    const path = require("path");
+    const payload = {
+      sessionId: "f558f7",
+      hypothesisId: "FC1",
+      location: "fundingCallController.publishFundingCall",
+      message: "funding call published — notifications",
+      data: {
+        callId: String(call._id),
+        title: call.title,
+        callProgramTier: call.programTier || null,
+        reqTier: req.programTier || null,
+        eligibilityTier: call.eligibilityTier,
+        tiersToNotify,
+        listLink,
+        applyLink,
+        ...notifyStats,
+      },
+      timestamp: Date.now(),
+      runId: "fund-call-notify",
+    };
+    fs.appendFileSync(path.join(__dirname, "../../../debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
+    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
+      body: JSON.stringify(payload),
+    }).catch(() => {});
+  } catch (_) { /* debug */ }
+  // #endregion
 
   await recordAudit({
     entityType: "funding_call",
@@ -371,7 +427,11 @@ async function publishFundingCall(req, res) {
     programTier: call.programTier || req.programTier,
   });
 
-  res.json({ message: "Funding call published", call: sanitizeCall(call) });
+  res.json({
+    message: "Funding call published — eligible researchers notified",
+    call: sanitizeCall(call),
+    notified: notifyStats,
+  });
 }
 
 async function closeFundingCall(req, res) {

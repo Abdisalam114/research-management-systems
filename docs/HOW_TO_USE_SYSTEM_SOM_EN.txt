@@ -50,7 +50,7 @@ EN — Job / what they do:
   • Create and publish funding calls (Internal / External) — no Leadership step
   • Final Approve / Reject on proposals
   • Decide ethics (JUREC) applications
-  • Approve purchase orders after Procurement
+  • Approve purchase orders after Finance review
   • Manage Users and Departments
   • View analytics, KPI, audit trail, all modules
 
@@ -59,7 +59,7 @@ SO — Shaqada:
   • Abuuri oo daabaca funding calls (Internal / External) — Leadership uma baahna
   • Ansixinta ugu dambeysa ee proposals
   • Go'aanka ethics (JUREC)
-  • Ansixinta PO ka dib Procurement
+  • Ansixinta PO ka dib Finance dib-u-eegis
   • Maamul Users iyo Departments
   • Analytics, KPI, audit trail
 
@@ -99,56 +99,31 @@ SO — Shaqada:
 
 
 4. Finance Officer — finance@rms.edu / finance.pg@rms.edu
-   (NOT the same as Procurement — see below)
 
-EN — Job (MONEY):
+EN — Job (MONEY + PO REVIEW):
   • Grant funding approval → Authorize budget (allocate only, not pay)
   • Finance review of proposal budgets
   • Manage budgets, payment requests, and pay approved items
+  • Review Purchase Orders (approve/reject) BEFORE Director
   • Pay purchase orders AFTER Director approved the PO
   • Finance reports and donor financial reports
   • Project closure (Finance) approval
-  • Does NOT review whether a purchase is the right item to buy (that is Procurement)
+  • Flow: Researcher creates PO → Finance reviews → Director approves → Finance pays
 
-SO — Shaqada (LACAG):
+SO — Shaqada (LACAG + DIB U EEGISTA PO):
   • Grant funding approval → Authorize budget (qoondee kaliya, ha bixin weli)
   • Dib u eegista budget-ka proposal-ka
   • Budgets, payment requests, bixinta lacagta
+  • Dib u eegis Purchase Orders (ansixi/diid) ka hor Director
   • Bixi PO ka dib Director ansixiyo
   • Finance reports / donor reports
   • Xiritaan maaliyadeed (Project closure Finance)
-  • MA sameeyo dib u eegista “maxaa la iibinayaa” (taasi waa Procurement)
+  • Safka: Researcher PO → Finance review → Director → Finance bixisaa
+
+Procurement Officer role was removed — Finance owns PO review.
 
 
-5. Procurement Officer — procurement@rms.edu / procurement.pg@rms.edu
-   (NOT the same as Finance — see below)
-
-EN — Job (BUYING / PURCHASE ORDERS):
-  • Review Purchase Orders (PO) created by researchers
-  • Approve or reject PO before Director
-  • Check that the requested goods/services match the project need
-  • Does NOT authorize grant awards
-  • Does NOT pay money (Finance pays after Director approves PO)
-  • Can view Funding Calls, Grants, and Budgets for context
-
-SO — Shaqada (IIBSASHADA / PO):
-  • Dib u eegista Purchase Orders (PO) ee researchers abuureen
-  • Ansixi ama diid PO ka hor Director
-  • Hubi in alaabta/adeegga uu ku habboon yahay mashruuca
-  • MA oggolaado grant / Authorize budget
-  • MA bixiso lacag (Finance ayaa bixisa ka dib Director)
-  • Wuu arki karaa Funding Calls, Grants, Budgets
-
-
-IMPORTANT — Finance vs Procurement / MUHIIM — Finance iyo Procurement isku mid ma aha:
-
-  Finance = lacagta (authorize grant budget, pay, reports, finance closure)
-  Procurement = iibsashada (review PO only)
-
-  Flow: Researcher creates PO → Procurement reviews → Director approves → Finance pays
-
-
-6. HR Officer — hr@rms.edu / hr.pg@rms.edu
+5. HR Officer — hr@rms.edu / hr.pg@rms.edu
 
 EN — Job:
   • View projects, thesis groups, and research groups for HR context
@@ -211,7 +186,7 @@ Somali steps:
   3. Director kaliya → dooro Undergraduate ama Postgraduate
   4. Dadka kale → portal waa automatic (.pg@ = Postgraduate)
 
-All 15 demo accounts (after: cd backend && npm run seed):
+All demo accounts (after: cd backend && npm run seed):
 
 SHARED — both portals:
   director@rms.edu / Director2024! — Research Director
@@ -219,7 +194,6 @@ SHARED — both portals:
 UNDERGRADUATE portal:
   coordinator@rms.edu / Coordinator2024! — Faculty Coordinator
   finance@rms.edu / Finance2024! — Finance Officer
-  procurement@rms.edu / Procurement2024! — Procurement Officer
   hr@rms.edu / Hr2024! — HR Officer
   leadership@rms.edu / Leadership2024! — University Leadership
   donor@rms.edu / Donor2024! — Donor Agency
@@ -228,13 +202,12 @@ UNDERGRADUATE portal:
 POSTGRADUATE portal:
   coordinator.pg@rms.edu / Coordinator2024!
   finance.pg@rms.edu / Finance2024!
-  procurement.pg@rms.edu / Procurement2024!
   hr.pg@rms.edu / Hr2024!
   leadership.pg@rms.edu / Leadership2024!
   donor.pg@rms.edu / Donor2024!
   mahad@rms.edu / Researcher2024! — Researcher (Dr. James Okonkwo)
 
-Removed / not used anymore: ethics@rms.edu, reviewer@rms.edu (roles removed from the system).
+Removed / not used anymore: ethics@rms.edu, reviewer@rms.edu, procurement@rms.edu (roles removed).
 
 
 ================================================================================
@@ -251,10 +224,10 @@ Grant funding approval — Finance Officer ONLY (/finance/grant-approvals)
 Project closure (Finance) — Finance Officer
 Peer Reviews — Director, Leadership
 Thesis — Director, Coordinator, Researcher, HR
-Funding Calls — Director, Coordinator, Finance, Researcher, Leadership, Procurement, Donor
+Funding Calls — Director, Coordinator, Finance, Researcher, Leadership, Donor
 Policies (Siyaasada) — Everyone
-Grants — Director, Coordinator, Finance, Researcher, Leadership, Procurement, Donor
-Finance & Budgets — Director, Finance, Researcher, Procurement
+Grants — Director, Coordinator, Finance, Researcher, Leadership, Donor
+Finance & Budgets — Director, Finance, Researcher
 Finance Reports — Director, Finance
 KPI Dashboard — Director, Coordinator, Leadership
 Search — Director, Coordinator, Researcher, Leadership, HR
@@ -399,8 +372,8 @@ STEP 4 — Project execution
   EN: Milestones, work plan, activities, communication log, progress reports
   SO: Milestones, work plan, hawlaha, communication log, warbixinno
 
-STEP 5 — Finance & procurement
-  EN: Finance authorizes grant budget → Budget → payment requests → PO (Procurement → Director → Finance pay)
+STEP 5 — Finance & purchase orders
+  EN: Finance authorizes grant budget → Budget → payment requests → PO (Finance review → Director → Finance pay)
   SO: Finance authorize → Budget → lacag bixin → PO
 
 STEP 6 — Outputs

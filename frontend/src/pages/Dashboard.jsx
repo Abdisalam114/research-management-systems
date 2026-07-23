@@ -33,10 +33,9 @@ function RoleDashboard({ role, user }) {
 
   const roleHints = {
     faculty_coordinator: { title: "Department (Faculty Coordinator)", focus: "Support and approve internal department priority." },
-    finance_officer: { title: "Finance Office", focus: "Approve budgets, track expenses, financial reports." },
+    finance_officer: { title: "Finance Office", focus: "Budgets, payments, purchase-order review, grant funding, and financial reports." },
     researcher: { title: "Researcher / PI", focus: "Apply for grants via funding calls, proposals, projects, reports." },
     research_director: { title: "Research Director", focus: "Issue certificates, approve proposals (creates projects), review ethics, oversee the system." },
-    procurement_officer: { title: "Procurement Office", focus: "Purchase orders and budget-linked procurement." },
     hr_officer: { title: "HR Office", focus: "Project teams, thesis groups, and staff coordination." },
     leadership: {
       title: "University Leadership",
@@ -46,11 +45,6 @@ function RoleDashboard({ role, user }) {
   };
 
   const quickLinksByRole = {
-    procurement_officer: [
-      { to: "/budgets", label: "Budgets & procurement", primary: true },
-      { to: "/grants", label: "Funded grants" },
-      { to: "/funding-calls", label: "Funding calls" },
-    ],
     hr_officer: [
       { to: "/projects", label: "Projects", primary: true },
       { to: "/thesis", label: "Thesis supervision" },
