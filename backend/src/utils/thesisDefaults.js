@@ -124,6 +124,15 @@ function buildActivityTimeline(group) {
     });
   }
 
+  if (group.finalDocument?.path && group.finalDocument?.uploadedAt) {
+    items.push({
+      type: "final_document",
+      at: group.finalDocument.uploadedAt,
+      label: "Final thesis document uploaded",
+      detail: group.finalDocument.originalName || "PDF / Word file",
+    });
+  }
+
   return items.sort((a, b) => new Date(b.at) - new Date(a.at));
 }
 

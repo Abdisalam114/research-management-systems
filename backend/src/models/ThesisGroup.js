@@ -85,6 +85,14 @@ const thesisGroupSchema = new mongoose.Schema(
     },
     meetingSchedule: { type: String, default: "", trim: true },
     meetings: { type: [meetingSchema], default: [] },
+    /** Final thesis manuscript uploaded by supervisor (PDF / Word). */
+    finalDocument: {
+      path: { type: String, default: "" },
+      originalName: { type: String, default: "" },
+      mimeType: { type: String, default: "" },
+      uploadedAt: { type: Date, default: null },
+      uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, index: true },
     ...programTierField,
   },

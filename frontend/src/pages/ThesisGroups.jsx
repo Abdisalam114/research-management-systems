@@ -10,6 +10,7 @@ import { PageHeader } from "../components/PageHeader";
 import { GroupsModuleNav } from "../components/GroupsModuleNav";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 import { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } from "../constants/faculties";
+import { apiOrigin } from "../config/apiBase";
 import "./groups.css";
 
 const MANAGE_ROLES = ["faculty_coordinator", "research_director"];
@@ -142,6 +143,9 @@ export function ThesisGroupsPage() {
   const [expandedId, setExpandedId] = useState(null);
   const [meetingForm, setMeetingForm] = useState(EMPTY_MEETING);
   const [titleForm, setTitleForm] = useState({ title: "", reviewNote: "" });
+  const [finalDocFile, setFinalDocFile] = useState(null);
+  const [markThesisCompleted, setMarkThesisCompleted] = useState(true);
+  const [uploadingFinalDoc, setUploadingFinalDoc] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
 
   const [message, setMessage] = useState("");
@@ -479,6 +483,39 @@ export function ThesisGroupsPage() {
     }
   }
 
+  async function submitFinalDocument(e, groupId) {
+    e.preventDefault();
+    if (!finalDocFile) {
+      setError("Choose a PDF or Word (.doc / .docx) file");
+      return;
+    }
+    try {
+      setError("");
+      setMessage("");
+      setUploadingFinalDoc(true);
+      const res = await thesisApi.uploadFinalThesisDocument(accessToken, groupId, {
+        file: finalDocFile,
+        markCompleted: markThesisCompleted,
+      });
+      if (res?.group) {
+        setGroups((prev) => prev.map((g) => (String(g.id) === String(groupId) ? res.group : g)));
+      }
+      setFinalDocFile(null);
+      setMarkThesisCompleted(true);
+      setExpandedId(groupId);
+      setMessage(
+        markThesisCompleted
+          ? "Final thesis uploaded and marked completed."
+          : "Final thesis document uploaded."
+      );
+      await reload();
+    } catch (e2) {
+      setError(e2?.response?.data?.message || "Failed to upload final thesis");
+    } finally {
+      setUploadingFinalDoc(false);
+    }
+  }
+
   function updateStudent(idx, field, value) {
     const next = form.students.map((s, i) => (i === idx ? { ...s, [field]: value } : s));
     setForm({ ...form, students: next });
@@ -703,9 +740,11 @@ export function ThesisGroupsPage() {
             user?.role === "researcher" && supervisorIdValue && String(supervisorIdValue) === String(user?.id);
           const canLogMeeting = canManage || isAssignedSupervisor;
           const canUpdateChapters = canManage || isAssignedSupervisor;
+          const canUploadFinalDoc = canManage || isAssignedSupervisor;
           const canEnterTitle = isAssignedSupervisor && titleStatus !== "accepted";
           const canReviewTitle = canManage && titleStatus === "pending";
           const shownTitle = displayTitle(g);
+          const finalDoc = g.finalDocument;
 
           return (
             <div
@@ -734,6 +773,12 @@ export function ThesisGroupsPage() {
                     Supervisor: <strong>{supervisorLabel(g)}</strong> • Students:{" "}
                     <strong>{g.students?.length || 0}</strong> • Meetings:{" "}
                     <strong>{g.meetings?.length || 0}</strong>
+                    {finalDoc?.path ? (
+                      <>
+                        {" "}
+                        • Final doc: <strong>uploaded</strong>
+                      </>
+                    ) : null}
                     {g.meetings?.length ? (
                       <>
                         {" "}
@@ -1032,6 +1077,73 @@ export function ThesisGroupsPage() {
                         </div>
                         <div>
                           <button type="submit" className="btn primary">+ Log meeting</button>
+                        </div>
+                      </form>
+                    ) : null}
+                  </div>
+
+                  <div className="card">
+                    <div style={{ fontWeight: 700, marginBottom: 6 }}>Final thesis document</div>
+                    <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+                      When the thesis is finished, the supervisor uploads the full manuscript as PDF or Word.
+                    </p>
+                    {finalDoc?.path ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 10,
+                          alignItems: "center",
+                          marginBottom: canUploadFinalDoc ? 12 : 0,
+                          padding: "10px 12px",
+                          borderRadius: 8,
+                          background: "rgba(22,163,74,0.08)",
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: 180 }}>
+                          <div style={{ fontWeight: 700 }}>{finalDoc.originalName || "Thesis document"}</div>
+                          {finalDoc.uploadedAt ? (
+                            <div className="muted" style={{ fontSize: 12 }}>
+                              Uploaded {formatTimelineDate(finalDoc.uploadedAt)}
+                            </div>
+                          ) : null}
+                        </div>
+                        <a
+                          className="btn"
+                          href={`${apiOrigin()}${finalDoc.path}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View / Download
+                        </a>
+                      </div>
+                    ) : (
+                      <div className="muted" style={{ marginBottom: canUploadFinalDoc ? 12 : 0 }}>
+                        No final document uploaded yet.
+                      </div>
+                    )}
+                    {canUploadFinalDoc ? (
+                      <form onSubmit={(e) => submitFinalDocument(e, g.id)} style={{ display: "grid", gap: 8 }}>
+                        <div className="field">
+                          <label>{finalDoc?.path ? "Replace with new file (PDF / DOC / DOCX)" : "Upload PDF or Word"}</label>
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            onChange={(e) => setFinalDocFile(e.target.files?.[0] || null)}
+                          />
+                        </div>
+                        <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
+                          <input
+                            type="checkbox"
+                            checked={markThesisCompleted}
+                            onChange={(e) => setMarkThesisCompleted(e.target.checked)}
+                          />
+                          Mark thesis as completed
+                        </label>
+                        <div>
+                          <button type="submit" className="btn primary" disabled={uploadingFinalDoc || !finalDocFile}>
+                            {uploadingFinalDoc ? "Uploading…" : finalDoc?.path ? "Replace final document" : "Upload final thesis"}
+                          </button>
                         </div>
                       </form>
                     ) : null}

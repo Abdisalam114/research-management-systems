@@ -151,6 +151,15 @@ function sanitize(g) {
     status: plain.status,
     meetingSchedule: plain.meetingSchedule,
     meetings: plain.meetings,
+    finalDocument: plain.finalDocument?.path
+      ? {
+          path: plain.finalDocument.path,
+          originalName: plain.finalDocument.originalName || "",
+          mimeType: plain.finalDocument.mimeType || "",
+          uploadedAt: plain.finalDocument.uploadedAt || null,
+          uploadedBy: plain.finalDocument.uploadedBy || null,
+        }
+      : null,
     activityTimeline: buildActivityTimeline(enriched),
     createdBy: plain.createdBy,
     createdAt: plain.createdAt,
@@ -726,6 +735,62 @@ async function addMeeting(req, res) {
   res.status(201).json({ message: "Meeting logged", group: sanitize(populated || group) });
 }
 
+/**
+ * Supervisor uploads final thesis (PDF / DOC / DOCX) when the work is finished.
+ * Optionally marks group status completed.
+ */
+async function uploadFinalDocument(req, res) {
+  const { role, id: userId } = req.user;
+  const { id } = req.params;
+  const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }));
+  if (!group) throw new AppError("Thesis group not found", 404);
+
+  const supervisorRef = group.supervisorId?._id || group.supervisorId;
+  const isSupervisor = supervisorRef && String(supervisorRef) === String(userId);
+  const isStaff = [ROLES.RESEARCH_DIRECTOR, ROLES.FACULTY_COORDINATOR].includes(role);
+  if (!isSupervisor && !isStaff) {
+    throw new AppError("Only the supervisor (or coordinator/director) can upload the final thesis", 403);
+  }
+
+  if (!titleIsLocked(group) && !String(group.title || "").trim()) {
+    throw new AppError("Accept the thesis title before uploading the final document", 400);
+  }
+
+  if (!req.file) throw new AppError("PDF or Word file is required", 400);
+
+  const markComplete =
+    String(req.body?.markCompleted || "").toLowerCase() === "true" || req.body?.markCompleted === true;
+
+  group.finalDocument = {
+    path: `/uploads/${req.file.filename}`,
+    originalName: req.file.originalname || req.file.filename,
+    mimeType: req.file.mimetype || "",
+    uploadedAt: new Date(),
+    uploadedBy: userId,
+  };
+
+  if (markComplete) {
+    group.status = THESIS_STATUSES.COMPLETED;
+  } else if (group.status === THESIS_STATUSES.IN_PROGRESS || group.status === THESIS_STATUSES.PROPOSED) {
+    group.status = THESIS_STATUSES.SUBMITTED;
+  }
+
+  await group.save();
+
+  const fileLabel = group.finalDocument.originalName || "thesis document";
+  await notifyStaffOfSupervisorUpdate(group, req.programTier, {
+    title: "Final thesis document uploaded",
+    body: `Supervisor uploaded "${fileLabel}" for ${thesisGroupLabel(group)}${
+      group.status === THESIS_STATUSES.COMPLETED ? " (marked completed)." : "."
+    }`,
+  });
+
+  res.json({
+    message: "Final thesis document uploaded",
+    group: await loadSanitizedGroup(group._id),
+  });
+}
+
 async function deleteGroup(req, res) {
   const { role } = req.user;
   if (role !== ROLES.RESEARCH_DIRECTOR) throw new AppError("Only the director can delete thesis groups", 403);
@@ -749,6 +814,7 @@ module.exports = {
   reviewTitleProposal,
   updateChapter,
   addMeeting,
+  uploadFinalDocument,
   deleteGroup,
   THESIS_STATUSES,
 };

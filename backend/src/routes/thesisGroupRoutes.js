@@ -3,6 +3,7 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 
 const thesisGroupController = require("../controllers/thesisGroupController");
 const { authenticateUser, requireActiveUser, authorizeRoles } = require("../middleware/auth");
+const { upload } = require("../middleware/upload");
 
 const router = express.Router();
 
@@ -52,6 +53,14 @@ router.post(
   authenticateUser,
   requireActiveUser,
   asyncHandler(thesisGroupController.addMeeting)
+);
+
+router.post(
+  "/:id/final-document",
+  authenticateUser,
+  requireActiveUser,
+  upload.single("document"),
+  asyncHandler(thesisGroupController.uploadFinalDocument)
 );
 
 router.delete(

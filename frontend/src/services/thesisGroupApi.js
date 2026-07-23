@@ -48,3 +48,14 @@ export async function deleteThesisGroup(accessToken, id) {
   const { data } = await api.delete(`/api/thesis-groups/${id}`, authHeaders(accessToken));
   return data;
 }
+
+/** Supervisor (or staff) uploads final thesis PDF / DOC / DOCX. */
+export async function uploadFinalThesisDocument(accessToken, id, { file, markCompleted = true }) {
+  const form = new FormData();
+  form.append("document", file);
+  form.append("markCompleted", markCompleted ? "true" : "false");
+  const { data } = await api.post(`/api/thesis-groups/${id}/final-document`, form, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
