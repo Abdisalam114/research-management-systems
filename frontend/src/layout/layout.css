@@ -79,8 +79,8 @@
 }
 
 .topBarBackBtn:hover {
-  background: rgba(14, 165, 233, 0.12);
-  border-color: rgba(14, 165, 233, 0.35);
+  background: var(--rms-accent-tint);
+  border-color: var(--rms-accent-border);
 }
 
 .topBarLogo {
@@ -126,8 +126,8 @@
 }
 
 .topBarIconBtn:hover {
-  background: rgba(14, 165, 233, 0.12);
-  border-color: rgba(14, 165, 233, 0.35);
+  background: var(--rms-accent-tint);
+  border-color: var(--rms-accent-border);
 }
 
 .topBarBell {
@@ -148,7 +148,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--rms-accent), #6366f1);
+  background: linear-gradient(135deg, var(--rms-accent), var(--rms-accent-strong));
   display: grid;
   place-items: center;
   font-weight: 800;
@@ -205,9 +205,9 @@
   background: rgba(255, 255, 255, 0.03);
 }
 .navItem.active {
-  background: rgba(14, 165, 233, 0.18);
-  border-color: rgba(14, 165, 233, 0.45);
-  color: var(--rms-accent);
+  background: var(--rms-accent-tint-strong);
+  border-color: var(--rms-accent-border-strong);
+  color: var(--rms-accent-soft);
 }
 
 .sidebarBrand {
@@ -341,12 +341,22 @@ a.btn {
   transform: scale(0.98);
 }
 .btn.primary {
-  background: rgba(14, 165, 233, 0.15);
-  border-color: rgba(14, 165, 233, 0.45);
+  background: var(--rms-accent-tint);
+  border-color: var(--rms-accent-border-strong);
   color: var(--rms-text-primary);
 }
 .btn.primary:hover {
-  background: rgba(14, 165, 233, 0.25);
+  background: var(--rms-accent-tint-strong);
+}
+.btn.danger {
+  background: var(--rms-danger-tint);
+  border-color: var(--rms-danger-border);
+  color: var(--rms-danger-soft);
+}
+.btn.success {
+  background: var(--rms-success-tint);
+  border-color: var(--rms-success-border);
+  color: var(--rms-success-soft);
 }
 .btn.secondary {
   width: 100%;
@@ -375,7 +385,7 @@ a.btn {
 .field textarea {
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid rgba(250, 204, 21, 0.45);
+  border: 1px solid var(--rms-input-border);
   outline: none;
 }
 
@@ -384,25 +394,25 @@ a.btn {
   min-height: 88px;
   font: inherit;
   line-height: 1.45;
-  background: rgba(0, 0, 0, 0.2);
-  color: inherit;
+  background: var(--rms-input-bg);
+  color: var(--rms-text-primary);
 }
 
 .field input {
-  background: rgba(0, 0, 0, 0.2);
-  color: inherit;
+  background: var(--rms-input-bg);
+  color: var(--rms-text-primary);
 }
 
 .field select {
   background: var(--rms-dropdown-bg);
   color: var(--rms-dropdown-text);
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 select {
   background: var(--rms-dropdown-bg);
   color: var(--rms-dropdown-text);
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 select option {
@@ -422,8 +432,8 @@ select option:hover {
 .field select:focus,
 .field textarea:focus,
 select:focus {
-  border-color: rgba(56, 189, 248, 0.55);
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
+  border-color: var(--rms-accent-border-strong);
+  box-shadow: 0 0 0 2px var(--rms-accent-tint);
 }
 
 .collaborationPage .overviewTile {

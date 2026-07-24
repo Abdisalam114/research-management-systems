@@ -18,9 +18,7 @@ const SEED_ACCOUNT_GROUPS = [
     accounts: [
       { email: "coordinator@rms.edu", password: "Coordinator2024!", role: "Faculty Coordinator" },
       { email: "finance@rms.edu", password: "Finance2024!", role: "Finance Officer" },
-      { email: "hr@rms.edu", password: "Hr2024!", role: "HR Officer" },
       { email: "leadership@rms.edu", password: "Leadership2024!", role: "University Leadership" },
-      { email: "donor@rms.edu", password: "Donor2024!", role: "Donor / Agency" },
       { email: "asha@rms.edu", password: "Researcher2024!", role: "Researcher / PI" },
     ],
   },
@@ -29,9 +27,7 @@ const SEED_ACCOUNT_GROUPS = [
     accounts: [
       { email: "coordinator.pg@rms.edu", password: "Coordinator2024!", role: "Faculty Coordinator" },
       { email: "finance.pg@rms.edu", password: "Finance2024!", role: "Finance Officer" },
-      { email: "hr.pg@rms.edu", password: "Hr2024!", role: "HR Officer" },
       { email: "leadership.pg@rms.edu", password: "Leadership2024!", role: "University Leadership" },
-      { email: "donor.pg@rms.edu", password: "Donor2024!", role: "Donor / Agency" },
       { email: "mahad@rms.edu", password: "Researcher2024!", role: "Researcher / PI" },
     ],
   },
@@ -115,9 +111,7 @@ export function LoginPage() {
                 }
                 const roleHome = {
                   finance_officer: "/budgets",
-                  hr_officer: "/projects",
                   leadership: "/grants",
-                  donor_agency: "/donor-reports",
                 };
                 navigate(roleHome[res.user?.role] || redirectTo, { replace: true });
               } catch (e) {
@@ -136,11 +130,10 @@ export function LoginPage() {
 
           <details className="seedAccountsPanel" style={{ marginTop: 16 }} open>
             <summary style={{ cursor: "pointer", fontWeight: 600 }}>
-              All demo accounts (15) — click to fill
+              All demo accounts (9) — click to fill
             </summary>
             <p className="muted" style={{ fontSize: 13, margin: "8px 0" }}>
-              Ethics Committee &amp; Peer Reviewer roles were removed. Peer review is done by{" "}
-              <strong>University Leadership</strong>.
+              Ethics, Peer Reviewer, Procurement, HR, and Donor logins were removed. Peer review is done by <strong>University Leadership</strong>; HR and donor duties are handled by the <strong>Research Director</strong>.
             </p>
             {SEED_ACCOUNT_GROUPS.map((group) => (
               <div key={group.title} style={{ marginBottom: 12 }}>

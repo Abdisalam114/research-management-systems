@@ -2,8 +2,8 @@
   margin-bottom: 20px;
   padding: 18px 20px;
   border-radius: 16px;
-  background: linear-gradient(180deg, rgba(14, 165, 233, 0.08), rgba(14, 165, 233, 0.02));
-  border: 1px solid rgba(56, 189, 248, 0.18);
+  background: linear-gradient(180deg, var(--rms-accent-tint), rgba(14, 165, 233, 0.02));
+  border: 1px solid var(--rms-accent-border);
   box-shadow: 0 8px 28px rgba(2, 6, 23, 0.35);
 }
 
@@ -55,7 +55,7 @@
   margin: 0;
   border-radius: 14px;
   background: rgba(15, 23, 42, 0.45);
-  border: 1px solid rgba(56, 189, 248, 0.14);
+  border: 1px solid var(--rms-accent-border);
 }
 
 .btnGroup .btn {
@@ -90,7 +90,7 @@
   padding: 12px 14px;
   border-radius: 12px;
   background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(56, 189, 248, 0.18);
+  border: 1px solid var(--rms-accent-border);
 }
 
 .pageHeaderStatBtn {
@@ -103,8 +103,8 @@
 }
 
 .pageHeaderStatBtn:hover {
-  background: rgba(14, 165, 233, 0.12);
-  border-color: rgba(56, 189, 248, 0.45);
+  background: var(--rms-accent-tint);
+  border-color: var(--rms-accent-border-strong);
 }
 
 .pageHeaderStatBtn:active {
@@ -112,13 +112,13 @@
 }
 
 .pageHeaderStatActive {
-  background: rgba(14, 165, 233, 0.18) !important;
-  border-color: rgba(56, 189, 248, 0.65) !important;
-  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.35);
+  background: var(--rms-accent-tint-strong) !important;
+  border-color: var(--rms-accent-border-strong) !important;
+  box-shadow: 0 0 0 1px var(--rms-accent-border);
 }
 
 .pageHeaderStatActive .pageHeaderStatValue {
-  color: #7dd3fc !important;
+  color: var(--rms-accent-soft) !important;
 }
 
 .pageHeaderStatLabel {
@@ -126,14 +126,14 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #7dd3fc;
+  color: var(--rms-accent-soft);
 }
 
 .pageHeaderStatValue {
   margin-top: 4px;
   font-size: 22px;
   font-weight: 800;
-  color: #38bdf8;
+  color: var(--rms-accent-soft);
   line-height: 1.1;
 }
 

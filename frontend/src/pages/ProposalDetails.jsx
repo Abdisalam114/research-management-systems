@@ -112,11 +112,11 @@ export function ProposalDetailsPage() {
               background:
                 (proposal.proposalKind || (proposal.fundingCallId ? "grant_fund_call" : "voluntary")) === "voluntary"
                   ? "rgba(56, 189, 248, 0.15)"
-                  : "rgba(250, 204, 21, 0.18)",
+                  : "rgba(245, 158, 11, 0.16)",
               color:
                 (proposal.proposalKind || (proposal.fundingCallId ? "grant_fund_call" : "voluntary")) === "voluntary"
                   ? "#7dd3fc"
-                  : "#fde047",
+                  : "#fbbf24",
             }}
           >
             {(proposal.proposalKind || (proposal.fundingCallId ? "grant_fund_call" : "voluntary")) === "voluntary"

@@ -140,6 +140,11 @@ async function seedUsers() {
     await User.deleteOne({ email: String(email).toLowerCase().trim() });
   }
 
+  // Drop any leftover HR / Donor (and procurement) role accounts not covered by email list
+  await User.deleteMany({
+    role: { $in: [ROLES.HR_OFFICER, ROLES.DONOR_AGENCY, ROLES.PROCUREMENT_OFFICER] },
+  });
+
   const legacyAdmin = await User.findOne({ email: "admin@rms.edu" }).select("+password");
   if (legacyAdmin) {
     legacyAdmin.fullName = "Research Director";

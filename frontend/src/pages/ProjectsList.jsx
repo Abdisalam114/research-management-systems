@@ -42,8 +42,8 @@ function ProjectCard({ p }) {
                 background:
                   kindLabel(p) === "Voluntary"
                     ? "rgba(56, 189, 248, 0.15)"
-                    : "rgba(250, 204, 21, 0.18)",
-                color: kindLabel(p) === "Voluntary" ? "#7dd3fc" : "#fde047",
+                    : "rgba(245, 158, 11, 0.16)",
+                color: kindLabel(p) === "Voluntary" ? "#7dd3fc" : "#fbbf24",
               }}
             >
               {kindLabel(p)}
@@ -213,8 +213,8 @@ export function ProjectsListPage({
       { label: "Voluntary", value: voluntaryCount, filterKey: "kind:voluntary", accent: "#38bdf8" },
       { label: "Grant Fund", value: grantCount, filterKey: "kind:grant_fund_call", accent: "#eab308" },
       { label: "Active", value: activeCount, filterKey: "active", accent: "#38bdf8" },
-      { label: "Closing", value: closingCount, filterKey: "closing", accent: "#fcd34d" },
-      { label: "Completed", value: completedCount, filterKey: "completed", accent: "#1d4ed8" },
+      { label: "Closing", value: closingCount, filterKey: "closing", accent: "#f59e0b" },
+      { label: "Completed", value: completedCount, filterKey: "completed", accent: "#16a34a" },
       ...(onHoldCount > 0 ? [{ label: "On hold", value: onHoldCount, filterKey: "on_hold" }] : []),
     ];
   }, [projects]);

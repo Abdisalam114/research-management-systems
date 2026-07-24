@@ -8,6 +8,7 @@ import { CoordinatorDashboardPage } from "./CoordinatorDashboard";
 import { ActiveProjectsPanel } from "../components/ActiveProjectsPanel";
 import { SystemModulesGrid } from "../components/SystemModulesGrid";
 import * as analyticsApi from "../services/analyticsApi";
+import { DASH_ERROR_BORDER } from "../constants/dashboardTheme";
 import "./dashboard.css";
 
 function RoleDashboard({ role, user }) {
@@ -35,32 +36,20 @@ function RoleDashboard({ role, user }) {
     faculty_coordinator: { title: "Department (Faculty Coordinator)", focus: "Support and approve internal department priority." },
     finance_officer: { title: "Finance Office", focus: "Budgets, payments, purchase-order review, grant funding, and financial reports." },
     researcher: { title: "Researcher / PI", focus: "Apply for grants via funding calls, proposals, projects, reports." },
-    research_director: { title: "Research Director", focus: "Issue certificates, approve proposals (creates projects), review ethics, oversee the system." },
-    hr_officer: { title: "HR Office", focus: "Project teams, thesis groups, and staff coordination." },
+    research_director: { title: "Research Director", focus: "Approve proposals, ethics, users, funding calls (internal & external), donor reports, and overall system oversight." },
     leadership: {
       title: "University Leadership",
       focus: "Peer review assignments, approve funding calls, grant awards, KPIs, and institutional policy (siyaasada guud).",
     },
-    donor_agency: { title: "Donor / External Agency", focus: "Create external funding calls and monitor funded grants." },
   };
 
   const quickLinksByRole = {
-    hr_officer: [
-      { to: "/projects", label: "Projects", primary: true },
-      { to: "/thesis", label: "Thesis supervision" },
-      { to: "/groups", label: "Research groups" },
-    ],
     leadership: [
       { to: "/review-assignments", label: "Peer review assignments", primary: true },
       { to: "/funding-calls", label: "Approve funding calls" },
       { to: "/policies", label: "Institutional policies" },
       { to: "/grants", label: "Grant awards" },
       { to: "/kpi-dashboard", label: "KPI dashboard" },
-    ],
-    donor_agency: [
-      { to: "/funding-calls", label: "Create external funding calls", primary: true },
-      { to: "/donor-reports", label: "Donor reports" },
-      { to: "/grants", label: "Funded grants" },
     ],
     researcher: [
       { to: "/funding-calls", label: "Apply via Funding Calls", primary: true },
@@ -97,7 +86,7 @@ function RoleDashboard({ role, user }) {
         </div>
       </header>
 
-      {error ? <div className="card" style={{ borderColor: "rgba(239,68,68,0.5)" }}>{error}</div> : null}
+      {error ? <div className="card" style={{ borderColor: DASH_ERROR_BORDER }}>{error}</div> : null}
 
       {metrics ? (
         <>

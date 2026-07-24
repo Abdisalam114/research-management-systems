@@ -16,9 +16,18 @@ import { useProgramTier } from "../hooks/useProgramTier";
 import * as analyticsApi from "../services/analyticsApi";
 import * as grantApi from "../services/grantApi";
 import { SystemModulesGrid } from "./SystemModulesGrid";
+import {
+  DASH_AXIS_TICK,
+  DASH_CHART_TOOLTIP,
+  DASH_COLORS,
+  DASH_ERROR_BORDER,
+  DASH_PIE,
+  DASH_WARNING_BG,
+  DASH_WARNING_BORDER,
+} from "../constants/dashboardTheme";
 import "../pages/dashboard.css";
 
-const PIE_COLORS = ["#0ea5e9", "#38bdf8", "#1d4ed8"];
+const PIE_COLORS = DASH_PIE;
 
 function formatMoney(n) {
   if (!n && n !== 0) return "$0";
@@ -103,7 +112,7 @@ export function FinanceDashboard() {
   if (error) {
     return (
       <div className="dashboardPage">
-        <div className="card" style={{ borderColor: "rgba(239, 68, 68, 0.5)" }}>{error}</div>
+        <div className="card" style={{ borderColor: DASH_ERROR_BORDER }}>{error}</div>
       </div>
     );
   }
@@ -133,8 +142,8 @@ export function FinanceDashboard() {
         className="card"
         style={{
           marginBottom: 16,
-          borderColor: pendingFinanceCount ? "rgba(251,191,36,0.55)" : "rgba(148,163,184,0.25)",
-          background: pendingFinanceCount ? "rgba(251,191,36,0.08)" : undefined,
+          borderColor: pendingFinanceCount ? DASH_WARNING_BORDER : "rgba(148,163,184,0.25)",
+          background: pendingFinanceCount ? DASH_WARNING_BG : undefined,
         }}
       >
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center", justifyContent: "space-between" }}>
@@ -155,7 +164,7 @@ export function FinanceDashboard() {
       <div className="overviewGrid">
         <Link to="/finance/grant-approvals" className="overviewTile" style={{ textDecoration: "none" }}>
           <div className="label">Awaiting finance</div>
-          <div className="value" style={{ color: pendingFinanceCount ? "#fcd34d" : undefined }}>
+          <div className="value" style={{ color: pendingFinanceCount ? DASH_COLORS.warning : undefined }}>
             {pendingFinanceCount}
           </div>
         </Link>
@@ -203,9 +212,7 @@ export function FinanceDashboard() {
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10 }}
-                  />
+                  <Tooltip contentStyle={DASH_CHART_TOOLTIP} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -227,18 +234,16 @@ export function FinanceDashboard() {
             <div className="dashChartPlot dashChartPlotBars">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart layout="vertical" data={grantBars} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
-                  <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 10 }} />
+                  <XAxis type="number" tick={DASH_AXIS_TICK} />
                   <YAxis
                     type="category"
                     dataKey="name"
                     width={72}
-                    tick={{ fill: "#94a3b8", fontSize: 11 }}
+                    tick={{ ...DASH_AXIS_TICK, fontSize: 11 }}
                     tickLine={false}
                   />
-                  <Tooltip
-                    contentStyle={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10 }}
-                  />
-                  <Bar dataKey="value" fill="#0ea5e9" radius={[0, 6, 6, 0]} />
+                  <Tooltip contentStyle={DASH_CHART_TOOLTIP} />
+                  <Bar dataKey="value" fill={DASH_COLORS.accent} radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -1,10 +1,8 @@
-/** Active institutional roles (procurement_officer removed — Finance owns PO review). */
+/** Active institutional roles (procurement, HR, and donor logins removed — Director owns those duties). */
 export const SYSTEM_ROLES = Object.freeze([
   "research_director",
   "faculty_coordinator",
   "finance_officer",
   "researcher",
-  "hr_officer",
   "leadership",
-  "donor_agency",
 ]);

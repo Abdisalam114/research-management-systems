@@ -65,14 +65,9 @@ export function GrantsPage() {
   const canCreate = user?.role === "researcher";
   const isDirector = user?.role === "research_director";
   const isLeadership = user?.role === "leadership";
-  const isDonor = user?.role === "donor_agency";
-  const canViewAll = ["research_director", "finance_officer", "faculty_coordinator", "leadership", "donor_agency"].includes(
+  const canViewAll = ["research_director", "finance_officer", "faculty_coordinator", "leadership"].includes(
     user?.role
   );
-
-  useEffect(() => {
-    if (isDonor) setDonorFilter(true);
-  }, [isDonor]);
 
   const load = useCallback(async () => {
     const grantParams = projectIdFromUrl ? { projectId: projectIdFromUrl } : {};
@@ -133,10 +128,10 @@ export function GrantsPage() {
         accent: "#22c55e",
         sub: "Director accepted",
       },
-      { label: "Pending finance", value: by("pending_finance"), filterKey: "pending_finance", accent: "#fcd34d" },
-      { label: "Awarded", value: awardedCount, filterKey: "awarded", accent: "#1d4ed8", sub: "From funding calls" },
+      { label: "Pending finance", value: by("pending_finance"), filterKey: "pending_finance", accent: "#f59e0b" },
+      { label: "Awarded", value: awardedCount, filterKey: "awarded", accent: "#16a34a", sub: "From funding calls" },
       { label: "Awarded $", value: `$${totalAwarded.toLocaleString()}`, accent: "#38bdf8", sub: "Total awarded amount" },
-      { label: "Active", value: by("active"), filterKey: "active", accent: "#6366f1" },
+      { label: "Active", value: by("active"), filterKey: "active", accent: "#0ea5e9" },
     ];
   }, [grants]);
 
@@ -154,10 +149,7 @@ export function GrantsPage() {
     <div>
       <PageHeader
         title="Grants & Funding"
-        subtitle={
-          isDonor
-            ? "Donor monitor view — funding-call applications only (read-only)."
-            : canCreate
+        subtitle={canCreate
               ? "Your Funding Call applications appear here (Draft → Submit → Awarded). Start from an open call."
               : "Only applications from Funding Calls appear here. Start from an open call."
         }
@@ -171,12 +163,8 @@ export function GrantsPage() {
                 Apply via Funding Calls
               </Link>
             ) : null}
-            {isDonor ? (
-              <Link className="btn primary" to="/donor-reports">
-                Donor reports
-              </Link>
-            ) : null}
-            {isDirector || isDonor ? (
+            
+            {isDirector ? (
               <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
                 <input type="checkbox" checked={donorFilter} onChange={(e) => setDonorFilter(e.target.checked)} />
                 Donor-funded only

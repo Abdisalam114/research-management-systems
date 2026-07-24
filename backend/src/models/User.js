@@ -6,11 +6,12 @@ const ROLES = Object.freeze({
   RESEARCH_DIRECTOR: "research_director",
   FACULTY_COORDINATOR: "faculty_coordinator",
   FINANCE_OFFICER: "finance_officer",
+  LEADERSHIP: "leadership",
+  RESEARCHER: "researcher",
+  // Legacy enum values kept so historic DB rows / audits still validate until cleaned
   PROCUREMENT_OFFICER: "procurement_officer",
   HR_OFFICER: "hr_officer",
-  LEADERSHIP: "leadership",
   DONOR_AGENCY: "donor_agency",
-  RESEARCHER: "researcher",
 });
 
 const USER_STATUSES = Object.freeze({

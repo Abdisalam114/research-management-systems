@@ -4,6 +4,13 @@ import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as analyticsApi from "../services/analyticsApi";
 import { PageHeader } from "../components/PageHeader";
+import {
+  DASH_SUCCESS_BG,
+  DASH_SUCCESS_BORDER,
+  DASH_WARNING_BG,
+  DASH_WARNING_BORDER,
+} from "../constants/dashboardTheme";
+import "../pages/dashboard.css";
 
 function KpiCard({ label, value, sub }) {
   return (
@@ -30,10 +37,10 @@ export function KpiDashboardPage() {
   const coverage = data?.coverageScore || {};
 
   return (
-    <div className="pageStack">
+    <div className="dashboardPage">
       <PageHeader
         title="KPI Dashboard"
-        subtitle="Leadership metrics — grant success, funding, projects, publications (Phase 5)"
+        subtitle="Leadership metrics — grant success, funding, projects, publications"
         actions={
           <Link className="btn" to="/dashboard">
             ← Dashboard
@@ -48,8 +55,8 @@ export function KpiDashboardPage() {
           <div
             className="card"
             style={{
-              borderColor: data.thesisReady ? "rgba(34,197,94,0.45)" : "rgba(251,191,36,0.45)",
-              background: data.thesisReady ? "rgba(34,197,94,0.08)" : "rgba(251,191,36,0.08)",
+              borderColor: data.thesisReady ? DASH_SUCCESS_BORDER : DASH_WARNING_BORDER,
+              background: data.thesisReady ? DASH_SUCCESS_BG : DASH_WARNING_BG,
             }}
           >
             <div style={{ fontWeight: 800 }}>

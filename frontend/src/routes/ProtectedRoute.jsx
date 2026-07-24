@@ -40,9 +40,7 @@ export function ProtectedRoute({ roles }) {
     // #endregion
     const homeByRole = {
       finance_officer: "/budgets",
-      hr_officer: "/projects",
       leadership: "/grants",
-      donor_agency: "/donor-reports",
     };
     return <Navigate to={homeByRole[user?.role] || "/dashboard"} replace />;
   }

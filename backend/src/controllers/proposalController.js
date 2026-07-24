@@ -526,7 +526,6 @@ async function listProposals(req, res) {
         "faculty_coordinator",
         "finance_officer",
         "leadership",
-        "donor_agency",
       ].includes(role)
     ) {
       throw new AppError("Forbidden", 403);

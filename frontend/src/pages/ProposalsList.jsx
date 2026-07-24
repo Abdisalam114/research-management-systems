@@ -135,8 +135,8 @@ export function ProposalsListPage() {
                           background:
                             kindLabel(p) === "Voluntary"
                               ? "rgba(56, 189, 248, 0.15)"
-                              : "rgba(250, 204, 21, 0.18)",
-                          color: kindLabel(p) === "Voluntary" ? "#7dd3fc" : "#fde047",
+                              : "rgba(245, 158, 11, 0.16)",
+                          color: kindLabel(p) === "Voluntary" ? "#7dd3fc" : "#fbbf24",
                         }}
                       >
                         {kindLabel(p)}

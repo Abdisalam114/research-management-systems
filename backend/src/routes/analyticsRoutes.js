@@ -60,7 +60,7 @@ router.get(
   "/donor-report",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("research_director", "finance_officer", "donor_agency"),
+  authorizeRoles("research_director", "finance_officer"),
   asyncHandler(analyticsController.getDonorReport)
 );
 

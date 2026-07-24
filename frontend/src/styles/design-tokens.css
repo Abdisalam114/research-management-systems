@@ -1,34 +1,68 @@
 :root {
-  /* Dark blue surfaces */
-  --rms-bg-primary: #020617;     /* deepest navy */
-  --rms-bg-secondary: #0f172a;   /* dark slate-blue */
-  --rms-bg-card: #1e293b;        /* slate-blue card */
+  /* Surfaces — navy / slate */
+  --rms-bg-primary: #020617;
+  --rms-bg-secondary: #0f172a;
+  --rms-bg-card: #1e293b;
+  --rms-bg-elevated: #243447;
 
-  /* Light blue accents */
-  --rms-accent: #0ea5e9;         /* sky-500 (light blue) */
-  --rms-accent-soft: #38bdf8;    /* sky-400 (lighter blue) */
-  --rms-accent-strong: #1d4ed8;  /* blue-700 (deep blue) */
+  /* Brand accent — sky blue family */
+  --rms-accent: #0ea5e9;
+  --rms-accent-soft: #38bdf8;
+  --rms-accent-strong: #0284c7;
+  --rms-accent-deep: #0369a1;
+  --rms-accent-tint: rgba(14, 165, 233, 0.12);
+  --rms-accent-tint-strong: rgba(14, 165, 233, 0.22);
+  --rms-accent-border: rgba(56, 189, 248, 0.35);
+  --rms-accent-border-strong: rgba(56, 189, 248, 0.55);
 
-  /* Semantic tokens — restricted to the blue family */
-  --rms-success: #38bdf8;        /* light blue (positive) */
-  --rms-warning: #7dd3fc;        /* very light blue (attention) */
-  --rms-danger:  #1d4ed8;        /* dark blue (negative) */
+  /* Semantic — clear meaning, same system */
+  --rms-success: #16a34a;
+  --rms-success-soft: #22c55e;
+  --rms-success-tint: rgba(22, 163, 74, 0.14);
+  --rms-success-border: rgba(22, 163, 74, 0.4);
+
+  --rms-warning: #f59e0b;
+  --rms-warning-soft: #fbbf24;
+  --rms-warning-tint: rgba(245, 158, 11, 0.14);
+  --rms-warning-border: rgba(245, 158, 11, 0.4);
+
+  --rms-danger: #ef4444;
+  --rms-danger-soft: #f87171;
+  --rms-danger-tint: rgba(239, 68, 68, 0.14);
+  --rms-danger-border: rgba(239, 68, 68, 0.4);
+
+  --rms-neutral: #64748b;
+  --rms-neutral-soft: #94a3b8;
 
   --rms-text-primary: #f8fafc;
   --rms-text-secondary: #94a3b8;
-  --rms-border: rgba(148, 197, 255, 0.10);
+  --rms-border: rgba(148, 197, 255, 0.12);
   --rms-shadow: 0 24px 80px rgba(2, 6, 23, 0.55);
   --rms-font: "Inter", system-ui, "Segoe UI", Roboto, sans-serif;
 
-  /* Text & list selection — light blue */
+  /* Selection */
   --rms-selection-bg: rgba(56, 189, 248, 0.42);
   --rms-selection-text: #f8fafc;
   --rms-selection-bg-strong: rgba(14, 165, 233, 0.55);
 
-  /* Dropdown — yellow background (not white) */
-  --rms-dropdown-bg: #fef08a;
-  --rms-dropdown-bg-open: #fde047;
-  --rms-dropdown-text: #1c1917;
-  --rms-dropdown-selected-bg: #facc15;
-  --rms-dropdown-selected-text: #1c1917;
+  /* Form controls — match dark navy UI (no yellow clash) */
+  --rms-input-bg: rgba(2, 6, 23, 0.45);
+  --rms-input-border: rgba(148, 197, 255, 0.22);
+  --rms-dropdown-bg: #0f172a;
+  --rms-dropdown-bg-open: #1e293b;
+  --rms-dropdown-text: #f8fafc;
+  --rms-dropdown-selected-bg: rgba(14, 165, 233, 0.28);
+  --rms-dropdown-selected-text: #f8fafc;
+
+  /* Legacy aliases used by Vite starter / older CSS */
+  --accent: var(--rms-accent);
+  --accent-bg: var(--rms-accent-tint);
+  --accent-border: var(--rms-accent-border);
+  --text: var(--rms-text-secondary);
+  --text-h: var(--rms-text-primary);
+  --bg: var(--rms-bg-primary);
+  --border: var(--rms-border);
+  --shadow: var(--rms-shadow);
+  --sans: var(--rms-font);
+  --heading: var(--rms-font);
 }

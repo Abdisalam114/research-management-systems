@@ -102,7 +102,7 @@ export function RepositoryPage() {
     const by = (s) => items.filter((i) => i.type === s).length;
     return [
       totalStatTile("Total items", items.length),
-      typeStatTile("PDF", by("document"), "document", "#1d4ed8"),
+      typeStatTile("PDF", by("document"), "document", "#0ea5e9"),
       typeStatTile("CSV / Excel", by("dataset"), "dataset", "#38bdf8"),
     ];
   }, [items]);

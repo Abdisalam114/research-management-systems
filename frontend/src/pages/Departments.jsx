@@ -118,7 +118,7 @@ export function DepartmentsPage() {
     return [
       { label: "Faculties", value: FACULTIES.length, filterKey: "all", accent: "#0ea5e9" },
       { label: "With departments", value: facultiesWithDepts, filterKey: "hasDepartments", accent: "#38bdf8" },
-      { label: "Departments", value: departments.length, filterKey: "all", accent: "#1d4ed8" },
+      { label: "Departments", value: departments.length, filterKey: "all", accent: "#0ea5e9" },
     ];
   }, [departments, departmentsByFaculty]);
 

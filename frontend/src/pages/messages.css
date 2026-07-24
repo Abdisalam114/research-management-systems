@@ -33,10 +33,10 @@
   width: 100%;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(250, 204, 21, 0.45);
+  border: 1px solid var(--rms-input-border);
   background: var(--rms-dropdown-bg);
   color: var(--rms-dropdown-text);
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 .messagesUserSelect option {
@@ -48,8 +48,8 @@
 .messagesSearch:focus,
 .messagesComposer input:focus {
   outline: none;
-  border-color: rgba(56, 189, 248, 0.55);
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
+  border-color: var(--rms-accent-border-strong);
+  box-shadow: 0 0 0 2px var(--rms-accent-tint);
 }
 
 .messagesUserSelect option:checked,

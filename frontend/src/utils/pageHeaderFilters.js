@@ -5,8 +5,8 @@ export function buildStatusFilterStats(items, statusField = "status", extraStats
     { label: "Total", value: items.length, filterKey: "all" },
     { label: "Draft", value: by("draft"), filterKey: "draft" },
     { label: "Submitted", value: by("submitted"), filterKey: "submitted", accent: "#38bdf8" },
-    { label: "Approved", value: by("approved"), filterKey: "approved", accent: "#1d4ed8" },
-    { label: "Rejected", value: by("rejected"), filterKey: "rejected" },
+    { label: "Approved", value: by("approved"), filterKey: "approved", accent: "#16a34a" },
+    { label: "Rejected", value: by("rejected"), filterKey: "rejected", accent: "#ef4444" },
   ];
   const known = new Set(base.map((s) => s.filterKey));
   const merged = [...base];

@@ -1,11 +1,10 @@
 /**
- * Shared status badge — same look as Ethics Approved (solid pill).
- * Approved / accepted / completed / active (success) → green.
+ * Shared status badge — navy/sky brand + semantic success/warning/danger.
  */
-const STATUS_COLORS = {
-  draft: "#7dd3fc",
-  submitted: "#38bdf8",
-  under_review: "#eab308",
+export const STATUS_COLORS = {
+  draft: "#64748b",
+  submitted: "#0ea5e9",
+  under_review: "#f59e0b",
   revision_requested: "#fb923c",
   pending: "#f59e0b",
   pending_finance: "#f59e0b",
@@ -16,15 +15,15 @@ const STATUS_COLORS = {
   awarded: "#16a34a",
   completed: "#16a34a",
   closed: "#64748b",
-  rejected: "#1e3a8a",
+  rejected: "#ef4444",
   on_hold: "#94a3b8",
-  closing: "#eab308",
+  closing: "#f59e0b",
   proposed: "#38bdf8",
   in_progress: "#0ea5e9",
   defended: "#16a34a",
   open: "#16a34a",
   paid: "#16a34a",
-  requested: "#38bdf8",
+  requested: "#0ea5e9",
   procurement_approved: "#0ea5e9",
   director_approved: "#0284c7",
   none: "#64748b",

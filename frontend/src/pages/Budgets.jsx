@@ -29,13 +29,13 @@ const PAYMENT_METHODS = [
 ];
 
 const STATUS_BADGE = {
-  requested: "#38bdf8",
-  director_approved: "#0ea5e9",
-  procurement_approved: "#0284c7",
-  pending: "#38bdf8",
-  approved: "#0ea5e9",
-  paid: "#1d4ed8",
-  rejected: "#1e3a8a",
+  requested: "#0ea5e9",
+  director_approved: "#0284c7",
+  procurement_approved: "#0ea5e9",
+  pending: "#f59e0b",
+  approved: "#16a34a",
+  paid: "#16a34a",
+  rejected: "#ef4444",
 };
 
 const BUDGET_ITEM_TYPES = [
@@ -388,7 +388,7 @@ export function BudgetsPage() {
       label: "Disbursed (paid)",
       value: formatMoney(totals.disbursed, totals.currency),
       sub: `Payments ${formatMoney(totals.disbursedPayments, totals.currency)} • POs ${formatMoney(totals.disbursedPOs, totals.currency)}`,
-      accent: "#1d4ed8",
+      accent: "#16a34a",
       filterKey: "disbursed",
     },
     {

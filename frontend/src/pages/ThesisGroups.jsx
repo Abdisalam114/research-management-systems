@@ -264,7 +264,7 @@ export function ThesisGroupsPage() {
         label: "With supervisor",
         value: validGroups.filter((g) => g.supervisorId).length,
         filterKey: "hasSupervisor",
-        accent: "#1d4ed8",
+        accent: "#0284c7",
       },
       { label: "Total students", value: totalStudents, filterKey: "hasStudents", accent: "#7dd3fc" },
     ];

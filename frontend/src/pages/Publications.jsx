@@ -277,7 +277,7 @@ export function PublicationsPage() {
       { label: "Total outputs", value: publications.length, filterKey: "all" },
       { label: "Draft", value: by("draft"), filterKey: "draft" },
       { label: "Submitted", value: by("submitted"), filterKey: "submitted", accent: "#38bdf8" },
-      { label: "Validated", value: by("validated"), filterKey: "validated", accent: "#1d4ed8" },
+      { label: "Validated", value: by("validated"), filterKey: "validated", accent: "#16a34a" },
       {
         label: "Published",
         value: publishedCount,

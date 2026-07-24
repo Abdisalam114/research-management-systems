@@ -36,14 +36,10 @@ const ROLE_CHECKS = {
     ["GET", "/api/proposals/my-review-assignments", [200]],
     ["GET", "/api/policies", [200]],
   ],
-  hr_officer: [
-    ["GET", "/api/analytics/dashboard", [200]],
     ["GET", "/api/projects", [200]],
     ["GET", "/api/thesis-groups", [200]],
     ["GET", "/api/policies", [200]],
   ],
-  donor_agency: [
-    ["GET", "/api/analytics/dashboard", [200]],
     ["GET", "/api/analytics/donor-report", [200]],
     ["GET", "/api/grants", [200]],
   ],

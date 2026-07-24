@@ -1,5 +1,10 @@
 const { User, USER_STATUSES, ROLES } = require("../models/User");
+const { SYSTEM_ROLES } = require("../constants/systemRoles");
 const { AppError } = require("../utils/AppError");
+
+function isAssignableRole(role) {
+  return SYSTEM_ROLES.includes(role) && role !== ROLES.RESEARCH_DIRECTOR;
+}
 
 function sanitizeUser(userDoc) {
   const tier = userDoc.programTier;
@@ -47,12 +52,13 @@ async function createUserByDirector(req, res) {
     throw new AppError("Password must be at least 6 characters", 400);
   }
 
-  if (!Object.values(ROLES).includes(role)) {
-    throw new AppError("Invalid role", 400);
-  }
-
-  if (role === ROLES.RESEARCH_DIRECTOR) {
-    throw new AppError("Research Director accounts cannot be created here", 400);
+  if (!isAssignableRole(role)) {
+    throw new AppError(
+      role === ROLES.RESEARCH_DIRECTOR
+        ? "Research Director accounts cannot be created here"
+        : "Invalid role",
+      400
+    );
   }
 
   const nextStatus =
@@ -145,7 +151,12 @@ async function updateUserByDirector(req, res) {
   if (rank !== undefined) user.rank = String(rank).trim();
 
   if (role !== undefined) {
-    if (!Object.values(ROLES).includes(role)) throw new AppError("Invalid role", 400);
+    if (!isAssignableRole(role) && role !== ROLES.RESEARCH_DIRECTOR) {
+      throw new AppError("Invalid role", 400);
+    }
+    if (role === ROLES.RESEARCH_DIRECTOR) {
+      throw new AppError("Cannot assign Research Director role here", 400);
+    }
     user.role = role;
   }
 

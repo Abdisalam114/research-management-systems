@@ -53,12 +53,13 @@ Creates: `docs/DATABASE_STRUCTURE.pdf`, `docs/SYSTEM_DOCUMENTATION.pdf`
 
 | Role | English | Somali |
 |------|---------|--------|
-| `research_director` | Research Director — final approvals, users, analytics | Agaasimaha cilmi-baarista |
+| `research_director` | Research Director — final approvals, users, analytics, ethics, external funding & donor reports | Agaasimaha cilmi-baarista |
 | `faculty_coordinator` | Faculty Coordinator — faculty review, thesis | Isku-duwaha faculty-ga |
 | `finance_officer` | Finance — budgets, PO review, payments | Sarkaalka maaliyadda |
 | `researcher` | Researcher / PI — proposals, projects, supervision | Cilmi-baarista |
+| `leadership` | University Leadership — peer review, KPI | Hogaanka jaamacadda |
 
-Procurement Officer (`procurement_officer`) was removed — Finance owns PO review.
+Procurement, HR Officer, and Donor Agency logins were removed — Finance owns PO review; Director owns former HR/donor duties.
 
 ---
 

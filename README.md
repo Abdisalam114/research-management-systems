@@ -93,11 +93,9 @@ New routes: `/kpi-dashboard` (director, coordinator, finance, leadership), `/sea
 | Department | `faculty_coordinator` | `coordinator@rms.edu` |
 | Research Office | `research_director` | `director@rms.edu` |
 | Finance Office | `finance_officer` | `finance@rms.edu` (also owns PO review) |
-| HR Office | `hr_officer` | `hr@rms.edu` |
 | Leadership (peer review / KPI) | `leadership` | `leadership@rms.edu` |
-| Donor / External Agency | `donor_agency` | `donor@rms.edu` |
 
-Procurement Officer was removed — Finance reviews purchase orders before Director approval.
+Procurement, HR Officer, and Donor Agency logins were removed. Finance owns PO review; the Research Director owns former HR visibility and external funding / donor reports.
 
 ### Undergraduate (UG)
 
@@ -106,9 +104,7 @@ Procurement Officer was removed — Finance reviews purchase orders before Direc
 | Research Director | `director@rms.edu` | `Director2024!` | Dr. Catherine Morrison |
 | Faculty Coordinator | `coordinator@rms.edu` | `Coordinator2024!` | Dr. Emma Richardson |
 | Finance Officer | `finance@rms.edu` | `Finance2024!` | Michael Brooks |
-| HR Officer | `hr@rms.edu` | `Hr2024!` | Fatima Ahmed |
 | Leadership | `leadership@rms.edu` | `Leadership2024!` | Prof. Ibrahim Warsame |
-| Donor Agency | `donor@rms.edu` | `Donor2024!` | UNESCO Program Liaison |
 | Researcher | `asha@rms.edu` | `Researcher2024!` | Dr. Sarah Chen |
 
 ### Postgraduate (PG)
@@ -117,14 +113,12 @@ Procurement Officer was removed — Finance reviews purchase orders before Direc
 |------|-------|----------|------|
 | Faculty Coordinator | `coordinator.pg@rms.edu` | `Coordinator2024!` | Dr. Robert Clarke |
 | Finance Officer | `finance.pg@rms.edu` | `Finance2024!` | Linda Martinez |
-| HR Officer | `hr.pg@rms.edu` | `Hr2024!` | Yusuf Ali |
 | Leadership | `leadership.pg@rms.edu` | `Leadership2024!` | Prof. Halima Nur |
-| Donor Agency | `donor.pg@rms.edu` | `Donor2024!` | WHO EMRO Liaison |
 | Researcher | `mahad@rms.edu` | `Researcher2024!` | Dr. James Okonkwo |
 
-**Login shortcuts:** Finance (PO review + pay) → `/budgets` · HR → `/projects` · Leadership → `/grants` · Donor → `/donor-reports`
+**Login shortcuts:** Finance (PO review + pay) → `/budgets` · Leadership → `/grants` · Director donor reports → `/donor-reports`
 
-Default passwords can be overridden via `backend/.env`: `SEED_DIRECTOR_PASSWORD`, `SEED_COORDINATOR_PASSWORD`, `SEED_FINANCE_PASSWORD`, `SEED_HR_PASSWORD`, `SEED_LEADERSHIP_PASSWORD`, `SEED_DONOR_PASSWORD`, `SEED_RESEARCHER_PASSWORD`.
+Default passwords can be overridden via `backend/.env`: `SEED_DIRECTOR_PASSWORD`, `SEED_COORDINATOR_PASSWORD`, `SEED_FINANCE_PASSWORD`, `SEED_LEADERSHIP_PASSWORD`, `SEED_RESEARCHER_PASSWORD`.
 
 ## Scripts
 

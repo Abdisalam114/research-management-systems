@@ -36,7 +36,7 @@ const INSTITUTIONAL_POLICY_CATALOG = [
 
 Scope:
 • All faculty, researchers, graduate students, and administrative offices must use RMS for research administration unless exempted in writing by the Research Office.
-• External donors and partner agencies use designated donor-agency accounts for funding calls and reporting only.
+• External donors and partner agencies are recorded via donor reference fields on funding calls; the Research Director manages external calls and donor reports (no separate donor login).
 • Records created in RMS constitute the official institutional research file for audit and accreditation purposes.`,
   },
   {
@@ -48,13 +48,11 @@ Scope:
 Role responsibilities:
 • Researcher / PI — proposals, ethics forms, projects, publications, repository uploads for owned projects.
 • Faculty Coordinator — department proposal pre-review, publication validation support, faculty-level oversight.
-• Research Director — final proposal approval (project creation), ethics review & JUREC certificate, user management, departments, institutional analytics.
-• University Leadership — peer review assignments, funding-call approval, grant awards, KPI review, institutional policy maintenance.
+• Research Director — final proposal approval (project creation), ethics review & JUREC certificate, user management, departments, institutional analytics, external funding calls, donor reporting, and former HR coordination visibility.
+• University Leadership — peer review assignments, grant awards, KPI review, institutional policy maintenance.
 • Finance Officer — grant funding approval, budgets, purchase-order review (before Director), payments, finance reports, project closure (finance).
-• HR Officer — project teams, thesis groups, staff coordination modules.
-• Donor / External Agency — external funding calls and donor reporting.
 
-Only the Research Director may create or activate user accounts.`,
+Only the Research Director may create or activate user accounts. Separate HR Officer and Donor Agency logins are not used.`,
   },
   {
     moduleKey: "program_tiers",
@@ -207,8 +205,7 @@ Process:
     body: `Funding calls announce available research funds.
 
 Rules:
-• Internal calls are created by Research Director or Leadership; external calls by Donor Agency accounts.
-• Leadership approves internal calls before they open to researchers.
+• Internal and external calls are created and published by the Research Director.
 • Calls display deadline, eligibility, and required attachments; late applications are not accepted unless extended in writing.
 • Closed calls remain visible for audit of accepted applications.`,
   },
@@ -250,11 +247,11 @@ PIs must submit final progress and outputs before requesting closure.`,
   {
     moduleKey: "donor_reporting",
     category: "funding",
-    title: "Donor Agency Reporting & External Funds",
-    body: `Donor agencies create external funding calls and access donor reports for funded activities.
+    title: "Donor Reporting & External Funds",
+    body: `The Research Director (with Finance) monitors external funding through donor reports and donor-reference fields on funding calls and grants.
 
 Requirements:
-• Donor accounts are limited to funding-call and reporting modules — not internal HR or user administration.
+• External funding calls are created by the Research Director; donor agency name/reference is stored on the call.
 • Researchers acknowledge donor terms when applying; compliance is monitored by Research Director and Finance.
 • Reports exported from RMS donor modules are suitable for external submission unless marked draft.`,
   },

@@ -16,7 +16,7 @@ export const PROGRAM_TIER_OPTIONS = [
     label: "Postgraduate",
     description: "Master, PGD, and advanced research management",
     icon: "📚",
-    accent: "#8b5cf6",
+    accent: "#0284c7",
   },
 ];
 

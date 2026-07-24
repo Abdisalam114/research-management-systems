@@ -18,7 +18,7 @@ const { canViewProjectAwards } = require("../utils/researchJourney");
 
 async function redactGrantAwardsIfNeeded(out, req) {
   if (!out?.amountAwarded) return out;
-  if (["research_director", "finance_officer", "donor_agency", "leadership"].includes(req.user.role)) {
+  if (["research_director", "finance_officer", "leadership"].includes(req.user.role)) {
     return out;
   }
   const projectId = out.projectId;
@@ -281,10 +281,6 @@ async function listGrants(req, res) {
   }
   if (callId) filter.callId = callId;
   if (role === "researcher") filter.researcherId = req.user.id;
-  // Donor agency: monitor funded / submitted grants (no drafts)
-  if (role === "donor_agency") {
-    filter.status = { $nin: ["draft"] };
-  }
   const grants = await Grant.find(req.tierWhere(filter))
     .sort({ createdAt: -1 })
     .populate("projectId", "title status")
@@ -337,7 +333,6 @@ async function getGrant(req, res) {
     "finance_officer",
     "faculty_coordinator",
     "leadership",
-    "donor_agency",
   ].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 

@@ -22,9 +22,16 @@ import { ActiveProjectsPanel } from "./ActiveProjectsPanel";
 import { MetricProvenanceBar } from "./MetricProvenanceBar";
 import { SystemModulesGrid } from "./SystemModulesGrid";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
+import {
+  DASH_AXIS_TICK,
+  DASH_CHART_TOOLTIP,
+  DASH_COLORS,
+  DASH_ERROR_BORDER,
+  DASH_PIE,
+} from "../constants/dashboardTheme";
 import "../pages/dashboard.css";
 
-const PIE_COLORS = ["#0ea5e9", "#334155", "#f59e0b"];
+const PIE_COLORS = DASH_PIE;
 
 function formatMoney(n) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
@@ -114,7 +121,7 @@ export function DirectorDashboard() {
   if (error) {
     return (
       <div className="dashboardPage">
-        <div className="card" style={{ borderColor: "rgba(239, 68, 68, 0.5)" }}>
+        <div className="card" style={{ borderColor: DASH_ERROR_BORDER }}>
           {error}
         </div>
       </div>
@@ -230,16 +237,10 @@ export function DirectorDashboard() {
             <div className="dashChartPlot">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={data.grantFunding.trends} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
-                  <XAxis dataKey="month" tick={{ fill: "#94a3b8", fontSize: 10 }} interval="preserveStartEnd" />
-                  <YAxis tick={{ fill: "#94a3b8", fontSize: 10 }} width={44} />
-                  <Tooltip
-                    contentStyle={{
-                      background: "#0f172a",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 10,
-                    }}
-                  />
-                  <Line type="monotone" dataKey="amount" stroke="#0ea5e9" strokeWidth={2} dot={false} />
+                  <XAxis dataKey="month" tick={DASH_AXIS_TICK} interval="preserveStartEnd" />
+                  <YAxis tick={DASH_AXIS_TICK} width={44} />
+                  <Tooltip contentStyle={DASH_CHART_TOOLTIP} />
+                  <Line type="monotone" dataKey="amount" stroke={DASH_COLORS.accent} strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -252,22 +253,16 @@ export function DirectorDashboard() {
             <div className="dashChartPlot dashChartPlotBars">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart layout="vertical" data={outputBars} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
-                  <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: 10 }} />
+                  <XAxis type="number" tick={DASH_AXIS_TICK} />
                   <YAxis
                     type="category"
                     dataKey="name"
                     width={84}
-                    tick={{ fill: "#94a3b8", fontSize: 11 }}
+                    tick={{ ...DASH_AXIS_TICK, fontSize: 11 }}
                     tickLine={false}
                   />
-                  <Tooltip
-                    contentStyle={{
-                      background: "#0f172a",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 10,
-                    }}
-                  />
-                  <Bar dataKey="value" fill="#0ea5e9" radius={[0, 6, 6, 0]} />
+                  <Tooltip contentStyle={DASH_CHART_TOOLTIP} />
+                  <Bar dataKey="value" fill={DASH_COLORS.accent} radius={[0, 6, 6, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>

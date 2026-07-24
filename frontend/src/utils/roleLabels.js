@@ -2,10 +2,12 @@ const ROLE_LABELS = {
   research_director: "Research Director (Research Office)",
   faculty_coordinator: "Faculty Coordinator (Department)",
   finance_officer: "Finance Officer",
-  hr_officer: "HR Officer",
   leadership: "University Leadership",
-  donor_agency: "Donor / External Agency",
   researcher: "Researcher / PI",
+  // Legacy (removed logins — kept for historic audit labels)
+  hr_officer: "HR Officer (removed)",
+  donor_agency: "Donor / External Agency (removed)",
+  procurement_officer: "Procurement Officer (removed)",
 };
 
 export function formatRole(role) {

@@ -48,13 +48,8 @@
   align-items: center;
   padding: 22px 26px;
   border-radius: 18px;
-  background: linear-gradient(
-    135deg,
-    rgba(14, 165, 233, 0.1) 0%,
-    rgba(255, 255, 255, 0.03) 42%,
-    transparent 100%
-  );
-  border: 1px solid rgba(14, 165, 233, 0.18);
+  background: linear-gradient(135deg, var(--rms-accent-tint) 0%, rgba(255, 255, 255, 0.03) 42%, transparent 100%);
+  border: 1px solid var(--rms-accent-border);
   box-shadow: var(--rms-shadow);
 }
 
@@ -188,7 +183,7 @@
 }
 
 .dashCard:hover {
-  border-color: rgba(14, 165, 233, 0.28);
+  border-color: var(--rms-accent-border);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
 }
 
@@ -394,7 +389,7 @@
   display: block;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--rms-accent), #38bdf8);
+  background: linear-gradient(90deg, var(--rms-accent), var(--rms-accent-soft));
 }
 
 .activityItem {
@@ -457,8 +452,8 @@
 
 .overviewTile:hover {
   transform: translateY(-2px);
-  border-color: rgba(14, 165, 233, 0.38);
-  box-shadow: 0 10px 28px rgba(14, 165, 233, 0.1);
+  border-color: var(--rms-accent-border-strong);
+  box-shadow: 0 10px 28px var(--rms-accent-tint);
 }
 
 .overviewTile .label {
@@ -634,4 +629,21 @@
   .pubCategoryGrid {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+.dashWorkflowStep {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--rms-accent-strong);
+}
+
+.dashProjectLink {
+  color: var(--rms-accent-soft);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.dashProjectLink:hover {
+  color: var(--rms-accent);
+  text-decoration: underline;
 }

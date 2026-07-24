@@ -38,30 +38,12 @@ const PORTAL_USER_SPECS = {
       status: USER_STATUSES.ACTIVE,
     },
     {
-      fullName: "Fatima Ahmed",
-      email: "hr@rms.edu",
-      password: process.env.SEED_HR_PASSWORD || "Hr2024!",
-      role: ROLES.HR_OFFICER,
-      department: "HR Office",
-      rank: "Officer",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
       fullName: "Prof. Ibrahim Warsame",
       email: "leadership@rms.edu",
       password: process.env.SEED_LEADERSHIP_PASSWORD || "Leadership2024!",
       role: ROLES.LEADERSHIP,
       department: "University Leadership",
       rank: "Vice Chancellor",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
-      fullName: "UNESCO Program Liaison",
-      email: "donor@rms.edu",
-      password: process.env.SEED_DONOR_PASSWORD || "Donor2024!",
-      role: ROLES.DONOR_AGENCY,
-      department: "External Donor Agency",
-      rank: "Program Officer",
       status: USER_STATUSES.ACTIVE,
     },
     {
@@ -94,30 +76,12 @@ const PORTAL_USER_SPECS = {
       status: USER_STATUSES.ACTIVE,
     },
     {
-      fullName: "Yusuf Ali",
-      email: "hr.pg@rms.edu",
-      password: process.env.SEED_HR_PASSWORD || "Hr2024!",
-      role: ROLES.HR_OFFICER,
-      department: "HR Office",
-      rank: "Officer",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
       fullName: "Prof. Halima Nur",
       email: "leadership.pg@rms.edu",
       password: process.env.SEED_LEADERSHIP_PASSWORD || "Leadership2024!",
       role: ROLES.LEADERSHIP,
       department: "University Leadership",
       rank: "Deputy Vice Chancellor",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
-      fullName: "WHO EMRO Liaison",
-      email: "donor.pg@rms.edu",
-      password: process.env.SEED_DONOR_PASSWORD || "Donor2024!",
-      role: ROLES.DONOR_AGENCY,
-      department: "External Donor Agency",
-      rank: "Grant Monitor",
       status: USER_STATUSES.ACTIVE,
     },
     {
@@ -154,6 +118,10 @@ const REMOVED_INSTITUTIONAL_EMAILS = [
   "reviewer.pg@rms.edu",
   "procurement@rms.edu",
   "procurement.pg@rms.edu",
+  "hr@rms.edu",
+  "hr.pg@rms.edu",
+  "donor@rms.edu",
+  "donor.pg@rms.edu",
 ];
 
 const PORTAL_ORDER = [PROGRAM_TIERS.UNDERGRADUATE, PROGRAM_TIERS.POSTGRADUATE];

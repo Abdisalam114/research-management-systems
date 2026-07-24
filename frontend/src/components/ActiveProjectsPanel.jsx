@@ -72,7 +72,7 @@ export function ActiveProjectsPanel({ projects, totalActive, title = "Active Pro
                 <td className="dashColStatus">
                   {p.currentStepLabel || p.workflow?.currentStepLabel ? (
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 12, color: "#0369a1" }}>
+                      <div className="dashWorkflowStep">
                         {p.currentStepLabel || p.workflow?.currentStepLabel}
                       </div>
                       <div className="muted" style={{ fontSize: 11 }}>{p.status}</div>

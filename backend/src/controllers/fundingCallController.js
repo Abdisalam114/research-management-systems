@@ -107,14 +107,6 @@ async function listFundingCalls(req, res) {
     }
   }
 
-  // Donor sees external calls (all statuses) + open internal for awareness
-  if (req.user.role === "donor_agency") {
-    filter.$or = [
-      { callType: "external" },
-      { status: CALL_STATUSES.OPEN, callType: "internal" },
-    ];
-  }
-
   let calls;
   if (req.user.role === "researcher") {
     // Researchers see: (1) open calls they are eligible for (any portal), (2) calls they already applied to
@@ -181,9 +173,6 @@ async function getFundingCall(req, res) {
       throw new AppError("Not eligible for this call", 403);
     }
   }
-  if (req.user.role === "donor_agency" && call.callType !== "external" && call.status !== CALL_STATUSES.OPEN) {
-    throw new AppError("Forbidden", 403);
-  }
   res.json({ call: sanitizeCall(call) });
 }
 
@@ -197,14 +186,10 @@ async function createFundingCall(req, res) {
   const role = req.user.role;
   let resolvedType = callType === "external" ? "external" : "internal";
 
-  if (role === "donor_agency") {
-    resolvedType = "external";
-  } else if (role === "research_director") {
-    // Director may create Internal or External institutional calls
-    resolvedType = callType === "external" ? "external" : "internal";
-  } else {
-    throw new AppError("Forbidden", 403);
+  if (role !== "research_director") {
+    throw new AppError("Only Research Director can create funding calls", 403);
   }
+  resolvedType = callType === "external" ? "external" : "internal";
   if (resolvedType === "external" && !(donorRef || "").trim()) {
     throw new AppError("Donor / agency reference is required for external funding calls", 400);
   }
@@ -245,24 +230,6 @@ async function createFundingCall(req, res) {
     programTier: portalTier,
   });
 
-  // Donor drafts notify Director to publish — Leadership is not required for funding calls
-  if (role === "donor_agency") {
-    try {
-      await notifyUsersByRole(
-        "research_director",
-        {
-          type: "grant",
-          title: "External funding call draft ready",
-          body: `${call.title} — open Funding Calls and Publish when ready (no Leadership step).`,
-          link: `/funding-calls?callId=${call._id}`,
-        },
-        portalTier
-      );
-    } catch {
-      /* best-effort */
-    }
-  }
-
   res.status(201).json({ call: sanitizeCall(call) });
 }
 
@@ -272,11 +239,8 @@ async function updateFundingCall(req, res) {
   if (call.status !== CALL_STATUSES.DRAFT) throw new AppError("Only draft calls can be edited", 400);
 
   const role = req.user.role;
-  if (role === "donor_agency") {
-    if (call.callType !== "external") throw new AppError("Donors may only edit external funding calls", 403);
-    if (!isCallOwner(call, req.user.id)) throw new AppError("You can only edit funding calls you created", 403);
-  } else if (role !== "research_director") {
-    throw new AppError("Only Research Director or the donor owner can edit draft funding calls", 403);
+  if (role !== "research_director") {
+    throw new AppError("Only Research Director can edit draft funding calls", 403);
   }
 
   const fields = ["title", "description", "fundingSource", "donorRef", "amountCap", "currency", "deadline", "eligibilityTier", "requiredDocuments", "callType"];
@@ -286,15 +250,11 @@ async function updateFundingCall(req, res) {
       else if (f === "amountCap") call.amountCap = Number(req.body.amountCap) || 0;
       else if (f === "currency") call.currency = String(req.body.currency).trim().toUpperCase();
       else if (f === "callType") {
-        if (role === "donor_agency") call.callType = "external";
-        else if (["internal", "external"].includes(req.body.callType)) call.callType = req.body.callType;
+        if (["internal", "external"].includes(req.body.callType)) call.callType = req.body.callType;
       }
       else call[f] = String(req.body[f]).trim();
     }
   }
-
-  // Donor stays external; director may set internal or external
-  if (role === "donor_agency") call.callType = "external";
 
   if (call.callType === "external" && !(call.donorRef || "").trim()) {
     throw new AppError("Donor / agency reference is required for external funding calls", 400);
@@ -440,9 +400,7 @@ async function closeFundingCall(req, res) {
   if (call.status !== CALL_STATUSES.OPEN) throw new AppError("Only open calls can be closed", 400);
 
   const role = req.user.role;
-  const allowed =
-    role === "research_director" ||
-    (role === "donor_agency" && call.callType === "external" && isCallOwner(call, req.user.id));
+  const allowed = role === "research_director";
   if (!allowed) throw new AppError("Forbidden", 403);
 
   call.status = CALL_STATUSES.CLOSED;

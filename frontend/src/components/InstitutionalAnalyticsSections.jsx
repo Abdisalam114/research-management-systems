@@ -1,4 +1,5 @@
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
+import { DASH_AXIS_TICK, DASH_CHART_TOOLTIP, DASH_COLORS } from "../constants/dashboardTheme";
 
 export function InstitutionalAnalyticsSections({ data }) {
   if (!data) return null;
@@ -16,10 +17,6 @@ export function InstitutionalAnalyticsSections({ data }) {
   return (
     <section id="institutional-analytics" className="dashAnalyticsSection">
       <h2 className="dashSectionTitle">Institutional analytics</h2>
-      <p className="muted dashSectionSub">
-        Budget workflow, research groups, publications, and repository — counts from database; tables show the most recent records.
-      </p>
-
       <p className="muted dashSectionSub">
         Budget workflow, research groups, publications, and repository — counts from database; tables show the most recent records.
       </p>
@@ -48,16 +45,10 @@ export function InstitutionalAnalyticsSections({ data }) {
           <div className="dashChartPlot">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={budgetChart} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
-                <XAxis dataKey="name" tick={{ fill: "#94a3b8", fontSize: 11 }} />
-                <YAxis tick={{ fill: "#94a3b8", fontSize: 11 }} width={36} />
-                <Tooltip
-                  contentStyle={{
-                    background: "#0f172a",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: 10,
-                  }}
-                />
-                <Bar dataKey="value" fill="#0ea5e9" radius={[8, 8, 0, 0]} />
+                <XAxis dataKey="name" tick={{ ...DASH_AXIS_TICK, fontSize: 11 }} />
+                <YAxis tick={{ ...DASH_AXIS_TICK, fontSize: 11 }} width={36} />
+                <Tooltip contentStyle={DASH_CHART_TOOLTIP} />
+                <Bar dataKey="value" fill={DASH_COLORS.accent} radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

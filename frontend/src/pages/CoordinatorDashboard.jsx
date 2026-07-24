@@ -5,6 +5,7 @@ import * as analyticsApi from "../services/analyticsApi";
 import * as proposalApi from "../services/proposalApi";
 import { ActiveProjectsPanel } from "../components/ActiveProjectsPanel";
 import { SystemModulesGrid } from "../components/SystemModulesGrid";
+import { DASH_ERROR_BORDER } from "../constants/dashboardTheme";
 import "./dashboard.css";
 
 export function CoordinatorDashboardPage() {
@@ -87,7 +88,7 @@ export function CoordinatorDashboardPage() {
         <p className="dashPageSub">Faculty Coordinator — {user?.department || "your faculty"}</p>
       </header>
 
-      {error ? <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>{error}</div> : null}
+      {error ? <div className="card" style={{ borderColor: DASH_ERROR_BORDER }}>{error}</div> : null}
 
       {metrics ? (
         <>

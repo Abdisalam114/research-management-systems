@@ -7,7 +7,6 @@ import { PageHeader } from "../components/PageHeader";
 export function DonorReportsPage() {
   const { accessToken, user } = useAuth();
   const { programTier } = useProgramTier();
-  const isDonor = user?.role === "donor_agency";
   const [report, setReport] = useState(null);
   const [error, setError] = useState("");
 
@@ -40,10 +39,7 @@ export function DonorReportsPage() {
     <div>
       <PageHeader
         title="Donor reports"
-        subtitle={
-          isDonor
-            ? "Your agency accountability view — grants, awards, and funding calls (read-only)."
-            : `Generated ${new Date(report.generatedAt).toLocaleString()} · ${report.donors?.length || 0} donor references`
+        subtitle={`Generated ${new Date(report.generatedAt).toLocaleString()} · ${report.donors?.length || 0} donor references`
         }
       />
 
