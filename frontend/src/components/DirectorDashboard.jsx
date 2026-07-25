@@ -136,7 +136,9 @@ export function DirectorDashboard() {
     <div className="dashboardPage">
       <header className="dashPageHeader">
         <h1 className="dashPageTitle">Institutional Dashboard</h1>
-        <p className="dashPageSub">All Jamhuriya RMS modules — live, consistent counts across the system.</p>
+        <p className="dashPageSub">
+          All Jamhuriya RMS modules — live counts across Undergraduate and Postgraduate.
+        </p>
       </header>
 
       <section className="dashboardSection">

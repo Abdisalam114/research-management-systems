@@ -203,7 +203,9 @@ function buildMonthlyGrantTrends(grants) {
 }
 
 async function buildInstitutionalAnalytics(programTier) {
-  const tf = (base = {}) => ({ ...base, programTier });
+  // null/undefined = all UG + PG (shared staff). Specific tier = filter that portal only.
+  const tf = (base = {}) =>
+    programTier ? { ...base, programTier } : { ...base };
   const [
     proposalCount,
     projectCount,
@@ -1027,7 +1029,7 @@ async function getWorkflowOverview(req, res) {
   res.json({
     generatedAt: new Date().toISOString(),
     programTier: req.programTier || null,
-    scope: researcherOnly ? "mine" : dept ? `faculty:${dept}` : "portal",
+    scope: researcherOnly ? "mine" : dept ? `faculty:${dept}` : req.programTier ? "portal" : "all",
     totals: {
       proposals: proposals.length,
       projects: projects.length,
@@ -1093,7 +1095,7 @@ async function getSystemReport(req, res) {
   const report = {
     generatedAt: new Date().toISOString(),
     programTier: req.programTier || null,
-    scope: dept ? `faculty:${dept}` : "portal",
+    scope: dept ? `faculty:${dept}` : req.programTier ? "portal" : "all",
     users:
       role === "research_director"
         ? {
@@ -1237,7 +1239,7 @@ async function getDonorReport(req, res) {
 
 async function getKpiDashboard(req, res) {
   const tier = req.programTier;
-  const tf = (base = {}) => ({ ...base, programTier: tier });
+  const tf = (base = {}) => (tier ? { ...base, programTier: tier } : { ...base });
 
   const [proposals, grants, projects, publications, calls, closedProjects] = await Promise.all([
     Proposal.find(tf({})).select("status createdAt submittedAt"),
