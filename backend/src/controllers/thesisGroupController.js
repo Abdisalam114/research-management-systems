@@ -360,12 +360,19 @@ async function createGroup(req, res) {
   }
 
   let resolvedSupervisorId = null;
+  let supervisorTier = null;
   if (supervisorId) {
     const sup = await User.findOne(req.tierWhere({ _id: supervisorId }));
     if (!sup) throw new AppError("Supervisor user not found", 404);
     if (sup.role !== ROLES.RESEARCHER) throw new AppError("Supervisor must have researcher role", 400);
     resolvedSupervisorId = sup._id;
+    supervisorTier = sup.programTier || null;
   }
+
+  const writeTier = req.requireWriteProgramTier(
+    supervisorTier || req.body?.programTier,
+    "programTier (undergraduate or postgraduate)"
+  );
 
   const { cleanDepartment, linkedDepartmentId, facultyValue } = await resolveThesisDepartment(req, {
     departmentId,
@@ -390,6 +397,7 @@ async function createGroup(req, res) {
     kind: GROUP_KINDS.THESIS,
     departmentId: departmentIdForGroup,
     createdBy: userId,
+    programTier: writeTier,
     members: Array.from(memberIds).map((id) => ({
       userId: id,
       role: String(id) === String(leadId) ? GROUP_MEMBER_ROLES.LEAD : GROUP_MEMBER_ROLES.MEMBER,
@@ -411,11 +419,12 @@ async function createGroup(req, res) {
     chapters: defaultChapters(),
     titleProposal: emptyTitleProposal(),
     createdBy: userId,
+    programTier: writeTier,
   });
 
   const group = await ThesisGroup.create(groupData);
   if (resolvedSupervisorId) {
-    await notifySupervisorAssignment(group, req.programTier);
+    await notifySupervisorAssignment(group, writeTier);
   }
 
   debugLog("H1", "createGroup ok", {
@@ -504,7 +513,7 @@ async function updateGroup(req, res) {
   const newSupervisorId = group.supervisorId ? String(group.supervisorId) : null;
   if (newSupervisorId && newSupervisorId !== prevSupervisorId) {
     group.supervisorAssignedAt = new Date();
-    await notifySupervisorAssignment(group, req.programTier);
+    await notifySupervisorAssignment(group, group.programTier || req.programTier);
   }
 
   // Keep linked research group membership in sync with supervisor
@@ -556,7 +565,7 @@ async function proposeTitle(req, res) {
   applyStudentTitleProposal(group, trimmed, userId);
   await group.save();
 
-  await notifyStaffOfSupervisorUpdate(group, req.programTier, {
+  await notifyStaffOfSupervisorUpdate(group, group.programTier || req.programTier, {
     title: "Thesis title submitted for acceptance",
     body: `Supervisor submitted title "${trimmed}" for ${thesisGroupLabel(group)}. Coordinator: Accept or Reject on Thesis.`,
   });
@@ -593,7 +602,7 @@ async function reviewTitleProposal(req, res) {
         title: "Thesis title unlocked",
         body: "The accepted thesis title was unlocked. Please enter a new student-chosen title.",
         link: `/thesis?groupId=${group._id}`,
-        programTier: req.programTier,
+        programTier: group.programTier || req.programTier,
       });
     }
     return res.json({ message: "Title unlocked", group: await loadSanitizedGroup(group._id) });
@@ -628,7 +637,7 @@ async function reviewTitleProposal(req, res) {
         ? `The thesis title "${group.titleProposal.title}" has been accepted. You may begin supervision.`
         : `The proposed thesis title was rejected.${note ? ` Note: ${note}` : ""}`,
       link: `/thesis?groupId=${group._id}`,
-      programTier: req.programTier,
+      programTier: group.programTier || req.programTier,
     });
   }
 
@@ -666,7 +675,7 @@ async function updateChapter(req, res) {
 
   if (isSupervisor) {
     const chapterLabel = chapter.title || chapter.key || chapterKey;
-    await notifyStaffOfSupervisorUpdate(group, req.programTier, {
+    await notifyStaffOfSupervisorUpdate(group, group.programTier || req.programTier, {
       title: "Thesis chapter updated by supervisor",
       body: `Supervisor updated "${chapterLabel}" → ${chapter.status} on ${thesisGroupLabel(group)}.`,
     });
@@ -712,7 +721,7 @@ async function addMeeting(req, res) {
   await group.save();
 
   if (isSupervisor) {
-    await notifyStaffOfSupervisorUpdate(group, req.programTier, {
+    await notifyStaffOfSupervisorUpdate(group, group.programTier || req.programTier, {
       title: "Thesis meeting logged by supervisor",
       body: `Supervisor logged a meeting (${dateStr}) for ${thesisGroupLabel(group)}${agenda ? `: ${String(agenda).slice(0, 80)}` : ""}.`,
     });
@@ -778,7 +787,7 @@ async function uploadFinalDocument(req, res) {
   await group.save();
 
   const fileLabel = group.finalDocument.originalName || "thesis document";
-  await notifyStaffOfSupervisorUpdate(group, req.programTier, {
+  await notifyStaffOfSupervisorUpdate(group, group.programTier || req.programTier, {
     title: "Final thesis document uploaded",
     body: `Supervisor uploaded "${fileLabel}" for ${thesisGroupLabel(group)}${
       group.status === THESIS_STATUSES.COMPLETED ? " (marked completed)." : "."

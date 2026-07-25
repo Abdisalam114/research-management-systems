@@ -563,7 +563,9 @@ async function directorDecision(req, res) {
   // Accepted grant must enter Projects (create/link), not stay only on Grants
   if (decision === GRANT_STATUSES.APPROVED) {
     try {
-      projectResult = await ensureProjectForAcceptedGrant(grant, { programTier: req.programTier });
+      projectResult = await ensureProjectForAcceptedGrant(grant, {
+        programTier: grant.programTier || req.programTier,
+      });
     } catch { /* best-effort — finance approve will retry */ }
   }
 
@@ -639,7 +641,9 @@ async function financeDecision(req, res) {
     await grant.save();
     // Ensure grant has a Project so it appears under Projects, not only Grants
     try {
-      projectResult = await ensureProjectForAcceptedGrant(grant, { programTier: req.programTier });
+      projectResult = await ensureProjectForAcceptedGrant(grant, {
+        programTier: grant.programTier || req.programTier,
+      });
     } catch { /* best-effort */ }
     budgetResult = await ensureBudgetForGrant(grant);
 

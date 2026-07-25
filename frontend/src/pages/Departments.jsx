@@ -11,7 +11,7 @@ export function DepartmentsPage() {
   const { programTier } = useProgramTier();
   const [departments, setDepartments] = useState([]);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ name: "", code: "", faculty: FACULTIES[0].value });
+  const [form, setForm] = useState({ name: "", code: "", faculty: FACULTIES[0].value, programTier: "undergraduate" });
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -38,7 +38,7 @@ export function DepartmentsPage() {
       } else {
         await departmentApi.createDepartment(accessToken, form);
       }
-      setForm({ name: "", code: "", faculty: FACULTIES[0].value });
+      setForm({ name: "", code: "", faculty: FACULTIES[0].value, programTier: "undergraduate" });
       setEditingId(null);
       setShowForm(false);
       await load();
@@ -59,7 +59,7 @@ export function DepartmentsPage() {
 
   function startAddForFaculty(faculty) {
     setEditingId(null);
-    setForm({ name: "", code: "", faculty });
+    setForm({ name: "", code: "", faculty, programTier: "undergraduate" });
     setShowForm(true);
   }
 
@@ -145,7 +145,7 @@ export function DepartmentsPage() {
               setShowForm((v) => !v);
               if (!showForm) {
                 setEditingId(null);
-                setForm({ name: "", code: "", faculty: FACULTIES[0].value });
+                setForm({ name: "", code: "", faculty: FACULTIES[0].value, programTier: "undergraduate" });
               }
             }}
           >
@@ -182,11 +182,23 @@ export function DepartmentsPage() {
               <label>Code</label>
               <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} required />
             </div>
+            <div className="field">
+              <label>Program (UG / PG)</label>
+              <select
+                value={form.programTier || "undergraduate"}
+                onChange={(e) => setForm({ ...form, programTier: e.target.value })}
+                disabled={Boolean(editingId)}
+                required
+              >
+                <option value="undergraduate">Undergraduate (UG)</option>
+                <option value="postgraduate">Postgraduate (PG)</option>
+              </select>
+            </div>
           </div>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn primary" type="submit">{editingId ? "Update" : "Create"}</button>
             {editingId ? (
-              <button type="button" className="btn" onClick={() => { setEditingId(null); setForm({ name: "", code: "", faculty: FACULTIES[0].value }); setShowForm(false); }}>Cancel</button>
+              <button type="button" className="btn" onClick={() => { setEditingId(null); setForm({ name: "", code: "", faculty: FACULTIES[0].value, programTier: "undergraduate" }); setShowForm(false); }}>Cancel</button>
             ) : null}
           </div>
         </form>

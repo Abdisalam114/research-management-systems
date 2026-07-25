@@ -30,12 +30,15 @@ async function createDepartment(req, res) {
   const { name, code, faculty } = req.body || {};
   if (!name || !code) throw new AppError("name and code are required", 400);
 
-  const department = await Department.create(req.tierAssign({
-    name: String(name).trim(),
-    code: String(code).trim().toUpperCase(),
-    faculty: faculty ? String(faculty).trim() : "",
-    createdBy: req.user.id,
-  }));
+  const department = await Department.create(
+    req.tierAssign({
+      name: String(name).trim(),
+      code: String(code).trim().toUpperCase(),
+      faculty: faculty ? String(faculty).trim() : "",
+      createdBy: req.user.id,
+      programTier: req.requireWriteProgramTier(req.body?.programTier, "programTier"),
+    })
+  );
 
   res.status(201).json({ department: sanitizeDepartment(department) });
 }

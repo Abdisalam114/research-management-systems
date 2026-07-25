@@ -813,6 +813,7 @@ async function archiveProject(req, res) {
       access: REPOSITORY_ACCESS.INSTITUTION,
       projectId: project._id,
       uploadedBy: project.researcherId,
+      programTier: project.programTier,
     }));
   }
 
@@ -822,7 +823,7 @@ async function archiveProject(req, res) {
       title: "Project archived",
       body: project.title,
       link: `/projects/${project._id}`,
-      programTier: req.programTier,
+      programTier: project.programTier || req.programTier,
     });
   } catch { /* best-effort */ }
 
@@ -834,7 +835,7 @@ async function archiveProject(req, res) {
     detail: project.title,
     actorId: req.user.id,
     actorRole: req.user.role,
-    programTier: req.programTier,
+    programTier: project.programTier || req.programTier,
   });
 
   res.json({ message: "Project archived", project: sanitizeProject(project) });
@@ -925,6 +926,7 @@ async function backfillProjectFromApprovedProposal(req, res) {
     proposalId: proposal._id,
     title: proposal.title,
     researcherId: proposal.researcherId,
+    programTier: proposal.programTier,
     teamMembers: [],
     milestones: [],
     status: "active",

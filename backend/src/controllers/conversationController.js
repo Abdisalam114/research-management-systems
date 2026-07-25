@@ -111,6 +111,7 @@ async function openGroupChat(req, res) {
       title: group.name,
       messages: [],
       lastMessageAt: null,
+      programTier: group.programTier,
     }));
   } else {
     const participantSet = new Set((conversation.participants || []).map(String));
@@ -163,10 +164,18 @@ async function createConversation(req, res) {
     }
   }
 
+  const peerUsers = await User.find({ _id: { $in: others } }).select("programTier role");
+  const peerTier =
+    peerUsers.find((u) => u.role === "researcher" && u.programTier)?.programTier ||
+    peerUsers.find((u) => u.programTier)?.programTier ||
+    null;
+  const writeTier = req.programTier || peerTier || "undergraduate";
+
   const conversation = await Conversation.create(req.tierAssign({
     participants: ids,
     messages: [],
     lastMessageAt: null,
+    programTier: writeTier,
   }));
 
   res.status(201).json({ conversation: await enrichConversation(conversation, req.user.id) });
@@ -202,7 +211,7 @@ async function sendMessage(req, res) {
       title: `New message from ${senderName}`,
       body: preview,
       link,
-      programTier: req.programTier,
+      programTier: conversation.programTier || req.programTier,
     });
     notified += 1;
   }

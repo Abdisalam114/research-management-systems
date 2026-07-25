@@ -113,6 +113,7 @@ async function createPurchaseOrder(req, res) {
     requestedBy: req.user.id,
     notes: notes ? String(notes) : "",
     status: PO_STATUSES.REQUESTED,
+    programTier: budget.programTier,
   }));
 
   try {
@@ -121,7 +122,7 @@ async function createPurchaseOrder(req, res) {
       title: "New purchase order awaiting finance review",
       body: `${po.vendorName} — ${po.currency} ${po.totalAmount}`,
       link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
-    }, req.programTier);
+    }, budget.programTier || req.programTier);
   } catch {
     /* best-effort */
   }

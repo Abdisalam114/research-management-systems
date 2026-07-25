@@ -46,14 +46,17 @@ async function createPolicy(req, res) {
   const { POLICY_MODULE_KEYS } = require("../constants/institutionalPolicyCatalog");
   if (!POLICY_MODULE_KEYS.includes(moduleKey)) throw new AppError("Invalid moduleKey", 400);
 
-  const policy = await InstitutionalPolicy.create(req.tierAssign({
-    title: String(title).trim(),
-    body: body != null ? String(body) : "",
-    moduleKey,
-    category: ["research", "funding", "ethics", "general"].includes(category) ? category : "general",
-    status: status === "draft" ? "draft" : "published",
-    updatedBy: req.user.id,
-  }));
+  const policy = await InstitutionalPolicy.create(
+    req.tierAssign({
+      title: String(title).trim(),
+      body: body != null ? String(body) : "",
+      moduleKey,
+      category: ["research", "funding", "ethics", "general"].includes(category) ? category : "general",
+      status: status === "draft" ? "draft" : "published",
+      updatedBy: req.user.id,
+      programTier: req.requireWriteProgramTier(req.body?.programTier, "programTier"),
+    })
+  );
 
   await recordAudit({
     entityType: "policy",

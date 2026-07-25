@@ -81,6 +81,10 @@ async function ensureProjectForAcceptedGrant(grant, { programTier } = {}) {
     if (proposal?.title && !looksLikeFundingAwardTitle(proposal.title)) {
       const ethicsApproved = proposal.ethicsStatus === ETHICS_STATUSES.APPROVED;
       const tier = programTier || grant.programTier || proposal.programTier;
+      if (!tier) {
+        debugLog("skip create — missing programTier", { grantId: String(grant._id) }, "G3b");
+        return null;
+      }
       const project = await Project.create({
         proposalId: proposal._id,
         title: proposal.title,

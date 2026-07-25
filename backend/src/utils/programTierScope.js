@@ -54,6 +54,34 @@ function tierAssign(req, data = {}) {
   return data;
 }
 
+/**
+ * Resolve programTier for writes. Prefer an existing document / body value,
+ * then the request filter. Throws if still missing (avoids silent UG default).
+ */
+function requireWriteProgramTier(req, preferred, label = "programTier") {
+  const candidates = [
+    preferred,
+    preferred?.programTier,
+    req.body?.programTier,
+    req.programTier,
+  ];
+  for (const c of candidates) {
+    if (typeof c === "string" && isValidProgramTier(c)) return c;
+  }
+  throw new AppError(
+    `${label} is required (undergraduate or postgraduate)`,
+    400
+  );
+}
+
+/** Best-effort notify stamp: document tier first, then request filter. */
+function notifyProgramTier(doc, req) {
+  const fromDoc = doc?.programTier;
+  if (isValidProgramTier(fromDoc)) return fromDoc;
+  if (isValidProgramTier(req?.programTier)) return req.programTier;
+  return undefined;
+}
+
 function assertTierDocument(req, doc) {
   if (!doc) return;
   if (!req.programTier) return;
@@ -66,6 +94,9 @@ function attachProgramTierHelpers(req) {
   req.isCrossTierStaff = isCrossTierRole(req.user?.role);
   req.tierWhere = (base = {}) => tierWhere(req, base);
   req.tierAssign = (data = {}) => tierAssign(req, data);
+  req.requireWriteProgramTier = (preferred, label) =>
+    requireWriteProgramTier(req, preferred, label);
+  req.notifyProgramTier = (doc) => notifyProgramTier(doc, req);
   req.assertTierDocument = (doc) => assertTierDocument(req, doc);
 }
 
@@ -75,6 +106,8 @@ module.exports = {
   resolveProgramTier,
   tierWhere,
   tierAssign,
+  requireWriteProgramTier,
+  notifyProgramTier,
   assertTierDocument,
   attachProgramTierHelpers,
 };

@@ -213,7 +213,7 @@ async function addBudgetItem(req, res) {
       title: "New budget item pending",
       body: String(description).trim(),
       link: budget.projectId ? `/budgets?projectId=${budget.projectId}` : `/budgets?budgetId=${budget._id}`,
-    }, req.programTier);
+    }, budget.programTier || req.programTier);
   } catch {
     /* notifications are best-effort */
   }

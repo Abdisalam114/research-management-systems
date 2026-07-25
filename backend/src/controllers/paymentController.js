@@ -149,6 +149,7 @@ async function createPayment(req, res) {
     grantId: budget.grantId || null,
     notes: notes ? String(notes) : "",
     status: PAYMENT_STATUSES.REQUESTED,
+    programTier: budget.programTier,
   }));
 try {
     await notifyUsersByRole("research_director", {

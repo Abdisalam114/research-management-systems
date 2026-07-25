@@ -49,6 +49,7 @@ const EMPTY_FORM = {
   supervisorId: "",
   meetingSchedule: "",
   status: "proposed",
+  programTier: "undergraduate",
   students: defaultStudentRows(),
 };
 
@@ -299,6 +300,7 @@ export function ThesisGroupsPage() {
       supervisorId: g.supervisorId?._id || g.supervisorId || "",
       meetingSchedule: g.meetingSchedule || "",
       status: g.status || "proposed",
+      programTier: g.programTier || "undergraduate",
       students: studentRowsForForm(g.students),
     });
     setShowForm(true);
@@ -636,6 +638,21 @@ export function ThesisGroupsPage() {
               </select>
             </div>
             <div className="field">
+              <label>Program (UG / PG)</label>
+              <select
+                value={form.programTier || "undergraduate"}
+                onChange={(e) => setForm({ ...form, programTier: e.target.value })}
+                disabled={Boolean(editingId)}
+                required
+              >
+                <option value="undergraduate">Undergraduate (UG)</option>
+                <option value="postgraduate">Postgraduate (PG)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="row">
+            <div className="field" style={{ flex: 1 }}>
               <label>Assign supervisor (choose from all researchers)</label>
               <input
                 type="search"
@@ -646,21 +663,29 @@ export function ThesisGroupsPage() {
               />
               <select
                 value={form.supervisorId}
-                onChange={(e) => setForm({ ...form, supervisorId: e.target.value })}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  const picked = activeResearchers.find((r) => String(r.id || r._id) === String(id));
+                  setForm({
+                    ...form,
+                    supervisorId: id,
+                    ...(picked?.programTier ? { programTier: picked.programTier } : {}),
+                  });
+                }}
                 size={Math.min(8, Math.max(4, activeResearchers.length + 1))}
                 style={{ width: "100%" }}
               >
                 <option value="">— Unassigned —</option>
                 {activeResearchers.map((r) => (
                   <option key={r.id || r._id} value={r.id || r._id}>
-                    {r.fullName} — {r.department || "No dept"} — {r.email || ""}
+                    {r.fullName} — {r.programTierLabel || r.programTier || ""} — {r.department || "No dept"} — {r.email || ""}
                     {r.rank ? ` (${r.rank})` : ""}
                   </option>
                 ))}
               </select>
               <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
                 Showing {activeResearchers.length} of {researchers.filter((r) => !r.status || r.status === "active").length}{" "}
-                active researchers on this portal
+                active researchers
                 {researcherQuery.trim() ? " (filtered)" : ""}. Pick who will supervise this student group.
               </p>
               {researchersError ? (
@@ -675,8 +700,7 @@ export function ThesisGroupsPage() {
               <>
                 {" "}
                 <strong style={{ color: "#b45309" }}>
-                  No researchers on this portal yet — create researcher accounts under Users (Director), then assign
-                  here.
+                  No researchers yet — create researcher accounts under Users (Director), then assign here.
                 </strong>
               </>
             ) : null}

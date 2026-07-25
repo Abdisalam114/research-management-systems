@@ -928,7 +928,7 @@ async function directorDecision(req, res) {
     detail: proposal.title,
     actorId: req.user.id,
     actorRole: req.user.role,
-    programTier: req.programTier,
+    programTier: req.notifyProgramTier?.(proposal) || proposal.programTier,
   });
 
   if (decision === PROPOSAL_STATUSES.APPROVED) {
@@ -938,6 +938,7 @@ async function directorDecision(req, res) {
         proposalId: proposal._id,
         title: proposal.title,
         researcherId: proposal.researcherId,
+        programTier: proposal.programTier,
         teamMembers: [],
         milestones: [
           { title: "Ethics clearance", dueDate: null, completed: proposal.ethicsStatus === ETHICS_STATUSES.APPROVED },

@@ -111,7 +111,11 @@ async function listFundingCalls(req, res) {
   if (req.user.role === "researcher") {
     // Researchers see: (1) open calls they are eligible for (any portal), (2) calls they already applied to
     const eligCodes =
-      req.programTier === "undergraduate" ? ["ug", "all"] : ["pg", "pgd", "all"];
+      req.programTier === "undergraduate"
+        ? ["ug", "all"]
+        : req.programTier === "postgraduate"
+          ? ["pg", "pgd", "all"]
+          : ["ug", "pg", "pgd", "all"];
     const researcherFilter = {
       $or: [
         {
@@ -294,7 +298,10 @@ async function publishFundingCall(req, res) {
   const listLink = `/funding-calls?callId=${call._id}`;
   const applyLink = `/grants/apply?callId=${call._id}`;
   // Notify by eligibility — each portal gets its own researchers with that portal's programTier
-  let tiersToNotify = [call.programTier || req.programTier];
+  let tiersToNotify = [call.programTier || req.programTier].filter(Boolean);
+  if (!tiersToNotify.length) {
+    tiersToNotify = [PROGRAM_TIERS.UNDERGRADUATE, PROGRAM_TIERS.POSTGRADUATE];
+  }
   if (call.eligibilityTier === "all") {
     tiersToNotify = [PROGRAM_TIERS.UNDERGRADUATE, PROGRAM_TIERS.POSTGRADUATE];
   } else if (call.eligibilityTier === "ug") {

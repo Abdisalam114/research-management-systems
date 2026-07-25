@@ -3,6 +3,8 @@ const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
 
 function tierMatchesCall(req, call) {
   if (!call || call.eligibilityTier === "all") return true;
+  // Shared staff (null programTier) may open any call; researchers are portal-locked
+  if (!req.programTier) return true;
   const pt = req.programTier === "undergraduate" ? "ug" : "pg";
   if (call.eligibilityTier === "ug") return pt === "ug";
   if (call.eligibilityTier === "pg" || call.eligibilityTier === "pgd") return pt === "pg";
