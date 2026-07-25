@@ -44,8 +44,8 @@ Creates: `docs/DATABASE_STRUCTURE.pdf`, `docs/SYSTEM_DOCUMENTATION.pdf`
 | English | Somali |
 |---------|--------|
 | Web system to manage research from proposal to project closure | Nidaam web ah oo cilmi-baarista laga maamulo laga bilaabo proposal ilaa xiritaanka mashruuca |
-| Two separate portals: UG and PG | Laba portal oo kala go’an: Undergraduate iyo Postgraduate |
-| Director switches portals; all other users stay on one portal | Director ayaa beddela portal; dadka kale hal portal ayay ku jiraan |
+| Two program tracks: UG and PG (labeled on each project) | Laba barnaamij: UG iyo PG (ku calaamadaysan project kasta) |
+| Shared staff see UG + PG together; researchers stay on one program | Staff-ka wadaagga ah wuxuu arkaa UG + PG; researchers-na barnaamijkooda |
 
 ---
 
@@ -59,24 +59,24 @@ Creates: `docs/DATABASE_STRUCTURE.pdf`, `docs/SYSTEM_DOCUMENTATION.pdf`
 | `researcher` | Researcher / PI — proposals, projects, supervision | Cilmi-baarista |
 | `leadership` | University Leadership — peer review, KPI | Hogaanka jaamacadda |
 
-Procurement, HR Officer, and Donor Agency logins were removed — Finance owns PO review; Director owns former HR/donor duties.
-
 ---
 
 ## 3. Login / Galitaanka
 
 1. Open `http://localhost:5173` → **Login**
-2. **Director** → choose **Undergraduate** or **Postgraduate**
-3. Others → automatic portal from account
+2. Sign in with your institutional account
+3. Shared staff (Director, Coordinator, Finance, Leadership) see **UG + PG** together; researchers stay on their program
 
 **Seed accounts** (run `npm run seed` first):
 
 | Email | Password | Role |
 |-------|----------|------|
-| director@rms.edu | Director2024! | Director |
-| coordinator@rms.edu | Coordinator2024! | Coordinator |
-| finance@rms.edu | Finance2024! | Finance |
-| asha@rms.edu | Researcher2024! | Researcher |
+| director@rms.edu | Director2024! | Director (UG + PG) |
+| coordinator@rms.edu | Coordinator2024! | Coordinator (UG + PG) |
+| finance@rms.edu | Finance2024! | Finance (UG + PG) |
+| leadership@rms.edu | Leadership2024! | Leadership (UG + PG) |
+| asha@rms.edu | Researcher2024! | Researcher (UG) |
+| mahad@rms.edu | Researcher2024! | Researcher (PG) |
 
 ---
 

@@ -24,11 +24,11 @@
 
 ### English
 
-Jamhuriya RMS implements the **core research lifecycle** shown in the full system specification: application → ethics → review → project → grant → budget → publication → repository. After **Phases 1–4 (July 2026)** and **thesis completion features**, approximately **92%** of the full specification is covered. Remaining gaps: **external integrations** (ERP, HR payroll sync, SSO), **KPI dashboard**, and **automated email/SMS**.
+Jamhuriya RMS implements the **core research lifecycle** shown in the full system specification: application → ethics → review → project → grant → budget → publication → repository. After **Phases 1–4 (July 2026)** and thesis module work, the in-scope university workflow is in place. Remaining gaps are mainly **external integrations** (ERP, HR payroll sync, SSO) and **automated SMS** beyond email.
 
 ### Somali
 
-Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqda qorshaha buuxa ee nidaamka. Ka dib **Phase 1–4 (July 2026)**, qiyaastii **78%** qorshaha buuxa waa la dhisay. Weli ma jiraan: **isku-xirka dibadda** (ERP, HR, SSO), **KPI dashboard**, iyo **email/SMS otomaatig ah**.
+Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqda qorshaha buuxa ee nidaamka. Ka dib **Phase 1–4 (July 2026)**, socodka jaamacadda ee ku jira qorshaha waa la dhisay. Weli ma jiraan inta badan: **isku-xirka dibadda** (ERP, HR, SSO), iyo **SMS** ka baxsan email.
 
 ---
 
@@ -36,21 +36,20 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 
 | Specified stakeholder | Jamhuriya RMS role / module | Status |
 |-----------------------|----------------------------|--------|
-| Researchers / PI | `researcher` | ✅ |
-| Department | `faculty_coordinator` (faculty-scoped) | ✅ |
-| Research Office | `research_director` | ✅ |
+| Researchers / PI | `researcher` (asha@ UG, mahad@ PG) | ✅ |
+| Department | `faculty_coordinator` (faculty-scoped; shared UG+PG view) | ✅ |
+| Research Office | `research_director` (ethics + donor reports; shared UG+PG) | ✅ |
 | Finance Office | `finance_officer` — budgets, PO review, payments | ✅ |
-| HR Office | `hr_officer` | ⚠️ User + project/thesis access; no payroll module |
-| Ethics Committee | Handled by `research_director` on `/ethics` (no separate login) | ✅ |
+| Ethics Committee | Handled by `research_director` on `/ethics` | ✅ |
 | Reviewers | University `leadership` peer review (score + comment) | ✅ |
 | Leadership | `leadership` + Director analytics | ✅ |
-| Donors | `donor_agency` + `donorRef` on grants | ⚠️ Donor reports page; not full external portal |
+| Donors | `donorRef` on grants + Donor Reports (Director / Finance) | ⚠️ Reports in-app; not a separate external portal |
 
 ### Somali — Sharaxaad
 
-- **Cilmi-baaraha, Isku-duwaha, Agaasimaha, Maaliyadda, Leadership, HR, Donor** — dhammaan waa la dhisay.
-- **Ethics Committee, Peer Reviewer, Procurement** — doorarka gooni ah waa laga saaray (Ethics = Director; peer review = Leadership; PO = Finance).
-- **HR payroll sync, Donor portal buuxa** — weli ma jiraan.
+- **Cilmi-baaraha, Isku-duwaha, Agaasimaha, Maaliyadda, Leadership** — dhammaan waa la dhisay (akoono wadaag ah; UG/PG calaamado).
+- **Ethics** = Director; **peer review** = Leadership; **PO review** = Finance.
+- **HR payroll sync, Donor portal dibadda ah** — weli ma jiraan.
 
 ---
 
@@ -63,7 +62,7 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 |---------|----|----|--------|--------------|
 | Published funding calls | Open calls researchers can browse | Call-yada la daabaco | ✅ | `/funding-calls` |
 | Internal seed / institutional grants | University-initiated grant rounds | Deeqaha gudaha | ⚠️ | Funding calls + grants |
-| Eligibility rules | Who can apply (UG/PG, faculty, deadline) | Shuruudaha u qalmitaanka | ⚠️ | UG/PG portal + call deadlines |
+| Eligibility rules | Who can apply (UG/PG, faculty, deadline) | Shuruudaha u qalmitaanka | ⚠️ | UG/PG labels + call deadlines |
 | Call notifications | Alert when new call opens | Ogeysiis marka call cusub furmo | ⚠️ | General notifications only |
 | Link grant application to a call | Application tied to specific opportunity | Grant ku xiran call gaar ah | ✅ | Grant requires `callId` |
 | Funding source text | Donor / source name on grant | Magaca deeq-bixiyaha | ✅ | `Grant.fundingSource`, `donorRef` |
@@ -131,13 +130,13 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 | Progress monitoring | ✅ | Project progress updates |
 | Technical reports | ⚠️ | Progress text; no formal template |
 | Financial reports | ✅ | `/finance-reports`, analytics API |
-| KPI tracking | ❌ | No KPI dashboard |
+| KPI tracking | ✅ | `/kpi-dashboard` |
 | Publications tracking | ✅ | `/publications` workflow |
 | Research Workflow Status | ✅ | `/research-workflow` |
 | Faculty / annual reports | ✅ | PDF export on dashboard |
 | Citation metrics | ✅ | CrossRef DOI refresh |
 
-**Somali:** Warbixinnada maaliyadeed iyo publications waa jira. KPI tracking rasmi ah ma jiro.
+**Somali:** Warbixinnada maaliyadeed, KPI, iyo publications waa jira.
 
 ---
 
@@ -166,8 +165,8 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 | Audit Trail (full activity log) | ✅ | `/audit-trail`, `listRecentAudit` API |
 | Notifications & Alerts | ⚠️ | Ogeysiisyada | `/notifications` in-app only |
 | Electronic Signatures | ⚠️ | Saxiix elektaroonig | JUREC PDF signature + stamp only |
-| Search, Reports & Analytics | ⚠️ | Raadinta & warbixinnada | Dashboards, PDF reports; no global search |
-| Security | ✅ | Amniga | JWT, RBAC, UG/PG `programTier` |
+| Search, Reports & Analytics | ✅ | Raadinta & warbixinnada | `/search`, dashboards, PDF reports |
+| Security | ✅ | Amniga | JWT, RBAC, UG/PG `programTier` labels |
 
 ---
 
@@ -207,28 +206,28 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 
 ---
 
-## 7. Coverage Scorecard / Dhibcaha Guud
+## 7. Module status (vs specification)
 
-| System section | Coverage | Priority to close gap |
-|----------------|----------|------------------------|
-| Stakeholders (10 roles) | ~92% | Low |
-| Step 1 — Funding & Calls | ~88% | Low |
-| Step 2 — Applications | ~95% | Low |
-| Step 3 — Review & Approval | ~88% | Low |
-| Step 4 — Project Management | ~95% | Low |
-| Step 5 — Monitoring & Reporting | ~90% | Low |
-| Step 6 — Project Closure | ~88% | Low |
-| Shared Services | ~90% | Low |
-| Dashboards | ~92% | Low |
-| Architecture & Integrations | ~55% | Long-term |
-| KPI tracking | ✅ | `/kpi-dashboard` |
-| Global search | ✅ | `/search`, `GET /api/search` |
-| Email notifications | ⚠️ | In-app + SMTP/outbox |
-| Technical report PDF | ✅ | `GET /api/projects/:id/technical-report.pdf` |
-| Auto-archive to repository | ✅ | On project archive |
-| Internal vs external calls | ✅ | `callType` on FundingCall |
+| System section | Status notes | Priority for remaining gaps |
+|----------------|--------------|-----------------------------|
+| Stakeholders | Core roles in place (Director, Coordinator, Finance, Leadership, Researcher) | Low |
+| Step 1 — Funding & Calls | Strong; eligibility automation partial | Low |
+| Step 2 — Applications | Proposal + ethics + docs in place | Low |
+| Step 3 — Review & Approval | Multi-stage flow; committee still limited | Low |
+| Step 4 — Project Management | Milestones, work plan, communication log | Low |
+| Step 5 — Monitoring & Reporting | Finance reports, KPI, publications | Low |
+| Step 6 — Project Closure | Checklist + Director + Finance | Low |
+| Shared Services | Audit trail, search, ethics; SMS partial | Low |
+| Dashboards | Role dashboards present | Low |
+| Architecture & Integrations | ERP / SSO / payroll not in scope | Long-term |
+| KPI tracking | ✅ `/kpi-dashboard` | — |
+| Global search | ✅ `/search`, `GET /api/search` | — |
+| Email notifications | ⚠️ In-app + SMTP/outbox | — |
+| Technical report PDF | ✅ `GET /api/projects/:id/technical-report.pdf` | — |
+| Auto-archive to repository | ✅ On project archive | — |
+| Internal vs external calls | ✅ `callType` on FundingCall | — |
 
-**Overall / Guud ahaan:** ~**92%** of full system specification — **thesis-ready (90%+)**.
+**Overall:** In-scope lifecycle modules are implemented. Gaps that remain are mainly external systems (ERP, SSO, payroll sync, SMS).
 
 ---
 
@@ -240,25 +239,25 @@ Jamhuriya RMS wuxuu qabtaa **socodka cilmi-baarista ee asaasiga ah** ee ku muuqd
 | Thesis module | Title: students choose → supervisor enters → coordinator accepts; chapters & meetings | Thesis: magac doorasho → supervisor geliyo → coordinator aqbalo |
 | JUREC certificate editor | Full preview/edit before approve; serial, dates, signatory, stamp | Shahaadada JUREC oo la beddeli karo ka hor ansixinta |
 | Dual-tab authentication | sessionStorage per browser tab | Labo user isla browser kala tabs |
-| UG / PG portals | Data separated by `programTier` | UG iyo PG gooni gooni |
+| UG / PG labels | Staff see both programs; items labeled by `programTier` | UG iyo PG calaamado — shaqaalaha wada arkaan |
 | Research policies | Director `/policies` (themes, programs) | Siyaasadaha cilmi-baarista |
 | Purchase Orders (Finance) | Full PO lifecycle: Finance review → Director → Finance pay | Purchase Orders (Finance) |
 | Payments module | RA, travel, equipment, publication fees | Bixinta lacagaha |
 
 ---
 
-## 9. Recommended Build Order / Taxanaha Dhismaha (thesis scope)
+## 9. Recommended Build Order / Taxanaha Dhismaha
 
-**Completed for thesis (July 2026):** KPI dashboard, email notifications (SMTP/outbox), call eligibility rules, technical report PDF, global search, internal/external call types, auto-archive to repository.
+**Completed (July 2026):** KPI dashboard, email notifications (SMTP/outbox), call eligibility rules, technical report PDF, global search, internal/external call types, auto-archive to repository.
 
-Features deferred to **future work** (not required for 90%+ thesis defense):
+Features deferred to **future work**:
 
 | Priority | Module | EN rationale | SO |
 |----------|--------|--------------|-----|
 | **Future** | External integrations | SSO, ERP, full HR payroll | Isku-xirka dibadda |
 | **Future** | SMS gateway | Mobile alerts beyond email | Ogeysiis SMS |
 
-**Somali:** Nidaamku waa **92%** — diyaar qalin-jabinta. ERP/SSO waa mustaqbal, ma aha shuruud qalin-jabinta.
+**Somali:** Socodka jaamacadda ee ku jira qorshaha waa la dhisay. ERP/SSO waa mustaqbal.
 
 ---
 

@@ -33,7 +33,7 @@ const { syncGrantProjectLinks } = require("../utils/syncGrantProjectLinks");
 const { defaultChapters, TITLE_PROPOSAL_STATUSES, MIN_THESIS_GROUP_STUDENTS } = require("../utils/thesisDefaults");
 const { INSTITUTIONAL_POLICY_CATALOG } = require("../constants/institutionalPolicyCatalog");
 const { InstitutionalPolicy } = require("../models/InstitutionalPolicy");
-const { INSTITUTIONAL_USERS, PORTAL_ORDER, PROGRAM_TIERS, REMOVED_INSTITUTIONAL_EMAILS } = require("./seedData");
+const { INSTITUTIONAL_USERS, PORTAL_ORDER, PROGRAM_TIERS, RETIRED_SEED_EMAILS } = require("./seedData");
 const {
   RECORDS_PER_TIER,
   MAX_SAMPLE_RECORDS,
@@ -136,7 +136,7 @@ async function seedUsers() {
     users[spec.email.toLowerCase()] = u;
   }
 
-  for (const email of REMOVED_INSTITUTIONAL_EMAILS) {
+  for (const email of RETIRED_SEED_EMAILS) {
     await User.deleteOne({ email: String(email).toLowerCase().trim() });
   }
 
@@ -163,12 +163,13 @@ async function portalContext(users, programTier) {
   const researchers = Object.values(users).filter(
     (u) => u.role === ROLES.RESEARCHER && String(u.programTier) === String(programTier)
   );
-  const coordinator = Object.values(users).find(
-    (u) => u.role === ROLES.FACULTY_COORDINATOR && String(u.programTier) === String(programTier)
-  );
-  const finance = Object.values(users).find(
-    (u) => u.role === ROLES.FINANCE_OFFICER && String(u.programTier) === String(programTier)
-  );
+  // Shared staff — one account system-wide (not duplicated per portal)
+  const coordinator =
+    users["coordinator@rms.edu"] ||
+    Object.values(users).find((u) => u.role === ROLES.FACULTY_COORDINATOR);
+  const finance =
+    users["finance@rms.edu"] ||
+    Object.values(users).find((u) => u.role === ROLES.FINANCE_OFFICER);
   return { programTier, director, researchers, coordinator, finance };
 }
 

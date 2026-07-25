@@ -120,6 +120,13 @@ function sanitizeProposal(p) {
         ? { amountCap: callCap }
         : null,
     submittedAt: p.submittedAt,
+    programTier: p.programTier || null,
+    programTierLabel:
+      p.programTier === "postgraduate"
+        ? "Postgraduate (PG)"
+        : p.programTier === "undergraduate"
+          ? "Undergraduate (UG)"
+          : p.programTier || null,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   };

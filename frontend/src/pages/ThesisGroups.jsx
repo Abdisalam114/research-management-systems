@@ -136,6 +136,8 @@ export function ThesisGroupsPage() {
   const groupIdFromUrl = searchParams.get("groupId") || "";
   const [groups, setGroups] = useState([]);
   const [researchers, setResearchers] = useState([]);
+  const [researchersError, setResearchersError] = useState("");
+  const [researcherQuery, setResearcherQuery] = useState("");
   const [departments, setDepartments] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -177,7 +179,6 @@ export function ThesisGroupsPage() {
   useEffect(() => {
     if (!accessToken) return;
     (async () => {
-      // Load separately so a users 403 does not wipe departments
       try {
         const deptRes = await departmentApi.listDepartments(accessToken);
         setDepartments(deptRes.departments || []);
@@ -185,50 +186,36 @@ export function ThesisGroupsPage() {
         setDepartments([]);
       }
       try {
-        const usersRes = await userApi.listUsers(accessToken, { role: "researcher", status: "active" });
-        setResearchers(usersRes.users || []);
-        // #region agent log
-        fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-          body: JSON.stringify({
-            sessionId: "f558f7",
-            runId: "thesis-fix",
-            hypothesisId: "H1",
-            location: "ThesisGroups.jsx:loadMeta",
-            message: "thesis meta loaded",
-            data: {
-              role: user?.role,
-              researchers: (usersRes.users || []).length,
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
+        // All researchers on this portal (Director may see non-active too; coordinator API returns active only).
+        const usersRes = await userApi.listUsers(accessToken, { role: "researcher" });
+        const list = (usersRes.users || [])
+          .slice()
+          .sort((a, b) => String(a.fullName || "").localeCompare(String(b.fullName || "")));
+        setResearchers(list);
+        setResearchersError("");
       } catch (err) {
         setResearchers([]);
-        // #region agent log
-        fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-          body: JSON.stringify({
-            sessionId: "f558f7",
-            runId: "thesis-fix",
-            hypothesisId: "H1",
-            location: "ThesisGroups.jsx:loadMeta",
-            message: "researchers load failed",
-            data: {
-              role: user?.role,
-              status: err?.response?.status || null,
-              msg: err?.response?.data?.message || String(err?.message || ""),
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
+        setResearchersError(
+          err?.response?.data?.message ||
+            "Could not load researchers. Supervisor assignment needs the researcher list."
+        );
       }
     })();
   }, [accessToken, user?.role, programTier]);
+
+  const filteredResearchers = useMemo(() => {
+    const q = researcherQuery.trim().toLowerCase();
+    if (!q) return researchers;
+    return researchers.filter((r) => {
+      const blob = `${r.fullName || ""} ${r.email || ""} ${r.department || ""} ${r.rank || ""}`.toLowerCase();
+      return blob.includes(q);
+    });
+  }, [researchers, researcherQuery]);
+
+  const activeResearchers = useMemo(
+    () => filteredResearchers.filter((r) => !r.status || r.status === "active"),
+    [filteredResearchers]
+  );
 
   const departmentsByFaculty = useMemo(() => {
     const map = {};
@@ -649,25 +636,47 @@ export function ThesisGroupsPage() {
               </select>
             </div>
             <div className="field">
-              <label>Supervisor (researcher)</label>
-              <select value={form.supervisorId} onChange={(e) => setForm({ ...form, supervisorId: e.target.value })}>
+              <label>Assign supervisor (choose from all researchers)</label>
+              <input
+                type="search"
+                value={researcherQuery}
+                onChange={(e) => setResearcherQuery(e.target.value)}
+                placeholder="Search researchers by name, email, or department…"
+                style={{ marginBottom: 8 }}
+              />
+              <select
+                value={form.supervisorId}
+                onChange={(e) => setForm({ ...form, supervisorId: e.target.value })}
+                size={Math.min(8, Math.max(4, activeResearchers.length + 1))}
+                style={{ width: "100%" }}
+              >
                 <option value="">— Unassigned —</option>
-                {researchers.map((r) => (
+                {activeResearchers.map((r) => (
                   <option key={r.id || r._id} value={r.id || r._id}>
-                    {r.fullName} — {r.department}
+                    {r.fullName} — {r.department || "No dept"} — {r.email || ""}
+                    {r.rank ? ` (${r.rank})` : ""}
                   </option>
                 ))}
               </select>
+              <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
+                Showing {activeResearchers.length} of {researchers.filter((r) => !r.status || r.status === "active").length}{" "}
+                active researchers on this portal
+                {researcherQuery.trim() ? " (filtered)" : ""}. Pick who will supervise this student group.
+              </p>
+              {researchersError ? (
+                <p style={{ color: "#fca5a5", fontSize: 13, marginTop: 6, marginBottom: 0 }}>{researchersError}</p>
+              ) : null}
             </div>
           </div>
 
           <p className="muted" style={{ fontSize: 13, margin: 0 }}>
             Thesis title is entered later by the assigned supervisor after students choose it.
-            {researchers.length === 0 ? (
+            {researchers.length === 0 && !researchersError ? (
               <>
                 {" "}
                 <strong style={{ color: "#b45309" }}>
-                  No researchers loaded — you cannot assign a supervisor until researchers are available on this portal.
+                  No researchers on this portal yet — create researcher accounts under Users (Director), then assign
+                  here.
                 </strong>
               </>
             ) : null}

@@ -1,7 +1,7 @@
 # What's New — July 2026 / Waxa Cusub
 # Jamhuriya RMS — Phases 1–4 + Thesis fixes
 
-**Read this first if you already know the old RMS.**  
+**Read this first if you already know the older RMS layout.**  
 **Akhri tan marka hore haddii aad taqaanid RMS-kii hore.**
 
 ---
@@ -16,8 +16,8 @@
 | 4 | **Project closure** | Projects → open project | Researcher → Director → Finance |
 | 5 | **Proposal budget at apply** | Proposals → New | Researcher |
 | 6 | **Compliance + supporting docs** | Proposals → New | Researcher |
-| 7 | **Ethics = Research Director** | `/ethics` | `research_director` |
-| 8 | **Finance owns PO review** | `/budgets` PO queue | `finance_officer` |
+| 7 | **Ethics = Research Director** | `/ethics` | Research Director |
+| 8 | **Finance owns PO review** | `/budgets` PO queue | Finance Officer |
 | 9 | **Work plan + activities** | Projects → execution panel | Researcher, staff |
 | 10 | **Communication log** | Projects → execution panel | Researcher, staff |
 | 11 | **Thesis min 4 students** | `/thesis` | Coordinator, Director |
@@ -33,7 +33,7 @@
 
 **SO:** Diiwaanka ficillada nidaamka oo dhan. Filter ku samee nooca entity.
 
-**Who:** `research_director`, `faculty_coordinator`
+**Who:** Research Director, Faculty Coordinator
 
 **How to use:**
 1. Sidebar → **Audit Trail**
@@ -44,11 +44,11 @@
 
 ### 1.2 Finance Reports (`/finance-reports`)
 
-**EN:** Restored dedicated page (was redirecting to budgets). Shows budget allocation vs spend summary.
+**EN:** Dedicated finance page. Shows budget allocation vs spend summary.
 
 **SO:** Bog warbixin maaliyadeed oo gooni ah — miisaaniyadda la qoondeeyay vs la isticmaalay.
 
-**Who:** `research_director`, `finance_officer`
+**Who:** Research Director, Finance Officer
 
 ---
 
@@ -125,13 +125,13 @@ Upload PDF/DOC per type.
 
 ---
 
-## Phase 3 — Roles update / Doorashooyin (current)
+## Phase 3 — Role responsibilities (current)
 
-### 3.1 Ethics = Research Director (no separate Ethics Committee login)
+### 3.1 Ethics = Research Director
 
-**EN:** Ethics / JUREC decisions are made by the **Research Director** on `/ethics`. The separate `ethics_committee` account was removed.
+**EN:** Ethics / JUREC decisions are made by the **Research Director** on `/ethics`.
 
-**SO:** Ethics / JUREC waxaa go’aamiya **Research Director**. Akoonka `ethics_committee` waa laga saaray.
+**SO:** Ethics / JUREC waxaa go’aamiya **Research Director**.
 
 **Login:** `director@rms.edu` / `Director2024!`
 
@@ -139,19 +139,19 @@ Upload PDF/DOC per type.
 
 ---
 
-### 3.2 Finance Officer owns Purchase Order review (Procurement removed)
+### 3.2 Finance Officer reviews Purchase Orders
 
-**EN:** Finance reviews **Purchase Orders** before Director. The separate Procurement Officer role was removed.
+**EN:** Finance reviews **Purchase Orders** before the Director approves them, then pays after Director approval.
 
-**SO:** Finance ayaa eega PO ka hor Director. Doorarka Procurement waa laga saaray.
+**SO:** Finance ayaa eega PO ka hor Director, ka dibna wuu bixiyaa marka Director ansixiyo.
 
-**Login:** `finance@rms.edu` / `Finance2024!` (UG) · `finance.pg@rms.edu` (PG)
+**Login:** `finance@rms.edu` / `Finance2024!`
 
-**PO workflow (updated):**
+**PO workflow:**
 
 ```
 Researcher creates PO (status: requested)
-    → Finance Officer approves/rejects (status: procurement_approved — legacy status name)
+    → Finance Officer approves/rejects
     → Director approves/rejects
     → Finance pays or rejects
 ```
@@ -162,11 +162,17 @@ Researcher creates PO (status: requested)
 
 ### 3.3 Donor Reports (`/donor-reports`)
 
-**EN:** Summary by `donorRef` on grants — total awarded, open funding calls, per-donor breakdown.
+**EN:** Summary by `donorRef` on grants — total awarded, open funding calls, per-donor breakdown. Available to Director and Finance.
 
-**SO:** Warbixin deeq-bixiyeyaasha (`donorRef`) — wadarta la siiyay, call-yada furan.
+**SO:** Warbixin deeq-bixiyeyaasha (`donorRef`) — wadarta la siiyay, call-yada furan. Director iyo Finance.
 
-**Who:** Director, Finance
+---
+
+### 3.4 Shared staff view (UG + PG)
+
+**EN:** One shared Director, Coordinator, Finance, and Leadership account each. Staff see Undergraduate and Postgraduate research together, with **UG/PG labels** on projects — they do not switch portals. Researchers use `asha@rms.edu` (UG) and `mahad@rms.edu` (PG).
+
+**SO:** Hal akoon wadaag ah Director, Coordinator, Finance, iyo Leadership. Shaqaalaha waxay wada arkaan UG iyo PG oo leh calaamado — ma beddelaan portal. Researchers: `asha@rms.edu` (UG), `mahad@rms.edu` (PG).
 
 ---
 
@@ -224,25 +230,20 @@ Seed data updated so demo groups have 4 students each.
 
 ## Seed accounts (current)
 
-Run `cd backend && npm run seed` then login with Finance for PO review:
+Run `cd backend && npm run seed` then login:
 
 | Email | Password | Role |
 |-------|----------|------|
-| finance@rms.edu | Finance2024! | Finance Officer (UG) — PO review + pay |
-| finance.pg@rms.edu | Finance2024! | Finance Officer (PG) |
-
-Removed: `ethics@`, `reviewer@`, `procurement@` (and `.pg` variants).
+| director@rms.edu | Director2024! | Research Director |
+| coordinator@rms.edu | Coordinator2024! | Faculty Coordinator |
+| finance@rms.edu | Finance2024! | Finance Officer (PO review + pay) |
+| leadership@rms.edu | Leadership2024! | University Leadership (peer review) |
+| asha@rms.edu | Researcher2024! | Researcher (Undergraduate) |
+| mahad@rms.edu | Researcher2024! | Researcher (Postgraduate) |
 
 ---
 
-## Coverage update / Cusbooneysiinta qiyaasta
+## Related docs
 
-After Phases 1–4, approximate full specification coverage: **~78%** (was ~58% in June 2026 gap doc).
-
-Still missing / weli ma jiraan:
-- External ERP/HR/SSO integrations
-- Dedicated reviewer portal
-- Formal KPI dashboard
-- Automated email/SMS gateway
-
-See updated `SYSTEM_GAP_ANALYSIS_SOM_EN.md` for details.
+See `SYSTEM_GAP_ANALYSIS_SOM_EN.md` for module-by-module status vs the specification.
+See how-to guides: `HOW_TO_USE_SYSTEM_SOM_EN.txt`, `HOW_TO_USE_SYSTEM_EN.txt`, `HOW_TO_USE_SYSTEM_SO.txt`.

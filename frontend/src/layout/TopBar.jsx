@@ -1,24 +1,22 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { BackButton } from "../components/BackButton";
 import { GlobalSearchBar } from "../components/GlobalSearchBar";
 import * as notificationApi from "../services/notificationApi";
 import logo from "../assets/jamhuriya-logo.png";
-import { PROGRAM_TIER_OPTIONS } from "../constants/programTier";
+import { isCrossTierRole, programTierLabel } from "../constants/programTier";
 
 export function TopBar({ title = "Dashboard" }) {
   const { user, accessToken } = useAuth();
-  const { programTier, programTierLabel, clearProgramTier } = useProgramTier();
-  const navigate = useNavigate();
+  const { programTier } = useProgramTier();
   const [unread, setUnread] = useState(0);
 
-  const tierMeta = PROGRAM_TIER_OPTIONS.find((o) => o.value === programTier);
-  const activeTier = user?.role === "research_director" ? programTier : user?.programTier;
-  const activeTierLabel = PROGRAM_TIER_OPTIONS.find((o) => o.value === activeTier)?.label;
-  const showTierBadge = Boolean(activeTier);
-  const canSwitchTier = user?.role === "research_director";
+  const sharedStaff = isCrossTierRole(user?.role);
+  const badgeLabel = sharedStaff
+    ? "All programs (UG + PG)"
+    : programTierLabel(user?.programTier || programTier);
 
   useEffect(() => {
     if (!accessToken) return undefined;
@@ -28,7 +26,7 @@ export function TopBar({ title = "Dashboard" }) {
       try {
         const res = await notificationApi.getUnreadCount(accessToken);
         if (!cancelled) setUnread(res.unread || 0);
-} catch {
+      } catch {
         if (!cancelled) setUnread(0);
       }
     }
@@ -54,35 +52,28 @@ export function TopBar({ title = "Dashboard" }) {
 
       <div className="topBarActions">
         <GlobalSearchBar />
-        {showTierBadge ? (
-          <button
-            type="button"
+        {badgeLabel ? (
+          <span
             className="topBarTierBadge"
-            title={canSwitchTier ? "Switch Undergraduate / Postgraduate portal" : "Your program portal"}
-            onClick={
-              canSwitchTier
-                ? () => {
-                    clearProgramTier();
-                    navigate("/program-tier", { replace: true });
-                  }
-                : undefined
+            title={
+              sharedStaff
+                ? "Shared staff account — Undergraduate and Postgraduate records together"
+                : "Your program portal"
             }
             style={{
-              border: `1px solid ${(tierMeta?.accent || PROGRAM_TIER_OPTIONS.find((o) => o.value === activeTier)?.accent) || "#38bdf8"}55`,
-              background: `${(tierMeta?.accent || PROGRAM_TIER_OPTIONS.find((o) => o.value === activeTier)?.accent) || "#38bdf8"}18`,
-              color: (tierMeta?.accent || PROGRAM_TIER_OPTIONS.find((o) => o.value === activeTier)?.accent) || "#38bdf8",
+              border: "1px solid rgba(56,189,248,0.35)",
+              background: "rgba(14,165,233,0.12)",
+              color: "#7dd3fc",
               borderRadius: 999,
               padding: "6px 12px",
               fontSize: 12,
               fontWeight: 800,
-              cursor: canSwitchTier ? "pointer" : "default",
               marginRight: 4,
+              display: "inline-block",
             }}
           >
-            {(tierMeta?.icon || PROGRAM_TIER_OPTIONS.find((o) => o.value === activeTier)?.icon) || "📍"}{" "}
-            {user?.role === "research_director" ? programTierLabel : activeTierLabel}
-            {canSwitchTier ? " ▾" : ""}
-          </button>
+            {sharedStaff ? "🌐" : "📍"} {badgeLabel}
+          </span>
         ) : null}
         <Link className="topBarIconBtn" to="/messages" title="Messages">
           💬

@@ -64,26 +64,12 @@ npm run verify:stakeholders
 
 Expected output: `19/19 users fully working`.
 
-### Thesis coverage (90%+)
-
-Jamhuriya RMS targets **92%** coverage of the full 6-phase specification — thesis-ready for defense.
-
-Verify programmatically:
-
-```bash
-cd backend
-npm run verify:thesis
-```
-
-Expected output: `Overall: 92%` and `Thesis-ready (90%+): YES`.
-
-Full gap analysis: [`docs/SYSTEM_GAP_ANALYSIS_SOM_EN.md`](docs/SYSTEM_GAP_ANALYSIS_SOM_EN.md).  
 New routes: `/kpi-dashboard` (director, coordinator, finance, leadership), `/search` (all users), technical report PDF on project details.
 
 **Portal rules**
 
-- **Research Director** (`director@rms.edu`) — choose **Undergraduate** or **Postgraduate** at login (Research Office).
-- All other accounts are fixed to **one portal** (UG or PG); they cannot switch.
+- **Director, Coordinator, Finance, Leadership** — one shared account each; they see **Undergraduate + Postgraduate** records together. Each project/proposal shows an **UG / PG** label.
+- **Researchers** stay on one portal (UG or PG) only.
 
 ### Stakeholder → system role
 
@@ -95,9 +81,9 @@ New routes: `/kpi-dashboard` (director, coordinator, finance, leadership), `/sea
 | Finance Office | `finance_officer` | `finance@rms.edu` (also owns PO review) |
 | Leadership (peer review / KPI) | `leadership` | `leadership@rms.edu` |
 
-Procurement, HR Officer, and Donor Agency logins were removed. Finance owns PO review; the Research Director owns former HR visibility and external funding / donor reports.
+Finance owns purchase-order review; the Research Director owns external funding and donor reports.
 
-### Undergraduate (UG)
+### Shared staff (one account each — UG + PG together)
 
 | Role | Email | Password | Name |
 |------|-------|----------|------|
@@ -105,16 +91,15 @@ Procurement, HR Officer, and Donor Agency logins were removed. Finance owns PO r
 | Faculty Coordinator | `coordinator@rms.edu` | `Coordinator2024!` | Dr. Emma Richardson |
 | Finance Officer | `finance@rms.edu` | `Finance2024!` | Michael Brooks |
 | Leadership | `leadership@rms.edu` | `Leadership2024!` | Prof. Ibrahim Warsame |
-| Researcher | `asha@rms.edu` | `Researcher2024!` | Dr. Sarah Chen |
 
-### Postgraduate (PG)
+### Researchers (portal-scoped)
 
-| Role | Email | Password | Name |
-|------|-------|----------|------|
-| Faculty Coordinator | `coordinator.pg@rms.edu` | `Coordinator2024!` | Dr. Robert Clarke |
-| Finance Officer | `finance.pg@rms.edu` | `Finance2024!` | Linda Martinez |
-| Leadership | `leadership.pg@rms.edu` | `Leadership2024!` | Prof. Halima Nur |
-| Researcher | `mahad@rms.edu` | `Researcher2024!` | Dr. James Okonkwo |
+| Role | Email | Password | Portal |
+|------|-------|----------|--------|
+| Researcher | `asha@rms.edu` | `Researcher2024!` | Undergraduate (UG) |
+| Researcher | `mahad@rms.edu` | `Researcher2024!` | Postgraduate (PG) |
+
+Projects and proposals show an **UG / PG** label so shared staff can tell them apart.
 
 **Login shortcuts:** Finance (PO review + pay) → `/budgets` · Leadership → `/grants` · Director donor reports → `/donor-reports`
 
@@ -125,7 +110,7 @@ Default passwords can be overridden via `backend/.env`: `SEED_DIRECTOR_PASSWORD`
 | Command | Description |
 |---------|-------------|
 | `npm run seed` | Bootstrap users and realistic institutional research data |
-| `node src/scripts/verifySeedUsers.js` | Verify all 19 seed accounts (role, portal, password) |
+| `node src/scripts/verifySeedUsers.js` | Verify institutional seed accounts (role, password) |
 | `npm run db:audit` | Count documents per collection (backend) |
 
 ## Documentation

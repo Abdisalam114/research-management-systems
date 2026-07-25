@@ -1,14 +1,16 @@
 const {
   Publication,
   PUBLICATION_STATUSES,
+  PUBLICATION_STATUS_LABELS,
   PUBLICATION_TYPES,
   LEGACY_PUBLICATION_TYPE_MAP,
   WORKFLOW_STAGES,
+  JOURNAL_DECISIONS,
+  JOURNAL_DECISION_LABELS,
 } = require("../models/Publication");
 const { Project } = require("../models/Project");
 const { User } = require("../models/User");
 const { AppError } = require("../utils/AppError");
-const { notifyUser } = require("../utils/notify");
 const { recordAudit } = require("../utils/audit");
 const {
   resolveOwnedProjectId,
@@ -24,8 +26,33 @@ const {
 } = require("../utils/publicationWorkflow");
 const { resolvePrincipalInvestigatorName } = require("../utils/projectPrincipalInvestigator");
 const { userDisplayName } = require("../utils/userDisplay");
-const { afterPublicationSubmitted } = require("../utils/publicationSideEffects");
+const {
+  afterPublicationSubmitted,
+  afterPublicationDecision,
+  afterPublicationComment,
+  notifyPublicationEvent,
+} = require("../utils/publicationSideEffects");
 
+const EDITABLE_STATUSES = [
+  PUBLICATION_STATUSES.DRAFT,
+  PUBLICATION_STATUSES.REJECTED,
+  PUBLICATION_STATUSES.REVISION_REQUESTED,
+];
+
+function pushReviewerComment(pub, req, comment, decision = null) {
+  const text = String(comment || "").trim();
+  if (!text) throw new AppError("comment is required", 400);
+  pub.reviewerComments = pub.reviewerComments || [];
+  const entry = {
+    authorId: req.user.id,
+    authorName: req.user.fullName || req.currentUser?.fullName || "",
+    authorRole: req.user.role,
+    comment: text,
+    at: new Date(),
+  };
+  if (decision) entry.decision = decision;
+  pub.reviewerComments.push(entry);
+}
 async function authorsFromProject(projectId, researcherId) {
   const project = await Project.findById(projectId)
     .populate("researcherId", "fullName name email")
@@ -89,6 +116,7 @@ function sanitizePublication(p) {
     citationCount: p.citationCount,
     communityImpact: p.communityImpact || "",
     status: p.status,
+    statusLabel: PUBLICATION_STATUS_LABELS[p.status] || p.status,
     workflowStage,
     workflowStageLabel: workflowStageLabel(workflowStage),
     researcherId: p.researcherId,
@@ -98,6 +126,22 @@ function sanitizePublication(p) {
     validatedBy: p.validatedBy,
     validatedAt: p.validatedAt,
     validationComment: p.validationComment,
+    journalDecision: p.journalDecision || JOURNAL_DECISIONS.PENDING,
+    journalDecisionLabel:
+      JOURNAL_DECISION_LABELS[p.journalDecision] || JOURNAL_DECISION_LABELS.pending,
+    journalDecisionNote: p.journalDecisionNote || "",
+    journalDecisionAt: p.journalDecisionAt || null,
+    journalDecisionBy: p.journalDecisionBy || null,
+    reviewerComments: (p.reviewerComments || []).map((c) => ({
+      id: c._id,
+      authorId: c.authorId,
+      authorName: c.authorName,
+      authorRole: c.authorRole,
+      comment: c.comment,
+      decision: c.decision,
+      decisionLabel: c.decision ? JOURNAL_DECISION_LABELS[c.decision] || c.decision : null,
+      at: c.at,
+    })),
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   };
@@ -345,8 +389,8 @@ async function updatePublication(req, res) {
   if (!pub) throw new AppError("Publication not found", 404);
   if (String(pub.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
 
-  if (![PUBLICATION_STATUSES.DRAFT, PUBLICATION_STATUSES.REJECTED].includes(pub.status)) {
-    throw new AppError("Only draft or rejected publications can be edited", 400);
+  if (!EDITABLE_STATUSES.includes(pub.status)) {
+    throw new AppError("Only draft, rejected, or revise&resubmit publications can be edited", 400);
   }
 
   const { title, type, year, venue, doi, orcid, url, authors, citationCount, communityImpact, projectId } = req.body || {};
@@ -373,11 +417,15 @@ async function updatePublication(req, res) {
     pub.projectId = nextProjectId;
   }
 
-  // Editing a rejected output returns it to draft so it can be resubmitted
-  if (pub.status === PUBLICATION_STATUSES.REJECTED) {
+  // Editing a rejected / revise output returns it to draft so it can be resubmitted
+  if (
+    pub.status === PUBLICATION_STATUSES.REJECTED ||
+    pub.status === PUBLICATION_STATUSES.REVISION_REQUESTED
+  ) {
     pub.status = PUBLICATION_STATUSES.DRAFT;
     pub.validatedBy = undefined;
     pub.validatedAt = undefined;
+    pub.journalDecision = JOURNAL_DECISIONS.PENDING;
     pub.validationComment = "";
     pub.workflowStage = null;
   }
@@ -391,8 +439,8 @@ async function submitPublication(req, res) {
   const pub = await Publication.findOne(req.tierWhere({ _id: id }));
   if (!pub) throw new AppError("Publication not found", 404);
   if (String(pub.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
-  if (![PUBLICATION_STATUSES.DRAFT, PUBLICATION_STATUSES.REJECTED].includes(pub.status)) {
-    throw new AppError("Only draft or rejected publications can be submitted", 400);
+  if (!EDITABLE_STATUSES.includes(pub.status)) {
+    throw new AppError("Only draft, rejected, or revise&resubmit publications can be submitted", 400);
   }
   if (!pub.projectId) {
     throw new AppError("Link this output to a research project before submitting", 400);
@@ -416,6 +464,9 @@ async function submitPublication(req, res) {
 
   pub.status = PUBLICATION_STATUSES.SUBMITTED;
   pub.workflowStage = WORKFLOW_STAGES.SUBMITTED;
+  pub.journalDecision = JOURNAL_DECISIONS.PENDING;
+  pub.validatedBy = undefined;
+  pub.validatedAt = undefined;
   await pub.save();
 
   const sideEffects = await afterPublicationSubmitted(req, pub);
@@ -439,68 +490,62 @@ async function submitPublication(req, res) {
 async function validatePublication(req, res) {
   const { id } = req.params;
   const { decision, comment } = req.body || {};
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    const payload = {
-      sessionId: "f558f7",
-      hypothesisId: "P1",
-      location: "publicationController.validatePublication",
-      message: "validate entry",
-      data: { pubId: id, decision, reqTier: req.programTier || null, role: req.user.role },
-      timestamp: Date.now(),
-      runId: "pub-validate",
-    };
-    fs.appendFileSync(path.join(__dirname, "../../../debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
-  } catch (_) { /* debug */ }
-  // #endregion
-  if (!comment) throw new AppError("comment is required", 400);
-  if (!["validated", "rejected"].includes(decision)) throw new AppError("Invalid decision", 400);
+  if (!comment) throw new AppError("comment is required (reviewer feedback)", 400);
+
+  // International-style decisions: accept | reject | revise
+  // Legacy aliases: validated → accept, rejected → reject
+  const normalized =
+    decision === "validated" || decision === "accept"
+      ? "accept"
+      : decision === "rejected" || decision === "reject"
+        ? "reject"
+        : decision === "revise" || decision === "revision_requested"
+          ? "revise"
+          : null;
+  if (!normalized) {
+    throw new AppError("Invalid decision — use accept, reject, or revise", 400);
+  }
 
   const pub = await Publication.findOne(req.tierWhere({ _id: id }));
-  if (!pub) {
-    // #region agent log
-    try {
-      const fs = require("fs");
-      const path = require("path");
-      fs.appendFileSync(
-        path.join(__dirname, "../../../debug-f558f7.log"),
-        `${JSON.stringify({
-          sessionId: "f558f7",
-          hypothesisId: "P1",
-          location: "publicationController.validatePublication",
-          message: "publication not found for tier",
-          data: { pubId: id, reqTier: req.programTier || null },
-          timestamp: Date.now(),
-          runId: "pub-validate",
-        })}\n`
-      );
-    } catch (_) { /* debug */ }
-    // #endregion
-    throw new AppError("Publication not found", 404);
+  if (!pub) throw new AppError("Publication not found", 404);
+  if (
+    ![PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.REVISION_REQUESTED].includes(pub.status)
+  ) {
+    throw new AppError("Publication is not ready for a review decision", 400);
   }
-  if (pub.status !== PUBLICATION_STATUSES.SUBMITTED) throw new AppError("Publication is not validation-ready", 400);
 
-  pub.status = decision === "validated" ? PUBLICATION_STATUSES.VALIDATED : PUBLICATION_STATUSES.REJECTED;
+  const journalDecision =
+    normalized === "accept"
+      ? JOURNAL_DECISIONS.ACCEPT
+      : normalized === "reject"
+        ? JOURNAL_DECISIONS.REJECT
+        : JOURNAL_DECISIONS.REVISE;
+
+  pushReviewerComment(pub, req, comment, journalDecision);
+
+  pub.journalDecision = journalDecision;
+  pub.journalDecisionNote = String(comment).trim();
+  pub.journalDecisionAt = new Date();
+  pub.journalDecisionBy = req.user.id;
   pub.validatedBy = req.user.id;
   pub.validatedAt = new Date();
-  pub.validationComment = String(comment);
-  // Validate = institutional acceptance → Published (not stuck on Submitted / In process)
-  if (decision === "validated") {
+  pub.validationComment = String(comment).trim();
+
+  if (normalized === "accept") {
+    pub.status = PUBLICATION_STATUSES.VALIDATED;
     pub.workflowStage = WORKFLOW_STAGES.PUBLISHED;
-  } else {
+  } else if (normalized === "reject") {
+    pub.status = PUBLICATION_STATUSES.REJECTED;
     pub.workflowStage = WORKFLOW_STAGES.SUBMITTED;
+  } else {
+    pub.status = PUBLICATION_STATUSES.REVISION_REQUESTED;
+    pub.workflowStage = WORKFLOW_STAGES.IN_PROCESS;
   }
+
   await pub.save();
 
   let projectCompletion = null;
-  if (decision === "validated" && pub.projectId) {
+  if (normalized === "accept" && pub.projectId) {
     try {
       const { maybeCompleteFundedProject } = require("../utils/maybeCompleteFundedProject");
       projectCompletion = await maybeCompleteFundedProject(pub.projectId);
@@ -509,48 +554,119 @@ async function validatePublication(req, res) {
     }
   }
 
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    const payload = {
-      sessionId: "f558f7",
-      hypothesisId: "P2",
-      location: "publicationController.validatePublication",
-      message: "validate saved",
-      data: {
-        pubId: String(pub._id),
-        status: pub.status,
-        workflowStage: pub.workflowStage,
-        projectId: pub.projectId ? String(pub.projectId) : null,
-        projectCompletion,
-        reqTier: req.programTier || null,
-      },
-      timestamp: Date.now(),
-      runId: "pub-validate",
-    };
-    fs.appendFileSync(path.join(__dirname, "../../../debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
-  } catch (_) { /* debug */ }
-  // #endregion
+  const decisionLabel =
+    normalized === "accept" ? "accepted" : normalized === "reject" ? "rejected" : "sent back for revision";
 
-  try {
-    await notifyUser(pub.researcherId, {
-      type: "publication",
-      title: `Publication ${decision === "validated" ? "validated" : "rejected"}`,
-      body: pub.title,
-      link: pub.projectId ? `/publications?projectId=${pub.projectId}` : "/publications",
-      programTier: req.programTier,
-    });
-  } catch {
-    /* notifications are best-effort */
+  await afterPublicationDecision(req, pub, { decisionLabel, comment });
+
+  res.json({
+    message: `Decision saved: ${decisionLabel}`,
+    publication: sanitizePublication(pub),
+    projectCompletion,
+  });
+}
+
+/** Researcher or staff adds a review comment (no status change). */
+async function addPublicationComment(req, res) {
+  const { id } = req.params;
+  const { comment } = req.body || {};
+  const pub = await Publication.findOne(req.tierWhere({ _id: id }));
+  if (!pub) throw new AppError("Publication not found", 404);
+
+  const role = req.user.role;
+  const isOwner = String(pub.researcherId) === String(req.user.id);
+  const isStaff = ["faculty_coordinator", "research_director", "leadership"].includes(role);
+  if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+  if (pub.status === PUBLICATION_STATUSES.DRAFT && !isOwner) {
+    throw new AppError("Cannot comment on a draft you do not own", 400);
   }
 
-  res.json({ message: "Validation saved", publication: sanitizePublication(pub), projectCompletion });
+  pushReviewerComment(pub, req, comment, null);
+  await pub.save();
+
+  await afterPublicationComment(req, pub, comment);
+
+  res.json({ message: "Comment added", publication: sanitizePublication(pub) });
+}
+
+/**
+ * Record external journal / venue decision (international accept/reject/revise).
+ * Researcher (owner) or Director/Coordinator may set this after submission.
+ */
+async function setJournalDecision(req, res) {
+  const { id } = req.params;
+  const { decision, note } = req.body || {};
+  const pub = await Publication.findOne(req.tierWhere({ _id: id }));
+  if (!pub) throw new AppError("Publication not found", 404);
+
+  const role = req.user.role;
+  const isOwner = String(pub.researcherId) === String(req.user.id);
+  const isStaff = ["faculty_coordinator", "research_director"].includes(role);
+  if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+  if (pub.status === PUBLICATION_STATUSES.DRAFT) {
+    throw new AppError("Submit the publication before recording a journal decision", 400);
+  }
+
+  const normalized =
+    decision === "accept" || decision === "validated"
+      ? JOURNAL_DECISIONS.ACCEPT
+      : decision === "reject" || decision === "rejected"
+        ? JOURNAL_DECISIONS.REJECT
+        : decision === "revise" || decision === "revision_requested"
+          ? JOURNAL_DECISIONS.REVISE
+          : decision === "pending"
+            ? JOURNAL_DECISIONS.PENDING
+            : null;
+  if (!normalized) throw new AppError("Invalid journal decision — use accept, reject, revise, or pending", 400);
+
+  const noteText = String(note || "").trim();
+  if (normalized !== JOURNAL_DECISIONS.PENDING && !noteText) {
+    throw new AppError("note/comment is required with the journal decision", 400);
+  }
+
+  pub.journalDecision = normalized;
+  pub.journalDecisionNote = noteText;
+  pub.journalDecisionAt = new Date();
+  pub.journalDecisionBy = req.user.id;
+
+  if (noteText) pushReviewerComment(pub, req, noteText, normalized);
+
+  // Keep institutional status aligned when staff/researcher logs venue outcome
+  if (normalized === JOURNAL_DECISIONS.ACCEPT) {
+    pub.status = PUBLICATION_STATUSES.VALIDATED;
+    pub.workflowStage = WORKFLOW_STAGES.PUBLISHED;
+    pub.validationComment = noteText || pub.validationComment;
+    pub.validatedAt = new Date();
+    pub.validatedBy = req.user.id;
+  } else if (normalized === JOURNAL_DECISIONS.REJECT) {
+    pub.status = PUBLICATION_STATUSES.REJECTED;
+    pub.validationComment = noteText || pub.validationComment;
+    pub.validatedAt = new Date();
+    pub.validatedBy = req.user.id;
+  } else if (normalized === JOURNAL_DECISIONS.REVISE) {
+    pub.status = PUBLICATION_STATUSES.REVISION_REQUESTED;
+    pub.workflowStage = WORKFLOW_STAGES.IN_PROCESS;
+    pub.validationComment = noteText || pub.validationComment;
+    pub.validatedAt = new Date();
+    pub.validatedBy = req.user.id;
+  }
+
+  await pub.save();
+
+  if (normalized !== JOURNAL_DECISIONS.PENDING) {
+    const decisionLabel =
+      normalized === JOURNAL_DECISIONS.ACCEPT
+        ? "accepted (journal)"
+        : normalized === JOURNAL_DECISIONS.REJECT
+          ? "rejected (journal)"
+          : "sent back for revision (journal)";
+    await afterPublicationDecision(req, pub, { decisionLabel, comment: noteText });
+  }
+
+  res.json({
+    message: `Journal decision saved: ${JOURNAL_DECISION_LABELS[normalized]}`,
+    publication: sanitizePublication(pub),
+  });
 }
 
 async function refreshCitations(req, res) {
@@ -653,17 +769,11 @@ async function updateWorkflowStage(req, res) {
     }
   }
 
-  try {
-    const researcherId = pub.researcherId?._id || pub.researcherId;
-    await notifyUser(researcherId, {
-      type: "publication",
-      title: `Research output: ${workflowStageLabel(stage)}`,
-      body: pub.title,
-      link: pub.projectId ? `/publications?projectId=${pub.projectId}` : "/publications",
-    });
-  } catch {
-    /* best-effort */
-  }
+  await notifyPublicationEvent(req, pub, {
+    title: `Research output: ${workflowStageLabel(stage)}`,
+    body: `${pub.title} — see project details for full comments and status.`,
+    notifyOwner: true,
+  });
 
   res.json({ message: "Workflow stage updated", publication: sanitizePublication(pub), projectCompletion });
 }
@@ -679,9 +789,13 @@ async function deletePublication(req, res) {
 
   if (
     !isDirector &&
-    ![PUBLICATION_STATUSES.DRAFT, PUBLICATION_STATUSES.REJECTED].includes(pub.status)
+    ![
+      PUBLICATION_STATUSES.DRAFT,
+      PUBLICATION_STATUSES.REJECTED,
+      PUBLICATION_STATUSES.REVISION_REQUESTED,
+    ].includes(pub.status)
   ) {
-    throw new AppError("Only draft or rejected outputs can be deleted", 400);
+    throw new AppError("Only draft, rejected, or revise&resubmit outputs can be deleted", 400);
   }
 
   const title = pub.title;
@@ -730,6 +844,8 @@ module.exports = {
   updatePublication,
   submitPublication,
   validatePublication,
+  addPublicationComment,
+  setJournalDecision,
   refreshCitations,
   updateWorkflowStage,
   deletePublication,

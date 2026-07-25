@@ -17,6 +17,7 @@ const {
   buildResearchJourneyForResearcher,
   listResearchersForJourney,
 } = require("../utils/researchJourney");
+const { TITLE_PROPOSAL_STATUSES } = require("../utils/thesisDefaults");
 const { Notification } = require("../models/Notification");
 const { FACULTIES, matchFacultyByName } = require("../utils/facultyMatcher");
 const {
@@ -30,6 +31,15 @@ const { enrichProjectsResearcher } = require("../utils/projectPi");
 const { AppError } = require("../utils/AppError");
 const { userDisplayName } = require("../utils/userDisplay");
 const PDFDocument = require("pdfkit");
+
+function countByField(docs, field) {
+  const out = {};
+  for (const d of docs) {
+    const key = d[field] || "unknown";
+    out[key] = (out[key] || 0) + 1;
+  }
+  return out;
+}
 
 function sum(nums) {
   return (nums || []).reduce((acc, n) => acc + (typeof n === "number" ? n : 0), 0);
@@ -824,6 +834,359 @@ async function getResearchJourney(req, res) {
   res.json({ mode: "journey", ...journey });
 }
 
+/** Institutional ops board: counts + sample items for each major lifecycle stage. */
+async function getWorkflowOverview(req, res) {
+  const role = req.user?.role;
+  if (!["research_director", "faculty_coordinator", "researcher"].includes(role)) {
+    throw new AppError("Forbidden", 403);
+  }
+
+  const tf = (extra = {}) => req.tierWhere(extra);
+  const dept =
+    role === "faculty_coordinator" ? String(req.user.department || "").trim() : "";
+  const researcherOnly = role === "researcher" ? req.user.id : null;
+
+  const proposalFilter = tf({});
+  const projectFilter = tf({});
+  const ethicsFilter = tf({});
+  const grantFilter = tf({});
+  const pubFilter = tf({});
+  const thesisFilter = tf({});
+
+  if (researcherOnly) {
+    proposalFilter.researcherId = researcherOnly;
+    projectFilter.researcherId = researcherOnly;
+    ethicsFilter.researcherId = researcherOnly;
+    grantFilter.researcherId = researcherOnly;
+    pubFilter.researcherId = researcherOnly;
+  } else if (dept) {
+    proposalFilter.department = dept;
+    projectFilter.department = dept;
+  }
+
+  const [proposals, projects, ethicsApps, grants, publications, thesisGroups, fundingCalls] =
+    await Promise.all([
+      Proposal.find(proposalFilter)
+        .select("title status ethicsStatus department researcherId updatedAt")
+        .sort({ updatedAt: -1 })
+        .limit(400)
+        .lean(),
+      Project.find(projectFilter)
+        .select("title status department researcherId proposalId updatedAt")
+        .sort({ updatedAt: -1 })
+        .limit(400)
+        .lean(),
+      EthicsApplication.find(ethicsFilter)
+        .select("projectTitle status updatedAt")
+        .sort({ updatedAt: -1 })
+        .limit(200)
+        .lean(),
+      Grant.find(grantFilter)
+        .select("title status amountAwarded amountRequested researcherId updatedAt")
+        .sort({ updatedAt: -1 })
+        .limit(300)
+        .lean(),
+      Publication.find(pubFilter)
+        .select("title status workflowStage projectId updatedAt")
+        .sort({ updatedAt: -1 })
+        .limit(300)
+        .lean(),
+      ThesisGroup.find(thesisFilter)
+        .select("groupName status titleProposal supervisorId updatedAt")
+        .sort({ updatedAt: -1 })
+        .limit(200)
+        .lean(),
+      FundingCall.find(tf({})).select("title status updatedAt").lean(),
+    ]);
+
+  const sample = (items, mapFn, n = 5) => items.slice(0, n).map(mapFn);
+
+  const stages = [
+    {
+      key: "proposals_draft",
+      label: "Proposals — draft",
+      link: "/proposals",
+      count: proposals.filter((p) => p.status === PROPOSAL_STATUSES.DRAFT).length,
+      items: sample(
+        proposals.filter((p) => p.status === PROPOSAL_STATUSES.DRAFT),
+        (p) => ({ id: String(p._id), title: p.title, link: `/proposals/${p._id}`, status: p.status })
+      ),
+    },
+    {
+      key: "proposals_review",
+      label: "Proposals — under review / submitted",
+      link: "/proposals",
+      count: proposals.filter((p) =>
+        [PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW, PROPOSAL_STATUSES.REVISION_REQUESTED].includes(
+          p.status
+        )
+      ).length,
+      items: sample(
+        proposals.filter((p) =>
+          [PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW, PROPOSAL_STATUSES.REVISION_REQUESTED].includes(
+            p.status
+          )
+        ),
+        (p) => ({
+          id: String(p._id),
+          title: p.title,
+          link: `/proposals/${p._id}/review`,
+          status: p.status,
+        })
+      ),
+    },
+    {
+      key: "ethics_queue",
+      label: "Ethics (REC) — pending / submitted",
+      link: "/ethics",
+      count: ethicsApps.filter((e) => ["draft", "submitted", "pending"].includes(String(e.status).toLowerCase()))
+        .length,
+      items: sample(
+        ethicsApps.filter((e) => ["draft", "submitted", "pending"].includes(String(e.status).toLowerCase())),
+        (e) => ({
+          id: String(e._id),
+          title: e.projectTitle || "Ethics application",
+          link: "/ethics",
+          status: e.status,
+        })
+      ),
+    },
+    {
+      key: "projects_active",
+      label: "Projects — active",
+      link: "/projects",
+      count: projects.filter((p) => p.status === PROJECT_STATUSES.ACTIVE).length,
+      items: sample(
+        projects.filter((p) => p.status === PROJECT_STATUSES.ACTIVE),
+        (p) => ({
+          id: String(p._id),
+          title: p.title,
+          link: `/projects/${p._id}`,
+          status: p.status,
+        })
+      ),
+    },
+    {
+      key: "funding_calls",
+      label: "Funding calls — open",
+      link: "/funding-calls",
+      count: fundingCalls.filter((c) => c.status === CALL_STATUSES.OPEN).length,
+      items: sample(
+        fundingCalls.filter((c) => c.status === CALL_STATUSES.OPEN),
+        (c) => ({ id: String(c._id), title: c.title, link: "/funding-calls", status: c.status })
+      ),
+    },
+    {
+      key: "grants_pending",
+      label: "Grants — draft / submitted",
+      link: "/grants",
+      count: grants.filter((g) =>
+        [GRANT_STATUSES.DRAFT, GRANT_STATUSES.SUBMITTED, GRANT_STATUSES.PENDING_FINANCE].includes(g.status)
+      ).length,
+      items: sample(
+        grants.filter((g) =>
+          [GRANT_STATUSES.DRAFT, GRANT_STATUSES.SUBMITTED, GRANT_STATUSES.PENDING_FINANCE].includes(g.status)
+        ),
+        (g) => ({ id: String(g._id), title: g.title, link: `/grants/${g._id}`, status: g.status })
+      ),
+    },
+    {
+      key: "publications_pipeline",
+      label: "Publications — in workflow",
+      link: "/research-workflow?tab=publications",
+      count: publications.filter((p) => p.status !== PUBLICATION_STATUSES.DRAFT).length,
+      items: sample(
+        publications.filter((p) => p.status !== PUBLICATION_STATUSES.DRAFT),
+        (p) => ({
+          id: String(p._id),
+          title: p.title,
+          link: p.projectId ? `/projects/${p.projectId}` : "/publications",
+          status: p.workflowStage || p.status,
+        })
+      ),
+    },
+    {
+      key: "thesis_titles",
+      label: "Thesis — titles pending accept/reject",
+      link: "/thesis",
+      count: thesisGroups.filter(
+        (t) => t.titleProposal?.status === TITLE_PROPOSAL_STATUSES.PENDING
+      ).length,
+      items: sample(
+        thesisGroups.filter((t) => t.titleProposal?.status === TITLE_PROPOSAL_STATUSES.PENDING),
+        (t) => ({
+          id: String(t._id),
+          title: t.groupName || t.titleProposal?.title || "Thesis group",
+          link: "/thesis",
+          status: t.titleProposal?.status,
+        })
+      ),
+    },
+  ];
+
+  res.json({
+    generatedAt: new Date().toISOString(),
+    programTier: req.programTier || null,
+    scope: researcherOnly ? "mine" : dept ? `faculty:${dept}` : "portal",
+    totals: {
+      proposals: proposals.length,
+      projects: projects.length,
+      ethics: ethicsApps.length,
+      grants: grants.length,
+      publications: publications.length,
+      thesisGroups: thesisGroups.length,
+      fundingCalls: fundingCalls.length,
+    },
+    stages,
+  });
+}
+
+/** Live system data pack for Director / Coordinator / Finance. */
+async function getSystemReport(req, res) {
+  const role = req.user?.role;
+  if (!["research_director", "faculty_coordinator", "finance_officer", "leadership"].includes(role)) {
+    throw new AppError("Forbidden", 403);
+  }
+
+  const tf = (extra = {}) => req.tierWhere(extra);
+  const dept =
+    role === "faculty_coordinator" ? String(req.user.department || "").trim() : "";
+
+  const proposalQ = tf(dept ? { department: dept } : {});
+  const projectQ = tf(dept ? { department: dept } : {});
+
+  const [
+    proposals,
+    projects,
+    ethicsApps,
+    grants,
+    budgets,
+    payments,
+    purchaseOrders,
+    publications,
+    thesisGroups,
+    fundingCalls,
+    users,
+    repositoryItems,
+  ] = await Promise.all([
+    Proposal.find(proposalQ).select("status ethicsStatus department").lean(),
+    Project.find(projectQ).select("status department kind").lean(),
+    EthicsApplication.find(tf({})).select("status").lean(),
+    Grant.find(tf({})).select("status amountAwarded amountRequested").lean(),
+    Budget.find(tf({})).select("totalAmount allocatedAmount spentAmount status").lean(),
+    Payment.find(tf({})).select("amount status").lean(),
+    PurchaseOrder.find(tf({})).select("totalAmount status").lean(),
+    Publication.find(tf({})).select("status workflowStage type").lean(),
+    ThesisGroup.find(tf({})).select("status titleProposal").lean(),
+    FundingCall.find(tf({})).select("status").lean(),
+    role === "research_director"
+      ? User.find(tf({ role: { $ne: ROLES.RESEARCH_DIRECTOR } })).select("role status").lean()
+      : Promise.resolve([]),
+    RepositoryItem.find(tf({})).select("_id").lean(),
+  ]);
+
+  const paidPayments = payments.filter((p) => p.status === PAYMENT_STATUSES.PAID || p.status === "paid");
+  const allocated = sum(budgets.map((b) => Number(b.allocatedAmount ?? b.totalAmount ?? 0)));
+  const spent = sum(budgets.map((b) => Number(b.spentAmount || 0)));
+  const paid = sum(paidPayments.map((p) => Number(p.amount || 0)));
+
+  const report = {
+    generatedAt: new Date().toISOString(),
+    programTier: req.programTier || null,
+    scope: dept ? `faculty:${dept}` : "portal",
+    users:
+      role === "research_director"
+        ? {
+            total: users.length,
+            byRole: countByField(users, "role"),
+            byStatus: countByField(users, "status"),
+          }
+        : undefined,
+    proposals: {
+      total: proposals.length,
+      byStatus: countByField(proposals, "status"),
+    },
+    ethics: {
+      total: ethicsApps.length,
+      byStatus: countByField(ethicsApps, "status"),
+    },
+    projects: {
+      total: projects.length,
+      byStatus: countByField(projects, "status"),
+    },
+    fundingCalls: {
+      total: fundingCalls.length,
+      byStatus: countByField(fundingCalls, "status"),
+    },
+    grants: {
+      total: grants.length,
+      byStatus: countByField(grants, "status"),
+      totalAwarded: sum(grants.map((g) => Number(g.amountAwarded || 0))),
+      totalRequested: sum(grants.map((g) => Number(g.amountRequested || 0))),
+    },
+    finance: {
+      budgets: budgets.length,
+      allocated,
+      spent,
+      paid,
+      utilizationPercent: allocated > 0 ? Math.round((spent / allocated) * 1000) / 10 : 0,
+      payments: payments.length,
+      purchaseOrders: purchaseOrders.length,
+      poByStatus: countByField(purchaseOrders, "status"),
+    },
+    publications: {
+      total: publications.length,
+      byStatus: countByField(publications, "status"),
+      byWorkflowStage: countByField(publications, "workflowStage"),
+    },
+    thesis: {
+      total: thesisGroups.length,
+      byStatus: countByField(thesisGroups, "status"),
+      titlesPending: thesisGroups.filter(
+        (t) => t.titleProposal?.status === TITLE_PROPOSAL_STATUSES.PENDING
+      ).length,
+    },
+    repository: {
+      total: repositoryItems.length,
+    },
+  };
+
+  if (String(req.query.format || "").toLowerCase() === "csv") {
+    const lines = ["section,key,value"];
+    const push = (section, key, value) => {
+      lines.push(`"${section}","${key}","${value}"`);
+    };
+    push("meta", "generatedAt", report.generatedAt);
+    push("meta", "programTier", report.programTier || "");
+    push("proposals", "total", report.proposals.total);
+    Object.entries(report.proposals.byStatus).forEach(([k, v]) => push("proposals", k, v));
+    push("ethics", "total", report.ethics.total);
+    Object.entries(report.ethics.byStatus).forEach(([k, v]) => push("ethics", k, v));
+    push("projects", "total", report.projects.total);
+    Object.entries(report.projects.byStatus).forEach(([k, v]) => push("projects", k, v));
+    push("grants", "total", report.grants.total);
+    push("grants", "totalAwarded", report.grants.totalAwarded);
+    Object.entries(report.grants.byStatus).forEach(([k, v]) => push("grants", k, v));
+    push("finance", "allocated", report.finance.allocated);
+    push("finance", "spent", report.finance.spent);
+    push("finance", "paid", report.finance.paid);
+    push("finance", "utilizationPercent", report.finance.utilizationPercent);
+    push("publications", "total", report.publications.total);
+    push("thesis", "total", report.thesis.total);
+    push("thesis", "titlesPending", report.thesis.titlesPending);
+    push("repository", "total", report.repository.total);
+    if (report.users) {
+      push("users", "total", report.users.total);
+      Object.entries(report.users.byRole).forEach(([k, v]) => push("users_role", k, v));
+    }
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="just-rms-system-report.csv"');
+    return res.send(lines.join("\n"));
+  }
+
+  res.json(report);
+}
+
 async function getDonorReport(req, res) {
   const [grants, calls] = await Promise.all([
     Grant.find(req.tierWhere({ callId: { $ne: null, $exists: true } })).select(
@@ -901,24 +1264,9 @@ async function getKpiDashboard(req, res) {
   const internalCalls = calls.filter((c) => (c.callType || "internal") === "internal").length;
   const externalCalls = calls.filter((c) => c.callType === "external").length;
 
-  const coverageScore = {
-    stakeholders: 92,
-    phase1Funding: 88,
-    phase2Application: 95,
-    phase3Review: 88,
-    phase4Project: 95,
-    phase5Monitoring: 90,
-    phase6Closure: 92,
-    sharedServices: 90,
-    dashboards: 92,
-    integrations: 55,
-    overall: 92,
-  };
-
   res.json({
     generatedAt: new Date().toISOString(),
     programTier: tier,
-    coverageScore,
     kpis: {
       proposalApprovalRate,
       grantSuccessRate,
@@ -933,7 +1281,6 @@ async function getKpiDashboard(req, res) {
       externalFundingCalls: externalCalls,
       researchersActive: await User.countDocuments(tf({ role: ROLES.RESEARCHER, status: USER_STATUSES.ACTIVE })),
     },
-    thesisReady: coverageScore.overall >= 90,
   });
 }
 
@@ -948,5 +1295,7 @@ module.exports = {
   getFacultyReport,
   exportFacultyReportPdf,
   getResearchJourney,
+  getWorkflowOverview,
+  getSystemReport,
 };
 

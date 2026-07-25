@@ -78,9 +78,8 @@ export function AuthProvider({ children }) {
       const res = await authApi.login({ email, password });
       applyTokens({ accessToken: res.accessToken, refreshToken: res.refreshToken });
       setUser(res.user);
-      if (res.user?.role === "research_director") {
-        clearProgramTier();
-      }
+      // Shared staff see UG+PG together — never lock to a portal filter
+      clearProgramTier();
       return res;
     },
     [applyTokens]

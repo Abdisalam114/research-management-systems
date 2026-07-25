@@ -13,8 +13,8 @@
 | English | Somali |
 |---------|--------|
 | A web app for managing university research from idea to project closure | App web ah oo lagu maamulo cilmi-baarista jaamacadda — laga bilaabo fikrad ilaa xiritaanka mashruuca |
-| Two portals: **Undergraduate (UG)** and **Postgraduate (PG)** — data is separated | Laba portal: **Undergraduate** iyo **Postgraduate** — xogtu waa kala go'an |
-| Only the **Research Director** can switch between UG and PG | Kaliya **Research Director** ayaa beddeli kara UG iyo PG |
+| Two program tracks: **Undergraduate (UG)** and **Postgraduate (PG)** — each project shows its label | Laba barnaamij: **UG** iyo **PG** — project kasta wuxuu muujiyaa calaamaddiisa |
+| **Director, Coordinator, Finance, Leadership** — one account each; they see UG + PG together | **Director, Coordinator, Finance, Leadership** — mid mid; UG + PG wada arkaan |
 
 ---
 
@@ -25,32 +25,31 @@
 | **Research Director** | Runs the whole office; final approvals | Maamulka guud; ansixinta ugu dambeysa |
 | **Faculty Coordinator** | Faculty-level review, thesis groups, reports | Daraasaadka faculty-ga; thesis groups |
 | **Finance Officer** | Budgets, PO review, payments, finance closure | Miisaaniyad, dib-u-eegis PO, lacag bixin, xiritaan |
+| **Leadership** | Peer review, KPI | Peer review, KPI |
 | **Researcher** | Proposals, projects, grants, publications, thesis supervision | Proposal, project, grant, publication, thesis |
-
-Procurement Officer was removed — Finance reviews purchase orders before Director.
 
 ---
 
-## 3. Login & portal / Galitaanka
+## 3. Login / Galitaanka
 
 **English**
 1. Open the app → Login with email + password
-2. If you are **Director** → choose **Undergraduate** or **Postgraduate**
-3. Everyone else → auto-assigned to **one portal only** (UG or PG)
+2. Shared staff see all UG + PG records; researchers see their own program only
 
 **Somali**
 1. Fur app-ka → gal email + password
-2. Haddii aad tahay **Director** → dooro **Undergraduate** ama **Postgraduate**
-3. Dadka kale → hal portal kaliya (UG ama PG)
+2. Staff-ka wadaagga ah wuxuu arkaa UG + PG; researchers-na barnaamijkooda
 
 **Test accounts (after `npm run seed`):**
 
 | Email | Password | Role |
 |-------|----------|------|
-| `director@rms.edu` | `Director2024!` | Director |
-| `coordinator@rms.edu` | `Coordinator2024!` | Coordinator |
-| `finance@rms.edu` | `Finance2024!` | Finance (PO review + pay) |
-| `asha@rms.edu` | `Researcher2024!` | Researcher |
+| `director@rms.edu` | `Director2024!` | Director (UG + PG) |
+| `coordinator@rms.edu` | `Coordinator2024!` | Coordinator (UG + PG) |
+| `finance@rms.edu` | `Finance2024!` | Finance (UG + PG) |
+| `leadership@rms.edu` | `Leadership2024!` | Leadership (UG + PG) |
+| `asha@rms.edu` | `Researcher2024!` | Researcher (UG) |
+| `mahad@rms.edu` | `Researcher2024!` | Researcher (PG) |
 
 ---
 

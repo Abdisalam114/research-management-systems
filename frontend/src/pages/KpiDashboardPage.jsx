@@ -4,12 +4,6 @@ import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as analyticsApi from "../services/analyticsApi";
 import { PageHeader } from "../components/PageHeader";
-import {
-  DASH_SUCCESS_BG,
-  DASH_SUCCESS_BORDER,
-  DASH_WARNING_BG,
-  DASH_WARNING_BORDER,
-} from "../constants/dashboardTheme";
 import "../pages/dashboard.css";
 
 function KpiCard({ label, value, sub }) {
@@ -34,7 +28,6 @@ export function KpiDashboardPage() {
   const { loading, error } = useModuleLoad(accessToken, load, []);
 
   const kpis = data?.kpis || {};
-  const coverage = data?.coverageScore || {};
 
   return (
     <div className="dashboardPage">
@@ -52,21 +45,9 @@ export function KpiDashboardPage() {
 
       {data ? (
         <>
-          <div
-            className="card"
-            style={{
-              borderColor: data.thesisReady ? DASH_SUCCESS_BORDER : DASH_WARNING_BORDER,
-              background: data.thesisReady ? DASH_SUCCESS_BG : DASH_WARNING_BG,
-            }}
-          >
-            <div style={{ fontWeight: 800 }}>
-              System coverage: <strong>{coverage.overall || 0}%</strong>
-              {data.thesisReady ? " — Thesis-ready (90%+)" : ""}
-            </div>
-            <p className="muted" style={{ fontSize: 13, margin: "6px 0 0" }}>
-              Generated {new Date(data.generatedAt).toLocaleString()} · Portal: {data.programTier}
-            </p>
-          </div>
+          <p className="muted" style={{ marginTop: 0 }}>
+            Generated {new Date(data.generatedAt).toLocaleString()}
+          </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
             <KpiCard label="Grant success rate" value={`${kpis.grantSuccessRate ?? 0}%`} />
@@ -76,29 +57,11 @@ export function KpiDashboardPage() {
             <KpiCard label="Archived projects" value={kpis.projectsArchived ?? 0} />
             <KpiCard label="Validated publications" value={kpis.publicationsValidated ?? 0} />
             <KpiCard label="Citations" value={kpis.totalCitations ?? 0} />
-            <KpiCard label="Open funding calls" value={kpis.openFundingCalls ?? 0} sub={`Internal ${kpis.internalFundingCalls ?? 0} · External ${kpis.externalFundingCalls ?? 0}`} />
-          </div>
-
-          <div className="card" style={{ marginTop: 12 }}>
-            <div style={{ fontWeight: 800, marginBottom: 8 }}>Coverage by area</div>
-            <table className="dashTable">
-              <thead>
-                <tr>
-                  <th>Area</th>
-                  <th>%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(coverage)
-                  .filter(([k]) => k !== "overall")
-                  .map(([k, v]) => (
-                    <tr key={k}>
-                      <td>{k.replace(/([A-Z])/g, " $1").replace(/^phase/, "Phase ")}</td>
-                      <td>{v}%</td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+            <KpiCard
+              label="Open funding calls"
+              value={kpis.openFundingCalls ?? 0}
+              sub={`Internal ${kpis.internalFundingCalls ?? 0} · External ${kpis.externalFundingCalls ?? 0}`}
+            />
           </div>
         </>
       ) : null}

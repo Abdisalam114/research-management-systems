@@ -2,7 +2,7 @@
 JUST RMS — FULL SYSTEM GUIDE (ENGLISH + SOMALI)
 Tilmaamaha Buuxa ee Nidaamka — Step by Step
 Jamhuriya University Research Management System
-Updated: July 22, 2026
+Updated: July 25, 2026
 ================================================================================
 
 
@@ -20,84 +20,66 @@ English: A web app for managing university research from funding call to project
 
 Somali: App web ah oo lagu maamulo cilmi-baarista jaamacadda — laga bilaabo funding call ilaa xiritaanka mashruuca.
 
-English: Two portals — Undergraduate (UG) and Postgraduate (PG). Data is separated.
+English: Undergraduate (UG) and Postgraduate (PG) research share one system. Items are labeled UG or PG.
 
-Somali: Laba portal — UG iyo PG. Xogtu waa kala go'an.
+Somali: UG iyo PG waxay ku jiraan nidaam wadaag ah. Waxyaabaha waxaa lagu calaamadeeyaa UG ama PG.
 
-English: Only Research Director can switch between UG and PG.
+English: Staff (Director, Coordinator, Finance, Leadership) see UG and PG together — they do not switch portals. Researchers work in their own program tier.
 
-Somali: Kaliya Research Director ayaa beddeli kara UG iyo PG.
+Somali: Shaqaalaha waxay wada arkaan UG iyo PG — ma beddelaan portal. Researchers waxay ku jiraan barnaamijkooda.
 
 
 ================================================================================
-2. WHO USES IT? / YAA ISTICMAALA? — SHAQADA MID KASTA (8 ROLES)
+2. WHO USES IT? / YAA ISTICMAALA? — SHAQADA MID KASTA
 ================================================================================
 
-There is no separate Ethics Committee or Peer Reviewer account.
-Ma jiro akoon gooni ah oo Ethics Committee ama Peer Reviewer.
+Ethics decisions: Research Director. Peer review: University Leadership. Purchase order review: Finance (before Director). Donor reports: Director (and Finance for financial views).
 
 Research Director
-  EN: Portal switch; create/publish funding calls (no Leadership); final proposal approve; ethics; PO after Finance review; Users; analytics
-  SO: Portal; abuuri/daabaca funding calls (Leadership uma baahna); ansixinta ugu dambeysa; ethics; PO; Users; analytics
+  EN: Sees UG+PG with labels; create/publish funding calls; final proposal approve; ethics; PO after Finance review; donor reports; Users; analytics
+  SO: Arag UG+PG; abuuri/daabaca funding calls; ansixinta ugu dambeysa; ethics; PO; donor reports; Users; analytics
 
 University Leadership
-  EN: Peer review score 1–5 + comment; KPI — does NOT publish funding calls
-  SO: Peer review; KPI — MA daabaco funding calls
+  EN: Peer review score 1–5 + comment; KPI — does NOT publish funding calls; sees UG+PG with labels
+  SO: Peer review; KPI — MA daabaco funding calls; arag UG+PG
 
 Faculty Coordinator
-  EN: Faculty proposal queue; thesis groups; Validate publications → Published; faculty reports
-  SO: Proposal faculty; thesis; Validate → Published; warbixin faculty
+  EN: Faculty proposal queue; thesis groups; Validate publications → Published; faculty reports; sees UG+PG with labels
+  SO: Proposal faculty; thesis; Validate → Published; warbixin faculty; arag UG+PG
 
 Finance Officer — MONEY + PO REVIEW
-  EN: Authorize grant budget; review PO before Director; pay budgets/payments; pay PO after Director; finance reports; finance closure
-  SO: Authorize budget; dib u eegis PO ka hor Director; bixi lacag; bixi PO ka dib Director; reports; xiritaan
+  EN: Authorize grant budget; review PO before Director; pay budgets/payments; pay PO after Director; finance reports; finance closure; sees UG+PG with labels
+  SO: Authorize budget; dib u eegis PO ka hor Director; bixi lacag; bixi PO ka dib Director; reports; xiritaan; arag UG+PG
   EN: Flow: Researcher PO → Finance review → Director → Finance pays
   SO: Safka: Researcher PO → Finance review → Director → Finance bixisaa
 
-HR Officer
-  EN: Projects, thesis, groups — HR view only (no money/ethics approvals)
-  SO: Projects, thesis, groups — HR (ma ansixiyo lacag/ethics)
-
-Donor Agency
-  EN: Draft external funding calls; donor reports
-  SO: Funding calls dibadda (draft); donor reports
-
 Researcher
-  EN: Apply, propose, run project, budgets, create PO, publications, thesis, closure
-  SO: Codso, proposal, project, budgets, abuuri PO, publications, thesis, closure
+  EN: Apply, propose, run project, budgets, create PO, publications, thesis, closure (asha@ UG / mahad@ PG)
+  SO: Codso, proposal, project, budgets, abuuri PO, publications, thesis, closure (asha@ UG / mahad@ PG)
 
 
 ================================================================================
-3. LOGIN & PORTAL / GALITAANKA
+3. LOGIN & DEMO ACCOUNTS / GALITAANKA
 ================================================================================
 
 English steps:
   1. Open http://localhost:5173 → email + password
-  2. If Director → choose Undergraduate or Postgraduate
-  3. Everyone else → one portal only (UG or PG)
+  2. Staff see Undergraduate and Postgraduate items together (labeled)
+  3. Researchers stay on their program: asha@ = UG, mahad@ = PG
 
 Somali steps:
   1. Fur http://localhost:5173 → email + password
-  2. Haddii Director → dooro Undergraduate ama Postgraduate
-  3. Dadka kale → hal portal kaliya
+  2. Shaqaalaha waxay wada arkaan UG iyo PG (calaamadeysan)
+  3. Researchers: asha@ = UG, mahad@ = PG
 
 Demo accounts (npm run seed):
 
   director@rms.edu            Director2024!       Research Director
-  coordinator@rms.edu         Coordinator2024!    Coordinator (UG)
-  finance@rms.edu             Finance2024!        Finance (UG)
-  hr@rms.edu                  Hr2024!             HR (UG)
-  leadership@rms.edu          Leadership2024!     Leadership (UG)
-  donor@rms.edu               Donor2024!          Donor (UG)
+  coordinator@rms.edu         Coordinator2024!    Faculty Coordinator
+  finance@rms.edu             Finance2024!        Finance Officer
+  leadership@rms.edu          Leadership2024!     University Leadership
   asha@rms.edu                Researcher2024!     Researcher UG
-  coordinator.pg@rms.edu      Coordinator2024!    Coordinator (PG)
-  finance.pg@rms.edu          Finance2024!        Finance (PG)
-  hr.pg@rms.edu               Hr2024!             HR (PG)
-  leadership.pg@rms.edu       Leadership2024!     Leadership (PG)
-  donor.pg@rms.edu            Donor2024!          Donor (PG)
   mahad@rms.edu               Researcher2024!     Researcher PG
-
-Removed: ethics@rms.edu, reviewer@rms.edu, procurement@rms.edu, procurement.pg@rms.edu
 
 
 ================================================================================
@@ -106,8 +88,8 @@ Removed: ethics@rms.edu, reviewer@rms.edu, procurement@rms.edu, procurement.pg@r
 
 STEP 1 — Funding & Calls / Deeqaha
 
-EN: Director (or Donor draft + Leadership publish) opens Funding Calls. Researchers apply.
-SO: Director / Leadership waxay daabacaan Funding Calls. Researchers waxay codsadaan.
+EN: Director opens Funding Calls and publishes. Researchers apply.
+SO: Director wuxuu daabaca Funding Calls. Researchers waxay codsadaan.
 Menu: Funding Calls, Grants
 
 STEP 2 — Application (Proposal) / Codsiga
@@ -130,7 +112,7 @@ EN order:
   1. Admin screening — Director/Coordinator
   2. Peer review — University Leadership (score + comment)
   3. Committee review
-  4. Ethics — Research Director (not a separate ethics role)
+  4. Ethics — Research Director
   5. Finance review — Finance Officer (proposal budget)
   6. Final decision — Director Approve or Reject
   7. If approved → Project created; funding-call grant → pending_finance
@@ -140,7 +122,7 @@ Menu: Proposals, Peer Reviews, Ethics, Grant funding approval
 
 STEP 4 — Project Management / Maamulka Mashruuca
 
-EN: Projects → timeline, milestones, team, work plan, activities, communication log, progress reports
+EN: Projects → timeline, milestones, team, work plan, activities, communication log, progress reports (UG/PG labeled for staff)
 SO: Projects → milestones, work plan, hawlaha, communication log, warbixinno
 Menu: Projects, Finance & Budgets
 
@@ -180,7 +162,7 @@ Menu: Projects → project → Project closure; Finance → Project closure (Fin
 ================================================================================
 
 Dashboard & Analytics — Everyone
-Projects — Director, Coordinator, Researcher, HR
+Projects — Director, Coordinator, Researcher
 Research Workflow Status — Director, Coordinator, Researcher
 Publications & Outputs — Director, Coordinator, Researcher
 Ethics — Director, Coordinator, Researcher
@@ -188,20 +170,20 @@ Proposals — Director, Coordinator, Researcher, Leadership
 Grant funding approval — Finance only
 Project closure (Finance) — Finance only
 Peer Reviews — Director, Leadership
-Thesis — Director, Coordinator, Researcher, HR
-Funding Calls — Director, Coordinator, Finance, Researcher, Leadership, Donor
+Thesis — Director, Coordinator, Researcher
+Funding Calls — Director, Coordinator, Finance, Researcher, Leadership
 Policies — Everyone
-Grants — Director, Coordinator, Finance, Researcher, Leadership, Donor
+Grants — Director, Coordinator, Finance, Researcher, Leadership
 Finance & Budgets — Director, Finance, Researcher
 Finance Reports — Director, Finance
 KPI Dashboard — Director, Coordinator, Leadership
-Search — Director, Coordinator, Researcher, Leadership, HR
-Donor Reports — Director, Finance, Donor
+Search — Director, Coordinator, Researcher, Leadership
+Donor Reports — Director, Finance
 Audit Trail — Director, Coordinator
 Repository — Director, Coordinator, Researcher
 Collaboration — Director, Coordinator, Researcher
-Groups — Director, Coordinator, Researcher, HR
-Messages — Director, Coordinator, Researcher, HR
+Groups — Director, Coordinator, Researcher
+Messages — Director, Coordinator, Researcher
 Notifications — Everyone
 Users / Departments — Director only
 Profile — Everyone

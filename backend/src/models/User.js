@@ -8,7 +8,7 @@ const ROLES = Object.freeze({
   FINANCE_OFFICER: "finance_officer",
   LEADERSHIP: "leadership",
   RESEARCHER: "researcher",
-  // Legacy enum values kept so historic DB rows / audits still validate until cleaned
+  // Historic role values (DB compatibility for older rows)
   PROCUREMENT_OFFICER: "procurement_officer",
   HR_OFFICER: "hr_officer",
   DONOR_AGENCY: "donor_agency",

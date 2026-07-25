@@ -7,6 +7,7 @@ import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
 import { ProjectWorkflowSummary } from "../components/ProjectWorkflowPanel";
 import { StatusBadge } from "../components/StatusBadge";
+import { ProgramTierBadge } from "../components/ProgramTierBadge";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 
 function projectKind(p) {
@@ -31,6 +32,7 @@ function ProjectCard({ p }) {
             {p.title}
           </Link>
           <div className="muted" style={{ marginTop: 4 }}>
+            <ProgramTierBadge tier={p.programTier} label={p.programTierLabel} />
             <span
               style={{
                 display: "inline-block",

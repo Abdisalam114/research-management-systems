@@ -32,6 +32,9 @@ router.get(
   asyncHandler(userController.listUsers)
 );
 
+// Must be registered before /:id so "me" is not cast as an ObjectId.
+router.put("/me", authenticateUser, requireActiveUser, asyncHandler(userController.updateMyProfile));
+
 router.post(
   "/:id/approve",
   authenticateUser,
@@ -63,9 +66,6 @@ router.delete(
   authorizeRoles("research_director"),
   asyncHandler(userController.deleteUserByDirector)
 );
-
-// Any active user
-router.put("/me", authenticateUser, requireActiveUser, asyncHandler(userController.updateMyProfile));
 
 module.exports = { userRoutes: router };
 

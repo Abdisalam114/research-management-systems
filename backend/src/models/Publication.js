@@ -34,11 +34,39 @@ const LEGACY_PUBLICATION_TYPE_MAP = Object.freeze({
   other: "letter_to_editor",
 });
 
+/** Institutional + international-style lifecycle statuses. */
 const PUBLICATION_STATUSES = Object.freeze({
   DRAFT: "draft",
   SUBMITTED: "submitted",
+  REVISION_REQUESTED: "revision_requested",
   VALIDATED: "validated",
   REJECTED: "rejected",
+});
+
+const PUBLICATION_STATUS_LABELS = Object.freeze({
+  draft: "Draft",
+  submitted: "Under review",
+  revision_requested: "Revise & resubmit",
+  validated: "Accepted",
+  rejected: "Rejected",
+});
+
+/**
+ * Journal / venue decision (international peer-review style).
+ * Distinct from institutional workflowStage; mirrors accept / reject / revise.
+ */
+const JOURNAL_DECISIONS = Object.freeze({
+  PENDING: "pending",
+  ACCEPT: "accept",
+  REJECT: "reject",
+  REVISE: "revise",
+});
+
+const JOURNAL_DECISION_LABELS = Object.freeze({
+  pending: "Pending decision",
+  accept: "Accept",
+  reject: "Reject",
+  revise: "Revise & resubmit",
 });
 
 /** Faculty research output pipeline — visible on coordinator dashboard. */
@@ -56,6 +84,22 @@ const WORKFLOW_STAGE_LABELS = Object.freeze({
   published: "Published",
 });
 
+const reviewerCommentSchema = new mongoose.Schema(
+  {
+    authorId: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    authorName: { type: String, default: "", trim: true },
+    authorRole: { type: String, default: "", trim: true },
+    comment: { type: String, required: true, trim: true },
+    /** Optional decision attached to this comment (accept/reject/revise). */
+    decision: {
+      type: String,
+      enum: Object.values(JOURNAL_DECISIONS),
+      default: undefined,
+    },
+    at: { type: Date, default: Date.now },
+  },
+  { _id: true }
+);
 
 const publicationSchema = new mongoose.Schema(
   {
@@ -75,7 +119,12 @@ const publicationSchema = new mongoose.Schema(
     authors: [{ type: String, trim: true }],
     citationCount: { type: Number, min: 0, default: 0 },
     communityImpact: { type: String, default: "", trim: true },
-    status: { type: String, enum: Object.values(PUBLICATION_STATUSES), default: PUBLICATION_STATUSES.DRAFT, index: true },
+    status: {
+      type: String,
+      enum: Object.values(PUBLICATION_STATUSES),
+      default: PUBLICATION_STATUSES.DRAFT,
+      index: true,
+    },
     workflowStage: {
       type: String,
       enum: Object.values(WORKFLOW_STAGES),
@@ -88,6 +137,21 @@ const publicationSchema = new mongoose.Schema(
     validatedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null, index: true },
     validatedAt: { type: Date, default: null },
     validationComment: { type: String, default: "" },
+
+    /** Latest journal-style decision (accept / reject / revise / pending). */
+    journalDecision: {
+      type: String,
+      enum: Object.values(JOURNAL_DECISIONS),
+      default: JOURNAL_DECISIONS.PENDING,
+      index: true,
+    },
+    journalDecisionNote: { type: String, default: "", trim: true },
+    journalDecisionAt: { type: Date, default: null },
+    journalDecisionBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+
+    /** Peer / staff / researcher review comments (international revise cycle). */
+    reviewerComments: { type: [reviewerCommentSchema], default: [] },
+
     ...programTierField,
   },
   { timestamps: true }
@@ -103,8 +167,10 @@ module.exports = {
   PUBLICATION_TYPES,
   PUBLICATION_TYPE_LABELS,
   PUBLICATION_STATUSES,
+  PUBLICATION_STATUS_LABELS,
+  JOURNAL_DECISIONS,
+  JOURNAL_DECISION_LABELS,
   WORKFLOW_STAGES,
   WORKFLOW_STAGE_LABELS,
   LEGACY_PUBLICATION_TYPE_MAP,
 };
-

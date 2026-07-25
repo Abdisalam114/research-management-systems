@@ -7,7 +7,7 @@ import logo from "../assets/jamhuriya-logo.png";
 const MENU = [
   { to: "/dashboard", label: "Dashboard & Analytics", icon: "🏠", roles: [...SYSTEM_ROLES] },
   { to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher"] },
-  { to: "/research-workflow", label: "Research Workflow Status", icon: "🔄", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { to: "/research-workflow", label: "Research Workflow", icon: "🔄", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/publications", label: "Publications & Outputs", icon: "📚", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/ethics", label: "Ethics", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher", "leadership"] },
@@ -20,6 +20,7 @@ const MENU = [
   { to: "/policies", label: "Policies (Siyaasada)", icon: "📜", roles: [...SYSTEM_ROLES] },
   { to: "/grants", label: "Grants", icon: "💰", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher", "leadership"] },
   { to: "/budgets", label: "Finance & Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher"] },
+  { to: "/system-reports", label: "System Reports", icon: "📑", roles: ["research_director", "faculty_coordinator", "finance_officer", "leadership"] },
   { to: "/finance-reports", label: "Finance Reports", icon: "📊", roles: ["research_director", "finance_officer"] },
   { to: "/kpi-dashboard", label: "KPI Dashboard", icon: "📈", roles: ["research_director", "faculty_coordinator", "leadership"] },
   { to: "/search", label: "Search", icon: "🔍", roles: ["research_director", "faculty_coordinator", "researcher", "leadership"] },

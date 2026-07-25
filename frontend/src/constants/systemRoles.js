@@ -1,4 +1,4 @@
-/** Active institutional roles (procurement, HR, and donor logins removed — Director owns those duties). */
+/** Active institutional roles for Jamhuriya RMS. */
 export const SYSTEM_ROLES = Object.freeze([
   "research_director",
   "faculty_coordinator",

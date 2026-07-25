@@ -1,6 +1,6 @@
 /**
- * Institutional user accounts per portal (Undergraduate / Postgraduate).
- * Run with: npm run seed
+ * Institutional accounts: one shared Director / Coordinator / Finance / Leadership
+ * for the whole system (UG + PG). Researchers remain portal-scoped (UG or PG).
  */
 const { ROLES, USER_STATUSES } = require("../models/User");
 const { PROGRAM_TIERS } = require("../constants/programTier");
@@ -17,35 +17,43 @@ const DIRECTOR_USER = {
   programTier: PROGRAM_TIERS.UNDERGRADUATE,
 };
 
+/** One of each — shared across Undergraduate and Postgraduate. */
+const SHARED_STAFF_USERS = [
+  {
+    fullName: "Dr. Emma Richardson",
+    email: "coordinator@rms.edu",
+    password: process.env.SEED_COORDINATOR_PASSWORD || "Coordinator2024!",
+    role: ROLES.FACULTY_COORDINATOR,
+    department: "Faculty of Computing",
+    rank: "Coordinator",
+    status: USER_STATUSES.ACTIVE,
+    programTier: PROGRAM_TIERS.UNDERGRADUATE,
+  },
+  {
+    fullName: "Michael Brooks",
+    email: "finance@rms.edu",
+    password: process.env.SEED_FINANCE_PASSWORD || "Finance2024!",
+    role: ROLES.FINANCE_OFFICER,
+    department: "Finance Office",
+    rank: "Officer",
+    status: USER_STATUSES.ACTIVE,
+    programTier: PROGRAM_TIERS.UNDERGRADUATE,
+  },
+  {
+    fullName: "Prof. Ibrahim Warsame",
+    email: "leadership@rms.edu",
+    password: process.env.SEED_LEADERSHIP_PASSWORD || "Leadership2024!",
+    role: ROLES.LEADERSHIP,
+    department: "University Leadership",
+    rank: "Vice Chancellor",
+    status: USER_STATUSES.ACTIVE,
+    programTier: PROGRAM_TIERS.UNDERGRADUATE,
+  },
+];
+
+/** Portal-scoped researchers only. */
 const PORTAL_USER_SPECS = {
   [PROGRAM_TIERS.UNDERGRADUATE]: [
-    {
-      fullName: "Dr. Emma Richardson",
-      email: "coordinator@rms.edu",
-      password: process.env.SEED_COORDINATOR_PASSWORD || "Coordinator2024!",
-      role: ROLES.FACULTY_COORDINATOR,
-      department: "Faculty of Computing",
-      rank: "Coordinator",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
-      fullName: "Michael Brooks",
-      email: "finance@rms.edu",
-      password: process.env.SEED_FINANCE_PASSWORD || "Finance2024!",
-      role: ROLES.FINANCE_OFFICER,
-      department: "Finance Office",
-      rank: "Officer",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
-      fullName: "Prof. Ibrahim Warsame",
-      email: "leadership@rms.edu",
-      password: process.env.SEED_LEADERSHIP_PASSWORD || "Leadership2024!",
-      role: ROLES.LEADERSHIP,
-      department: "University Leadership",
-      rank: "Vice Chancellor",
-      status: USER_STATUSES.ACTIVE,
-    },
     {
       fullName: "Dr. Sarah Chen",
       email: "asha@rms.edu",
@@ -57,33 +65,6 @@ const PORTAL_USER_SPECS = {
     },
   ],
   [PROGRAM_TIERS.POSTGRADUATE]: [
-    {
-      fullName: "Dr. Robert Clarke",
-      email: "coordinator.pg@rms.edu",
-      password: process.env.SEED_COORDINATOR_PASSWORD || "Coordinator2024!",
-      role: ROLES.FACULTY_COORDINATOR,
-      department: "Faculty of Graduate Studies",
-      rank: "Coordinator",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
-      fullName: "Linda Martinez",
-      email: "finance.pg@rms.edu",
-      password: process.env.SEED_FINANCE_PASSWORD || "Finance2024!",
-      role: ROLES.FINANCE_OFFICER,
-      department: "Finance Office",
-      rank: "Officer",
-      status: USER_STATUSES.ACTIVE,
-    },
-    {
-      fullName: "Prof. Halima Nur",
-      email: "leadership.pg@rms.edu",
-      password: process.env.SEED_LEADERSHIP_PASSWORD || "Leadership2024!",
-      role: ROLES.LEADERSHIP,
-      department: "University Leadership",
-      rank: "Deputy Vice Chancellor",
-      status: USER_STATUSES.ACTIVE,
-    },
     {
       fullName: "Dr. James Okonkwo",
       email: "mahad@rms.edu",
@@ -97,9 +78,9 @@ const PORTAL_USER_SPECS = {
 };
 
 function buildInstitutionalUsers() {
-  const users = [DIRECTOR_USER];
+  const users = [DIRECTOR_USER, ...SHARED_STAFF_USERS];
   for (const tier of Object.values(PROGRAM_TIERS)) {
-    for (const spec of PORTAL_USER_SPECS[tier]) {
+    for (const spec of PORTAL_USER_SPECS[tier] || []) {
       users.push({ ...spec, programTier: tier });
     }
   }
@@ -108,8 +89,8 @@ function buildInstitutionalUsers() {
 
 const INSTITUTIONAL_USERS = buildInstitutionalUsers();
 
-/** Former seed accounts removed from institutional roster (cleaned on seed). */
-const REMOVED_INSTITUTIONAL_EMAILS = [
+/** Institutional emails retired from the active seed roster (cleaned on seed). */
+const RETIRED_SEED_EMAILS = [
   "sahra@rms.edu",
   "amina@rms.edu",
   "ethics@rms.edu",
@@ -122,15 +103,19 @@ const REMOVED_INSTITUTIONAL_EMAILS = [
   "hr.pg@rms.edu",
   "donor@rms.edu",
   "donor.pg@rms.edu",
+  "coordinator.pg@rms.edu",
+  "finance.pg@rms.edu",
+  "leadership.pg@rms.edu",
 ];
 
 const PORTAL_ORDER = [PROGRAM_TIERS.UNDERGRADUATE, PROGRAM_TIERS.POSTGRADUATE];
 
 module.exports = {
   DIRECTOR_USER,
+  SHARED_STAFF_USERS,
   PORTAL_USER_SPECS,
   PORTAL_ORDER,
   INSTITUTIONAL_USERS,
-  REMOVED_INSTITUTIONAL_EMAILS,
+  RETIRED_SEED_EMAILS,
   PROGRAM_TIERS,
 };

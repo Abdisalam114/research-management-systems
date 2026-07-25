@@ -6,18 +6,30 @@ const {
   isValidProgramTier,
 } = require("../constants/programTier");
 
+/** Shared institutional staff — one account each, see UG + PG together. */
+const CROSS_TIER_ROLES = Object.freeze([
+  ROLES.RESEARCH_DIRECTOR,
+  ROLES.FACULTY_COORDINATOR,
+  ROLES.FINANCE_OFFICER,
+  ROLES.LEADERSHIP,
+]);
+
+function isCrossTierRole(role) {
+  return CROSS_TIER_ROLES.includes(role);
+}
+
+/**
+ * Resolve active program-tier scope for the request.
+ * Cross-tier staff: optional X-Program-Tier header filters to one portal;
+ * omit header → null (all UG + PG).
+ * Researchers (and other portal users): always locked to user.programTier.
+ */
 function resolveProgramTier(req, user) {
   const headerTier = String(req.headers[PROGRAM_TIER_HEADER] || "").toLowerCase();
 
-  if (user.role === ROLES.RESEARCH_DIRECTOR) {
-    if (!isValidProgramTier(headerTier)) {
-      throw new AppError(
-        "Program tier selection required. Choose Undergraduate or Postgraduate.",
-        428,
-        "PROGRAM_TIER_REQUIRED"
-      );
-    }
-    return headerTier;
+  if (isCrossTierRole(user.role)) {
+    if (isValidProgramTier(headerTier)) return headerTier;
+    return null;
   }
 
   if (user.programTier && isValidProgramTier(user.programTier)) {
@@ -33,24 +45,33 @@ function tierWhere(req, base = {}) {
 }
 
 function tierAssign(req, data = {}) {
-  if (!req.programTier) return data;
-  return { ...data, programTier: req.programTier };
+  if (data.programTier && isValidProgramTier(data.programTier)) {
+    return data;
+  }
+  if (req.programTier) {
+    return { ...data, programTier: req.programTier };
+  }
+  return data;
 }
 
 function assertTierDocument(req, doc) {
   if (!doc) return;
+  if (!req.programTier) return;
   if (doc.programTier && doc.programTier !== req.programTier) {
     throw new AppError("Not found", 404);
   }
 }
 
 function attachProgramTierHelpers(req) {
+  req.isCrossTierStaff = isCrossTierRole(req.user?.role);
   req.tierWhere = (base = {}) => tierWhere(req, base);
   req.tierAssign = (data = {}) => tierAssign(req, data);
   req.assertTierDocument = (doc) => assertTierDocument(req, doc);
 }
 
 module.exports = {
+  CROSS_TIER_ROLES,
+  isCrossTierRole,
   resolveProgramTier,
   tierWhere,
   tierAssign,

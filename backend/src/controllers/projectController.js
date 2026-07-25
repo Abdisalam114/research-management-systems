@@ -113,6 +113,13 @@ function sanitizeProject(p) {
     status: p.status,
     progressReports: p.progressReports,
     closure: p.closure || { status: CLOSURE_STATUSES.NONE },
+    programTier: p.programTier || null,
+    programTierLabel:
+      p.programTier === "postgraduate"
+        ? "Postgraduate (PG)"
+        : p.programTier === "undergraduate"
+          ? "Undergraduate (UG)"
+          : p.programTier || null,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
   };

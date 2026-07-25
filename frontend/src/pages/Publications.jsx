@@ -85,8 +85,80 @@ export function PublicationsPage() {
 
   function canDeletePublication(p) {
     if (user?.role === "research_director") return true;
-    if (canCreate && (p.status === "draft" || p.status === "rejected")) return true;
+    if (
+      canCreate &&
+      (p.status === "draft" || p.status === "rejected" || p.status === "revision_requested")
+    ) {
+      return true;
+    }
     return false;
+  }
+
+  function canResubmit(p) {
+    return canCreate && (p.status === "draft" || p.status === "rejected" || p.status === "revision_requested");
+  }
+
+  function canDecide(p) {
+    return canValidate && (p.status === "submitted" || p.status === "revision_requested");
+  }
+
+  async function decidePublication(p, decision) {
+    const labels = {
+      accept: "Accept (international-style accept)",
+      revise: "Revise & resubmit — reviewer comments (required)",
+      reject: "Reject — reason (required)",
+    };
+    const comment = prompt(labels[decision] || "Reviewer comment (required):");
+    if (!comment) return;
+    try {
+      setError("");
+      setSuccessMsg("");
+      const res = await publicationApi.validatePublication(accessToken, p.id, { decision, comment });
+      setSuccessMsg(res.message || `Decision: ${decision}`);
+      if (decision === "accept") setStatusFilter("validated");
+      else if (decision === "revise") setStatusFilter("revision_requested");
+      else setStatusFilter("rejected");
+      await reload();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to save decision");
+    }
+  }
+
+  async function addComment(p) {
+    const comment = prompt("Add review comment:");
+    if (!comment) return;
+    try {
+      setError("");
+      await publicationApi.addPublicationComment(accessToken, p.id, comment);
+      setSuccessMsg("Comment added");
+      await reload();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to add comment");
+    }
+  }
+
+  async function recordJournalDecision(p) {
+    const decision = prompt(
+      "Journal / venue decision (international):\nType: accept | reject | revise | pending",
+      p.journalDecision || "pending"
+    );
+    if (!decision) return;
+    const note =
+      decision.trim().toLowerCase() === "pending"
+        ? ""
+        : prompt("Note / reviewer feedback for this journal decision (required):");
+    if (decision.trim().toLowerCase() !== "pending" && !note) return;
+    try {
+      setError("");
+      const res = await publicationApi.setJournalDecision(accessToken, p.id, {
+        decision: decision.trim().toLowerCase(),
+        note: note || "",
+      });
+      setSuccessMsg(res.message || "Journal decision saved");
+      await reload();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to save journal decision");
+    }
   }
 
   async function handleDeletePublication(p) {
@@ -276,8 +348,15 @@ export function PublicationsPage() {
     return [
       { label: "Total outputs", value: publications.length, filterKey: "all" },
       { label: "Draft", value: by("draft"), filterKey: "draft" },
-      { label: "Submitted", value: by("submitted"), filterKey: "submitted", accent: "#38bdf8" },
-      { label: "Validated", value: by("validated"), filterKey: "validated", accent: "#16a34a" },
+      { label: "Under review", value: by("submitted"), filterKey: "submitted", accent: "#38bdf8" },
+      {
+        label: "Revise",
+        value: by("revision_requested"),
+        filterKey: "revision_requested",
+        accent: "#f59e0b",
+      },
+      { label: "Accepted", value: by("validated"), filterKey: "validated", accent: "#16a34a" },
+      { label: "Rejected", value: by("rejected"), filterKey: "rejected", accent: "#ef4444" },
       {
         label: "Published",
         value: publishedCount,
@@ -348,8 +427,8 @@ export function PublicationsPage() {
         title="Publications & Outputs"
         subtitle={
           isResearcher
-            ? "Hal project = hal output (1:1). Xogta waxay ka timaadaa My Projects kaliya."
-            : "Staff view: one output per project (1:1), linked via projectId."
+            ? "Hal project = hal output (1:1). Review cycle: submit → accept / revise / reject (heer caalami) + comments."
+            : "Staff review: Accept, Revise & resubmit, or Reject — with reviewer comments (international style)."
         }
         stats={stats}
         activeFilter={statusFilter}
@@ -602,9 +681,47 @@ export function PublicationsPage() {
                 <div>
                   <div style={{ fontWeight: 800 }}>{p.title}</div>
                   <div className="muted">
-                    {publicationTypeLabel(p.type)} • {p.year} • {p.status}
+                    {publicationTypeLabel(p.type)} • {p.year} •{" "}
+                    <strong>{p.statusLabel || p.status}</strong>
                     {p.venue ? ` • ${p.venue}` : ""}
                   </div>
+                  {p.journalDecision && p.journalDecision !== "pending" ? (
+                    <div style={{ fontSize: 12, marginTop: 4, color: "#fbbf24" }}>
+                      Journal decision: <strong>{p.journalDecisionLabel || p.journalDecision}</strong>
+                      {p.journalDecisionNote ? ` — ${p.journalDecisionNote}` : ""}
+                    </div>
+                  ) : null}
+                  {p.validationComment ? (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                      Latest review note: {p.validationComment}
+                    </div>
+                  ) : null}
+                  {Array.isArray(p.reviewerComments) && p.reviewerComments.length ? (
+                    <div
+                      style={{
+                        marginTop: 8,
+                        padding: 8,
+                        borderRadius: 8,
+                        background: "rgba(14,165,233,0.08)",
+                        border: "1px solid rgba(56,189,248,0.25)",
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6 }}>
+                        Reviewer comments ({p.reviewerComments.length})
+                      </div>
+                      <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                        {p.reviewerComments.slice(-5).map((c) => (
+                          <li key={c.id} style={{ marginBottom: 4 }}>
+                            <strong>{c.authorName || c.authorRole || "Reviewer"}</strong>
+                            {c.decisionLabel ? ` [${c.decisionLabel}]` : ""}: {c.comment}
+                            {c.at ? (
+                              <span className="muted"> · {new Date(c.at).toLocaleString()}</span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                   {Array.isArray(p.authors) && p.authors.length ? (
                     <div className="muted" style={{ fontSize: 13 }}>
                       Authors: {p.authors.join(", ")}
@@ -651,7 +768,7 @@ export function PublicationsPage() {
                       Refresh citations
                     </button>
                   ) : null}
-                  {canCreate && (p.status === "draft" || p.status === "rejected") ? (
+                  {canResubmit(p) ? (
                     <button
                       type="button"
                       className="btn primary"
@@ -659,7 +776,7 @@ export function PublicationsPage() {
                         try {
                           setError("");
                           await publicationApi.submitPublication(accessToken, p.id);
-                          setStatusFilter("all");
+                          setStatusFilter("submitted");
                           await reload();
                           if (p.projectId) {
                             navigate(`/projects/${p.projectId}#project-outputs`, {
@@ -672,82 +789,40 @@ export function PublicationsPage() {
                         }
                       }}
                     >
-                      {p.status === "rejected" ? "Resubmit" : "Submit"}
+                      {p.status === "revision_requested"
+                        ? "Resubmit after revision"
+                        : p.status === "rejected"
+                          ? "Resubmit"
+                          : "Submit for review"}
                     </button>
                   ) : null}
-                  {canValidate && p.status === "submitted" ? (
+                  {canDecide(p) ? (
                     <>
-                      <button
-                        type="button"
-                        className="btn primary"
-                        onClick={async () => {
-                          const comment = prompt(
-                            "Validation comment (required) — approve as complete publication:"
-                          );
-                          if (!comment) return;
-                          try {
-                            setError("");
-                            setSuccessMsg("");
-                            const res = await publicationApi.validatePublication(accessToken, p.id, {
-                              decision: "validated",
-                              comment,
-                            });
-                            // #region agent log
-                            fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-                              body: JSON.stringify({
-                                sessionId: "f558f7",
-                                hypothesisId: "UG1",
-                                location: "Publications.jsx:approveComplete",
-                                message: "validated from publications page",
-                                data: {
-                                  pubId: p.id,
-                                  programTier,
-                                  status: res?.publication?.status,
-                                  workflowStage: res?.publication?.workflowStage,
-                                  projectCompletion: res?.projectCompletion || null,
-                                },
-                                timestamp: Date.now(),
-                                runId: "pub-validate",
-                              }),
-                            }).catch(() => {});
-                            // #endregion
-                            setStatusFilter("validated");
-                            setSuccessMsg(
-                              res?.projectCompletion?.completed
-                                ? `Publication approved — project marked completed (${programTierLabel} portal).`
-                                : "Publication approved as complete (validated → Published)."
-                            );
-                            await reload();
-                          } catch (e) {
-                            setError(e?.response?.data?.message || "Failed to approve publication");
-                          }
-                        }}
-                      >
-                        Approve complete publication
+                      <button type="button" className="btn primary" onClick={() => decidePublication(p, "accept")}>
+                        Accept
                       </button>
                       <button
                         type="button"
                         className="btn"
-                        onClick={async () => {
-                          const comment = prompt("Rejection reason (required):");
-                          if (!comment) return;
-                          try {
-                            setError("");
-                            await publicationApi.validatePublication(accessToken, p.id, {
-                              decision: "rejected",
-                              comment,
-                            });
-                            await reload();
-                          } catch (e) {
-                            setError(e?.response?.data?.message || "Failed to reject");
-                          }
-                        }}
+                        style={{ borderColor: "rgba(245,158,11,0.6)", color: "#fbbf24" }}
+                        onClick={() => decidePublication(p, "revise")}
                       >
+                        Revise
+                      </button>
+                      <button type="button" className="btn" onClick={() => decidePublication(p, "reject")}>
                         Reject
                       </button>
                     </>
+                  ) : null}
+                  {p.status !== "draft" ? (
+                    <button type="button" className="btn" onClick={() => addComment(p)}>
+                      Add comment
+                    </button>
+                  ) : null}
+                  {(canCreate || canValidate) && p.status !== "draft" ? (
+                    <button type="button" className="btn" onClick={() => recordJournalDecision(p)}>
+                      Journal decision
+                    </button>
                   ) : null}
                   {canDeletePublication(p) ? (
                     <button

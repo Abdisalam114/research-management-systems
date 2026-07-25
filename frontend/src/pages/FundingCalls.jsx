@@ -71,6 +71,7 @@ const EMPTY_INTERNAL = {
   deadline: "",
   eligibilityTier: "all",
   requiredDocuments: "",
+  programTier: "undergraduate",
 };
 
 const EMPTY_EXTERNAL = {
@@ -251,6 +252,7 @@ export function FundingCallsPage() {
       deadline: call.deadline ? call.deadline.slice(0, 10) : "",
       eligibilityTier: call.eligibilityTier || "all",
       requiredDocuments: call.requiredDocuments || defaultRequiredDocuments(callType),
+      programTier: call.programTier || "undergraduate",
     });
     setShowForm(true);
     setMessage("");
@@ -646,6 +648,18 @@ await fundingCallApi.publishFundingCall(accessToken, id);
                   value={form.deadline}
                   onChange={(e) => setForm({ ...form, deadline: e.target.value })}
                 />
+              </div>
+              <div className="field">
+                <label htmlFor="fc-program">Home program (UG / PG label)</label>
+                <select
+                  id="fc-program"
+                  value={form.programTier || "undergraduate"}
+                  onChange={(e) => setForm({ ...form, programTier: e.target.value })}
+                  disabled={Boolean(editingId)}
+                >
+                  <option value="undergraduate">Undergraduate (UG)</option>
+                  <option value="postgraduate">Postgraduate (PG)</option>
+                </select>
               </div>
               <div className="field">
                 <label htmlFor="fc-eligibility">Eligible researchers</label>

@@ -25,7 +25,6 @@
     "docs:pdf": "node src/scripts/generateDatabaseDocsPdf.js && node src/scripts/generateSystemDocsPdf.js",
     "verify:roles": "node ../scripts/verify-all-roles.cjs",
     "verify:stakeholders": "node src/scripts/verifyAllStakeholders.js",
-    "verify:thesis": "node src/scripts/verifyThesisCoverage.js",
     "test": "echo \"No tests yet\" && exit 0"
   },
   "keywords": [],

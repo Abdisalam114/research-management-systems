@@ -72,5 +72,21 @@ router.get(
   asyncHandler(analyticsController.getResearchJourney)
 );
 
+router.get(
+  "/workflow-overview",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("researcher", "faculty_coordinator", "research_director"),
+  asyncHandler(analyticsController.getWorkflowOverview)
+);
+
+router.get(
+  "/system-report",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("research_director", "faculty_coordinator", "finance_officer", "leadership"),
+  asyncHandler(analyticsController.getSystemReport)
+);
+
 module.exports = { analyticsRoutes: router };
 

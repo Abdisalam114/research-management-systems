@@ -6,6 +6,7 @@ import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
+import { ProgramTierBadge } from "../components/ProgramTierBadge";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 
 export function ProposalsListPage() {
@@ -124,6 +125,7 @@ export function ProposalsListPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 800 }}>{p.title}</div>
                     <div className="muted" style={{ marginTop: 4 }}>
+                      <ProgramTierBadge tier={p.programTier} label={p.programTierLabel} />
                       <span
                         style={{
                           display: "inline-block",

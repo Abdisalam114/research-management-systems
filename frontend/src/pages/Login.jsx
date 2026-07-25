@@ -5,34 +5,6 @@ import { useProgramTier } from "../hooks/useProgramTier";
 import "./auth.css";
 import logo from "../assets/jamhuriya-logo.png";
 
-/** All institutional demo accounts (matches backend seedData). */
-const SEED_ACCOUNT_GROUPS = [
-  {
-    title: "Shared (both portals)",
-    accounts: [
-      { email: "director@rms.edu", password: "Director2024!", role: "Research Director" },
-    ],
-  },
-  {
-    title: "Undergraduate",
-    accounts: [
-      { email: "coordinator@rms.edu", password: "Coordinator2024!", role: "Faculty Coordinator" },
-      { email: "finance@rms.edu", password: "Finance2024!", role: "Finance Officer" },
-      { email: "leadership@rms.edu", password: "Leadership2024!", role: "University Leadership" },
-      { email: "asha@rms.edu", password: "Researcher2024!", role: "Researcher / PI" },
-    ],
-  },
-  {
-    title: "Postgraduate",
-    accounts: [
-      { email: "coordinator.pg@rms.edu", password: "Coordinator2024!", role: "Faculty Coordinator" },
-      { email: "finance.pg@rms.edu", password: "Finance2024!", role: "Finance Officer" },
-      { email: "leadership.pg@rms.edu", password: "Leadership2024!", role: "University Leadership" },
-      { email: "mahad@rms.edu", password: "Researcher2024!", role: "Researcher / PI" },
-    ],
-  },
-];
-
 export function LoginPage() {
   const { signIn } = useAuth();
   const { clearProgramTier } = useProgramTier();
@@ -49,12 +21,6 @@ export function LoginPage() {
     }
     return "/dashboard";
   }, [location.state]);
-
-  function fillAccount(a) {
-    setEmail(a.email);
-    setPassword(a.password);
-    setError("");
-  }
 
   return (
     <div className="authBg">
@@ -104,11 +70,7 @@ export function LoginPage() {
               const trimmedPassword = password;
               try {
                 const res = await signIn(trimmedEmail, trimmedPassword);
-                if (res.user?.role === "research_director") {
-                  clearProgramTier();
-                  navigate("/program-tier", { replace: true });
-                  return;
-                }
+                clearProgramTier();
                 const roleHome = {
                   finance_officer: "/budgets",
                   leadership: "/grants",
@@ -127,43 +89,6 @@ export function LoginPage() {
           <p className="authFooter muted" style={{ marginTop: 14, marginBottom: 0 }}>
             Need an account? Contact the Research Director — only they can create users.
           </p>
-
-          <details className="seedAccountsPanel" style={{ marginTop: 16 }} open>
-            <summary style={{ cursor: "pointer", fontWeight: 600 }}>
-              All demo accounts (9) — click to fill
-            </summary>
-            <p className="muted" style={{ fontSize: 13, margin: "8px 0" }}>
-              Ethics, Peer Reviewer, Procurement, HR, and Donor logins were removed. Peer review is done by <strong>University Leadership</strong>; HR and donor duties are handled by the <strong>Research Director</strong>.
-            </p>
-            {SEED_ACCOUNT_GROUPS.map((group) => (
-              <div key={group.title} style={{ marginBottom: 12 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{group.title}</div>
-                <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
-                  {group.accounts.map((a) => (
-                    <li key={a.email} style={{ marginBottom: 6 }}>
-                      <button
-                        type="button"
-                        className="linkBtn"
-                        style={{
-                          background: "none",
-                          border: "none",
-                          padding: 0,
-                          color: "inherit",
-                          cursor: "pointer",
-                          textDecoration: "underline",
-                        }}
-                        onClick={() => fillAccount(a)}
-                      >
-                        {a.role}
-                      </button>
-                      {" — "}
-                      <code>{a.email}</code> / <code>{a.password}</code>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </details>
         </div>
       </div>
     </div>

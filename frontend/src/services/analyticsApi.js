@@ -75,3 +75,27 @@ export async function researchJourney(accessToken, researcherId) {
   return res.data;
 }
 
+export async function workflowOverview(accessToken) {
+  const res = await api.get("/api/analytics/workflow-overview", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
+
+export async function systemReport(accessToken, params = {}) {
+  const res = await api.get("/api/analytics/system-report", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params,
+  });
+  return res.data;
+}
+
+export async function downloadSystemReportCsv(accessToken) {
+  const res = await api.get("/api/analytics/system-report", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    params: { format: "csv" },
+    responseType: "blob",
+  });
+  return res.data;
+}
+

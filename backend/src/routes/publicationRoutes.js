@@ -47,6 +47,22 @@ router.post(
 );
 
 router.post(
+  "/:id/comments",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("researcher", "faculty_coordinator", "research_director", "leadership"),
+  asyncHandler(publicationController.addPublicationComment)
+);
+
+router.post(
+  "/:id/journal-decision",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("researcher", "faculty_coordinator", "research_director"),
+  asyncHandler(publicationController.setJournalDecision)
+);
+
+router.post(
   "/:id/citations/refresh",
   authenticateUser,
   requireActiveUser,

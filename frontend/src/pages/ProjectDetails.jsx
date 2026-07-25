@@ -7,6 +7,7 @@ import * as analyticsApi from "../services/analyticsApi";
 import { ProjectWorkflowPanel } from "../components/ProjectWorkflowPanel";
 import { ProjectExecutionPanel, CLOSURE_CHECKLIST_ITEMS } from "../components/ProjectExecutionPanel";
 import { ProjectOutputsHub } from "../components/ProjectOutputsHub";
+import { ProgramTierBadge } from "../components/ProgramTierBadge";
 
 const emptyMilestone = { title: "", dueDate: "", completed: false };
 const emptyMember = { name: "", role: "member" };
@@ -100,7 +101,12 @@ export function ProjectDetailsPage() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-        <h2 style={{ marginTop: 0 }}>Project Management</h2>
+        <div>
+          <h2 style={{ marginTop: 0, marginBottom: 6 }}>Project Management</h2>
+          {project?.programTier || project?.programTierLabel ? (
+            <ProgramTierBadge tier={project.programTier} label={project.programTierLabel} />
+          ) : null}
+        </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {isOwner || user?.role === "research_director" ? (
             <button
@@ -269,6 +275,7 @@ export function ProjectDetailsPage() {
         canAddOutput={isOwner}
         canDeleteOutput={isOwner || user?.role === "research_director"}
         canManage={["faculty_coordinator", "research_director"].includes(user?.role)}
+        canComment={isOwner || ["faculty_coordinator", "research_director", "leadership"].includes(user?.role)}
         departmentLabel={project.title}
         onPublicationValidated={() => load().catch(() => {})}
       />

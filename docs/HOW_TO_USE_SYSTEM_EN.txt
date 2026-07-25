@@ -1,7 +1,7 @@
 ================================================================================
 JAMHURIYA RMS — HOW TO USE THE SYSTEM (ENGLISH)
 User Guide — Jamhuriya University Research Management System
-Updated: July 22, 2026
+Updated: July 25, 2026
 ================================================================================
 
 
@@ -9,48 +9,41 @@ Updated: July 22, 2026
 
 JUST RMS manages university research from funding calls through proposals, multi-stage review, project execution, finance, publications, and formal closure.
 
-Two portals exist: Undergraduate (UG) and Postgraduate (PG). Only the Research Director can switch between them. Data never mixes.
+Undergraduate (UG) and Postgraduate (PG) research share one system. Staff see both, with UG/PG labels on projects and items. Researchers work within their own program tier.
 
 Open the app at http://localhost:5173 after starting backend (:5000) and frontend (:5173).
 
 
-2. USER JOBS — WHAT EACH ROLE DOES (7)
+2. USER JOBS — WHAT EACH ROLE DOES
 
-There is no separate Ethics Committee, Peer Reviewer, or Procurement login.
-Ethics = Research Director. Peer review = University Leadership. Purchase orders = Finance.
+Ethics = Research Director. Peer review = University Leadership. Purchase order review = Finance (before Director approval). Donor reports = Director (and Finance for financial views).
 
 Research Director (director@rms.edu)
-  • Switch UG/PG portals; create/publish funding calls (no Leadership step)
-  • Final Approve/Reject proposals; decide ethics (JUREC)
-  • Approve POs after Finance review; manage Users & Departments
-  • Analytics, KPI, audit trail
+  • Sees UG and PG together with labels (no portal switch)
+  • Create/publish funding calls; final Approve/Reject proposals
+  • Decide ethics (JUREC); approve POs after Finance review
+  • Donor reports; manage Users & Departments; analytics, KPI, audit trail
 
-University Leadership (leadership@ / leadership.pg@)
+University Leadership (leadership@rms.edu)
   • Peer review: score 1–5 + comment on assigned proposals
   • Peer Reviews + Proposals menus; KPI
+  • Sees UG and PG together with labels
   • Does NOT publish funding calls
 
-Faculty Coordinator (coordinator@ / coordinator.pg@)
+Faculty Coordinator (coordinator@rms.edu)
   • Faculty proposal queue; thesis groups (min 4 students), titles, supervisors
   • Publication workflow; Validate → Published
-  • Faculty monitoring / reports
+  • Faculty monitoring / reports; sees UG and PG with labels
 
-Finance Officer (finance@ / finance.pg@) — MONEY + PO REVIEW
+Finance Officer (finance@rms.edu) — MONEY + PO REVIEW
   • Grant funding approval → Authorize budget (allocate only, not pay)
   • Proposal finance review; budgets; payment requests; pay approved items
   • Review Purchase Orders (approve/reject) before Director
   • Pay POs after Director approval; finance reports; finance closure
+  • Sees UG and PG finance items with labels
   • Flow: Researcher PO → Finance review → Director → Finance pays
 
-HR Officer (hr@ / hr.pg@)
-  • View projects, thesis, groups for HR context
-  • No grant/ethics/payment approvals
-
-Donor Agency (donor@ / donor.pg@)
-  • Draft external funding calls; wait for Director publish
-  • Donor reports; monitor related grants
-
-Researcher (asha@ UG / mahad@ PG)
+Researcher (asha@rms.edu UG / mahad@rms.edu PG)
   • Apply to calls; write proposals (budget + ethics + docs)
   • Run projects; budgets; payment requests; create POs
   • Publications Create & submit; repository; thesis supervision; closure checklist
@@ -60,22 +53,24 @@ Researcher (asha@ UG / mahad@ PG)
 
 Run: cd backend && npm run seed
 
-Shared: director@rms.edu / Director2024!
+Shared staff (UG + PG together):
+  director@rms.edu / Director2024!
+  coordinator@rms.edu / Coordinator2024!
+  finance@rms.edu / Finance2024!
+  leadership@rms.edu / Leadership2024!
 
-Undergraduate: coordinator@, finance@, hr@, leadership@, donor@, asha@rms.edu
-Postgraduate: *.pg@rms.edu equivalents + mahad@rms.edu
-Passwords: Coordinator2024!, Finance2024!, Hr2024!, Leadership2024!, Donor2024!, Researcher2024!
+Researchers:
+  asha@rms.edu / Researcher2024! — Undergraduate
+  mahad@rms.edu / Researcher2024! — Postgraduate
 
-Director chooses UG or PG after login. All others use one portal automatically.
-
-Do not use ethics@, reviewer@, or procurement@ — those roles were removed.
+Staff do not switch portals — they see all research with UG/PG labels.
 
 
 4. FUNDING CALLS
 
 Director creates Internal or External calls. Required documents auto-fill. Choose eligibility (UG / PG / all / PGD).
 
-Director publishes the call themselves — Leadership is not required. Eligible researchers get notifications with a direct link.
+Director publishes the call themselves. Eligible researchers get notifications with a direct link.
 
 Researcher: Funding Calls → Apply via this call.
 
@@ -91,7 +86,7 @@ Approved funding-call proposals create a Project and queue a Grant for finance (
 
 Path: Sidebar → Grant funding approval (/finance/grant-approvals)
 
-Login as finance@rms.edu (UG) or finance.pg@rms.edu (PG).
+Login as finance@rms.edu.
 
 Click Authorize budget. This ALLOCATES the budget only — it does not pay money. Disburse later under Finance & Budgets.
 

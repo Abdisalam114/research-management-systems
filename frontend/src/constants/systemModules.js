@@ -14,9 +14,10 @@ export const SYSTEM_MODULES = [
   { key: "budgets", to: "/budgets", label: "Finance & Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher"] },
   { key: "finance_reports", to: "/finance-reports", label: "Finance Reports", icon: "📊", roles: ["research_director", "finance_officer"] },
   { key: "publications", to: "/publications", label: "Publications & Outputs", icon: "📚", roles: ["research_director", "faculty_coordinator", "researcher"] },
-  { key: "workflow", to: "/research-workflow", label: "Research Workflow Status", icon: "🔄", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { key: "workflow", to: "/research-workflow", label: "Research Workflow", icon: "🔄", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "groups", to: "/groups", label: "Groups", icon: "🧑‍🤝‍🧑", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "thesis", to: "/thesis", label: "Thesis", icon: "🎓", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { key: "system_reports", to: "/system-reports", label: "System Reports", icon: "📑", roles: ["research_director", "faculty_coordinator", "finance_officer", "leadership"] },
   { key: "kpi", to: "/kpi-dashboard", label: "KPI Dashboard", icon: "📈", roles: ["research_director", "faculty_coordinator", "leadership"] },
   { key: "donor", to: "/donor-reports", label: "Donor Reports", icon: "🌍", roles: ["research_director", "finance_officer"] },
 ];

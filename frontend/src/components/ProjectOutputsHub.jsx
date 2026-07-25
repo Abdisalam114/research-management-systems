@@ -6,8 +6,8 @@ import { FacultyResearchWorkflowModule } from "./FacultyResearchWorkflowModule";
 import { publicationTypeLabel } from "../constants/publicationTypes";
 
 /**
- * Project hub: outputs + faculty publication pipeline for ONE recognized project.
- * Keeps Publication Tracking / Workflow Status tied to Projects (no separate silo).
+ * Project hub: outputs + comments + review decisions for ONE recognized project.
+ * Keeps Publication Tracking tied to Projects (notifications deep-link here).
  */
 export function ProjectOutputsHub({
   projectId,
@@ -15,6 +15,7 @@ export function ProjectOutputsHub({
   canManage = false,
   canAddOutput = false,
   canDeleteOutput = false,
+  canComment = false,
   departmentLabel = "",
   onPublicationValidated,
 }) {
@@ -32,21 +33,6 @@ export function ProjectOutputsHub({
     try {
       const res = await publicationApi.listPublications(accessToken, { projectId });
       setPubs(res.publications || []);
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          runId: "project-hub",
-          hypothesisId: "PH1",
-          location: "ProjectOutputsHub.jsx:load",
-          message: "project-scoped outputs on project hub",
-          data: { projectId, count: (res.publications || []).length, programTier },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to load project outputs");
       setPubs([]);
@@ -55,43 +41,45 @@ export function ProjectOutputsHub({
     }
   }, [accessToken, projectId, programTier]);
 
-  async function approveCompletePublication(pub) {
-    const comment = window.prompt("Validation comment (required) — approve as complete publication:");
+  async function afterChange(res) {
+    await load();
+    setWorkflowKey((k) => k + 1);
+    onPublicationValidated?.(res);
+  }
+
+  async function decidePublication(pub, decision) {
+    const prompts = {
+      accept: "Accept comment (required):",
+      revise: "Revision request — what must the author fix? (required):",
+      reject: "Rejection reason (required):",
+    };
+    const comment = window.prompt(prompts[decision] || "Comment (required):");
     if (!comment?.trim()) return;
     setBusyId(pub.id);
     setError("");
     try {
       const res = await publicationApi.validatePublication(accessToken, pub.id, {
-        decision: "validated",
+        decision,
         comment: comment.trim(),
       });
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          hypothesisId: "P3",
-          location: "ProjectOutputsHub.jsx:approveCompletePublication",
-          message: "director validated from project hub",
-          data: {
-            pubId: pub.id,
-            projectId,
-            status: res?.publication?.status || null,
-            workflowStage: res?.publication?.workflowStage || null,
-            projectCompletion: res?.projectCompletion || null,
-            programTier,
-          },
-          timestamp: Date.now(),
-          runId: "pub-validate",
-        }),
-      }).catch(() => {});
-      // #endregion
-      await load();
-      setWorkflowKey((k) => k + 1);
-      onPublicationValidated?.(res);
+      await afterChange(res);
     } catch (e) {
-      setError(e?.response?.data?.message || "Failed to approve publication");
+      setError(e?.response?.data?.message || "Failed to save decision");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function addComment(pub) {
+    const comment = window.prompt("Add a review comment (visible on this project):");
+    if (!comment?.trim()) return;
+    setBusyId(pub.id);
+    setError("");
+    try {
+      const res = await publicationApi.addPublicationComment(accessToken, pub.id, comment.trim());
+      await afterChange(res);
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to add comment");
     } finally {
       setBusyId(null);
     }
@@ -101,6 +89,9 @@ export function ProjectOutputsHub({
     load().catch(() => {});
   }, [load]);
 
+  const canDecide = (p) =>
+    canManage && (p.status === "submitted" || p.status === "revision_requested");
+
   return (
     <div id="project-outputs" style={{ marginTop: 16, scrollMarginTop: 88 }}>
       <div className="card" style={{ borderColor: "rgba(56,189,248,0.35)" }}>
@@ -108,7 +99,7 @@ export function ProjectOutputsHub({
           <div>
             <div style={{ fontWeight: 800, fontSize: 16 }}>Publication outputs — this project</div>
             <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-              One output per project (1:1) — same data as Publications & Outputs menu.
+              Full details, review comments, and decisions live here (notifications open this section).
             </div>
           </div>
           {canAddOutput && pubs.length === 0 ? (
@@ -117,7 +108,7 @@ export function ProjectOutputsHub({
             </Link>
           ) : (
             <Link className="btn" to={`/publications?projectId=${projectId}`}>
-              {pubs.length ? "View output" : "Open outputs"}
+              {pubs.length ? "Open in Publications" : "Open outputs"}
             </Link>
           )}
         </div>
@@ -131,65 +122,141 @@ export function ProjectOutputsHub({
           </p>
         ) : null}
 
-        <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+        <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
           {pubs.map((p) => (
             <div
               key={p.id}
               className="card"
-              style={{ padding: 10, background: "rgba(15,23,42,0.03)", borderColor: "rgba(148,163,184,0.25)" }}
+              style={{ padding: 12, background: "rgba(15,23,42,0.03)", borderColor: "rgba(148,163,184,0.25)" }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                <div>
+                <div style={{ flex: "1 1 240px", minWidth: 0 }}>
                   <div style={{ fontWeight: 700 }}>{p.title}</div>
                   <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                    {publicationTypeLabel(p.type)} • {p.year} • {p.status}
+                    {publicationTypeLabel(p.type)} • {p.year} •{" "}
+                    <strong>{p.statusLabel || p.status}</strong>
+                    {p.venue ? ` • ${p.venue}` : ""}
                     {p.workflowStageLabel ? ` • ${p.workflowStageLabel}` : ""}
                   </div>
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignSelf: "start" }}>
-                  {p.status === "validated" ? (
-                    <span
+                  {p.journalDecision && p.journalDecision !== "pending" ? (
+                    <div style={{ fontSize: 12, marginTop: 4, color: "#fbbf24" }}>
+                      Journal decision: <strong>{p.journalDecisionLabel || p.journalDecision}</strong>
+                      {p.journalDecisionNote ? ` — ${p.journalDecisionNote}` : ""}
+                    </div>
+                  ) : null}
+                  {p.validationComment ? (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                      Latest review note: {p.validationComment}
+                    </div>
+                  ) : null}
+                  {Array.isArray(p.authors) && p.authors.length ? (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                      Authors: {p.authors.join(", ")}
+                    </div>
+                  ) : null}
+                  {p.doi ? <div className="muted" style={{ fontSize: 12 }}>DOI: {p.doi}</div> : null}
+
+                  {Array.isArray(p.reviewerComments) && p.reviewerComments.length ? (
+                    <div
                       style={{
-                        fontSize: 12,
-                        color: "#22c55e",
-                        fontWeight: 700,
-                        alignSelf: "start",
+                        marginTop: 10,
+                        padding: 10,
+                        borderRadius: 8,
+                        background: "rgba(14,165,233,0.08)",
+                        border: "1px solid rgba(56,189,248,0.25)",
                       }}
                     >
-                      ✓ Complete publication approved
+                      <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6 }}>
+                        Comments & decisions ({p.reviewerComments.length})
+                      </div>
+                      <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12 }}>
+                        {p.reviewerComments.map((c) => (
+                          <li key={c.id || `${c.at}-${c.comment}`} style={{ marginBottom: 6 }}>
+                            <strong>{c.authorName || c.authorRole || "Reviewer"}</strong>
+                            {c.decisionLabel ? ` [${c.decisionLabel}]` : ""}: {c.comment}
+                            {c.at ? (
+                              <span className="muted"> · {new Date(c.at).toLocaleString()}</span>
+                            ) : null}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : p.status !== "draft" ? (
+                    <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+                      No comments yet — Accept / Revise / Reject or Add comment to start the thread.
+                    </p>
+                  ) : null}
+                </div>
+
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignSelf: "start" }}>
+                  {p.status === "validated" ? (
+                    <span style={{ fontSize: 12, color: "#22c55e", fontWeight: 700 }}>
+                      ✓ Accepted / complete
                     </span>
                   ) : null}
-                  {canManage && p.status === "submitted" ? (
+                  {canDecide(p) ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn primary"
+                        disabled={busyId === p.id}
+                        onClick={() => decidePublication(p, "accept")}
+                      >
+                        {busyId === p.id ? "…" : "Accept"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ borderColor: "rgba(245,158,11,0.6)", color: "#fbbf24" }}
+                        disabled={busyId === p.id}
+                        onClick={() => decidePublication(p, "revise")}
+                      >
+                        Revise
+                      </button>
+                      <button
+                        type="button"
+                        className="btn"
+                        disabled={busyId === p.id}
+                        onClick={() => decidePublication(p, "reject")}
+                      >
+                        Reject
+                      </button>
+                    </>
+                  ) : null}
+                  {(canComment || canManage) && p.status !== "draft" ? (
                     <button
                       type="button"
-                      className="btn primary"
+                      className="btn"
                       disabled={busyId === p.id}
-                      onClick={() => approveCompletePublication(p)}
+                      onClick={() => addComment(p)}
                     >
-                      {busyId === p.id ? "…" : "Approve complete publication"}
+                      Add comment
                     </button>
                   ) : null}
-                {canDeleteOutput &&
-                (p.status === "draft" || p.status === "rejected" || canManage) ? (
-                  <button
-                    type="button"
-                    className="btn"
-                    style={{ borderColor: "rgba(248,113,113,0.6)", color: "#f87171", alignSelf: "start" }}
-                    onClick={async () => {
-                      const ok = window.confirm(`Delete output "${p.title}"?`);
-                      if (!ok) return;
-                      setError("");
-                      try {
-                        await publicationApi.deletePublication(accessToken, p.id);
-                        await load();
-                      } catch (e) {
-                        setError(e?.response?.data?.message || "Failed to delete output");
-                      }
-                    }}
-                  >
-                    Delete
-                  </button>
-                ) : null}
+                  {canDeleteOutput &&
+                  (p.status === "draft" ||
+                    p.status === "rejected" ||
+                    p.status === "revision_requested" ||
+                    canManage) ? (
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ borderColor: "rgba(248,113,113,0.6)", color: "#f87171" }}
+                      onClick={async () => {
+                        const ok = window.confirm(`Delete output "${p.title}"?`);
+                        if (!ok) return;
+                        setError("");
+                        try {
+                          await publicationApi.deletePublication(accessToken, p.id);
+                          await afterChange();
+                        } catch (e) {
+                          setError(e?.response?.data?.message || "Failed to delete output");
+                        }
+                      }}
+                    >
+                      Delete
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>

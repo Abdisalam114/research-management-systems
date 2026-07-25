@@ -38,6 +38,7 @@ import { AuditTrailPage } from "./pages/AuditTrailPage";
 import { FinanceReportsPage } from "./pages/FinanceReports";
 import { DonorReportsPage } from "./pages/DonorReportsPage";
 import { KpiDashboardPage } from "./pages/KpiDashboardPage";
+import { SystemReportsPage } from "./pages/SystemReportsPage";
 import { GlobalSearchPage } from "./pages/GlobalSearchPage";
 import { FinanceProposalReviewsPage } from "./pages/FinanceProposalReviewsPage";
 import { FinanceProposalReviewDetailPage } from "./pages/FinanceProposalReviewDetailPage";
@@ -81,6 +82,15 @@ export default function App() {
 
           <Route element={<ProtectedRoute roles={["research_director", "finance_officer"]} />}>
             <Route path="/finance-reports" element={<FinanceReportsPage />} />
+          </Route>
+          <Route
+            element={
+              <ProtectedRoute
+                roles={["research_director", "faculty_coordinator", "finance_officer", "leadership"]}
+              />
+            }
+          >
+            <Route path="/system-reports" element={<SystemReportsPage />} />
           </Route>
           <Route element={<ProtectedRoute roles={["research_director", "finance_officer"]} />}>
             <Route path="/donor-reports" element={<DonorReportsPage />} />

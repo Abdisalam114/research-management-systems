@@ -1,46 +1,40 @@
+/**
+ * Smoke-check: KPI dashboard API returns operational metrics.
+ * (Spec coverage / thesis-ready messaging was removed from the product UI.)
+ */
 require("dotenv").config();
 const { connectDB } = require("../config/db");
-const { User } = require("../models/User");
-const analyticsController = require("../controllers/analyticsController");
 
 async function login(email, password) {
-  const user = await User.findOne({ email: email.toLowerCase() }).select("+password");
-  if (!user || !(await user.comparePassword(password))) throw new Error(`Login failed: ${email}`);
-  const jwt = require("jsonwebtoken");
-  const token = jwt.sign(
-    { id: user._id, role: user.role, programTier: user.programTier },
-    process.env.JWT_ACCESS_SECRET,
-    { expiresIn: "1h" }
-  );
-  return { token, user };
-}
-
-function mockReq(user, tier) {
-  return {
-    user: { id: String(user._id), role: user.role },
-    programTier: tier || user.programTier || "undergraduate",
-    tierWhere: (base = {}) => ({ ...base, programTier: tier || user.programTier || "undergraduate" }),
-    tierAssign: (data = {}) => ({ ...data, programTier: tier || user.programTier || "undergraduate" }),
-  };
+  const res = await fetch("http://localhost:5000/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "login failed");
+  return data;
 }
 
 async function main() {
   await connectDB(process.env.MONGO_URI || process.env.MONGODB_URI);
-  const { token, user } = await login("director@rms.edu", process.env.SEED_DIRECTOR_PASSWORD || "Director2024!");
+  const email = process.env.SEED_DIRECTOR_EMAIL || "director@rms.edu";
+  const password = process.env.SEED_DIRECTOR_PASSWORD || "Director2024!";
+  const { accessToken } = await login(email, password);
 
-  const res = { json: (body) => body };
-  const kpi = await new Promise((resolve, reject) => {
-    analyticsController
-      .getKpiDashboard({ ...mockReq(user, "undergraduate"), headers: {} }, { json: resolve })
-      .catch(reject);
+  const res = await fetch("http://localhost:5000/api/analytics/kpi-dashboard", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
+  const kpi = await res.json();
+  if (!res.ok) throw new Error(kpi.message || "KPI request failed");
+  if (!kpi.kpis) throw new Error("KPI payload missing kpis");
 
-  console.log("=== THESIS COVERAGE CHECK ===");
-  console.log(`Overall: ${kpi.coverageScore?.overall}%`);
-  console.log(`Thesis-ready (90%+): ${kpi.thesisReady ? "YES" : "NO"}`);
-  console.log(`Grant success rate: ${kpi.kpis?.grantSuccessRate}%`);
-  console.log(`Director token OK: ${token ? "yes" : "no"}`);
-  process.exit(kpi.thesisReady ? 0 : 1);
+  console.log("KPI dashboard OK");
+  console.log(`Active projects: ${kpi.kpis.activeProjects ?? 0}`);
+  console.log(`Validated publications: ${kpi.kpis.publicationsValidated ?? 0}`);
+  process.exit(0);
 }
 
 main().catch((e) => {

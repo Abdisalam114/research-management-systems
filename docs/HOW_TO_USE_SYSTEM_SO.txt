@@ -1,7 +1,7 @@
 ================================================================================
 JAMHURIYA RMS — SIDEE LOO ISTICMAALO (SOMALI)
 Tilmaamaha Isticmaalaha — Nidaamka Maamulka Cilmi-baarista Jamhuriya
-Cusbooneysiin: July 22, 2026
+Cusbooneysiin: July 25, 2026
 ================================================================================
 
 
@@ -9,48 +9,41 @@ Cusbooneysiin: July 22, 2026
 
 JUST RMS wuxuu maamulaa cilmi-baarista jaamacadda: funding calls, proposals, dib u eegis, project, maaliyad, publications, iyo xiritaan.
 
-Laba portal ayaa jira: Undergraduate (UG) iyo Postgraduate (PG). Kaliya Research Director ayaa beddeli kara labadooda. Xogtu isma dhex gasho.
+Undergraduate (UG) iyo Postgraduate (PG) waxay ku jiraan nidaam wadaag ah. Shaqaalaha waxay wada arkaan labada, oo mashruucyada lagu calaamadeeyo UG ama PG. Researchers waxay ku shaqeeyaan barnaamijkooda.
 
 Fur app-ka: http://localhost:5173 (ka dib backend iyo frontend la shido).
 
 
-2. SHAQADA USER-KASTA (7 ROLES)
+2. SHAQADA USER-KASTA
 
-Ma jiro akoon Ethics Committee, Peer Reviewer, ama Procurement.
-Ethics = Research Director. Peer review = University Leadership. Purchase Orders = Finance.
+Ethics = Research Director. Peer review = University Leadership. Dib u eegista Purchase Orders = Finance (ka hor Director). Donor reports = Director (iyo Finance warbixin maaliyadeed).
 
 Research Director (director@rms.edu)
-  • Beddel portal UG/PG; abuuri/daabaca funding calls (Leadership uma baahna)
-  • Ansixinta ugu dambeysa proposals; go'aanka ethics (JUREC)
-  • Ansixi PO ka dib Finance dib-u-eegis; maamul Users & Departments
-  • Analytics, KPI, audit trail
+  • Arag UG iyo PG oo wada (ma beddelo portal)
+  • Abuuri/daabaca funding calls; ansixinta ugu dambeysa proposals
+  • Go'aanka ethics (JUREC); ansixi PO ka dib Finance dib-u-eegis
+  • Donor reports; maamul Users & Departments; analytics, KPI, audit trail
 
-University Leadership (leadership@ / leadership.pg@)
+University Leadership (leadership@rms.edu)
   • Peer review: score 1–5 + comment
   • Peer Reviews + Proposals; KPI
+  • Arag UG iyo PG oo calaamadeysan
   • MA daabaco funding calls
 
-Faculty Coordinator (coordinator@ / coordinator.pg@)
+Faculty Coordinator (coordinator@rms.edu)
   • Proposal queue faculty; thesis groups (min 4 arday), titles, supervisors
   • Publication workflow; Validate → Published
-  • Warbixin / monitoring faculty
+  • Warbixin / monitoring faculty; arag UG iyo PG
 
-Finance Officer (finance@ / finance.pg@) — LACAG + DIB U EEGISTA PO
+Finance Officer (finance@rms.edu) — LACAG + DIB U EEGISTA PO
   • Grant funding approval → Authorize budget (qoondee kaliya, ha bixin weli)
   • Finance review proposal; budgets; payments; bixi wax la ansixiyay
   • Dib u eegis Purchase Orders (ansixi/diid) ka hor Director
   • Bixi PO ka dib Director; finance reports; xiritaan maaliyadeed
+  • Arag UG iyo PG oo calaamadeysan
   • Safka: Researcher PO → Finance review → Director → Finance bixisaa
 
-HR Officer (hr@ / hr.pg@)
-  • Arag projects, thesis, groups — dhinaca HR
-  • Ma ansixiyo grants/ethics/lacag
-
-Donor Agency (donor@ / donor.pg@)
-  • Draft funding calls external; sug Director publish
-  • Donor reports; la soco grants
-
-Researcher (asha@ UG / mahad@ PG)
+Researcher (asha@rms.edu UG / mahad@rms.edu PG)
   • Codso calls; abuuri proposals (budget + ethics + docs)
   • Maamul projects; budgets; payments; abuuri PO
   • Publications Create & submit; repository; thesis; closure checklist
@@ -60,21 +53,24 @@ Researcher (asha@ UG / mahad@ PG)
 
 Run: cd backend && npm run seed
 
-Wadaag: director@rms.edu / Director2024!
+Shaqaalaha wadaagga (UG + PG wada):
+  director@rms.edu / Director2024!
+  coordinator@rms.edu / Coordinator2024!
+  finance@rms.edu / Finance2024!
+  leadership@rms.edu / Leadership2024!
 
-Undergraduate: coordinator@, finance@, hr@, leadership@, donor@, asha@rms.edu
-Postgraduate: *.pg@rms.edu + mahad@rms.edu / Researcher2024!
+Researchers:
+  asha@rms.edu / Researcher2024! — Undergraduate
+  mahad@rms.edu / Researcher2024! — Postgraduate
 
-Director → dooro UG ama PG. Dadka kale hal portal kaliya.
-
-Ha isticmaalin ethics@, reviewer@, ama procurement@ — doorarkaas waa laga saaray nidaamka.
+Shaqaalaha ma beddelaan portal — waxay arkaan cilmi-baarista oo dhan oo leh calaamado UG/PG.
 
 
 4. FUNDING CALLS
 
 Director wuxuu abuuraa Internal ama External. Requirements si otomaatig ah ayaa u buuxsamaan. Dooro eligibility (UG / PG / dhammaan / PGD).
 
-Director ayaa daabaca call-ka — Leadership uma baahna. Researchers eligible ah waa la ogeysiiyaa link toos ah.
+Director ayaa daabaca call-ka. Researchers eligible ah waa la ogeysiiyaa link toos ah.
 
 Researcher: Funding Calls → Apply via this call.
 
@@ -92,7 +88,7 @@ Proposal la aqbalay → Project la abuuraa + Grant finance queue (pending_financ
 
 Waddada: Sidebar → Grant funding approval (/finance/grant-approvals)
 
-Gal: finance@rms.edu (UG) ama finance.pg@rms.edu (PG)
+Gal: finance@rms.edu
 
 Guji Authorize budget. Tani waa ALLOCATE kaliya — ma aha bixin lacag. Lacag bixinta waa Finance & Budgets ka dib.
 

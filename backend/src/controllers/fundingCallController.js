@@ -6,7 +6,7 @@ const { notifyUsersByRole, notifyUser } = require("../utils/notify");
 const { recordAudit } = require("../utils/audit");
 const { tierMatchesCall } = require("../utils/fundingCallEligibility");
 const { closeExpiredOpenCalls } = require("../utils/fundingCallAutoClose");
-const { PROGRAM_TIERS } = require("../constants/programTier");
+const { PROGRAM_TIERS, isValidProgramTier } = require("../constants/programTier");
 
 function defaultRequiredDocuments(callType) {
   if (callType === "external") {
@@ -199,8 +199,13 @@ async function createFundingCall(req, res) {
     requiredDocuments && String(requiredDocuments).trim()
       ? String(requiredDocuments).trim()
       : defaultRequiredDocuments(resolvedType);
-  // Stay on the portal the director is managing; eligibility controls who is notified/can apply
-  const portalTier = req.programTier;
+  // Prefer explicit body programTier; otherwise current filter; else require choice
+  const portalTier = isValidProgramTier(req.body?.programTier)
+    ? req.body.programTier
+    : req.programTier;
+  if (!isValidProgramTier(portalTier)) {
+    throw new AppError("programTier is required (undergraduate or postgraduate)", 400);
+  }
 
   const call = await FundingCall.create(
     req.tierAssign({
@@ -216,6 +221,7 @@ async function createFundingCall(req, res) {
       requiredDocuments: docs,
       status: CALL_STATUSES.DRAFT,
       createdBy: req.user.id,
+      programTier: portalTier,
     })
   );
 

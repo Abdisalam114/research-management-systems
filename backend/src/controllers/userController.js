@@ -1,15 +1,35 @@
 const { User, USER_STATUSES, ROLES } = require("../models/User");
 const { SYSTEM_ROLES } = require("../constants/systemRoles");
 const { AppError } = require("../utils/AppError");
+const { PROGRAM_TIERS, isValidProgramTier } = require("../constants/programTier");
+const mongoose = require("mongoose");
+
+const SINGLETON_STAFF_ROLES = Object.freeze([
+  ROLES.FACULTY_COORDINATOR,
+  ROLES.FINANCE_OFFICER,
+  ROLES.LEADERSHIP,
+]);
 
 function isAssignableRole(role) {
   return SYSTEM_ROLES.includes(role) && role !== ROLES.RESEARCH_DIRECTOR;
+}
+
+function assertValidObjectId(id, label = "User id") {
+  if (!mongoose.isValidObjectId(id)) {
+    throw new AppError(`${label} is invalid`, 400);
+  }
 }
 
 function sanitizeUser(userDoc) {
   const tier = userDoc.programTier;
   const programTierLabel =
     tier === "undergraduate" ? "Undergraduate" : tier === "postgraduate" ? "Postgraduate" : tier || "—";
+  const isSharedStaff = [
+    ROLES.RESEARCH_DIRECTOR,
+    ROLES.FACULTY_COORDINATOR,
+    ROLES.FINANCE_OFFICER,
+    ROLES.LEADERSHIP,
+  ].includes(userDoc.role);
   return {
     id: userDoc._id,
     fullName: userDoc.fullName,
@@ -19,7 +39,8 @@ function sanitizeUser(userDoc) {
     rank: userDoc.rank,
     status: userDoc.status,
     programTier: tier,
-    programTierLabel,
+    programTierLabel: isSharedStaff ? "All programs (UG + PG)" : programTierLabel,
+    isSharedStaff,
     isProtected: Boolean(userDoc.isProtected),
     createdAt: userDoc.createdAt,
     updatedAt: userDoc.updatedAt,
@@ -38,10 +59,14 @@ async function listPendingUsers(req, res) {
 }
 
 async function createUserByDirector(req, res) {
-  const { fullName, email, password, role, department, rank, status, dualPlatform } = req.body || {};
+  const { fullName, email, password, role, department, rank, status, dualPlatform, programTier: bodyTier } =
+    req.body || {};
 
   if (dualPlatform === true || dualPlatform === "true") {
-    throw new AppError("Only the Research Director can access both portals. Assign each user to UG or PG only.", 400);
+    throw new AppError(
+      "Staff accounts (Director, Coordinator, Finance, Leadership) are already system-wide. Assign researchers to UG or PG only.",
+      400
+    );
   }
 
   if (!fullName || !email || !password || !role || !department || !rank) {
@@ -61,28 +86,57 @@ async function createUserByDirector(req, res) {
     );
   }
 
+  if (SINGLETON_STAFF_ROLES.includes(role)) {
+    const existing = await User.findOne({
+      role,
+      status: { $in: [USER_STATUSES.ACTIVE, USER_STATUSES.PENDING] },
+    });
+    if (existing) {
+      throw new AppError(
+        `Only one ${role.replace(/_/g, " ")} account is allowed for the whole system (UG + PG).`,
+        409
+      );
+    }
+  }
+
   const nextStatus =
     status && Object.values(USER_STATUSES).includes(status) ? status : USER_STATUSES.ACTIVE;
 
   const exists = await User.findOne({ email: String(email).toLowerCase().trim() });
   if (exists) throw new AppError("Email already in use", 409);
 
-  const user = await User.create(req.tierAssign({
-    fullName: String(fullName).trim(),
-    email: String(email).toLowerCase().trim(),
-    password,
-    role,
-    department: String(department).trim(),
-    rank: String(rank).trim(),
-    status: nextStatus,
-    isProtected: false,
-  }));
+  let assignedTier = isValidProgramTier(bodyTier) ? bodyTier : req.programTier || null;
+  if (role === ROLES.RESEARCHER) {
+    if (!isValidProgramTier(assignedTier)) {
+      throw new AppError("programTier is required for researchers (undergraduate or postgraduate)", 400);
+    }
+  } else if (!isValidProgramTier(assignedTier)) {
+    assignedTier = PROGRAM_TIERS.UNDERGRADUATE;
+  }
 
+  const user = await User.create(
+    req.tierAssign({
+      fullName: String(fullName).trim(),
+      email: String(email).toLowerCase().trim(),
+      password,
+      role,
+      department: String(department).trim(),
+      rank: String(rank).trim(),
+      status: nextStatus,
+      isProtected: false,
+      programTier: assignedTier,
+    })
+  );
+
+  const sanitized = sanitizeUser(user);
   res.status(201).json({
-    message: `${nextStatus === USER_STATUSES.ACTIVE ? "User created and activated" : "User created (pending)"} — assigned to ${sanitizeUser(user).programTierLabel} portal`,
-    user: sanitizeUser(user),
+    message: `${nextStatus === USER_STATUSES.ACTIVE ? "User created and activated" : "User created (pending)"} — ${
+      sanitized.isSharedStaff ? "system-wide staff (UG + PG)" : `assigned to ${sanitized.programTierLabel}`
+    }`,
+    user: sanitized,
   });
 }
+
 
 async function listUsers(req, res) {
   const { status, role, q } = req.query || {};
@@ -136,6 +190,7 @@ async function rejectUser(req, res) {
 
 async function updateUserByDirector(req, res) {
   const { id } = req.params;
+  assertValidObjectId(id);
   const user = await User.findOne(req.tierWhere({ _id: id })).select("+refreshToken");
   if (!user) throw new AppError("User not found", 404);
 
@@ -176,6 +231,7 @@ async function updateUserByDirector(req, res) {
 
 async function deleteUserByDirector(req, res) {
   const { id } = req.params;
+  assertValidObjectId(id);
   const user = await User.findOne(req.tierWhere({ _id: id }));
   if (!user) throw new AppError("User not found", 404);
 
