@@ -47,6 +47,14 @@ router.put(
   asyncHandler(proposalController.updateProposal)
 );
 
+router.delete(
+  "/:id",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("researcher", "research_director"),
+  asyncHandler(proposalController.deleteProposal)
+);
+
 router.post(
   "/:id/submit",
   authenticateUser,

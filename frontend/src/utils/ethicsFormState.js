@@ -1,6 +1,7 @@
 /** Shared ethics application form state (proposal + standalone ethics page). */
 
 import { PROGRAM_TIERS } from "../constants/programTier";
+import { normalizeProjectLevel } from "../constants/ethicsFormOptions";
 
 export function defaultProjectLevelFromTier(programTier) {
   if (programTier === PROGRAM_TIERS.UNDERGRADUATE) return "undergraduate";
@@ -62,8 +63,9 @@ export function ethicsApplicationToForm(a) {
     conflictOfInterest: { ...empty.conflictOfInterest, ...(a.conflictOfInterest || {}) },
     applicantSignature: { ...empty.applicantSignature, ...(a.applicantSignature || {}) },
     otherInvestigators: a.otherInvestigators || [],
+    projectLevel: normalizeProjectLevel(a.projectLevel),
   };
-return form;
+  return form;
 }
 
 /** Pre-fill ethics from logged-in researcher + proposal fields. */
@@ -96,7 +98,7 @@ export function syncEthicsFromProposal(ethics, proposal, user, programTier) {
   return {
     ...ethics,
     projectTitle: proposal.title || "",
-    projectLevel: ethics.projectLevel || defaultLevel,
+    projectLevel: normalizeProjectLevel(ethics.projectLevel) || defaultLevel,
     aimsObjectives: ethics.aimsObjectives || proposal.abstract || "",
     principal: {
       ...ethics.principal,
@@ -115,6 +117,7 @@ export function prepareEthicsPayload(form, { voluntary = false } = {}) {
   const payload = { ...form };
   if (payload.startDate === "") payload.startDate = null;
   if (payload.endDate === "") payload.endDate = null;
+  payload.projectLevel = normalizeProjectLevel(payload.projectLevel);
   if (voluntary) {
     payload.fundingSource = "";
     payload.conflictOfInterest = {

@@ -348,33 +348,7 @@ export function ResearchJourneyPanel() {
       isStaff && selectedResearcherId ? selectedResearcherId : undefined
     );
     setData(res);
-    // #region agent log
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify({
-        sessionId: "f558f7",
-        runId: "workflow-follows-project",
-        hypothesisId: "WF1",
-        location: "ResearchJourneyPanel.jsx:load",
-        message: "research workflow loaded for projects",
-        data: {
-          mode: res?.mode || null,
-          projectCount: res?.projects?.length || 0,
-          pendingCount: res?.pendingProposals?.length || 0,
-          focusProjectId: focusProjectId || null,
-          titles: (res?.projects || []).slice(0, 8).map((p) => ({
-            id: p.projectId,
-            title: p.title,
-            status: p.projectStatus,
-            current: p.currentStepLabel,
-          })),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [accessToken, isStaff, selectedResearcherId, focusProjectId]);
+}, [accessToken, isStaff, selectedResearcherId, focusProjectId]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load, [selectedResearcherId]);
 

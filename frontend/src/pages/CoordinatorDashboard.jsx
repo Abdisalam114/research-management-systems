@@ -46,22 +46,7 @@ export function CoordinatorDashboardPage() {
       } catch {
         setFacultyReport(null);
       }
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          runId: "systemic-pass",
-          hypothesisId: "S1",
-          location: "CoordinatorDashboard.jsx:load",
-          message: "coordinator dashboard isolated load",
-          data: { queueLen, metricsOk, facultyOk },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-    })();
+})();
   }, [accessToken, user?.department]);
 
   async function downloadFacultyPdf() {

@@ -179,36 +179,7 @@ async function listPublications(req, res) {
     const uid = String(req.user.id);
     pubs = pubs.filter((p) => String(p.researcherId?._id || p.researcherId) === uid);
   }
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(__dirname, "../../../debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "project-source",
-        hypothesisId: "SRC2",
-        location: "publicationController.listPublications",
-        message: "Publications data sourced from Projects only",
-        data: {
-          role,
-          userId: String(req.user.id),
-          count: pubs.length,
-          withProjectId: pubs.filter((p) => p.projectId).length,
-          withoutProjectId: pubs.filter((p) => !p.projectId).length,
-          projectIdQuery: req.query.projectId ? String(req.query.projectId) : null,
-        },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-
-  res.json({ publications: pubs.map(sanitizePublication) });
+res.json({ publications: pubs.map(sanitizePublication) });
 }
 
 async function getFacultyWorkflow(req, res) {
@@ -251,36 +222,7 @@ async function getFacultyWorkflow(req, res) {
   } else if (role === "faculty_coordinator" && dept) {
     pubs = pubs.filter((p) => p.researcherId && p.researcherId.department === dept);
   }
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(__dirname, "../../../debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "project-source",
-        hypothesisId: "SRC3",
-        location: "publicationController.getFacultyWorkflow",
-        message: "Workflow Status sourced from project-linked pubs only",
-        data: {
-          role,
-          userId: String(req.user.id),
-          pubCount: pubs.length,
-          withProjectId: pubs.filter((p) => p.projectId).length,
-          withoutProjectId: pubs.filter((p) => !p.projectId).length,
-          projectIdQuery: projectIdQuery || null,
-        },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-
-  const sanitized = pubs.map(sanitizePublication);
+const sanitized = pubs.map(sanitizePublication);
   const byStage = {};
   STAGE_ORDER.forEach((s) => {
     byStage[s] = sanitized.filter((p) => p.workflowStage === s);
@@ -801,28 +743,7 @@ async function deletePublication(req, res) {
   const title = pub.title;
   const projectId = pub.projectId ? String(pub.projectId) : null;
   await pub.deleteOne();
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(__dirname, "../../../debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "DEL1",
-        location: "publicationController.deletePublication",
-        message: "publication deleted",
-        data: { id, title, projectId, by: req.user.role, userId: String(req.user.id) },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-
-  try {
+try {
     await recordAudit(req, {
       action: "publication.deleted",
       entityType: "publication",

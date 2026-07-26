@@ -67,31 +67,7 @@ function sanitizeItem(i) {
 async function listItems(req, res) {
   const items = await fetchItemsForUser(req);
   const populated = await RepositoryItem.populate(items, { path: "projectId", select: "title status" });
-
-  // #region agent log
-  try {
-    fs.appendFileSync(
-      path.join(__dirname, "../../../debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "REPO1",
-        location: "repositoryController.listItems",
-        message: "repository list project-scoped",
-        data: {
-          role: req.user.role,
-          projectIdQuery: req.query.projectId ? String(req.query.projectId) : null,
-          count: populated.length,
-          withProjectId: populated.filter((i) => i.projectId).length,
-        },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-
-  return res.json({ items: populated.map(sanitizeItem) });
+return res.json({ items: populated.map(sanitizeItem) });
 }
 
 async function uploadItem(req, res) {
@@ -114,7 +90,7 @@ async function uploadItem(req, res) {
 
   const linkedProjectId =
     req.user.role === "researcher"
-      ? await requireOwnedProjectId(req, projectId, req.user.id)
+      ? await requireOwnedProjectId(req, projectId, req.user.id, { forRepository: true })
       : projectId
         ? await validateProjectQuery(req, projectId)
         : null;
@@ -122,8 +98,7 @@ async function uploadItem(req, res) {
   if (!linkedProjectId) {
     throw new AppError("projectId is required — select the research project this file belongs to", 400);
   }
-
-  const item = await RepositoryItem.create(req.tierAssign({
+const item = await RepositoryItem.create(req.tierAssign({
     type,
     title: String(title).trim(),
     description: description ? String(description) : "",
@@ -189,26 +164,7 @@ async function deleteItem(req, res) {
       /* optional file cleanup */
     }
   }
-
-  // #region agent log
-  try {
-    fs.appendFileSync(
-      path.join(__dirname, "../../../debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "REPO2",
-        location: "repositoryController.deleteItem",
-        message: "repository item deleted",
-        data: { id, title, projectId: item.projectId ? String(item.projectId) : null, by: req.user.role },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-
-  res.json({ message: "Repository item deleted", id });
+res.json({ message: "Repository item deleted", id });
 }
 
 async function buildExportRows(req) {

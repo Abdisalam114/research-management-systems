@@ -61,6 +61,8 @@ export function PublicationsPage() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
   const [successMsg, setSuccessMsg] = useState("");
+  const [decisionModal, setDecisionModal] = useState(null); // { publication, decision, comment, project, loading }
+  const [decisionBusy, setDecisionBusy] = useState(false);
 
   const canCreate = user?.role === "researcher";
   const canValidate = ["faculty_coordinator", "research_director"].includes(user?.role);
@@ -103,24 +105,49 @@ export function PublicationsPage() {
   }
 
   async function decidePublication(p, decision) {
-    const labels = {
-      accept: "Accept (international-style accept)",
-      revise: "Revise & resubmit — reviewer comments (required)",
-      reject: "Reject — reason (required)",
-    };
-    const comment = prompt(labels[decision] || "Reviewer comment (required):");
-    if (!comment) return;
+    setError("");
+    setSuccessMsg("");
+    setDecisionModal({
+      publication: p,
+      decision,
+      comment: "",
+      project: null,
+      loading: Boolean(p.projectId),
+    });
+    if (!p.projectId) return;
+    try {
+      const res = await projectApi.getProject(accessToken, p.projectId);
+      setDecisionModal((m) => (m ? { ...m, project: res.project || null, loading: false } : m));
+    } catch {
+      setDecisionModal((m) => (m ? { ...m, loading: false } : m));
+    }
+  }
+
+  async function confirmPublicationDecision() {
+    if (!decisionModal?.publication || !decisionModal?.decision) return;
+    const comment = String(decisionModal.comment || "").trim();
+    if (!comment) {
+      setError("Reviewer comment is required before Accept / Revise / Reject");
+      return;
+    }
+    setDecisionBusy(true);
     try {
       setError("");
       setSuccessMsg("");
-      const res = await publicationApi.validatePublication(accessToken, p.id, { decision, comment });
-      setSuccessMsg(res.message || `Decision: ${decision}`);
-      if (decision === "accept") setStatusFilter("validated");
-      else if (decision === "revise") setStatusFilter("revision_requested");
+      const res = await publicationApi.validatePublication(accessToken, decisionModal.publication.id, {
+        decision: decisionModal.decision,
+        comment,
+      });
+setSuccessMsg(res.message || `Decision: ${decisionModal.decision}`);
+      if (decisionModal.decision === "accept") setStatusFilter("validated");
+      else if (decisionModal.decision === "revise") setStatusFilter("revision_requested");
       else setStatusFilter("rejected");
+      setDecisionModal(null);
       await reload();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to save decision");
+    } finally {
+      setDecisionBusy(false);
     }
   }
 
@@ -198,29 +225,7 @@ export function PublicationsPage() {
         return !owner || owner === uid;
       });
     }
-    // #region agent log
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify({
-        sessionId: "f558f7",
-        runId: "owner-only-pubs",
-        hypothesisId: "H3",
-        location: "Publications.jsx:load",
-        message: "Publications menu — data from Projects only",
-        data: {
-          role: user?.role || null,
-          userId: user?.id ? String(user.id) : null,
-          count: list.length,
-          projectFilter: projectIdFromUrl || null,
-          withProjectId: list.filter((p) => p.projectId).length,
-          orphansExcluded: list.filter((p) => !p.projectId).length,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-    setPublications(list);
+setPublications(list);
   }, [accessToken, projectIdFromUrl, user?.role, user?.id, programTier]);
 
   useEffect(() => {
@@ -849,6 +854,166 @@ export function PublicationsPage() {
           ) : null}
         </div>
       </div>
+
+      {decisionModal ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 80,
+            background: "rgba(2, 6, 23, 0.72)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={() => (!decisionBusy ? setDecisionModal(null) : null)}
+        >
+          <div
+            className="card"
+            style={{ width: "min(640px, 100%)", maxHeight: "90vh", overflow: "auto" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ fontWeight: 800, fontSize: 18, textTransform: "capitalize" }}>
+              {decisionModal.decision === "accept"
+                ? "Accept / Publish output"
+                : decisionModal.decision === "revise"
+                  ? "Revise & resubmit"
+                  : "Reject output"}
+            </div>
+            <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
+              Review all project details and add a required comment before confirming.
+            </p>
+
+            <div className="card" style={{ marginTop: 12, background: "rgba(15,23,42,0.45)" }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>Output</div>
+              <div><strong>Title:</strong> {decisionModal.publication.title}</div>
+              <div className="muted" style={{ marginTop: 4 }}>
+                Type: {publicationTypeLabel(decisionModal.publication.type)} · Status:{" "}
+                {decisionModal.publication.status}
+                {decisionModal.publication.venue ? ` · Venue: ${decisionModal.publication.venue}` : ""}
+                {decisionModal.publication.year ? ` · Year: ${decisionModal.publication.year}` : ""}
+              </div>
+              {decisionModal.publication.authors?.length ? (
+                <div className="muted" style={{ marginTop: 4 }}>
+                  Authors: {Array.isArray(decisionModal.publication.authors)
+                    ? decisionModal.publication.authors.join(", ")
+                    : decisionModal.publication.authors}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="card" style={{ marginTop: 12, background: "rgba(15,23,42,0.45)" }}>
+              <div style={{ fontWeight: 700, marginBottom: 8 }}>Linked project (all details)</div>
+              {decisionModal.loading ? (
+                <div className="muted">Loading project…</div>
+              ) : decisionModal.project ? (
+                <div style={{ display: "grid", gap: 6, fontSize: 14 }}>
+                  <div><strong>Title:</strong> {decisionModal.project.title}</div>
+                  <div><strong>Status:</strong> {decisionModal.project.status}</div>
+                  {decisionModal.project.programTierLabel || decisionModal.project.programTier ? (
+                    <div>
+                      <strong>Portal:</strong>{" "}
+                      {decisionModal.project.programTierLabel || decisionModal.project.programTier}
+                    </div>
+                  ) : null}
+                  {decisionModal.project.principalInvestigatorName ||
+                  decisionModal.project.principalInvestigator?.fullName ? (
+                    <div>
+                      <strong>PI:</strong>{" "}
+                      {decisionModal.project.principalInvestigatorName ||
+                        decisionModal.project.principalInvestigator?.fullName}
+                    </div>
+                  ) : null}
+                  {decisionModal.project.department ? (
+                    <div><strong>Department:</strong> {decisionModal.project.department}</div>
+                  ) : null}
+                  {decisionModal.project.researchArea ? (
+                    <div><strong>Research area:</strong> {decisionModal.project.researchArea}</div>
+                  ) : null}
+                  {decisionModal.project.startDate || decisionModal.project.endDate ? (
+                    <div>
+                      <strong>Dates:</strong>{" "}
+                      {decisionModal.project.startDate
+                        ? new Date(decisionModal.project.startDate).toLocaleDateString()
+                        : "—"}{" "}
+                      →{" "}
+                      {decisionModal.project.endDate
+                        ? new Date(decisionModal.project.endDate).toLocaleDateString()
+                        : "—"}
+                    </div>
+                  ) : null}
+                  {(decisionModal.project.teamMembers || []).length ? (
+                    <div>
+                      <strong>Team:</strong>{" "}
+                      {decisionModal.project.teamMembers
+                        .map((m) => m.name || m.fullName || m.email)
+                        .filter(Boolean)
+                        .join(", ")}
+                    </div>
+                  ) : null}
+                  {decisionModal.project.abstract || decisionModal.project.description ? (
+                    <div>
+                      <strong>Summary:</strong>{" "}
+                      {decisionModal.project.abstract || decisionModal.project.description}
+                    </div>
+                  ) : null}
+                  <Link className="btn" style={{ marginTop: 6, width: "fit-content" }} to={`/projects/${decisionModal.project.id}`}>
+                    Open full project
+                  </Link>
+                </div>
+              ) : (
+                <div className="muted">
+                  {decisionModal.publication.projectTitle
+                    ? `Project: ${decisionModal.publication.projectTitle}`
+                    : "No linked project details available."}
+                </div>
+              )}
+            </div>
+
+            <div className="field" style={{ marginTop: 12 }}>
+              <label>
+                Reviewer comment / decision note <span style={{ color: "#f87171" }}>*</span>
+              </label>
+              <textarea
+                rows={4}
+                value={decisionModal.comment}
+                onChange={(e) => setDecisionModal((m) => (m ? { ...m, comment: e.target.value } : m))}
+                placeholder={
+                  decisionModal.decision === "accept"
+                    ? "Acceptance note (required before publish)…"
+                    : decisionModal.decision === "revise"
+                      ? "Revision instructions for the researcher…"
+                      : "Rejection reason…"
+                }
+                style={{ width: "100%" }}
+              />
+            </div>
+
+            <div className="formActions" style={{ marginTop: 12 }}>
+              <button type="button" className="btn" disabled={decisionBusy} onClick={() => setDecisionModal(null)}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn primary"
+                disabled={decisionBusy || !String(decisionModal.comment || "").trim()}
+                onClick={confirmPublicationDecision}
+              >
+                {decisionBusy
+                  ? "Saving…"
+                  : decisionModal.decision === "accept"
+                    ? "Confirm Accept / Publish"
+                    : decisionModal.decision === "revise"
+                      ? "Confirm Revise"
+                      : "Confirm Reject"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

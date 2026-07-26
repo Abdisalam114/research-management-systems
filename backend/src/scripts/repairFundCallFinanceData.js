@@ -3,8 +3,6 @@
  * Usage: node src/scripts/repairFundCallFinanceData.js
  */
 require("dotenv").config();
-const fs = require("fs");
-const path = require("path");
 const { connectDB } = require("../config/db");
 const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
 const { Grant, GRANT_STATUSES } = require("../models/Grant");
@@ -15,24 +13,9 @@ const { closeExpiredOpenCalls } = require("../utils/fundingCallAutoClose");
 const { linkGrantsMissingCallId } = require("../utils/linkGrantsToFundingCalls");
 const { STAGE_STATUS } = require("../utils/proposalReviewPipeline");
 
-const DEBUG_LOG = path.join(__dirname, "../../../debug-f558f7.log");
-
 function log(message, data) {
-  const line = JSON.stringify({
-    sessionId: "f558f7",
-    runId: "repair-data",
-    hypothesisId: "R1",
-    location: "repairFundCallFinanceData.js",
-    message,
-    data,
-    timestamp: Date.now(),
-  });
+  const line = JSON.stringify({ message, data, timestamp: Date.now() });
   console.log(line);
-  try {
-    fs.appendFileSync(DEBUG_LOG, `${line}\n`);
-  } catch {
-    /* ignore */
-  }
 }
 
 async function main() {

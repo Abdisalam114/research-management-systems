@@ -75,35 +75,7 @@ export function GrantsPage() {
     const all = res.grants || [];
     // Funding-call applications only
     const withCall = all.filter((g) => Boolean(g.callId));
-    // #region agent log
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify({
-        sessionId: "f558f7",
-        runId: "systemic-pass",
-        hypothesisId: "S2",
-        location: "Grants.jsx:load",
-        message: "grants list for visibility",
-        data: {
-          totalFromApi: all.length,
-          withCallId: withCall.length,
-          drafts: withCall.filter((g) => g.status === "draft").length,
-          acceptedStat: withCall.filter((g) =>
-            ["pending_finance", "active", "approved"].includes(g.status)
-          ).length,
-          sample: withCall.slice(0, 3).map((g) => ({
-            id: g.id,
-            title: g.title,
-            status: g.status,
-            callId: g.callId,
-          })),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-    setGrants(withCall);
+setGrants(withCall);
   }, [accessToken, projectIdFromUrl]);
 
   useEffect(() => {

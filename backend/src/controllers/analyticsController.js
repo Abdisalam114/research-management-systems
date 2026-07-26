@@ -30,6 +30,7 @@ const {
 const { enrichProjectsResearcher } = require("../utils/projectPi");
 const { AppError } = require("../utils/AppError");
 const { userDisplayName } = require("../utils/userDisplay");
+const { ACTIVE_PEER_REVIEW_STATUSES, peerReviewSentToReviewersFilter, peerReviewAssignedToUserFilter } = require("../utils/proposalReviewPipeline");
 const PDFDocument = require("pdfkit");
 
 function countByField(docs, field) {
@@ -96,7 +97,7 @@ async function getDashboardMetrics(req, res) {
     role === "researcher" ? { ownerResearcherId: userId } : role === "finance_officer" ? {} : isStaffAll ? {} : {}
   );
 
-  const [proposalCount, projectCount, grants, budgets, pubs, repoCount, collabGroupCount, ethicsCount, thesisCount, notifUnread, activeProjectCount, activeProjectDocs, workflowPubCount] =
+  const [proposalCount, projectCount, grants, budgets, pubs, repoCount, collabGroupCount, ethicsCount, thesisCount, notifUnread, activeProjectCount, activeProjectDocs, workflowPubCount, fundingCallCount, openFundingCallCount] =
     await Promise.all([
       Proposal.countDocuments(proposalFilter),
       Project.countDocuments(projectFilter),
@@ -127,6 +128,8 @@ async function getDashboardMetrics(req, res) {
         .populate("researcherId", "fullName name email")
         .select("title status progressReports researcherId endDate"),
       Publication.countDocuments({ ...pubFilter, status: { $ne: PUBLICATION_STATUSES.DRAFT } }),
+      FundingCall.countDocuments(tw({})),
+      FundingCall.countDocuments(tw({ status: CALL_STATUSES.OPEN })),
     ]);
 
   let usersCount = 0;
@@ -162,6 +165,42 @@ async function getDashboardMetrics(req, res) {
   base.ethics = { total: ethicsCount };
   base.thesis = { total: thesisCount };
   base.notifications = { unread: notifUnread };
+
+  // Peer-review assignments (Leadership dashboard + Director Peer Reviews tile)
+  // Both roles use ACTIVE_PEER_REVIEW_STATUSES so counts stay aligned.
+  let reviewAssignments = 0;
+  let reviewAssignmentsPending = 0;
+  let proposalsSentToReviewers = 0;
+  if (role === "leadership" || role === "research_director") {
+    if (role === "leadership") {
+      const assigned = await Proposal.find(
+        tw(peerReviewAssignedToUserFilter(userId))
+      ).select("peerReviews assignedReviewers");
+      reviewAssignments = assigned.length;
+      reviewAssignmentsPending = assigned.filter(
+        (p) => !(p.peerReviews || []).some((r) => String(r.userId) === String(userId))
+      ).length;
+    } else {
+      // Director Peer Reviews tile = active queue (same filter as Peer Reviews page)
+      const sentActive = await Proposal.find(
+        tw(peerReviewSentToReviewersFilter())
+      ).select("assignedReviewers peerReviews reviewPipeline");
+      proposalsSentToReviewers = sentActive.length;
+      reviewAssignments = sentActive.length;
+      reviewAssignmentsPending = sentActive.filter((p) => {
+        const reviewers = p.assignedReviewers || [];
+        const pending = reviewers.some(
+          (r) => !(p.peerReviews || []).some((pr) => String(pr.userId) === String(r.userId))
+        );
+        const peerStage = p.reviewPipeline?.peerReview?.status || "pending";
+        return pending || ["pending", "in_progress"].includes(peerStage);
+      }).length;
+    }
+  }
+  base.reviewAssignments = reviewAssignments;
+  base.reviewAssignmentsPending = reviewAssignmentsPending;
+  base.proposalsSentToReviewers = proposalsSentToReviewers;
+
   base.modules = {
     users: usersCount,
     departments: departmentsCount,
@@ -175,9 +214,15 @@ async function getDashboardMetrics(req, res) {
     repository: repoCount,
     groups: collabGroupCount,
     thesis: thesisCount,
+    // Leadership tile prefers pending; Director tile = active sent queue (matches Peer Reviews page)
+    reviews:
+      role === "leadership" ? reviewAssignmentsPending || reviewAssignments : reviewAssignments,
+    fundingCalls: openFundingCallCount || fundingCallCount,
+    grantsPendingFinance: grants.filter((g) => g.status === GRANT_STATUSES.PENDING_FINANCE).length,
     messages: "—",
     notificationsUnread: notifUnread,
   };
+  base.fundingCalls = { total: fundingCallCount, open: openFundingCallCount };
 res.json({ metrics: base, generatedAt: new Date().toISOString() });
 }
 
@@ -257,9 +302,21 @@ async function buildInstitutionalAnalytics(programTier) {
     Grant.find(tf({})).select("amountAwarded status createdAt decidedAt"),
     Budget.find(tf({})).select("items totalAllocated"),
     Publication.find(tf({})).select("title type year status citationCount doi createdAt updatedAt researcherId"),
-    Proposal.find(tf({ status: { $in: [PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW, PROPOSAL_STATUSES.APPROVED] } }))
+    Proposal.find(
+      tf({
+        status: {
+          $in: [
+            PROPOSAL_STATUSES.SUBMITTED,
+            PROPOSAL_STATUSES.UNDER_REVIEW,
+            PROPOSAL_STATUSES.REVISION_REQUESTED,
+            PROPOSAL_STATUSES.APPROVED,
+            PROPOSAL_STATUSES.REJECTED,
+          ],
+        },
+      })
+    )
       .sort({ updatedAt: -1 })
-      .limit(5)
+      .limit(8)
       .populate("researcherId", "fullName"),
     RepositoryItem.find(tf({})).sort({ createdAt: -1 }).limit(5).select("title type access createdAt"),
     ResearchGroup.find(tf(COLLAB_GROUP_FILTER)).sort({ createdAt: -1 }).limit(5).select("name members createdAt kind"),
@@ -353,7 +410,7 @@ async function buildInstitutionalAnalytics(programTier) {
     facultyMap[faculty].citations += pub.citationCount || 0;
   });
 
-  const allProposals = await Proposal.find(tf({})).select("department status");
+  const allProposals = await Proposal.find(tf({})).select("department status assignedReviewers");
   allProposals.forEach((p) => {
     const faculty = resolveFaculty(p.department);
     facultyMap[faculty].proposals += 1;
@@ -374,6 +431,14 @@ async function buildInstitutionalAnalytics(programTier) {
   const proposalApprovalRate = allProposals.length
     ? Math.round((approvedProposals / allProposals.length) * 100)
     : 0;
+
+  // Proposals already sent to Leadership peer reviewers (active review queue only)
+  const proposalsSentToReviewers = allProposals.filter(
+    (p) =>
+      Array.isArray(p.assignedReviewers) &&
+      p.assignedReviewers.length > 0 &&
+      ACTIVE_PEER_REVIEW_STATUSES.includes(p.status)
+  ).length;
 
   const annualReport = {
     year: new Date().getFullYear(),
@@ -421,9 +486,13 @@ async function buildInstitutionalAnalytics(programTier) {
         repository: repositoryCount,
         groups: collabGroupCount,
         thesis: thesisCount,
+        reviews: proposalsSentToReviewers,
+        fundingCalls: openFundingCalls,
+        grantsPendingFinance: pendingFinanceGrants,
         messages: "—",
         notificationsUnread: 0,
       },
+      fundingCalls: openFundingCalls,
     },
     projectStatus: {
       total: totalProjects,
@@ -433,6 +502,7 @@ async function buildInstitutionalAnalytics(programTier) {
       tracked: trackedProjects,
       activePercent,
     },
+    proposalsSentToReviewers,
     grantFunding: {
       activeFunds: awardedTotal,
       awardedGrantCount,
@@ -505,7 +575,7 @@ async function getInstitutionalAnalytics(req, res) {
   const data = await buildInstitutionalAnalytics(req.programTier);
   data.overview.modules.notificationsUnread = notificationsUnread;
   data.keyMetrics.notificationsUnread = notificationsUnread;
-  res.json(data);
+res.json(data);
 }
 
 async function getFacultyReport(req, res) {
@@ -724,25 +794,7 @@ async function getFinanceReport(req, res) {
   // Three spend channels are disjoint: payments, POs, and budget line items.
   // Also respect stored totalDisbursed when it is higher (post-deduction path).
   const totalPaid = Math.max(paidPayments + paidPOs + paidBudgetItems, disbursedStored);
-
-  // #region agent log
-  try {
-    const p = require("path");
-    const fs = require("fs");
-    const line = `${JSON.stringify({
-      sessionId: "f558f7",
-      hypothesisId: "H2",
-      location: "analyticsController.getFinanceReport",
-      message: "finance report paid totals",
-      data: { totalAllocated, paidPayments, paidPOs, paidBudgetItems, totalPaid, budgets: budgets.length },
-      timestamp: Date.now(),
-    })}\n`;
-    fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
-    fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
-  } catch (_) { /* debug */ }
-  // #endregion
-
-  res.json({
+res.json({
     generatedAt: new Date().toISOString(),
     summary: {
       budgets: budgets.length,
@@ -783,35 +835,7 @@ async function getResearchJourney(req, res) {
     if (role === "researcher") {
       const journey = await buildResearchJourneyForResearcher(userId, tierFilter, role);
       if (!journey) throw new AppError("Researcher not found", 404);
-      // #region agent log
-      try {
-        const fs = require("fs");
-        const path = require("path");
-        fs.appendFileSync(
-          path.join(__dirname, "../../../debug-f558f7.log"),
-          `${JSON.stringify({
-            sessionId: "f558f7",
-            runId: "workflow-follows-project",
-            hypothesisId: "WF2",
-            location: "analyticsController.getResearchJourney",
-            message: "journey for researcher projects",
-            data: {
-              researcherId: String(userId),
-              projectCount: journey.projects?.length || 0,
-              pendingCount: journey.pendingProposals?.length || 0,
-              sample: (journey.projects || []).slice(0, 5).map((p) => ({
-                id: String(p.projectId),
-                title: p.title,
-                status: p.projectStatus,
-                current: p.currentStepLabel,
-              })),
-            },
-            timestamp: Date.now(),
-          })}\n`
-        );
-      } catch { /* ignore */ }
-      // #endregion
-      return res.json({ mode: "journey", ...journey });
+return res.json({ mode: "journey", ...journey });
     }
     if (!isStaff) throw new AppError("Forbidden", 403);
     const dept = role === "faculty_coordinator" ? (department || "").trim() : "";

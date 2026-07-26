@@ -8,7 +8,7 @@ const ETHICS_STATUSES = Object.freeze({
   REJECTED: "rejected",
 });
 
-const ETHICS_LEVELS = Object.freeze(["undergraduate", "pgd", "master"]);
+const ETHICS_LEVELS = Object.freeze(["undergraduate", "master", "pgd"]); // pgd kept for legacy records only
 const RISK_LEVELS = Object.freeze(["no_risk", "minimal", "great"]);
 const SUBJECT_TYPES = Object.freeze(["human", "animal", "records", "others"]);
 const INSTRUMENTS = Object.freeze([

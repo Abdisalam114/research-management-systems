@@ -117,22 +117,7 @@ export function BudgetsPage() {
       .then((res) => {
         if (cancelled) return;
         setLinkedProject(res.project || null);
-        // #region agent log
-        fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-          body: JSON.stringify({
-            sessionId: "f558f7",
-            runId: "auto-project-context",
-            hypothesisId: "P3",
-            location: "Budgets.jsx:autofill",
-            message: "budget page locked to project",
-            data: { projectId: projectIdFromUrl, title: res.project?.title || null },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-      })
+})
       .catch(() => {
         if (!cancelled) setLinkedProject(null);
       });
@@ -175,29 +160,7 @@ export function BudgetsPage() {
     setPayments(nextPayments);
     setPOs(nextPOs);
     setFinanceReport(nextReport);
-    // #region agent log
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify({
-        sessionId: "f558f7",
-        runId: "systemic-pass",
-        hypothesisId: "H3",
-        location: "Budgets.jsx:load",
-        message: "finance budgets page loaded",
-        data: {
-          role: user?.role,
-          budgets: nextBudgets.length,
-          payments: nextPayments.length,
-          pos: nextPOs.length,
-          reportPaid: nextReport?.summary?.totalPaid ?? null,
-          itemCount: nextBudgets.reduce((n, x) => n + (x.items?.length || 0), 0),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [accessToken, canSeeFinanceReport, user?.role, programTier]);
+}, [accessToken, canSeeFinanceReport, user?.role, programTier]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 

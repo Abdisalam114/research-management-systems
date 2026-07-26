@@ -178,29 +178,7 @@ export function GrantApplyPage() {
         budgetBreakdown: lines,
         requirementChecklist,
       });
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          runId: "visibility",
-          hypothesisId: "A",
-          location: "GrantApplyPage.jsx:create",
-          message: "grant draft saved — check callId for Grants list visibility",
-          data: {
-            grantId: res.grant?.id || null,
-            callIdSent: call?.id || null,
-            callIdOnGrant: res.grant?.callId || null,
-            status: res.grant?.status || null,
-            title: res.grant?.title || null,
-            navigateTo: res.grant?.id ? `/grants/${res.grant.id}` : "/grants",
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-      const grantId = res.grant?.id;
+const grantId = res.grant?.id;
       if (!grantId) {
         setError("Grant saved but id missing — open Grants list.");
         navigate("/grants", { replace: true });
@@ -209,22 +187,7 @@ export function GrantApplyPage() {
       setMessage("Grant application saved as draft. Find it under Grants or Funding Calls.");
       navigate(`/grants/${grantId}`, { replace: true });
     } catch (e) {
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          runId: "visibility",
-          hypothesisId: "D",
-          location: "GrantApplyPage.jsx:createError",
-          message: "grant create failed",
-          data: { err: e?.response?.data?.message || String(e?.message || e) },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-      setError(e?.response?.data?.message || "Could not save grant application.");
+setError(e?.response?.data?.message || "Could not save grant application.");
     } finally {
       setBusy(false);
     }

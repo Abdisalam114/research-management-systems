@@ -80,9 +80,60 @@ function getCurrentReviewStage(proposal) {
   return "ready_for_director";
 }
 
+/** Proposals still in peer-review workflow (Director + Leadership queues must use the same set). */
+const ACTIVE_PEER_REVIEW_STATUSES = Object.freeze([
+  "submitted",
+  "under_review",
+  "revision_requested",
+]);
+
+function isActivePeerReviewStatus(status) {
+  return ACTIVE_PEER_REVIEW_STATUSES.includes(status);
+}
+
+/**
+ * Permanent invariant: only active peer-review statuses may keep Leadership assignees.
+ * Call before save / whenever status leaves the active queue.
+ */
+function clearPeerAssigneesIfInactive(proposal) {
+  if (!proposal) return false;
+  if (isActivePeerReviewStatus(proposal.status)) return false;
+  if (!Array.isArray(proposal.assignedReviewers) || proposal.assignedReviewers.length === 0) {
+    return false;
+  }
+  proposal.assignedReviewers = [];
+  if (typeof proposal.markModified === "function") {
+    proposal.markModified("assignedReviewers");
+  }
+  return true;
+}
+
+/** Mongo filter fragment: proposals sent to reviewers (Director queue). */
+function peerReviewSentToReviewersFilter(extra = {}) {
+  return {
+    "assignedReviewers.0": { $exists: true },
+    status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+    ...extra,
+  };
+}
+
+/** Mongo filter fragment: proposals assigned to a specific Leadership reviewer. */
+function peerReviewAssignedToUserFilter(userId, extra = {}) {
+  return {
+    "assignedReviewers.userId": userId,
+    status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+    ...extra,
+  };
+}
+
 module.exports = {
   STAGE_KEYS,
   STAGE_STATUS,
+  ACTIVE_PEER_REVIEW_STATUSES,
+  isActivePeerReviewStatus,
+  clearPeerAssigneesIfInactive,
+  peerReviewSentToReviewersFilter,
+  peerReviewAssignedToUserFilter,
   defaultReviewPipeline,
   ensureReviewPipeline,
   stagePassed,

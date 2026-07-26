@@ -4,10 +4,15 @@ import { DASH_AXIS_TICK, DASH_CHART_TOOLTIP, DASH_COLORS } from "../constants/da
 export function InstitutionalAnalyticsSections({ data }) {
   if (!data) return null;
 
+  const budgets = data.budgets || { itemsPending: 0, itemsApproved: 0, itemsPaid: 0 };
+  const groups = Array.isArray(data.groups) ? data.groups : [];
+  const publications = Array.isArray(data.publications) ? data.publications : [];
+  const repository = Array.isArray(data.repository) ? data.repository : [];
+
   const budgetChart = [
-    { name: "Pending", value: data.budgets.itemsPending },
-    { name: "Approved", value: data.budgets.itemsApproved },
-    { name: "Paid", value: data.budgets.itemsPaid },
+    { name: "Pending", value: Number(budgets.itemsPending) || 0 },
+    { name: "Approved", value: Number(budgets.itemsApproved) || 0 },
+    { name: "Paid", value: Number(budgets.itemsPaid) || 0 },
   ];
 
   const groupPreview = data.preview?.groups;
@@ -18,22 +23,27 @@ export function InstitutionalAnalyticsSections({ data }) {
     <section id="institutional-analytics" className="dashAnalyticsSection">
       <h2 className="dashSectionTitle">Institutional analytics</h2>
       <p className="muted dashSectionSub">
-        Budget workflow, research groups, publications, and repository — counts from database; tables show the most recent records.
+        Budget workflow, research groups, publications, and repository — counts from database; tables show the most
+        recent records.
       </p>
 
       {data.kpiMetrics ? (
         <div className="dashGrid" style={{ marginTop: 12 }}>
           {[
-            { label: "Grant success rate", value: `${data.kpiMetrics.grantSuccessRate}%` },
-            { label: "Proposal approval rate", value: `${data.kpiMetrics.proposalApprovalRate}%` },
-            { label: "Open funding calls", value: data.kpiMetrics.openFundingCalls },
-            { label: "Pending finance grants", value: data.kpiMetrics.pendingFinanceGrants },
-            { label: "Projects closing", value: data.kpiMetrics.projectsClosing },
-            { label: "Projects archived", value: data.kpiMetrics.projectsClosed },
+            { label: "Grant success rate", value: `${data.kpiMetrics.grantSuccessRate ?? 0}%` },
+            { label: "Proposal approval rate", value: `${data.kpiMetrics.proposalApprovalRate ?? 0}%` },
+            { label: "Open funding calls", value: data.kpiMetrics.openFundingCalls ?? 0 },
+            { label: "Pending finance grants", value: data.kpiMetrics.pendingFinanceGrants ?? 0 },
+            { label: "Projects closing", value: data.kpiMetrics.projectsClosing ?? 0 },
+            { label: "Projects archived", value: data.kpiMetrics.projectsClosed ?? 0 },
           ].map((k) => (
             <div key={k.label} className="dashCard dashSpan4">
-              <div className="muted" style={{ fontSize: 12 }}>{k.label}</div>
-              <div style={{ fontWeight: 900, fontSize: 22 }}>{k.value}</div>
+              <div className="muted" style={{ fontSize: 12 }}>
+                {k.label}
+              </div>
+              <div style={{ fontWeight: 900, fontSize: 22 }}>
+                {k.value}
+              </div>
             </div>
           ))}
         </div>
@@ -60,13 +70,13 @@ export function InstitutionalAnalyticsSections({ data }) {
             {groupPreview ? ` (${groupPreview.shown} of ${groupPreview.total})` : ""}
           </div>
           <div style={{ display: "grid", gap: 8 }}>
-            {data.groups.map((g) => (
+            {groups.map((g) => (
               <div key={g.id} className="metricRow">
                 <span>{g.name}</span>
                 <strong>{g.members} members</strong>
               </div>
             ))}
-            {data.groups.length === 0 ? <span className="muted">No groups yet.</span> : null}
+            {groups.length === 0 ? <span className="muted">No groups yet.</span> : null}
           </div>
         </div>
 
@@ -85,7 +95,7 @@ export function InstitutionalAnalyticsSections({ data }) {
               </tr>
             </thead>
             <tbody>
-              {data.publications.map((p) => (
+              {publications.map((p) => (
                 <tr key={p.id}>
                   <td>{p.title}</td>
                   <td>{p.type}</td>
@@ -93,7 +103,7 @@ export function InstitutionalAnalyticsSections({ data }) {
                   <td>{p.status}</td>
                 </tr>
               ))}
-              {data.publications.length === 0 ? (
+              {publications.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="muted">
                     No publications yet.
@@ -110,8 +120,8 @@ export function InstitutionalAnalyticsSections({ data }) {
             {repoPreview ? ` (${repoPreview.shown} of ${repoPreview.total})` : ""}
           </div>
           <div style={{ display: "grid", gap: 8 }}>
-            {data.repository.map((r) => (
-              <div key={r._id} className="activityItem">
+            {repository.map((r) => (
+              <div key={r._id || r.id} className="activityItem">
                 <span>🗄️</span>
                 <div>
                   <div style={{ fontWeight: 700 }}>{r.title}</div>
@@ -121,7 +131,7 @@ export function InstitutionalAnalyticsSections({ data }) {
                 </div>
               </div>
             ))}
-            {data.repository.length === 0 ? <span className="muted">No repository items yet.</span> : null}
+            {repository.length === 0 ? <span className="muted">No repository items yet.</span> : null}
           </div>
         </div>
       </div>

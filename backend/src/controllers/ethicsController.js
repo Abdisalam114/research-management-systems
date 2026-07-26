@@ -108,7 +108,7 @@ async function syncLinkedProposalEthics(proposalId, ethicsStatus, ethicsAppId) {
   }
   if (!linked) return;
   linked.ethicsStatus = ethicsStatus;
-  // Director issues JUREC as the ethics committee ù keep stage 3 Committee in sync
+  // Director issues JUREC as the ethics committee ÔøΩ keep stage 3 Committee in sync
   if (ethicsStatus === PROPOSAL_ETHICS_STATUSES.APPROVED) {
     const pipe = ensureReviewPipeline(linked);
     if (
@@ -136,32 +136,14 @@ async function syncLinkedProposalEthics(proposalId, ethicsStatus, ethicsAppId) {
       };
       linked.markModified("reviewPipeline");
     }
+    // Ethics reject ? proposal is rejected (cannot proceed)
+    const { PROPOSAL_STATUSES } = require("../models/Proposal");
+    if (linked.status !== PROPOSAL_STATUSES.REJECTED) {
+      linked.status = PROPOSAL_STATUSES.REJECTED;
+    }
   }
   await linked.save();
-  // #region agent log
-  try {
-    const payload = {
-      sessionId: "f558f7",
-      hypothesisId: "H6",
-      location: "ethicsController.syncLinkedProposalEthics",
-      message: "ethics synced to proposal + committee",
-      data: {
-        proposalId: String(linked._id),
-        ethicsStatus,
-        committee: linked.reviewPipeline?.committeeReview?.status || null,
-      },
-      timestamp: Date.now(),
-      runId: "post-fix",
-    };
-    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
-  } catch (_) { /* debug */ }
-  // #endregion
-  if (ethicsStatus === PROPOSAL_ETHICS_STATUSES.APPROVED) {
+if (ethicsStatus === PROPOSAL_ETHICS_STATUSES.APPROVED) {
     try {
       const { notifyFinanceProposalReviewReady } = require("../utils/notifyFinanceProposalReview");
       await notifyFinanceProposalReviewReady(linked, { force: true });
@@ -325,7 +307,7 @@ async function directorDecision(req, res) {
     return res.json({ message: "Application rejected", application: sanitize(a) });
   }
 
-  // ù APPROVE (Director issues certificate) ù
+  // ÔøΩ APPROVE (Director issues certificate) ÔøΩ
   const canIssueCert =
     a.status === ETHICS_STATUSES.SUBMITTED ||
     (a.status === ETHICS_STATUSES.APPROVED && !hasCertificate);
@@ -393,7 +375,7 @@ const issueDate = parseOptionalDate(signedAt, new Date());
 async function previewCertificate(req, res) {
   const a = await EthicsApplication.findOne(ethicsScopeFilter(req, { _id: req.params.id }));
   if (!a) throw new AppError("Application not found", 404);
-  // Certificate issuance preview ù Research Director only
+  // Certificate issuance preview ÔøΩ Research Director only
   if (req.user.role !== "research_director") {
     throw new AppError("Only the Research Director can preview/issue certificates", 403);
   }

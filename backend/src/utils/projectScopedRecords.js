@@ -44,7 +44,7 @@ function pickRepositoryForProject(repositoryItems, project) {
   return pickLatestByDate(linked, "createdAt");
 }
 
-async function resolveOwnedProjectId(req, projectId, researcherId) {
+async function resolveOwnedProjectId(req, projectId, researcherId, { forRepository = false } = {}) {
   if (!projectId) return null;
   const project = await Project.findOne(req.tierWhere({ _id: projectId, researcherId }));
   if (!project) throw new AppError("Research project not found or does not belong to you", 404);
@@ -60,7 +60,8 @@ async function resolveOwnedProjectId(req, projectId, researcherId) {
       if (isShell) {
         throw new AppError("Select a recognized research project from Projects (not a temporary output shell)", 400);
       }
-      if (proposal.status && proposal.status !== PROPOSAL_STATUSES.APPROVED) {
+      // Repository archives can be added to any owned active project; publications still need approval
+      if (!forRepository && proposal.status && proposal.status !== PROPOSAL_STATUSES.APPROVED) {
         throw new AppError("Publication can only link to an approved research project", 400);
       }
     }
@@ -68,11 +69,11 @@ async function resolveOwnedProjectId(req, projectId, researcherId) {
   return project._id;
 }
 
-async function requireOwnedProjectId(req, projectId, researcherId) {
+async function requireOwnedProjectId(req, projectId, researcherId, opts = {}) {
   if (!projectId) {
     throw new AppError("projectId is required — select your research project", 400);
   }
-  return resolveOwnedProjectId(req, projectId, researcherId);
+  return resolveOwnedProjectId(req, projectId, researcherId, opts);
 }
 
 async function validateProjectQuery(req, projectId, { ownerOnly = false } = {}) {

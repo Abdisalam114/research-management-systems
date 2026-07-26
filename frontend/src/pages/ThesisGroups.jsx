@@ -381,26 +381,7 @@ export function ThesisGroupsPage() {
         return;
       }
       const res = await thesisApi.addThesisMeeting(accessToken, groupId, meetingForm);
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          runId: "thesis-meetings-ui",
-          hypothesisId: "M6",
-          location: "ThesisGroups.jsx:submitMeeting",
-          message: "meeting logged from UI",
-          data: {
-            groupId: String(groupId),
-            meetingsInResponse: res?.group?.meetings?.length ?? null,
-            date: meetingForm.date,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-      // Keep meetings visible immediately (avoid “disappeared” flash on reload)
+// Keep meetings visible immediately (avoid “disappeared” flash on reload)
       if (res?.group) {
         setGroups((prev) => prev.map((g) => (String(g.id) === String(groupId) ? res.group : g)));
       }

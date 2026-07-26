@@ -1,31 +1,6 @@
 const { ThesisGroup, THESIS_STATUSES } = require("../models/ThesisGroup");
 const { User, ROLES } = require("../models/User");
 const { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } = require("../utils/facultyMatcher");
-const fs = require("fs");
-const path = require("path");
-const DEBUG_LOG = path.join(__dirname, "../../../debug-f558f7.log");
-
-function debugLog(hypothesisId, message, data) {
-  // #region agent log
-  try {
-    fs.appendFileSync(
-      DEBUG_LOG,
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "thesis-fix",
-        hypothesisId,
-        location: "thesisGroupController.js",
-        message,
-        data,
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-}
-
 function canonicalFaculty(value, fallbackName) {
   const raw = String(value || "").trim();
   if (raw && FACULTIES.includes(raw)) return raw;
@@ -305,12 +280,6 @@ async function listGroups(req, res) {
   // One-time legacy title sync only — do not rewrite students from seed templates on every list
   await Promise.all(groups.map((g) => syncLegacyTitleProposal(g)));
 
-  debugLog("H3", "listGroups", {
-    role,
-    count: groups.length,
-    valid: groups.filter((g) => (g.students || []).length >= MIN_THESIS_GROUP_STUDENTS).length,
-  });
-
   res.json({ groups: groups.map(sanitize) });
 }
 
@@ -426,15 +395,6 @@ async function createGroup(req, res) {
   if (resolvedSupervisorId) {
     await notifySupervisorAssignment(group, writeTier);
   }
-
-  debugLog("H1", "createGroup ok", {
-    groupId: String(group._id),
-    faculty: group.faculty,
-    department: group.department,
-    students: (group.students || []).length,
-    supervisorId: resolvedSupervisorId ? String(resolvedSupervisorId) : null,
-    role,
-  });
 
   const populated = await ThesisGroup.findById(group._id)
     .populate("researchGroupId", "name departmentId members createdAt")
@@ -726,13 +686,6 @@ async function addMeeting(req, res) {
       body: `Supervisor logged a meeting (${dateStr}) for ${thesisGroupLabel(group)}${agenda ? `: ${String(agenda).slice(0, 80)}` : ""}.`,
     });
   }
-
-  debugLog("M1", "addMeeting saved", {
-    groupId: String(group._id),
-    meetingsCount: (group.meetings || []).length,
-    date: dateStr,
-    role,
-  });
 
   const populated = await ThesisGroup.findById(group._id)
     .populate("researchGroupId", "name departmentId members createdAt")

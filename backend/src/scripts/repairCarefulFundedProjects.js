@@ -4,15 +4,12 @@
  */
 require("dotenv").config();
 const mongoose = require("mongoose");
-const fs = require("fs");
-const path = require("path");
 const { Project, PROJECT_STATUSES, CLOSURE_STATUSES } = require("../models/Project");
 const { Grant, GRANT_STATUSES } = require("../models/Grant");
 const { Publication } = require("../models/Publication");
 const { RepositoryItem } = require("../models/RepositoryItem");
 const { AuditEvent } = require("../models/AuditEvent");
 
-const DEBUG_LOG = path.join(__dirname, "../../../debug-f558f7.log");
 const RUN_ID = "careful-repair";
 
 function normalize(s) {
@@ -48,19 +45,6 @@ function looksLikeLongResearchTitle(title) {
       t
     ) || t.length >= 80
   );
-}
-
-function logChange(message, data) {
-  const row = {
-    sessionId: "f558f7",
-    runId: RUN_ID,
-    hypothesisId: "CARE1",
-    location: "repairCarefulFundedProjects.js",
-    message,
-    data,
-    timestamp: Date.now(),
-  };
-  fs.appendFileSync(DEBUG_LOG, `${JSON.stringify(row)}\n`);
 }
 
 async function markProjectCompleted(project) {
@@ -147,7 +131,6 @@ async function main() {
         createdProject: created,
       };
       mislinksFixed.push(fix);
-      logChange("mislink fixed (Campus Sustainability)", fix);
       continue;
     }
 
@@ -179,7 +162,6 @@ async function main() {
           createdProject: false,
         };
         mislinksFixed.push(fix);
-        logChange("mislink fixed (award name to matching project)", fix);
       }
     }
   }
@@ -202,14 +184,6 @@ async function main() {
     if (!titlesMatch(project.title, grant.title)) {
       // RULE D
       skippedReadyButTitleMismatch += 1;
-      logChange("skipped ready but title mismatch (RULE D)", {
-        projectId: String(project._id),
-        projectTitle: project.title,
-        grantId: String(grant._id),
-        grantTitle: grant.title,
-        pubCount,
-        repoCount,
-      });
       continue;
     }
 
@@ -229,7 +203,6 @@ async function main() {
       repoCount,
     };
     completedByRuleA.push(row);
-    logChange("completed by RULE A (title-matched funded project)", row);
   }
 
   // ── RULE C: status sync ────────────────────────────────────────────────
@@ -257,7 +230,6 @@ async function main() {
         after: g.status,
       };
       statusSynced.push(row);
-      logChange("status sync C1", row);
     }
   }
 
@@ -307,7 +279,6 @@ async function main() {
       after: g.status,
     };
     statusSynced.push(row);
-    logChange("status sync C2", row);
   }
 
   const summary = {
@@ -317,12 +288,6 @@ async function main() {
     skippedReadyButTitleMismatch,
   };
   console.log(JSON.stringify(summary, null, 2));
-  logChange("careful repair summary", {
-    completedByRuleA: completedByRuleA.length,
-    mislinksFixed: mislinksFixed.length,
-    statusSynced: statusSynced.length,
-    skippedReadyButTitleMismatch,
-  });
 
   await mongoose.disconnect();
 }

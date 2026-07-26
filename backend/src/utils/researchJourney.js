@@ -211,28 +211,7 @@ function buildProjectCompletedStep(project) {
  * Completed / blocked / skipped statuses are never rewritten.
  */
 function enforceSequentialWorkflow(steps) {
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    const currents = steps.filter((s) => s.status === "current").map((s) => s.key);
-    fs.appendFileSync(
-      path.join(__dirname, "..", "..", "debug-f558f7.log"),
-      JSON.stringify({
-        sessionId: "f558f7",
-        runId: "parallel-steps",
-        hypothesisId: "S1",
-        location: "researchJourney.js:enforceSequentialWorkflow",
-        message: "independent steps (no downgrade of later current)",
-        data: { currentKeys: currents, stepCount: steps.length },
-        timestamp: Date.now(),
-      }) + "\n"
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-  return steps;
+return steps;
 }
 
 function buildStepsForTrack({ proposal, project, grants, budget, publication, repositoryItem }) {

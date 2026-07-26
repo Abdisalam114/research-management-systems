@@ -1,0 +1,118 @@
+/* Ethics project level picker — UG/Bachelor & PG/Master */
+.ethicsLevelPicker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 6px;
+}
+
+@media (max-width: 560px) {
+  .ethicsLevelPicker {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ethicsLevelCard {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 14px 14px 14px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: linear-gradient(160deg, rgba(15, 23, 42, 0.55), rgba(30, 41, 59, 0.35));
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease,
+    background 0.15s ease;
+}
+
+.ethicsLevelCard:hover:not(.ethicsLevelCardDisabled) {
+  border-color: rgba(56, 189, 248, 0.55);
+  transform: translateY(-1px);
+}
+
+.ethicsLevelCardSelected {
+  border-color: rgba(14, 165, 233, 0.85);
+  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.35), 0 8px 24px rgba(2, 132, 199, 0.18);
+  background: linear-gradient(160deg, rgba(12, 74, 110, 0.45), rgba(15, 23, 42, 0.55));
+}
+
+.ethicsLevelCardDisabled {
+  opacity: 0.72;
+  cursor: default;
+}
+
+.ethicsLevelCard input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ethicsLevelIcon {
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  background: rgba(14, 165, 233, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+}
+
+.ethicsLevelCardSelected .ethicsLevelIcon {
+  background: rgba(14, 165, 233, 0.28);
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.ethicsLevelBody {
+  min-width: 0;
+  flex: 1;
+}
+
+.ethicsLevelBadge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-bottom: 4px;
+  background: rgba(56, 189, 248, 0.16);
+  color: #7dd3fc;
+}
+
+.ethicsLevelTitle {
+  font-weight: 800;
+  font-size: 15px;
+  line-height: 1.25;
+  color: inherit;
+}
+
+.ethicsLevelDesc {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.ethicsLevelCheck {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 2px solid rgba(148, 163, 184, 0.45);
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 800;
+  color: transparent;
+  margin-top: 2px;
+}
+
+.ethicsLevelCardSelected .ethicsLevelCheck {
+  border-color: #38bdf8;
+  background: #0ea5e9;
+  color: #0f172a;
+}

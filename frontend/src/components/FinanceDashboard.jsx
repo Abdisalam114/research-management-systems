@@ -59,22 +59,7 @@ export function FinanceDashboard() {
           if (m?.metrics) setMetrics(m.metrics);
           const pending = (grantsRes.grants || []).filter((g) => g.status === "pending_finance").length;
           setPendingFinanceCount(pending);
-          // #region agent log
-          fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-            body: JSON.stringify({
-              sessionId: "f558f7",
-              runId: "finance-grant-queue",
-              hypothesisId: "F1",
-              location: "FinanceDashboard.jsx:load",
-              message: "finance dashboard pending funding count",
-              data: { pendingFinanceCount: pending },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-          // #endregion
-        }
+}
       } catch (e) {
         if (!cancelled) setError(e?.response?.data?.message || "Failed to load finance report");
       }

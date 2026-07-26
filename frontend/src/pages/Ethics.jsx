@@ -14,6 +14,7 @@ import { SubmitValidationAlert } from "../components/SubmitValidationAlert";
 import { isEthicsFormComplete } from "../utils/ethicsForm";
 import { getEthicsMissingFields } from "../utils/proposalSubmitValidation";
 import { ethicsApplicationToForm, emptyEthicsForm } from "../utils/ethicsFormState";
+import { projectLevelLabel } from "../constants/ethicsFormOptions";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
 import { StatusBadge } from "../components/StatusBadge";
@@ -365,7 +366,7 @@ export function EthicsPage() {
                 <div>
                   <div style={{ fontWeight: 700 }}>{a.projectTitle || "(no title)"}</div>
                   <div className="muted">
-                    {a.principal?.firstName} {a.principal?.lastName} • {a.projectLevel || "—"}
+                    {a.principal?.firstName} {a.principal?.lastName} • {projectLevelLabel(a.projectLevel)}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -390,7 +391,7 @@ export function EthicsPage() {
                 <div>
                   <div style={{ fontWeight: 700 }}>{a.projectTitle || "(untitled)"}</div>
                   <div className="muted">
-                    {a.principal?.firstName} {a.principal?.lastName} • {a.projectLevel || "—"}
+                    {a.principal?.firstName} {a.principal?.lastName} • {projectLevelLabel(a.projectLevel)}
                     {a.approval?.certificateId ? ` • cert: ${a.approval.certificateId}` : ""}
                   </div>
                   {a.approval?.rejectionReason ? (

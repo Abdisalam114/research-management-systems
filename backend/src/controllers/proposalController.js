@@ -1,5 +1,3 @@
-const fs = require("fs");
-const path = require("path");
 const { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES, PROPOSAL_KINDS } = require("../models/Proposal");
 const { Project } = require("../models/Project");
 const { User, ROLES } = require("../models/User");
@@ -16,7 +14,7 @@ const {
   submitLinkedEthics,
 } = require("../utils/proposalEthicsLink");
 const { applyEthicsPayload, parseEthicsJson } = require("../utils/ethicsFormMerge");
-const { ensureReviewPipeline, getCurrentReviewStage, defaultReviewPipeline, STAGE_STATUS, isVoluntaryProposal } = require("../utils/proposalReviewPipeline");
+const { ensureReviewPipeline, getCurrentReviewStage, defaultReviewPipeline, STAGE_STATUS, isVoluntaryProposal, peerReviewAssignedToUserFilter, clearPeerAssigneesIfInactive } = require("../utils/proposalReviewPipeline");
 const { recordAudit } = require("../utils/audit");
 
 function resolveProposalKind(doc) {
@@ -542,35 +540,7 @@ async function listProposals(req, res) {
       .populate("researcherId", "fullName email department")
       .populate("fundingCallId", "title status deadline")
       .sort({ updatedAt: -1 });
-
-    // #region agent log
-    try {
-      const line = `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "accepted-visibility",
-        hypothesisId: "H4",
-        location: "proposalController.listProposals",
-        message: "grant fund call proposals listed",
-        data: {
-          role,
-          count: proposals.length,
-          approved: proposals.filter((p) => p.status === "approved").length,
-          sample: proposals.slice(0, 5).map((p) => ({
-            id: String(p._id),
-            title: p.title,
-            status: p.status,
-            callId: p.fundingCallId?._id ? String(p.fundingCallId._id) : p.fundingCallId,
-          })),
-        },
-        timestamp: Date.now(),
-      })}\n`;
-      fs.appendFileSync(path.join(__dirname, "../../../debug-f558f7.log"), line);
-    } catch {
-      /* ignore */
-    }
-    // #endregion
-
-    res.json({ proposals: proposals.map(sanitizeProposal) });
+res.json({ proposals: proposals.map(sanitizeProposal) });
     return;
   }
 
@@ -585,17 +555,7 @@ async function listProposals(req, res) {
 
   if (role === "leadership") {
     const proposals = await Proposal.find(
-      req.tierWhere({
-        "assignedReviewers.userId": req.user.id,
-        status: {
-          $in: [
-            PROPOSAL_STATUSES.SUBMITTED,
-            PROPOSAL_STATUSES.UNDER_REVIEW,
-            PROPOSAL_STATUSES.REVISION_REQUESTED,
-            PROPOSAL_STATUSES.APPROVED,
-          ],
-        },
-      })
+      req.tierWhere(peerReviewAssignedToUserFilter(req.user.id))
     )
       .populate("researcherId", "fullName email department")
       .populate("fundingCallId", "title status deadline")
@@ -609,7 +569,7 @@ async function listProposals(req, res) {
       .populate("researcherId", "fullName email department")
       .populate("fundingCallId", "title status deadline")
       .sort({ updatedAt: -1 });
-    res.json({ proposals: proposals.map(sanitizeProposal) });
+res.json({ proposals: proposals.map(sanitizeProposal) });
     return;
   }
 
@@ -665,55 +625,12 @@ async function getProposal(req, res) {
         } catch {
           /* best-effort */
         }
-        // #region agent log
-        try {
-          const payload = {
-            sessionId: "f558f7",
-            hypothesisId: "H6",
-            location: "proposalController.getProposal",
-            message: "repaired committee after ethics approved",
-            data: {
-              proposalId: String(id),
-              committee: pipe.committeeReview.status,
-              ethicsStatus: proposal.ethicsStatus,
-            },
-            timestamp: Date.now(),
-            runId: "post-fix",
-          };
-          fs.appendFileSync(
-            path.join(__dirname, "..", "..", "..", "debug-f558f7.log"),
-            `${JSON.stringify(payload)}\n`
-          );
-          fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-            body: JSON.stringify(payload),
-          }).catch(() => {});
-        } catch (_) { /* debug */ }
-        // #endregion
-      } else {
+} else {
         // Already committee-passed — ensure finance was notified (deduped)
         try {
           const { notifyFinanceProposalReviewReady } = require("../utils/notifyFinanceProposalReview");
           const sent = await notifyFinanceProposalReviewReady(proposal);
-          // #region agent log
-          if (sent) {
-            const payload = {
-              sessionId: "f558f7",
-              hypothesisId: "F1",
-              location: "proposalController.getProposal",
-              message: "finance notify for ready proposal",
-              data: { proposalId: String(id), sent: true },
-              timestamp: Date.now(),
-              runId: "post-fix",
-            };
-            fs.appendFileSync(
-              path.join(__dirname, "..", "..", "..", "debug-f558f7.log"),
-              `${JSON.stringify(payload)}\n`
-            );
-          }
-          // #endregion
-        } catch {
+} catch {
           /* best-effort */
         }
       }
@@ -734,67 +651,10 @@ async function getProposal(req, res) {
         proposal.budgetTotal = cap;
         if (!proposal.budgetCurrency) proposal.budgetCurrency = call.currency || "USD";
         await proposal.save();
-        // #region agent log
-        try {
-          const payload = {
-            sessionId: "f558f7",
-            hypothesisId: "B2",
-            location: "proposalController.getProposal",
-            message: "backfilled budgetTotal from call amountCap",
-            data: {
-              proposalId: String(id),
-              budgetTotal: proposal.budgetTotal,
-              amountCap: cap,
-              currency: proposal.budgetCurrency,
-            },
-            timestamp: Date.now(),
-            runId: "post-fix",
-          };
-          fs.appendFileSync(
-            path.join(__dirname, "..", "..", "..", "debug-f558f7.log"),
-            `${JSON.stringify(payload)}\n`
-          );
-        } catch (_) { /* debug */ }
-        // #endregion
-      }
+}
     }
   } catch (_) { /* best-effort */ }
-
-  // #region agent log
-  try {
-    const _pipe = proposal.reviewPipeline || {};
-    const payload = {
-      sessionId: "f558f7",
-      hypothesisId: "B1",
-      location: "proposalController.getProposal",
-      message: "pipeline on load",
-      data: {
-        proposalId: String(id),
-        role: req.user.role,
-        programTier: req.programTier || null,
-        admin: _pipe.adminScreening?.status || null,
-        peer: _pipe.peerReview?.status || null,
-        committee: _pipe.committeeReview?.status || null,
-        finance: _pipe.financeReview?.status || null,
-        peerReviewCount: (proposal.peerReviews || []).length,
-        ethicsStatus: proposal.ethicsStatus || null,
-        budgetTotal: proposal.budgetTotal || 0,
-        requestedAmount: resolveRequestedAmount(proposal),
-        callCap: Number(proposal.fundingCallId?.amountCap) || 0,
-      },
-      timestamp: Date.now(),
-      runId: "post-fix",
-    };
-    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
-  } catch (_) { /* debug */ }
-  // #endregion
-
-  res.json({ proposal: await attachEthicsSummary(proposal) });
+res.json({ proposal: await attachEthicsSummary(proposal) });
 }
 
 async function coordinatorReview(req, res) {
@@ -889,28 +749,11 @@ async function directorDecision(req, res) {
       }
     }
     proposal.markModified("reviewPipeline");
-    // #region agent log
-    try {
-      const payload = {
-        sessionId: "f558f7",
-        hypothesisId: "F3",
-        location: "proposalController.js:directorDecision",
-        message: "soft-pass applied (finance excluded)",
-        data: {
-          voluntary: isVoluntaryProposal(proposal),
-          softPass: softPassStages.map((s) => s?.status),
-          finance: pipe.financeReview?.status,
-        },
-        timestamp: Date.now(),
-        runId: "post-fix",
-      };
-      fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
-    } catch { /* ignore */ }
-    // #endregion
-  }
+}
 
   proposal.status = decision;
   proposal.reviewerComments.push({ role: "research_director", comment });
+  clearPeerAssigneesIfInactive(proposal);
   // Keep proposal.ethicsStatus in sync if ethics app is approved
   if (decision === PROPOSAL_STATUSES.APPROVED && proposal.requiresEthics) {
     const ethicsDoc = await getEthicsForProposal(proposal._id);
@@ -985,28 +828,7 @@ async function directorDecision(req, res) {
         null;
       if (projectDoc) {
         const result = await ensureBudgetForProject(projectDoc, { proposal });
-        // #region agent log
-        try {
-          const payload = {
-            sessionId: "f558f7",
-            hypothesisId: "BA1",
-            location: "proposalController.directorDecision",
-            message: "auto budget allocate on project create",
-            data: {
-              proposalId: String(proposal._id),
-              projectId: String(projectDoc._id),
-              created: result.created,
-              updated: result.updated,
-              amount: result.amount || 0,
-              totalAllocated: result.budget?.totalAllocated || 0,
-            },
-            timestamp: Date.now(),
-            runId: "post-fix",
-          };
-          fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
-        } catch { /* ignore */ }
-        // #endregion
-      }
+}
     } catch { /* best-effort */ }
   }
 
@@ -1069,6 +891,18 @@ if (!Array.isArray(reviewerIds) || reviewerIds.length === 0) {
   if ([PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.REVISION_REQUESTED].includes(proposal.status)) {
     proposal.status = PROPOSAL_STATUSES.UNDER_REVIEW;
   }
+  // Mark peer-review stage as in progress once sent to Leadership reviewers
+  if (
+    pipe.peerReview?.status === STAGE_STATUS.PENDING ||
+    pipe.peerReview?.status === "pending"
+  ) {
+    pipe.peerReview = {
+      ...(pipe.peerReview || {}),
+      status: STAGE_STATUS.IN_PROGRESS,
+      startedAt: new Date(),
+    };
+    proposal.markModified("reviewPipeline");
+  }
   await proposal.save();
 
   const newlyAssigned = users.filter((u) => !prevIds.has(String(u._id)));
@@ -1088,32 +922,76 @@ if (!Array.isArray(reviewerIds) || reviewerIds.length === 0) {
       /* best-effort */
     }
   }
-  // #region agent log
   try {
-    const fs = require("fs");
-    const path = require("path");
-    const line = `${JSON.stringify({
-      sessionId: "f558f7",
-      runId: "peer-assign",
-      hypothesisId: "PA2",
-      location: "proposalController.assignReviewers",
-      message: "reviewers assigned",
-      data: {
-        proposalId: String(proposal._id),
-        title: proposal.title,
-        status: proposal.status,
-        programTier: req.programTier,
-        reviewerIds: users.map((u) => ({ id: String(u._id), email: u.email, role: u.role })),
-        notified,
-      },
-      timestamp: Date.now(),
-    })}\n`;
-    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
-  } catch {
-    /* ignore */
+    await notifyUser(proposal.researcherId, {
+      type: "proposal",
+      title: "Proposal sent to reviewer",
+      body: `"${proposal.title}" was sent to Leadership peer reviewer(s).`,
+      link: `/proposals/${proposal._id}`,
+      programTier: req.programTier,
+    });
+  } catch (_) {
+    /* best-effort */
   }
-  // #endregion
-  res.json({ message: "Reviewers assigned", proposal: sanitizeProposal(proposal) });
+const names = users.map((u) => u.fullName || u.email).join(", ");
+  res.json({
+    message: `Sent to reviewer${users.length > 1 ? "s" : ""}: ${names}`,
+    sentToReviewers: true,
+    proposal: sanitizeProposal(proposal),
+  });
+}
+
+async function deleteProposal(req, res) {
+  const { id } = req.params;
+  const proposal = await Proposal.findOne(req.tierWhere({ _id: id }));
+  if (!proposal) throw new AppError("Proposal not found", 404);
+
+  const isOwner = String(proposal.researcherId) === String(req.user.id);
+  const isDirector = req.user.role === ROLES.RESEARCH_DIRECTOR;
+  if (!isOwner && !isDirector) throw new AppError("Forbidden", 403);
+
+  const deletableStatuses = [
+    PROPOSAL_STATUSES.DRAFT,
+    PROPOSAL_STATUSES.REJECTED,
+    PROPOSAL_STATUSES.REVISION_REQUESTED,
+  ];
+  if (isOwner && !isDirector && !deletableStatuses.includes(proposal.status)) {
+    throw new AppError("Only draft, rejected, or revision-requested proposals can be deleted", 400);
+  }
+
+  const linkedProject = await Project.findOne({ proposalId: proposal._id }).select("_id title status");
+  if (linkedProject && ![PROPOSAL_STATUSES.DRAFT, PROPOSAL_STATUSES.REJECTED].includes(proposal.status)) {
+    throw new AppError("Cannot delete a proposal that already has a project. Close the project first.", 400);
+  }
+
+  // Delete linked ethics with the proposal (required — no orphan ethics left behind).
+  let ethicsDeleted = 0;
+  const ethFilter = {
+    $or: [
+      { proposalId: proposal._id },
+      ...(proposal.ethicsApplicationId ? [{ _id: proposal.ethicsApplicationId }] : []),
+    ],
+  };
+  const delEth = await EthicsApplication.deleteMany(ethFilter);
+  ethicsDeleted = delEth.deletedCount || 0;
+
+  if (linkedProject && proposal.status === PROPOSAL_STATUSES.DRAFT) {
+    await Project.deleteOne({ _id: linkedProject._id });
+  }
+
+  await Proposal.deleteOne({ _id: proposal._id });
+
+  await recordAudit({
+    entityType: "proposal",
+    entityId: proposal._id,
+    action: "deleted",
+    label: "Proposal deleted",
+    detail: proposal.title,
+    actorId: req.user.id,
+    actorRole: req.user.role,
+    programTier: proposal.programTier || req.programTier,
+  });
+res.json({ message: "Proposal deleted", id: String(id), ethicsDeleted });
 }
 
 module.exports = {
@@ -1127,4 +1005,5 @@ module.exports = {
   directorDecision,
   ethicsDecision,
   assignReviewers,
+  deleteProposal,
 };

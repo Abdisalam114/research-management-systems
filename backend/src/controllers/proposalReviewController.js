@@ -8,6 +8,9 @@ const {
   ensureReviewPipeline,
   getCurrentReviewStage,
   isVoluntaryProposal,
+  ACTIVE_PEER_REVIEW_STATUSES,
+  peerReviewSentToReviewersFilter,
+  peerReviewAssignedToUserFilter,
 } = require("../utils/proposalReviewPipeline");
 
 function sanitizeProposalBrief(p) {
@@ -161,38 +164,7 @@ async function submitPeerReview(req, res) {
   proposal.markModified("reviewPipeline");
   proposal.markModified("peerReviews");
   await proposal.save();
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    const payload = {
-      sessionId: "f558f7",
-      hypothesisId: "H1",
-      location: "proposalReviewController.submitPeerReview",
-      message: "peer submit after save",
-      data: {
-        proposalId: String(proposal._id),
-        peerComplete,
-        peerStatus: pipe.peerReview?.status,
-        committeeStatus: pipe.committeeReview?.status,
-        assignedCount: assignedIds.length,
-        reviewedCount: reviewedIds.size,
-        role: req.user.role,
-      },
-      timestamp: Date.now(),
-      runId: "pre-fix",
-    };
-    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
-  } catch (_) { /* debug */ }
-  // #endregion
-
-  await recordAudit({
+await recordAudit({
     entityType: "proposal",
     entityId: proposal._id,
     action: "peer_review",
@@ -231,56 +203,9 @@ async function submitPeerReview(req, res) {
 }
 
 async function completePeerReview(req, res) {
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    const payload = {
-      sessionId: "f558f7",
-      hypothesisId: "H1",
-      location: "proposalReviewController.completePeerReview",
-      message: "complete peer entry",
-      data: {
-        proposalId: req.params.id,
-        reqTier: req.programTier || null,
-        role: req.user.role,
-      },
-      timestamp: Date.now(),
-      runId: "complete-debug",
-    };
-    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
-  } catch (_) { /* debug */ }
-  // #endregion
-
-  const proposal = await Proposal.findOne(proposalScopeFilter(req, { _id: req.params.id }));
+const proposal = await Proposal.findOne(proposalScopeFilter(req, { _id: req.params.id }));
   if (!proposal) {
-    // #region agent log
-    try {
-      const fs = require("fs");
-      const path = require("path");
-      const payload = {
-        sessionId: "f558f7",
-        hypothesisId: "H1",
-        location: "proposalReviewController.completePeerReview",
-        message: "proposal not found for tier",
-        data: { proposalId: req.params.id, reqTier: req.programTier || null },
-        timestamp: Date.now(),
-        runId: "complete-debug",
-      };
-      fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify(payload),
-      }).catch(() => {});
-    } catch (_) { /* debug */ }
-    // #endregion
-    throw new AppError("Proposal not found", 404);
+throw new AppError("Proposal not found", 404);
   }
   if (req.user.role !== "research_director") throw new AppError("Forbidden", 403);
 
@@ -295,37 +220,7 @@ async function completePeerReview(req, res) {
   await proposal.save();
 
   const fresh = await Proposal.findById(proposal._id).select("reviewPipeline programTier peerReviews");
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    const payload = {
-      sessionId: "f558f7",
-      hypothesisId: "H2",
-      location: "proposalReviewController.completePeerReview",
-      message: "complete peer after save",
-      data: {
-        proposalId: String(proposal._id),
-        docTier: proposal.programTier || null,
-        reqTier: req.programTier || null,
-        savedPeer: pipe.peerReview?.status || null,
-        dbPeer: fresh?.reviewPipeline?.peerReview?.status || null,
-        peerReviewCount: reviews.length,
-        currentStage: getCurrentReviewStage(fresh || proposal),
-      },
-      timestamp: Date.now(),
-      runId: "complete-debug",
-    };
-    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
-  } catch (_) { /* debug */ }
-  // #endregion
-
-  try {
+try {
     const { notifyUsersByRole } = require("../utils/notify");
     await notifyUsersByRole(
       "research_director",
@@ -379,57 +274,11 @@ async function committeeReview(req, res) {
     try {
       const { notifyFinanceProposalReviewReady } = require("../utils/notifyFinanceProposalReview");
       const sent = await notifyFinanceProposalReviewReady(proposal, { force: true });
-      // #region agent log
-      try {
-        const fs = require("fs");
-        const path = require("path");
-        const payload = {
-          sessionId: "f558f7",
-          hypothesisId: "F1",
-          location: "proposalReviewController.committeeReview",
-          message: "finance notify after committee pass",
-          data: { proposalId: String(proposal._id), sent, programTier: proposal.programTier || null },
-          timestamp: Date.now(),
-          runId: "post-fix",
-        };
-        fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
-      } catch (_) { /* debug */ }
-      // #endregion
-    } catch {
+} catch {
       /* best-effort */
     }
   }
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    const payload = {
-      sessionId: "f558f7",
-      hypothesisId: "H2",
-      location: "proposalReviewController.committeeReview",
-      message: "committee after save",
-      data: {
-        proposalId: String(proposal._id),
-        decision,
-        savedCommitteeStatus: pipe.committeeReview?.status,
-        peerStatus: pipe.peerReview?.status,
-        role: req.user.role,
-        programTier: req.programTier || null,
-      },
-      timestamp: Date.now(),
-      runId: "pre-fix",
-    };
-    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
-  } catch (_) { /* debug */ }
-  // #endregion
-
-  await recordAudit({
+await recordAudit({
     entityType: "proposal",
     entityId: proposal._id,
     action: "committee_review",
@@ -482,57 +331,81 @@ async function financeProposalReview(req, res) {
 
 async function listMyReviewAssignments(req, res) {
   const userId = req.user.id;
-  const proposals = await Proposal.find(
-    req.tierWhere({
-      "assignedReviewers.userId": userId,
-      status: {
-        $nin: [PROPOSAL_STATUSES.DRAFT, PROPOSAL_STATUSES.REJECTED],
+  const isDirector = req.user.role === "research_director";
+
+  // Self-heal: strip assignees left on closed proposals (updateMany bypasses pre-save).
+  try {
+    await Proposal.updateMany(
+      {
+        status: { $nin: [...ACTIVE_PEER_REVIEW_STATUSES] },
+        "assignedReviewers.0": { $exists: true },
       },
-    })
-  )
-    .sort({ submittedAt: -1 })
-    .select("title status department submittedAt assignedReviewers peerReviews reviewPipeline");
+      { $set: { assignedReviewers: [] } }
+    );
+  } catch {
+    /* best-effort */
+  }
+
+  // Leadership + Director share the same active peer-review queue filter helpers.
+  const filter = isDirector
+    ? req.tierWhere(peerReviewSentToReviewersFilter())
+    : req.tierWhere(peerReviewAssignedToUserFilter(userId));
+
+  const proposals = await Proposal.find(filter)
+    .sort({ submittedAt: -1, updatedAt: -1 })
+    .populate("assignedReviewers.userId", "fullName email role")
+    .populate("researcherId", "fullName email")
+    .select(
+      "title status department submittedAt assignedReviewers peerReviews reviewPipeline researcherId updatedAt"
+    );
 
   const items = proposals.map((p) => {
     const reviewed = (p.peerReviews || []).some((r) => String(r.userId) === String(userId));
+    const reviewers = (p.assignedReviewers || []).map((r) => ({
+      id: r.userId?._id ? String(r.userId._id) : String(r.userId || ""),
+      fullName: r.userId?.fullName || null,
+      email: r.userId?.email || null,
+      assignedAt: r.assignedAt || null,
+      peerReviewSubmitted: (p.peerReviews || []).some(
+        (pr) => String(pr.userId) === String(r.userId?._id || r.userId)
+      ),
+    }));
+    const pendingReviewers = reviewers.filter((r) => !r.peerReviewSubmitted).length;
+    const peerStage = p.reviewPipeline?.peerReview?.status || "pending";
+    // Director "awaiting" = at least one assigned Leadership reviewer has not submitted yet
+    const awaitingLeadership = pendingReviewers > 0;
     return {
       id: p._id,
       title: p.title,
       status: p.status,
       department: p.department,
       submittedAt: p.submittedAt,
+      updatedAt: p.updatedAt,
+      researcherName: p.researcherId?.fullName || null,
       currentReviewStage: getCurrentReviewStage(p),
       peerReviewSubmitted: reviewed,
+      peerReviewCount: (p.peerReviews || []).length,
+      peerStage,
+      assignedReviewers: reviewers,
+      sentToReviewers: reviewers.length > 0,
+      pendingReviewers,
+      awaitingLeadership,
+      scope: isDirector ? "sent_to_reviewers" : "my_assignments",
     };
   });
 
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    const line = `${JSON.stringify({
-      sessionId: "f558f7",
-      runId: "peer-assign",
-      hypothesisId: "PA1",
-      location: "proposalReviewController.listMyReviewAssignments",
-      message: "review assignments listed",
-      data: {
-        role: req.user.role,
-        userId: String(userId),
-        programTier: req.programTier,
-        count: items.length,
-        pending: items.filter((i) => !i.peerReviewSubmitted).length,
-        sample: items.slice(0, 5).map((i) => ({ id: String(i.id), title: i.title, status: i.status })),
-      },
-      timestamp: Date.now(),
-    })}\n`;
-    fs.appendFileSync(path.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-
-  res.json({ assignments: items });
+  const awaitingCount = items.filter((i) =>
+    isDirector ? i.awaitingLeadership : !i.peerReviewSubmitted
+  ).length;
+res.json({
+    assignments: items,
+    mode: isDirector ? "director_sent" : "reviewer",
+    summary: {
+      total: items.length,
+      awaiting: awaitingCount,
+      received: items.length - awaitingCount,
+    },
+  });
 }
 
 module.exports = {

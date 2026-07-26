@@ -66,22 +66,7 @@ export function RepositoryPage() {
           if (!projectTitle || looksLikeFunding) return f;
           return { ...f, title: projectTitle };
         });
-        // #region agent log
-        fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-          body: JSON.stringify({
-            sessionId: "f558f7",
-            runId: "auto-project-context",
-            hypothesisId: "P2",
-            location: "Repository.jsx:autofill",
-            message: "repository auto-filled from project",
-            data: { projectId: String(form.projectId), title: p.title || null, locked: projectLocked },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {});
-        // #endregion
-      } catch {
+} catch {
         if (!cancelled) setLinkedProject(null);
       }
     })();
@@ -287,10 +272,10 @@ export function RepositoryPage() {
               <input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             </div>
             <div className="field">
-              <label>File (PDF / CSV / Excel)</label>
+              <label>File (PDF / Word / CSV / Excel / TXT / ZIP)</label>
               <input
                 type="file"
-                accept=".pdf,.csv,.xlsx,.xls,application/pdf,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                accept=".pdf,.doc,.docx,.csv,.xlsx,.xls,.txt,.zip,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,application/zip"
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
               />
             </div>
@@ -301,10 +286,10 @@ export function RepositoryPage() {
                 onClick={async () => {
                   try {
                     setError("");
-                    if (!file) throw new Error("Pick a PDF, CSV, or Excel file");
+                    if (!file) throw new Error("Pick a PDF, Word, CSV, Excel, TXT, or ZIP file");
                     const ext = file.name.split(".").pop()?.toLowerCase();
-                    if (!["pdf", "csv", "xlsx", "xls"].includes(ext || "")) {
-                      throw new Error("Only PDF, CSV, and Excel files are allowed");
+                    if (!["pdf", "doc", "docx", "csv", "xlsx", "xls", "txt", "zip"].includes(ext || "")) {
+                      throw new Error("Only PDF, Word, CSV, Excel, TXT, or ZIP files are allowed");
                     }
                     if (!form.projectId) throw new Error("Select the research project this file belongs to");
                     const fd = new FormData();

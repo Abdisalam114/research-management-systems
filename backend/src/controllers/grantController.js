@@ -287,33 +287,7 @@ async function listGrants(req, res) {
     .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId")
     .populate("callId", "title status fundingSource requiredDocuments deadline amountCap currency callType eligibilityTier");
   const sanitized = await Promise.all(grants.map(async (g) => redactGrantAwardsIfNeeded(sanitizeGrant(g), req)));
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(__dirname, "../../../debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "accepted-visibility",
-        hypothesisId: "H4",
-        location: "grantController.listGrants",
-        message: "grants list result",
-        data: {
-          role,
-          total: sanitized.length,
-          withCallId: sanitized.filter((g) => g.callId).length,
-        },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-
-  res.json({ grants: sanitized });
+res.json({ grants: sanitized });
 }
 
 async function getGrant(req, res) {
@@ -373,30 +347,7 @@ async function createGrant(req, res) {
 
   const explicitProjectId = projectId ? await resolveGrantProjectId(req, projectId, req.user.id) : null;
   const linkedProjectId = explicitProjectId || linkedProjectFromProposal;
-
-  // #region agent log
-  try {
-    const p = require("path");
-    const fs = require("fs");
-    const line = `${JSON.stringify({
-      sessionId: "f558f7",
-      hypothesisId: "H8",
-      location: "grantController.createGrant",
-      message: "auto title + researcher on grant create",
-      data: {
-        resolvedTitle,
-        proposalId: String(proposal._id),
-        researcherId: String(req.user.id),
-        callId: String(call._id),
-      },
-      timestamp: Date.now(),
-    })}\n`;
-    fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
-    fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
-  } catch (_) { /* debug */ }
-  // #endregion
-
-  const grant = await Grant.create(req.tierAssign({
+const grant = await Grant.create(req.tierAssign({
     title: resolvedTitle,
     fundingSource: String(call.fundingSource).trim(),
     amountRequested: requested,
@@ -679,36 +630,7 @@ async function financeDecision(req, res) {
         }
       } catch { /* best-effort */ }
     }
-
-    // #region agent log
-    try {
-      const fs = require("fs");
-      const path = require("path");
-      const b = budgetResult?.budget;
-      fs.appendFileSync(
-        path.join(__dirname, "../../../debug-f558f7.log"),
-        `${JSON.stringify({
-          sessionId: "f558f7",
-          runId: "finance-approve-not-paid",
-          hypothesisId: "F2",
-          location: "grantController.financeDecision",
-          message: "finance authorize award — allocation only, not paid",
-          data: {
-            grantId: String(grant._id),
-            amountAwarded: grant.amountAwarded,
-            budgetId: b?._id ? String(b._id) : null,
-            totalAllocated: b ? Number(b.totalAllocated || 0) : null,
-            totalDisbursed: b ? Number(b.totalDisbursed || 0) : null,
-            isPaidIncorrectly: b ? Number(b.totalDisbursed || 0) > 0 : null,
-          },
-          timestamp: Date.now(),
-        })}\n`
-      );
-    } catch {
-      /* ignore */
-    }
-    // #endregion
-    try {
+try {
       const projectId = projectResult?.project?._id || grant.projectId;
       await notifyUser(grant.researcherId, {
         type: "grant",

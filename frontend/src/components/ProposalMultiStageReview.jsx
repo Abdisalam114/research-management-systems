@@ -38,10 +38,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
 
   const pipe = proposal.reviewPipeline || {};
   const stage = proposal.currentReviewStage || "admin_screening";
-  // #region agent log
-  fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'H4',location:'ProposalMultiStageReview.jsx:render',message:'UI pipeline statuses',data:{proposalId:proposal?.id,role:user?.role,stage,admin:pipe.adminScreening?.status||null,peer:pipe.peerReview?.status||null,committee:pipe.committeeReview?.status||null,peerReviewCount:(proposal.peerReviews||[]).length,showCommitteeButtons:Boolean((user?.role==='research_director'||user?.role==='faculty_coordinator')&&pipe.peerReview?.status==='passed'&&pipe.committeeReview?.status==='pending')},timestamp:Date.now(),runId:'pre-fix'})}).catch(()=>{});
-  // #endregion
-  const isDirector = user?.role === "research_director";
+const isDirector = user?.role === "research_director";
   const isCoordinator = user?.role === "faculty_coordinator";
   const isFinance = user?.role === "finance_officer";
   const isLeadershipReviewer = user?.role === "leadership";
@@ -90,20 +87,11 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
     setErr("");
     setAssignMsg("");
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'H5',location:'ProposalMultiStageReview.jsx:run',message:'action starting',data:{proposalId:proposal?.id,peerBefore:proposal?.reviewPipeline?.peerReview?.status||null,committeeBefore:proposal?.reviewPipeline?.committeeReview?.status||null},timestamp:Date.now(),runId:'pre-fix'})}).catch(()=>{});
-      // #endregion
-      const result = await fn();
-      // #region agent log
-      fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'H5',location:'ProposalMultiStageReview.jsx:run',message:'action ok before reload',data:{proposalId:proposal?.id,apiCommittee:result?.proposal?.reviewPipeline?.committeeReview?.status||null,apiPeer:result?.proposal?.reviewPipeline?.peerReview?.status||null,apiMsg:result?.message||null},timestamp:Date.now(),runId:'pre-fix'})}).catch(()=>{});
-      // #endregion
-      setComment("");
+const result = await fn();
+setComment("");
       await onReload();
     } catch (e) {
-      // #region agent log
-      fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'H2',location:'ProposalMultiStageReview.jsx:run',message:'action failed',data:{proposalId:proposal?.id,err:e?.response?.data?.message||e?.message||'fail',status:e?.response?.status||null},timestamp:Date.now(),runId:'pre-fix'})}).catch(()=>{});
-      // #endregion
-      setErr(e?.response?.data?.message || "Action failed");
+setErr(e?.response?.data?.message || "Action failed");
     } finally {
       setBusy(false);
     }
@@ -125,8 +113,17 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
     setErr("");
     setAssignMsg("");
     try {
-      await proposalApi.assignReviewers(accessToken, proposal.id, selectedReviewerIds);
-      setAssignMsg("Reviewers assigned — they will get a notification.");
+      const res = await proposalApi.assignReviewers(accessToken, proposal.id, selectedReviewerIds);
+      const names = (res.proposal?.assignedReviewers || [])
+        .map((r) => r.fullName || r.email)
+        .filter(Boolean)
+        .join(", ");
+      setAssignMsg(
+        res.message ||
+          (names
+            ? `Sent to reviewer(s): ${names}. Peer Reviews dashboard will update.`
+            : "Sent to reviewer — Peer Reviews dashboard will update.")
+      );
 await onReload();
     } catch (e) {
       setErr(e?.response?.data?.message || "Assign reviewers failed");
@@ -171,7 +168,7 @@ await onReload();
         <div style={{ marginBottom: 14, padding: 12, borderRadius: 8, border: "1px solid rgba(148,197,255,0.2)" }}>
           <div style={{ fontWeight: 700, marginBottom: 6 }}>Assign peer reviewers</div>
           <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
-            Select reviewers and click Assign — each gets a notification.
+            Select Leadership reviewers and click Assign — status becomes <strong>Sent to reviewer</strong> and their Peer Reviews dashboard updates.
           </p>
           {peerReviewers.length === 0 ? (
             <p className="muted" style={{ fontSize: 13 }}>No active leadership reviewers on this portal.</p>
@@ -196,8 +193,28 @@ await onReload();
             disabled={busy || !selectedReviewerIds.length}
             onClick={assignSelected}
           >
-            Assign &amp; notify reviewers
+            Assign &amp; send to reviewer
           </button>
+          {(proposal.assignedReviewers || []).length > 0 ? (
+            <div
+              className="card"
+              style={{
+                marginTop: 10,
+                padding: 10,
+                borderColor: "rgba(34,197,94,0.45)",
+                background: "rgba(34,197,94,0.08)",
+                fontSize: 13,
+              }}
+            >
+              <strong>Sent to reviewer:</strong>{" "}
+              {(proposal.assignedReviewers || [])
+                .map((r) => r.fullName || r.email || "Leadership")
+                .join(", ")}
+              {pipe.peerReview?.status === "in_progress" ? (
+                <span className="muted"> · Peer review in progress</span>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
 

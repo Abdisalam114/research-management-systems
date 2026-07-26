@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { isCrossTierRole } from "../constants/programTier";
+import { homeAfterAuth } from "../utils/homePath";
 import "./auth.css";
 import logo from "../assets/jamhuriya-logo.png";
 
@@ -14,14 +15,6 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const redirectTo = useMemo(() => {
-    if (location.state?.from?.pathname && location.state.from.pathname !== "/program-tier") {
-      return location.state.from.pathname;
-    }
-    return "/dashboard";
-  }, [location.state]);
 
   return (
     <div className="authBg">
@@ -73,14 +66,11 @@ export function LoginPage() {
                 const res = await signIn(trimmedEmail, trimmedPassword);
                 if (isCrossTierRole(res.user?.role)) {
                   clearProgramTier();
-                  navigate("/program-tier", { replace: true });
+navigate("/program-tier", { replace: true });
                   return;
                 }
-                const roleHome = {
-                  finance_officer: "/budgets",
-                  leadership: "/grants",
-                };
-                navigate(roleHome[res.user?.role] || redirectTo, { replace: true });
+                const dest = homeAfterAuth();
+navigate(dest, { replace: true });
               } catch (e) {
                 setError(e?.response?.data?.message || "Login failed");
               } finally {

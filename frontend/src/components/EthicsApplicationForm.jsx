@@ -1,7 +1,14 @@
 import { useEffect } from "react";
-import { SUBJECT_OPTS, INSTRUMENT_OPTS, CONSENT_ITEMS } from "../constants/ethicsFormOptions";
+import {
+  SUBJECT_OPTS,
+  INSTRUMENT_OPTS,
+  CONSENT_ITEMS,
+  PROJECT_LEVEL_OPTS,
+  normalizeProjectLevel,
+} from "../constants/ethicsFormOptions";
 import { getEthicsMissingFields } from "../utils/proposalSubmitValidation";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
+import "./ethicsLevelPicker.css";
 
 const REQUIRED_FIELD_IDS = {
   projectTitle: "ethics-req-projectTitle",
@@ -151,19 +158,48 @@ export function EthicsApplicationForm({
             />
           </div>
         </div>
-        <div className="field">
-          <label htmlFor="ethics-req-projectLevel">Project level (Undergraduate / PGD / Master) *</label>
-          <select
-            id="ethics-req-projectLevel"
-            disabled={readOnly}
-            value={form.projectLevel}
-            onChange={(e) => set("projectLevel", e.target.value)}
-          >
-            <option value="">— Select level —</option>
-            <option value="undergraduate">Undergraduate</option>
-            <option value="pgd">PGD</option>
-            <option value="master">Master</option>
-          </select>
+        <div className="field" id="ethics-req-projectLevel">
+          <label>Project level *</label>
+          <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>
+            Choose one: Undergraduate (Bachelor) or Postgraduate (Master).
+          </p>
+          <div className="ethicsLevelPicker" role="radiogroup" aria-label="Project level">
+            {PROJECT_LEVEL_OPTS.map((opt) => {
+              const selected = normalizeProjectLevel(form.projectLevel) === opt.value;
+              return (
+                <label
+                  key={opt.value}
+                  className={[
+                    "ethicsLevelCard",
+                    selected ? "ethicsLevelCardSelected" : "",
+                    readOnly ? "ethicsLevelCardDisabled" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
+                  <input
+                    type="radio"
+                    name="ethics-project-level"
+                    value={opt.value}
+                    checked={selected}
+                    disabled={readOnly}
+                    onChange={() => set("projectLevel", opt.value)}
+                  />
+                  <span className="ethicsLevelIcon" aria-hidden="true">
+                    {opt.icon}
+                  </span>
+                  <span className="ethicsLevelBody">
+                    <span className="ethicsLevelBadge">{opt.short}</span>
+                    <div className="ethicsLevelTitle">{opt.label}</div>
+                    <div className="ethicsLevelDesc">{opt.description}</div>
+                  </span>
+                  <span className="ethicsLevelCheck" aria-hidden="true">
+                    ✓
+                  </span>
+                </label>
+              );
+            })}
+          </div>
         </div>
         <Textarea
           id="ethics-req-aimsObjectives"

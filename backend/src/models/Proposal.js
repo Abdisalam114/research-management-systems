@@ -155,6 +155,17 @@ const proposalSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Permanent guard: approved / rejected / draft must never keep Leadership assignees
+// (prevents Director vs Leadership peer-queue count drift).
+proposalSchema.pre("save", function clearStalePeerAssignees() {
+  try {
+    const { clearPeerAssigneesIfInactive } = require("../utils/proposalReviewPipeline");
+    clearPeerAssigneesIfInactive(this);
+  } catch {
+    /* ignore */
+  }
+});
+
 const Proposal = mongoose.model("Proposal", proposalSchema);
 
 module.exports = { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES, PROPOSAL_KINDS };

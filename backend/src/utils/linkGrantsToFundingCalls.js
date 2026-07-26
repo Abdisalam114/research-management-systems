@@ -1,9 +1,5 @@
-const fs = require("fs");
-const path = require("path");
 const { Grant } = require("../models/Grant");
 const { FundingCall } = require("../models/FundingCall");
-
-const DEBUG_LOG = path.join(__dirname, "../../../debug-f558f7.log");
 
 function norm(s) {
   return String(s || "")
@@ -24,27 +20,6 @@ function titlesMatch(grantTitle, callTitle) {
   return gWords.length >= 2 && hit >= Math.ceil(gWords.length * 0.7);
 }
 
-function debugLog(message, data) {
-  // #region agent log
-  try {
-    fs.appendFileSync(
-      DEBUG_LOG,
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "grant-call-link",
-        hypothesisId: "H4",
-        location: "linkGrantsToFundingCalls.js",
-        message,
-        data,
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-}
-
 /**
  * Link legacy/seed grants that have no callId to a FundingCall with a matching title + tier.
  */
@@ -58,7 +33,6 @@ async function linkGrantsMissingCallId(programTier) {
   const unlinked = await Grant.find(unlinkedFilter).select("_id title programTier callId");
 
   if (!unlinked.length) {
-    debugLog("no unlinked grants", { count: 0 });
     return { linked: 0 };
   }
 
@@ -85,13 +59,6 @@ async function linkGrantsMissingCallId(programTier) {
       samples.push({ grant: grant.title, call: match.title, tier: grant.programTier });
     }
   }
-
-  debugLog("linked grants to funding calls", {
-    unlinkedBefore: unlinked.length,
-    linked,
-    samples,
-    unmatched,
-  });
   return { linked, unlinkedBefore: unlinked.length };
 }
 

@@ -185,26 +185,7 @@ function StepRow({ step, index, highlighted }) {
               to={step.link}
               style={{ fontSize: 12 }}
               onClick={() => {
-                // #region agent log
-                fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-                  body: JSON.stringify({
-                    sessionId: "f558f7",
-                    runId: "auto-project-context",
-                    hypothesisId: "P1",
-                    location: "ProjectWorkflowPanel.jsx:Open",
-                    message: "workflow Open with project context",
-                    data: {
-                      stepKey: step.key || null,
-                      link: step.link,
-                      hasProjectId: String(step.link || "").includes("projectId="),
-                    },
-                    timestamp: Date.now(),
-                  }),
-                }).catch(() => {});
-                // #endregion
-              }}
+}}
             >
               Open
             </Link>
@@ -227,22 +208,7 @@ export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = 
   useEffect(() => {
     if (!focusWorkflow || !panelRef.current) return;
     panelRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    // #region agent log
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "W1",
-        location: "ProjectWorkflowPanel.jsx:focus",
-        message: "scrolled to project workflow panel",
-        data: { currentLabel: currentLabel || null, hash: location.hash || null },
-        timestamp: Date.now(),
-        runId: "post-fix",
-      }),
-    }).catch(() => {});
-    // #endregion
-  }, [focusWorkflow, currentLabel, location.hash]);
+}, [focusWorkflow, currentLabel, location.hash]);
 
   if (!workflow) return null;
 

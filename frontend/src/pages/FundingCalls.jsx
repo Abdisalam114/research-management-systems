@@ -154,27 +154,7 @@ export function FundingCallsPage() {
   useEffect(() => {
     if (!callIdFromUrl || loading) return;
     const match = calls.find((c) => String(c.id) === String(callIdFromUrl));
-    // #region agent log
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "FC3",
-        location: "FundingCalls.jsx:deepLink",
-        message: "funding call deep-link resolve",
-        data: {
-          callIdFromUrl,
-          found: Boolean(match),
-          callsCount: calls.length,
-          role: user?.role,
-        },
-        timestamp: Date.now(),
-        runId: "fund-call-notify",
-      }),
-    }).catch(() => {});
-    // #endregion
-    if (!match) {
+if (!match) {
       if (!calls.length) return;
       setMessage(`Funding call not found on this portal list (id ${callIdFromUrl}). Switch portal or check eligibility.`);
       return;

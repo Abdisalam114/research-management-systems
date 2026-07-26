@@ -1,15 +1,11 @@
 import { useNavigate } from "react-router-dom";
+import { flushSync } from "react-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { PROGRAM_TIER_OPTIONS } from "../constants/programTier";
+import { homeAfterAuth } from "../utils/homePath";
 import "./auth.css";
 import logo from "../assets/jamhuriya-logo.png";
-
-function homeForRole(role) {
-  if (role === "finance_officer") return "/budgets";
-  if (role === "leadership") return "/grants";
-  return "/dashboard";
-}
 
 export function ProgramTierSelectPage() {
   const { user } = useAuth();
@@ -17,8 +13,12 @@ export function ProgramTierSelectPage() {
   const navigate = useNavigate();
 
   function choose(tier) {
-    selectProgramTier(tier);
-    navigate(homeForRole(user?.role), { replace: true });
+    // Ensure tier is committed before leaving this page (all roles → dashboard).
+    flushSync(() => {
+      selectProgramTier(tier);
+    });
+    const dest = homeAfterAuth();
+    navigate(dest, { replace: true });
   }
 
   return (
@@ -72,7 +72,7 @@ export function ProgramTierSelectPage() {
         </div>
 
         <p className="muted" style={{ marginTop: 16, marginBottom: 0, fontSize: 12, textAlign: "center" }}>
-          Portal selection is required each time you sign in. Data stays separated by program.
+          After you choose a portal you open the Dashboard. You can switch portals anytime from the top bar.
         </p>
       </div>
     </div>

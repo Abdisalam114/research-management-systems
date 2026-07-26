@@ -3,17 +3,13 @@ import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { isCrossTierRole } from "../constants/programTier";
 import { financeRedirectPath, isFinanceOnlyPath } from "../constants/financeScope";
-
-function homeForRole(role) {
-  if (role === "finance_officer") return "/budgets";
-  if (role === "leadership") return "/grants";
-  return "/dashboard";
-}
+import { homeAfterAuth } from "../utils/homePath";
 
 export function ProtectedRoute({ roles }) {
   const { isAuthenticated, loading, user } = useAuth();
   const { hasProgramTier } = useProgramTier();
   const location = useLocation();
+  const home = homeAfterAuth();
 
   if (loading) return <div style={{ padding: 24 }}>Loading...</div>;
   if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location }} />;
@@ -26,15 +22,15 @@ export function ProtectedRoute({ roles }) {
   }
 
   if (sharedStaff && hasProgramTier && onTierSelectPage) {
-    return <Navigate to={homeForRole(user?.role)} replace />;
+    return <Navigate to={home} replace />;
   }
 
   if (!sharedStaff && onTierSelectPage) {
-    return <Navigate to={homeForRole(user?.role)} replace />;
+    return <Navigate to={home} replace />;
   }
 
   if (roles?.length && !roles.includes(user?.role)) {
-    return <Navigate to={homeForRole(user?.role)} replace />;
+    return <Navigate to={home} replace />;
   }
 
   // Hard scope: finance_officer may only open finance-related paths
@@ -44,7 +40,7 @@ export function ProtectedRoute({ roles }) {
       return <Navigate to={remap} replace />;
     }
     if (!isFinanceOnlyPath(location.pathname)) {
-      return <Navigate to="/budgets" replace />;
+      return <Navigate to={home} replace />;
     }
   }
 

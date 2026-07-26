@@ -1,12 +1,8 @@
-const fs = require("fs");
-const path = require("path");
 const { Project, PROJECT_STATUSES, CLOSURE_STATUSES } = require("../models/Project");
 const { Grant, GRANT_STATUSES } = require("../models/Grant");
 const { Publication, PUBLICATION_STATUSES, WORKFLOW_STAGES } = require("../models/Publication");
 const { RepositoryItem } = require("../models/RepositoryItem");
 const { Proposal, PROPOSAL_KINDS } = require("../models/Proposal");
-
-const DEBUG_LOG = path.join(__dirname, "../../../debug-f558f7.log");
 
 function normalize(s) {
   return String(s || "")
@@ -36,27 +32,6 @@ function publicationLooksFinished(pub) {
   return false;
 }
 
-function debugLog(hypothesisId, message, data) {
-  // #region agent log
-  try {
-    fs.appendFileSync(
-      DEBUG_LOG,
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "auto-complete-project",
-        hypothesisId,
-        location: "maybeCompleteFundedProject.js",
-        message,
-        data,
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-}
-
 async function markProjectCompleted(project, finalReport) {
   project.status = PROJECT_STATUSES.COMPLETED;
   project.closure = {
@@ -80,8 +55,8 @@ async function markProjectCompleted(project, finalReport) {
 
 /**
  * Careful auto-complete:
- * - Funded: pub + repo + awarded grant + project title matches grant title
- * - Voluntary: finished publication (validated/published) whose title matches the project
+ * - Always requires: finished publication + repository archive + matching titles
+ * - Funded also requires awarded grant
  */
 async function maybeCompleteFundedProject(projectId) {
   if (!projectId) return null;
@@ -115,62 +90,38 @@ async function maybeCompleteFundedProject(projectId) {
       (!proposal?.fundingCallId && proposal?.proposalKind !== PROPOSAL_KINDS.GRANT_FUND_CALL) ||
       !proposal);
 
-  // --- Voluntary: publication finished + matching title ---
+  // Repository is required for ALL project completion (funded + voluntary)
+  if (!repo) {
+    return { skipped: true, reason: "repository_required" };
+  }
+
+  // --- Voluntary: publication finished + repository + matching title ---
   if (isVoluntary) {
     if (!publicationLooksFinished(pub)) {
-      debugLog("C1", "voluntary skip — publication not finished", {
-        projectId: String(project._id),
-        pubStatus: pub?.status || null,
-        workflowStage: pub?.workflowStage || null,
-      });
       return { skipped: true, reason: "voluntary_pub_not_finished" };
     }
     if (isFundingNamedTitle(project.title)) {
       return { skipped: true, reason: "funding_named_project_blocked" };
     }
     if (!titlesAlign(project.title, pub.title)) {
-      debugLog("C2", "voluntary skip — title mismatch", {
-        projectId: String(project._id),
-        projectTitle: project.title,
-        pubTitle: pub.title,
-      });
       return { skipped: true, reason: "voluntary_title_mismatch" };
     }
 
     await markProjectCompleted(
       project,
-      "Auto-completed after research publication for this voluntary project."
+      "Auto-completed after publication and repository archive for this voluntary project."
     );
-    debugLog("C1", "auto-completed voluntary project after publication", {
-      projectId: String(project._id),
-      title: project.title,
-      pubId: String(pub._id),
-      status: project.status,
-    });
     return { completed: true, kind: "voluntary", projectId: String(project._id) };
   }
 
   // --- Funded: pub + repo + awarded grant + matching project/output title ---
-  if (!pub || !repo || !grant) {
-    debugLog("CARE3", "funded skip — missing piece", {
-      projectId: String(project._id),
-      hasPub: Boolean(pub),
-      pubFinished: publicationLooksFinished(pub),
-      hasRepo: Boolean(repo),
-      hasGrant: Boolean(grant),
-      grantStatus: grant?.status || null,
-    });
+  if (!pub || !grant) {
     return { skipped: true, reason: "missing_outputs_or_grant" };
   }
   if (isFundingNamedTitle(project.title)) {
     return { skipped: true, reason: "funding_named_project_blocked" };
   }
   if (!publicationLooksFinished(pub)) {
-    debugLog("CARE3", "funded skip — publication not finished", {
-      projectId: String(project._id),
-      pubStatus: pub?.status || null,
-      workflowStage: pub?.workflowStage || null,
-    });
     return { skipped: true, reason: "publication_not_finished" };
   }
   // Match research output title to project (grant/call title is often the seed fund name)
@@ -187,13 +138,6 @@ async function maybeCompleteFundedProject(projectId) {
     grant.status = GRANT_STATUSES.CLOSED;
     await grant.save();
   }
-
-  debugLog("CARE3", "auto-completed matching-title funded project", {
-    projectId: String(project._id),
-    grantId: String(grant._id),
-    title: project.title,
-    programTier: project.programTier || null,
-  });
 
   return { completed: true, kind: "funded", projectId: String(project._id), grantId: String(grant._id) };
 }

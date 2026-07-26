@@ -196,6 +196,32 @@ export function ProposalDetailsPage() {
             </button>
           ) : null}
 
+          {(isOwner && ["draft", "rejected", "revision_requested"].includes(proposal.status)) ||
+          user?.role === "research_director" ? (
+            <button
+              type="button"
+              className="btn"
+              style={{ borderColor: "rgba(248,113,113,0.6)", color: "#f87171" }}
+              disabled={busy}
+              onClick={async () => {
+                const ok = window.confirm(`Delete proposal "${proposal.title}"? This cannot be undone.`);
+                if (!ok) return;
+                setBusy(true);
+                setError("");
+                try {
+                  await proposalApi.deleteProposal(accessToken, id);
+                  navigate("/proposals", { replace: true, state: { message: "Proposal deleted" } });
+                } catch (e) {
+                  setError(e?.response?.data?.message || "Failed to delete proposal");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              Delete proposal
+            </button>
+          ) : null}
+
           {["faculty_coordinator", "research_director"].includes(user?.role) ? (
             <button type="button" className="btn primary" onClick={() => navigate(`/proposals/${id}/review`)}>
               Review

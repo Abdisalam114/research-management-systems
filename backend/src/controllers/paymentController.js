@@ -250,32 +250,7 @@ async function financePay(req, res) {
     await payment.save();
     throw err;
   }
-
-  // #region agent log
-  try {
-    const p = require("path");
-    const fs = require("fs");
-    const line = `${JSON.stringify({
-      sessionId: "f558f7",
-      hypothesisId: "H5",
-      location: "paymentController.financePay",
-      message: "payment paid — budget deducted",
-      data: {
-        paymentId: String(payment._id),
-        amount: payment.amount,
-        budgetId: String(payment.budgetId),
-        totalAllocated: budgetAfter.totalAllocated,
-        totalDisbursed: budgetAfter.totalDisbursed,
-        remainingBalance: remainingOf(budgetAfter),
-      },
-      timestamp: Date.now(),
-    })}\n`;
-    fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
-    fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
-  } catch (_) { /* debug */ }
-  // #endregion
-
-  try {
+try {
     await notifyUser(payment.requestedBy, {
       type: "payment",
       title: "Payment disbursed by finance",

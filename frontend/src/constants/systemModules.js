@@ -3,10 +3,10 @@ import { SYSTEM_ROLES } from "./systemRoles";
 
 export const SYSTEM_MODULES = [
   { key: "ethics", to: "/ethics", label: "Ethics (REC)", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher"] },
-  { key: "finance_grant_approvals", to: "/finance/grant-approvals", label: "Grant funding approval", icon: "💵", roles: ["finance_officer"] },
-  { key: "finance_closures", to: "/finance/closures", label: "Project closure", icon: "📁", roles: ["finance_officer"] },
   { key: "proposals_staff", to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher", "leadership"] },
   { key: "reviews", to: "/review-assignments", label: "Peer Reviews", icon: "✍️", roles: ["research_director", "leadership"] },
+  { key: "finance_grant_approvals", to: "/finance/grant-approvals", label: "Grant funding approval", icon: "💵", roles: ["finance_officer"] },
+  { key: "finance_closures", to: "/finance/closures", label: "Project closure", icon: "📁", roles: ["finance_officer"] },
   { key: "projects_staff", to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "funding_calls", to: "/funding-calls", label: "Funding Calls", icon: "📢", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher", "leadership"] },
   { key: "policies", to: "/policies", label: "Policies", icon: "📜", roles: [...SYSTEM_ROLES] },
@@ -34,14 +34,28 @@ export function countForModule(key, metrics = {}, overview = {}) {
       return m.ethics ?? o.ethics ?? metrics.ethics?.total ?? 0;
     case "proposals":
     case "proposals_staff":
+      return m.proposals ?? o.proposals ?? metrics.proposals?.total ?? 0;
     case "finance_grant_approvals":
-      return m.grantsPendingFinance ?? o.grantsPendingFinance ?? metrics.grants?.pendingFinance ?? m.grants ?? 0;
+      return (
+        m.grantsPendingFinance ??
+        o.grantsPendingFinance ??
+        metrics.grants?.pendingFinance ??
+        0
+      );
     case "reviews":
-      return m.reviews ?? o.reviews ?? metrics.reviewAssignments ?? 0;
+      return (
+        m.reviews ??
+        o.reviews ??
+        metrics.proposalsSentToReviewers ??
+        metrics.reviewAssignmentsPending ??
+        metrics.reviewAssignments ??
+        0
+      );
     case "projects":
     case "projects_staff":
-    case "finance_closures":
       return m.projects ?? o.projects ?? metrics.projects?.total ?? 0;
+    case "finance_closures":
+      return m.closuresPending ?? o.closuresPending ?? metrics.closures?.pending ?? m.projects ?? 0;
     case "funding_calls":
       return m.fundingCalls ?? o.fundingCalls ?? metrics.fundingCalls?.total ?? 0;
     case "policies":
@@ -64,6 +78,8 @@ export function countForModule(key, metrics = {}, overview = {}) {
       return m.groups ?? o.groups ?? metrics.groups?.total ?? 0;
     case "thesis":
       return m.thesis ?? o.thesis ?? metrics.thesis?.total ?? 0;
+    case "system_reports":
+      return m.systemReports ?? o.systemReports ?? "—";
     case "kpi":
       return m.kpi ?? o.kpi ?? "—";
     case "donor":

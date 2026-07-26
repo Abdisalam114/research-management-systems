@@ -42,10 +42,7 @@ async function listPurchaseOrders(req, res) {
 async function procurementDecision(req, res) {
   const { id } = req.params;
   const { decision, rejectedReason } = req.body || {};
-  // #region agent log
-  fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',runId:'po-finance',hypothesisId:'H1',location:'purchaseOrderController.js:procurementDecision',message:'Finance PO review attempt',data:{role:req.user?.role,poId:id,decision,programTier:req.programTier},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-  if (!["approve", "reject"].includes(decision)) {
+if (!["approve", "reject"].includes(decision)) {
     throw new AppError("decision must be 'approve' or 'reject'", 400);
   }
   const po = await PurchaseOrder.findOne(req.tierWhere({ _id: id }));
@@ -215,31 +212,7 @@ async function financePay(req, res) {
     await po.save();
     throw err;
   }
-
-  // #region agent log
-  try {
-    const p = require("path");
-    const fs = require("fs");
-    const line = `${JSON.stringify({
-      sessionId: "f558f7",
-      hypothesisId: "H5",
-      location: "purchaseOrderController.financePay",
-      message: "PO paid — budget deducted",
-      data: {
-        poId: String(po._id),
-        amount: po.totalAmount,
-        budgetId: String(po.budgetId),
-        totalDisbursed: budgetAfter.totalDisbursed,
-        remainingBalance: remainingOf(budgetAfter),
-      },
-      timestamp: Date.now(),
-    })}\n`;
-    fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
-    fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
-  } catch (_) { /* debug */ }
-  // #endregion
-
-  try {
+try {
     await notifyUser(po.requestedBy, {
       type: "procurement",
       title: "PO paid by finance",

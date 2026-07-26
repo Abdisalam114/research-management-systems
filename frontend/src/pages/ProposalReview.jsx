@@ -48,29 +48,7 @@ export function ProposalReviewPage() {
     setError("");
     try {
       const res = await proposalApi.getProposal(accessToken, id);
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          hypothesisId: "H3",
-          location: "ProposalReview.jsx:load",
-          message: "proposal reloaded in UI",
-          data: {
-            proposalId: id,
-            programTier,
-            peer: res.proposal?.reviewPipeline?.peerReview?.status || null,
-            committee: res.proposal?.reviewPipeline?.committeeReview?.status || null,
-            stage: res.proposal?.currentReviewStage || null,
-            status: res.proposal?.status || null,
-          },
-          timestamp: Date.now(),
-          runId: "complete-debug",
-        }),
-      }).catch(() => {});
-      // #endregion
-      setProposal(res.proposal);
+setProposal(res.proposal);
       if (res.proposal?.requiresEthics) {
         const eth = await proposalApi.getProposalEthicsApplication(accessToken, id);
         setEthics(eth.application);
@@ -78,27 +56,7 @@ export function ProposalReviewPage() {
         setEthics(null);
       }
     } catch (e) {
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          hypothesisId: "H4",
-          location: "ProposalReview.jsx:load",
-          message: "proposal reload failed",
-          data: {
-            proposalId: id,
-            programTier,
-            err: e?.response?.data?.message || e?.message || "fail",
-            httpStatus: e?.response?.status || null,
-          },
-          timestamp: Date.now(),
-          runId: "complete-debug",
-        }),
-      }).catch(() => {});
-      // #endregion
-      throw e;
+throw e;
     }
   }
 

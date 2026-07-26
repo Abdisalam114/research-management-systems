@@ -104,26 +104,7 @@ export function PaymentDetailsPage() {
         paymentMethodDetails: payForm.paymentMethodDetails,
         referenceNumber: payForm.referenceNumber || payForm.paymentMethodDetails,
       });
-      // #region agent log
-      fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-        body: JSON.stringify({
-          sessionId: "f558f7",
-          hypothesisId: "H5",
-          location: "PaymentDetails.jsx:financePay",
-          message: "FE payment paid response",
-          data: {
-            paymentId: payment.id,
-            amount: payment.amount,
-            budgetRemaining: res?.budget?.remainingBalance ?? null,
-            budgetDisbursed: res?.budget?.totalDisbursed ?? null,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-      await reload();
+await reload();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to pay");
     } finally {

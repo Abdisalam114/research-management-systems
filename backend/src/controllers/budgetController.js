@@ -152,33 +152,7 @@ async function createBudget(req, res) {
       400
     );
   }
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(__dirname, "..", "..", "..", "debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "DEL3",
-        location: "budgetController.createBudget",
-        message: "system allocate only (no manual totalAllocated)",
-        data: {
-          projectId: String(project._id),
-          created: result.created,
-          totalAllocated: result.budget.totalAllocated,
-        },
-        timestamp: Date.now(),
-        runId: "post-fix",
-      })}\n`
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
-
-  res.status(result.created ? 201 : 200).json({
+res.status(result.created ? 201 : 200).json({
     message: result.created
       ? "Budget allocated automatically from award amount"
       : "Budget allocated already exists (locked)",

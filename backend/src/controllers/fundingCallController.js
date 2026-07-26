@@ -356,40 +356,7 @@ async function publishFundingCall(req, res) {
       );
     }
   } catch { /* best-effort */ }
-
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    const payload = {
-      sessionId: "f558f7",
-      hypothesisId: "FC1",
-      location: "fundingCallController.publishFundingCall",
-      message: "funding call published — notifications",
-      data: {
-        callId: String(call._id),
-        title: call.title,
-        callProgramTier: call.programTier || null,
-        reqTier: req.programTier || null,
-        eligibilityTier: call.eligibilityTier,
-        tiersToNotify,
-        listLink,
-        applyLink,
-        ...notifyStats,
-      },
-      timestamp: Date.now(),
-      runId: "fund-call-notify",
-    };
-    fs.appendFileSync(path.join(__dirname, "../../../debug-f558f7.log"), `${JSON.stringify(payload)}\n`);
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify(payload),
-    }).catch(() => {});
-  } catch (_) { /* debug */ }
-  // #endregion
-
-  await recordAudit({
+await recordAudit({
     entityType: "funding_call",
     entityId: call._id,
     action: "published",

@@ -4,14 +4,11 @@
  */
 require("dotenv").config();
 const mongoose = require("mongoose");
-const fs = require("fs");
-const path = require("path");
 const { Project, PROJECT_STATUSES } = require("../models/Project");
 const { Grant } = require("../models/Grant");
 const { Publication } = require("../models/Publication");
 const { RepositoryItem } = require("../models/RepositoryItem");
 
-const DEBUG_LOG = path.join(__dirname, "../../../debug-f558f7.log");
 const RUN_ID = "careful-repair";
 const CUTOFF = new Date("2026-07-19T00:00:00.000Z");
 
@@ -25,19 +22,6 @@ function normalize(s) {
 
 function titlesMatch(a, b) {
   return normalize(a) === normalize(b) && normalize(a).length > 0;
-}
-
-function logChange(message, data) {
-  const row = {
-    sessionId: "f558f7",
-    runId: RUN_ID,
-    hypothesisId: "CARE2",
-    location: "repairCare2OrphanDuplicates.js",
-    message,
-    data,
-    timestamp: Date.now(),
-  };
-  fs.appendFileSync(DEBUG_LOG, `${JSON.stringify(row)}\n`);
 }
 
 async function main() {
@@ -98,7 +82,6 @@ async function main() {
       reason: "empty-orphan-duplicate-matching-grant-title",
     };
     deletions.push(row);
-    logChange("deleted empty orphan duplicate project", row);
   }
 
   // ---- Part 2: true title-mismatch relinks ----
@@ -140,7 +123,6 @@ async function main() {
       reason: "title-mismatch-relink-to-matching-title-project",
     };
     relinks.push(row);
-    logChange("relinked grant to matching-title project", row);
   }
 
   const out = { deletions, relinks, deletionCount: deletions.length, relinkCount: relinks.length };

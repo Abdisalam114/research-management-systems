@@ -74,6 +74,13 @@ export async function submitProposal(accessToken, id) {
   return data;
 }
 
+export async function deleteProposal(accessToken, id) {
+  const { data } = await api.delete(`/api/proposals/${id}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
 export async function coordinatorReview(accessToken, id, action, comment) {
   const { data } = await api.post(
     `/api/proposals/${id}/review`,

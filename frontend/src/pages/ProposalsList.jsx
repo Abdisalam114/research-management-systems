@@ -14,12 +14,15 @@ export function ProposalsListPage() {
   const { programTier } = useProgramTier();
   const [proposals, setProposals] = useState([]);
   const [error, setError] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+  const [busyId, setBusyId] = useState("");
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
 
   const canCreate = user?.role === "researcher";
   const isReviewer = ["faculty_coordinator", "research_director"].includes(user?.role);
   const isFinance = user?.role === "finance_officer";
   const isLeadershipReviewer = user?.role === "leadership";
+  const isDirector = user?.role === "research_director";
 
   const title = useMemo(() => {
     if (user?.role === "researcher") return "My Proposals";
@@ -72,6 +75,29 @@ export function ProposalsListPage() {
     return kind === "grant_fund_call" ? "Grant Fund Call" : "Voluntary";
   }
 
+  function canDeleteProposal(p) {
+    if (isDirector) return true;
+    if (!canCreate) return false;
+    return ["draft", "rejected", "revision_requested"].includes(p.status);
+  }
+
+  async function handleDelete(p) {
+    const ok = window.confirm(`Delete proposal "${p.title}"? This cannot be undone.`);
+    if (!ok) return;
+    setBusyId(p.id);
+    setError("");
+    setSuccessMsg("");
+    try {
+      await proposalApi.deleteProposal(accessToken, p.id);
+      setSuccessMsg("Proposal deleted");
+      await load();
+} catch (e) {
+      setError(e?.response?.data?.message || "Failed to delete proposal");
+    } finally {
+      setBusyId("");
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -113,6 +139,9 @@ export function ProposalsListPage() {
       ) : null}
 
       {error ? <div className="card" style={{ borderColor: "rgba(255, 99, 132, 0.55)" }}>{error}</div> : null}
+      {successMsg ? (
+        <div className="card" style={{ borderColor: "rgba(34, 197, 94, 0.45)", marginTop: 8 }}>{successMsg}</div>
+      ) : null}
 
       <div className="card" style={{ marginTop: 12 }}>
         {filtered.length === 0 ? (
@@ -156,6 +185,21 @@ export function ProposalsListPage() {
                     }}
                   >
                     <StatusBadge status={p.status} />
+                    {(p.assignedReviewers || []).length > 0 &&
+                    ["submitted", "under_review", "revision_requested"].includes(p.status) ? (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: 6,
+                          background: "rgba(56,189,248,0.18)",
+                          color: "#7dd3fc",
+                        }}
+                      >
+                        Sent to reviewer
+                      </span>
+                    ) : null}
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                       <Link className="btn" to={`/proposals/${p.id}`}>
                         Details
@@ -174,6 +218,17 @@ export function ProposalsListPage() {
                         <Link className="btn primary" to={`/proposals/${p.id}/review`}>
                           Peer review
                         </Link>
+                      ) : null}
+                      {canDeleteProposal(p) ? (
+                        <button
+                          type="button"
+                          className="btn"
+                          style={{ borderColor: "rgba(248,113,113,0.6)", color: "#f87171" }}
+                          disabled={busyId === p.id}
+                          onClick={() => handleDelete(p)}
+                        >
+                          {busyId === p.id ? "Deleting…" : "Delete"}
+                        </button>
                       ) : null}
                     </div>
                   </div>

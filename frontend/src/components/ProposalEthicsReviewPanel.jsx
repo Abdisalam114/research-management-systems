@@ -1,3 +1,5 @@
+import { projectLevelLabel } from "../constants/ethicsFormOptions";
+
 function Row({ label, value }) {
   if (!value || value === "—") return null;
   return (
@@ -59,7 +61,7 @@ export function ProposalEthicsReviewPanel({
 
       <div style={{ marginTop: 12, display: "grid", gap: 4 }}>
         <Row label="Project title (ethics)" value={ethics.projectTitle} />
-        <Row label="Project level" value={ethics.projectLevel} />
+        <Row label="Project level" value={projectLevelLabel(ethics.projectLevel)} />
         <Row label="Principal investigator" value={personLabel(ethics.principal)} />
         <Row label="Co-researcher / supervisor" value={personLabel(ethics.coResearcher)} />
         <Row label="Other co-investigators" value={(ethics.otherInvestigators || []).join(", ") || "—"} />

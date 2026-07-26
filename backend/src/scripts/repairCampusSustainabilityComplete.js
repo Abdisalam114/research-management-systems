@@ -8,10 +8,6 @@ const { Project, PROJECT_STATUSES, CLOSURE_STATUSES } = require("../models/Proje
 const { Grant, GRANT_STATUSES } = require("../models/Grant");
 const { Publication } = require("../models/Publication");
 const { RepositoryItem } = require("../models/RepositoryItem");
-const fs = require("fs");
-const path = require("path");
-
-const DEBUG_LOG = path.join(__dirname, "../../../debug-f558f7.log");
 
 async function main() {
   await mongoose.connect(process.env.MONGODB_URI || process.env.MONGO_URI);
@@ -72,19 +68,6 @@ async function main() {
       grantStatus: grant?.status || null,
     };
     results.push(row);
-
-    fs.appendFileSync(
-      DEBUG_LOG,
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "campus-sustainability-fix",
-        hypothesisId: "CS1",
-        location: "repairCampusSustainabilityComplete.js",
-        message: "repair campus sustainability completion",
-        data: row,
-        timestamp: Date.now(),
-      })}\n`
-    );
   }
 
   console.log(JSON.stringify({ count: results.length, results }, null, 2));

@@ -12,10 +12,7 @@ const { Project, PROJECT_STATUSES, CLOSURE_STATUSES } = require("../models/Proje
 const { Grant, GRANT_STATUSES } = require("../models/Grant");
 const { Publication } = require("../models/Publication");
 const { RepositoryItem } = require("../models/RepositoryItem");
-const fs = require("fs");
-const path = require("path");
 
-const DEBUG_LOG = path.join(__dirname, "../../../debug-f558f7.log");
 const titleFilter = process.argv[2] || "";
 
 async function main() {
@@ -93,19 +90,6 @@ async function main() {
       grantStatus: grant.status,
     };
     results.push(row);
-
-    fs.appendFileSync(
-      DEBUG_LOG,
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "repair-funded-complete",
-        hypothesisId: "WHO1",
-        location: "repairCompletedFundedProjects.js",
-        message: "marked funded project completed from outputs",
-        data: row,
-        timestamp: Date.now(),
-      })}\n`
-    );
   }
 
   console.log(

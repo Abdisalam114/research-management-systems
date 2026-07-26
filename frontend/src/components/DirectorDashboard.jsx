@@ -16,11 +16,13 @@ import {
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import * as analyticsApi from "../services/analyticsApi";
+import * as proposalApi from "../services/proposalApi";
 import { InstitutionalAnalyticsSections } from "./InstitutionalAnalyticsSections";
 import { FacultyAnalyticsSection } from "./FacultyAnalyticsSection";
 import { ActiveProjectsPanel } from "./ActiveProjectsPanel";
 import { MetricProvenanceBar } from "./MetricProvenanceBar";
 import { SystemModulesGrid } from "./SystemModulesGrid";
+import { StatusBadge } from "./StatusBadge";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
 import {
   DASH_AXIS_TICK,
@@ -41,10 +43,12 @@ function formatMoney(n) {
 
 export function DirectorDashboard() {
   const { accessToken } = useAuth();
-  const { programTier } = useProgramTier();
+  const { programTier, programTierLabel } = useProgramTier();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [peerQueue, setPeerQueue] = useState([]);
+  const [peerSummary, setPeerSummary] = useState({ total: 0, awaiting: 0, received: 0 });
 
   async function handleDownloadAnnualReport() {
     try {
@@ -74,10 +78,33 @@ export function DirectorDashboard() {
     async function load() {
       try {
         setError("");
-        const res = await analyticsApi.institutionalAnalytics(accessToken);
+        const [res, peer] = await Promise.all([
+          analyticsApi.institutionalAnalytics(accessToken),
+          proposalApi.listMyReviewAssignments(accessToken).catch(() => ({ assignments: [], summary: null })),
+        ]);
         if (!cancelled) {
-          setData(res);
-}
+          const list = peer.assignments || [];
+          const summary = peer.summary || {
+            total: list.length,
+            awaiting: list.filter((a) => a.awaitingLeadership || (a.pendingReviewers || 0) > 0).length,
+            received: list.filter((a) => !(a.awaitingLeadership || (a.pendingReviewers || 0) > 0)).length,
+          };
+          // Single source of truth: Peer Reviews tile = listMyReviewAssignments count
+          const aligned = {
+            ...res,
+            proposalsSentToReviewers: summary.total,
+            overview: {
+              ...(res.overview || {}),
+              modules: {
+                ...(res.overview?.modules || {}),
+                reviews: summary.total,
+              },
+            },
+          };
+          setData(aligned);
+          setPeerQueue(list);
+          setPeerSummary(summary);
+        }
       } catch (e) {
         if (!cancelled) setError(e?.response?.data?.message || "Failed to load institutional dashboard");
       }
@@ -91,8 +118,8 @@ export function DirectorDashboard() {
   }, [accessToken, programTier]);
 
   const pieData = useMemo(() => {
-    if (!data) return [];
-    const { active, completed, onHold } = data.projectStatus;
+    if (!data?.projectStatus) return [];
+    const { active = 0, completed = 0, onHold = 0 } = data.projectStatus;
     const slices = [
       { name: "Active", value: active },
       { name: "Completed", value: completed },
@@ -102,7 +129,7 @@ export function DirectorDashboard() {
   }, [data]);
 
   const outputBars = useMemo(() => {
-    if (!data) return [];
+    if (!data?.researchOutput) return [];
     const t = data.researchOutput.byType || {};
     return [
       { name: "Papers", value: t.paper || 0 },
@@ -131,13 +158,31 @@ export function DirectorDashboard() {
   if (!data) return <div className="dashboardLoading">Loading institutional dashboard…</div>;
 
   const topFaculty = (data.facultyAnalytics || []).slice(0, 1)[0];
+  const projectStatus = data.projectStatus || {
+    total: 0,
+    active: 0,
+    completed: 0,
+    onHold: 0,
+    activePercent: 0,
+  };
+  const researchOutput = data.researchOutput || { publications: 0, citations: 0, papers: 0, byType: {} };
+  const grantFunding = data.grantFunding || { activeFunds: 0, trends: [] };
+  const keyMetrics = data.keyMetrics || {
+    activeGrantsValue: 0,
+    ongoingStudies: 0,
+    researchers: 0,
+  };
+  const recentActivity = Array.isArray(data.recentActivity) ? data.recentActivity : [];
+  const citationsLabel = Number(researchOutput.citations || 0).toLocaleString();
 
   return (
     <div className="dashboardPage">
       <header className="dashPageHeader">
         <h1 className="dashPageTitle">Institutional Dashboard</h1>
         <p className="dashPageSub">
-          All Jamhuriya RMS modules — live counts across Undergraduate and Postgraduate.
+          Live module counts for the{" "}
+          <strong>{programTierLabel || programTier || "selected"}</strong> portal — proposals, peer reviews,
+          projects, funding, and outputs.
         </p>
       </header>
 
@@ -149,6 +194,68 @@ export function DirectorDashboard() {
         />
       </section>
 
+      <section className="dashboardSection">
+        <div className="dashboardSectionTitle">Peer Reviews — sent to Leadership</div>
+        <div className="card" style={{ marginTop: 8 }}>
+          <p style={{ marginTop: 0, fontSize: 14 }}>
+            <strong>{peerSummary.total}</strong> sent to Leadership ·{" "}
+            <strong style={{ color: "#fbbf24" }}>{peerSummary.awaiting}</strong> awaiting review ·{" "}
+            <strong style={{ color: "#22c55e" }}>{peerSummary.received}</strong> reviews received
+            {data.overview?.modules?.reviews != null ? (
+              <span className="muted"> · Tile: {data.overview.modules.reviews}</span>
+            ) : null}
+          </p>
+          {peerQueue.length === 0 ? (
+            <p className="muted" style={{ marginBottom: 0, fontSize: 14 }}>
+              No active proposals sent to reviewers. Assign Leadership from a proposal Review page.
+            </p>
+          ) : (
+            <div style={{ display: "grid", gap: 10 }}>
+              {peerQueue.map((a) => {
+                const awaiting = a.awaitingLeadership || (a.pendingReviewers || 0) > 0;
+                const names = (a.assignedReviewers || [])
+                  .map((r) => r.fullName || r.email)
+                  .filter(Boolean)
+                  .join(", ");
+                return (
+                  <div
+                    key={a.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      paddingBottom: 8,
+                      borderBottom: "1px solid rgba(148,163,184,0.2)",
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontWeight: 700 }}>{a.title}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        Sent to reviewer{names ? `: ${names}` : ""} ·{" "}
+                        <span style={{ color: awaiting ? "#fbbf24" : "#22c55e", fontWeight: 600 }}>
+                          {awaiting ? "Awaiting Leadership" : "Reviews received"}
+                        </span>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <StatusBadge status={a.status} />
+                      <Link className="btn primary" to={`/proposals/${a.id}/review`}>
+                        Open
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <Link className="btn" to="/review-assignments" style={{ marginTop: 12, display: "inline-block" }}>
+            Open Peer Reviews
+          </Link>
+        </div>
+      </section>
+
       <MetricProvenanceBar data={data} />
 
       <section className="dashboardKpiStrip">
@@ -158,11 +265,11 @@ export function DirectorDashboard() {
         </div>
         <div className="dashboardKpiItem">
           <div className="dashboardKpiLabel">💰 Funding awarded</div>
-          <div className="dashboardKpiValue">{formatMoney(data.keyMetrics.activeGrantsValue)}</div>
+          <div className="dashboardKpiValue">{formatMoney(keyMetrics.activeGrantsValue)}</div>
         </div>
         <div className="dashboardKpiItem">
           <div className="dashboardKpiLabel">📚 Total citations</div>
-          <div className="dashboardKpiValue">{data.researchOutput.citations.toLocaleString()}</div>
+          <div className="dashboardKpiValue">{citationsLabel}</div>
         </div>
         <div className="dashboardKpiItem">
           <div className="dashboardKpiLabel">🥇 Top faculty (pubs)</div>
@@ -187,18 +294,24 @@ export function DirectorDashboard() {
           <div className="dashCardTitle">Project Status</div>
           <div className="dashChartBlock">
             <div className="dashChartPlot">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieData} innerRadius={48} outerRadius={72} dataKey="value" paddingAngle={2}>
-                    {pieData.map((_, i) => (
-                      <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
+              {pieData.length ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={pieData} innerRadius={48} outerRadius={72} dataKey="value" paddingAngle={2}>
+                      {pieData.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="muted" style={{ padding: 24, textAlign: "center" }}>
+                  No project status data yet.
+                </div>
+              )}
             </div>
             <div className="dashPieSummary">
-              <span className="dashPiePercent">{data.projectStatus.activePercent}%</span>
+              <span className="dashPiePercent">{projectStatus.activePercent ?? 0}%</span>
               <span className="dashPiePercentLabel">Active projects</span>
             </div>
             <div className="dashChartLegend">
@@ -212,17 +325,17 @@ export function DirectorDashboard() {
             </div>
             <div className="dashStatRow dashStatRowSplit">
               <span>
-                Total <strong>{data.projectStatus.total}</strong>
+                Total <strong>{projectStatus.total}</strong>
               </span>
               <span>
-                Active <strong>{data.projectStatus.active}</strong>
+                Active <strong>{projectStatus.active}</strong>
               </span>
               <span>
-                Done <strong>{data.projectStatus.completed}</strong>
+                Done <strong>{projectStatus.completed}</strong>
               </span>
-              {data.projectStatus.onHold > 0 ? (
+              {projectStatus.onHold > 0 ? (
                 <span>
-                  On hold <strong>{data.projectStatus.onHold}</strong>
+                  On hold <strong>{projectStatus.onHold}</strong>
                 </span>
               ) : null}
             </div>
@@ -234,11 +347,11 @@ export function DirectorDashboard() {
           <div className="dashChartBlock">
             <div className="dashChartMeta">
               <span className="dashChartMetaLabel">Active funds</span>
-              <span className="dashChartMetaValue">{formatMoney(data.grantFunding.activeFunds)}</span>
+              <span className="dashChartMetaValue">{formatMoney(grantFunding.activeFunds || 0)}</span>
             </div>
             <div className="dashChartPlot">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.grantFunding.trends} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
+                <LineChart data={grantFunding.trends || []} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                   <XAxis dataKey="month" tick={DASH_AXIS_TICK} interval="preserveStartEnd" />
                   <YAxis tick={DASH_AXIS_TICK} width={44} />
                   <Tooltip contentStyle={DASH_CHART_TOOLTIP} />
@@ -270,13 +383,13 @@ export function DirectorDashboard() {
             </div>
             <div className="dashStatRow dashStatRowSplit">
               <span>
-                Pubs <strong>{data.researchOutput.publications}</strong>
+                Pubs <strong>{researchOutput.publications}</strong>
               </span>
               <span>
-                Citations <strong>{data.researchOutput.citations}</strong>
+                Citations <strong>{citationsLabel}</strong>
               </span>
               <span>
-                Papers <strong>{data.researchOutput.papers ?? 0}</strong>
+                Papers <strong>{researchOutput.papers ?? 0}</strong>
               </span>
             </div>
           </div>
@@ -285,25 +398,29 @@ export function DirectorDashboard() {
 
       <section className="dashGrid dashGridProjectsRow">
         <ActiveProjectsPanel
-          projects={data.activeProjects}
-          totalActive={data.projectStatus.active}
+          projects={data.activeProjects || []}
+          totalActive={projectStatus.active}
           previewMeta={data.preview?.activeProjects}
         />
 
         <div className="dashSpan4 dashSideCol">
           <div className="dashCard">
             <div className="dashCardTitle">Recent Activity</div>
-            {data.recentActivity.map((a, i) => (
-              <div key={i} className="activityItem">
-                <span>📌</span>
-                <div>
-                  <div style={{ fontWeight: 700 }}>{a.title}</div>
-                  <div className="muted">
-                    {a.type} • {a.subtitle}
+            {recentActivity.length === 0 ? (
+              <div className="muted">No recent activity.</div>
+            ) : (
+              recentActivity.map((a, i) => (
+                <div key={i} className="activityItem">
+                  <span>📌</span>
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{a.title}</div>
+                    <div className="muted">
+                      {a.type} • {a.subtitle}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           <div className="dashCard">
@@ -311,7 +428,7 @@ export function DirectorDashboard() {
             <div className="metricList">
               <div className="metricRow">
                 <span>💰 Active Grants</span>
-                <strong>{formatMoney(data.keyMetrics.activeGrantsValue)}</strong>
+                <strong>{formatMoney(keyMetrics.activeGrantsValue)}</strong>
               </div>
               <div className="metricRow">
                 <span>🏆 Grant success rate</span>
@@ -319,7 +436,7 @@ export function DirectorDashboard() {
               </div>
               <div className="metricRow">
                 <span>📚 Citations</span>
-                <strong>{data.researchOutput.citations.toLocaleString()}</strong>
+                <strong>{citationsLabel}</strong>
               </div>
               <div className="metricRow">
                 <span>🏛️ Faculties tracked</span>
@@ -327,11 +444,15 @@ export function DirectorDashboard() {
               </div>
               <div className="metricRow">
                 <span>🔬 Ongoing Studies</span>
-                <strong>{data.keyMetrics.ongoingStudies}</strong>
+                <strong>{keyMetrics.ongoingStudies}</strong>
               </div>
               <div className="metricRow">
                 <span>👥 Researchers</span>
-                <strong>{data.keyMetrics.researchers}</strong>
+                <strong>{keyMetrics.researchers}</strong>
+              </div>
+              <div className="metricRow">
+                <span>✍️ Sent to reviewers (active)</span>
+                <strong>{peerSummary.total || data.proposalsSentToReviewers || data.overview?.modules?.reviews || 0}</strong>
               </div>
             </div>
           </div>

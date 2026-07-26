@@ -73,28 +73,6 @@ async function globalSearch(req, res) {
       })),
     },
   });
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(__dirname, "../../../debug-f558f7.log"),
-      JSON.stringify({
-        sessionId: "f558f7",
-        runId: "systemic-pass",
-        hypothesisId: "S3",
-        location: "searchController.js:globalSearch",
-        message: "search deep-links",
-        data: {
-          qLen: q.length,
-          pubLinks: publications.slice(0, 3).map((p) => (p.projectId ? `projectId` : "bare")),
-          callLinks: calls.slice(0, 2).map((c) => `/funding-calls?callId=${c._id}`),
-        },
-        timestamp: Date.now(),
-      }) + "\n"
-    );
-  } catch (_) {}
-  // #endregion
 }
 
 module.exports = { globalSearch };
