@@ -249,7 +249,19 @@ async function committeeReview(req, res) {
   const proposal = await Proposal.findOne(proposalScopeFilter(req, { _id: req.params.id }));
   if (!proposal) throw new AppError("Proposal not found", 404);
 
+  const isDirector = req.user.role === "research_director";
+  const assigned = (proposal.assignedCommittee || []).some(
+    (r) => reviewerUserId(r.userId) === String(req.user.id)
+  );
+  if (!isDirector && !assigned) {
+    throw new AppError("You are not assigned to the committee for this proposal", 403);
+  }
+
   const pipe = ensureReviewPipeline(proposal);
+  if (pipe.peerReview?.status !== STAGE_STATUS.PASSED) {
+    throw new AppError("Peer review must be completed first", 400);
+  }
+
   let committeeStatus = STAGE_STATUS.PASSED;
   if (decision === "reject") committeeStatus = STAGE_STATUS.FAILED;
   else if (decision === "recommend_revision") committeeStatus = STAGE_STATUS.IN_PROGRESS;
@@ -270,15 +282,15 @@ async function committeeReview(req, res) {
   proposal.markModified("reviewPipeline");
   await proposal.save();
 
-  if (committeeStatus === STAGE_STATUS.PASSED) {
+  if (committeeStatus === STAGE_STATUS.PASSED && !isVoluntaryProposal(proposal)) {
     try {
       const { notifyFinanceProposalReviewReady } = require("../utils/notifyFinanceProposalReview");
-      const sent = await notifyFinanceProposalReviewReady(proposal, { force: true });
-} catch {
+      await notifyFinanceProposalReviewReady(proposal, { force: true });
+    } catch {
       /* best-effort */
     }
   }
-await recordAudit({
+  await recordAudit({
     entityType: "proposal",
     entityId: proposal._id,
     action: "committee_review",
@@ -301,6 +313,13 @@ async function financeProposalReview(req, res) {
   if (!proposal) throw new AppError("Proposal not found", 404);
   if (isVoluntaryProposal(proposal)) {
     throw new AppError("Finance review is not required for voluntary research proposals", 400);
+  }
+
+  const assigned = (proposal.assignedFinance || []).some(
+    (r) => reviewerUserId(r.userId) === String(req.user.id)
+  );
+  if (!assigned) {
+    throw new AppError("You are not assigned to finance-review this proposal", 403);
   }
 
   const pipe = ensureReviewPipeline(proposal);

@@ -98,14 +98,23 @@ function isActivePeerReviewStatus(status) {
 function clearPeerAssigneesIfInactive(proposal) {
   if (!proposal) return false;
   if (isActivePeerReviewStatus(proposal.status)) return false;
-  if (!Array.isArray(proposal.assignedReviewers) || proposal.assignedReviewers.length === 0) {
-    return false;
+  let changed = false;
+  if (Array.isArray(proposal.assignedReviewers) && proposal.assignedReviewers.length > 0) {
+    proposal.assignedReviewers = [];
+    changed = true;
+    if (typeof proposal.markModified === "function") proposal.markModified("assignedReviewers");
   }
-  proposal.assignedReviewers = [];
-  if (typeof proposal.markModified === "function") {
-    proposal.markModified("assignedReviewers");
+  if (Array.isArray(proposal.assignedCommittee) && proposal.assignedCommittee.length > 0) {
+    proposal.assignedCommittee = [];
+    changed = true;
+    if (typeof proposal.markModified === "function") proposal.markModified("assignedCommittee");
   }
-  return true;
+  if (Array.isArray(proposal.assignedFinance) && proposal.assignedFinance.length > 0) {
+    proposal.assignedFinance = [];
+    changed = true;
+    if (typeof proposal.markModified === "function") proposal.markModified("assignedFinance");
+  }
+  return changed;
 }
 
 /** Mongo filter fragment: proposals sent to reviewers (Director queue). */

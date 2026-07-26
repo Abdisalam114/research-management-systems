@@ -160,13 +160,15 @@ async function listUsers(req, res) {
     }
   }
 
-  const users = await User.find(req.tierWhere(filter)).sort({ createdAt: -1 });
+  const users = await User.find(req.userWhere ? req.userWhere(filter) : req.tierWhere(filter)).sort({
+    createdAt: -1,
+  });
   res.json({ users: users.map(sanitizeUser) });
 }
 
 async function approveUser(req, res) {
   const { id } = req.params;
-  const user = await User.findOne(req.tierWhere({ _id: id }));
+  const user = await User.findOne(req.userWhere ? req.userWhere({ _id: id }) : req.tierWhere({ _id: id }));
   if (!user) throw new AppError("User not found", 404);
 
   user.status = USER_STATUSES.ACTIVE;
@@ -177,7 +179,7 @@ async function approveUser(req, res) {
 
 async function rejectUser(req, res) {
   const { id } = req.params;
-  const user = await User.findOne(req.tierWhere({ _id: id }));
+  const user = await User.findOne(req.userWhere ? req.userWhere({ _id: id }) : req.tierWhere({ _id: id }));
   if (!user) throw new AppError("User not found", 404);
 
   assertNotSelfTarget(req, user._id, "reject/deactivate");
@@ -191,7 +193,9 @@ async function rejectUser(req, res) {
 async function updateUserByDirector(req, res) {
   const { id } = req.params;
   assertValidObjectId(id);
-  const user = await User.findOne(req.tierWhere({ _id: id })).select("+refreshToken");
+  const user = await User.findOne(req.userWhere ? req.userWhere({ _id: id }) : req.tierWhere({ _id: id })).select(
+    "+refreshToken"
+  );
   if (!user) throw new AppError("User not found", 404);
 
   const { role, status, fullName, department, rank, isProtected } = req.body || {};
@@ -232,7 +236,7 @@ async function updateUserByDirector(req, res) {
 async function deleteUserByDirector(req, res) {
   const { id } = req.params;
   assertValidObjectId(id);
-  const user = await User.findOne(req.tierWhere({ _id: id }));
+  const user = await User.findOne(req.userWhere ? req.userWhere({ _id: id }) : req.tierWhere({ _id: id }));
   if (!user) throw new AppError("User not found", 404);
 
   // Never allow self-delete (prevents self-lockout and accidental removal).

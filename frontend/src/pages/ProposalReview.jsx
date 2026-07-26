@@ -88,6 +88,13 @@ throw e;
   const ethicsApproved =
     !proposal.requiresEthics || proposal.ethicsStatus === "approved" || ethics?.status === "approved";
 
+  // Final Approve / Reject waits until Multi-stage review (Phase 3) is complete (UG + PG).
+  const multiStageReady = proposal.currentReviewStage === "ready_for_director";
+  const showFinalDecision =
+    (isCoordinator || isDirector) &&
+    multiStageReady &&
+    ["submitted", "under_review", "revision_requested"].includes(proposal.status);
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
@@ -181,7 +188,20 @@ throw e;
       <ProposalMultiStageReview proposal={proposal} onReload={load} />
 
       {(isCoordinator || isDirector) &&
-      ["submitted", "under_review", "revision_requested"].includes(proposal.status) ? (
+      ["submitted", "under_review", "revision_requested"].includes(proposal.status) &&
+      !multiStageReady ? (
+        <div className="card muted" style={{ marginTop: 12, fontSize: 13 }}>
+          <strong>Proposal decision</strong> is locked until Multi-stage review (Phase 3) is complete
+          (peer → committee
+          {proposal.proposalKind === "voluntary" ||
+          (!proposal.fundingCallId && proposal.proposalKind !== "grant_fund_call")
+            ? ""
+            : " → finance"}
+          ). Use Assign &amp; send above to move the proposal forward.
+        </div>
+      ) : null}
+
+      {showFinalDecision ? (
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ fontWeight: 800, marginBottom: 8 }}>
             {isDirector ? "Proposal decision" : "Coordinator recommendation"}
@@ -231,7 +251,7 @@ throw e;
               setBusy(true);
               setError("");
               try {
-if (isCoordinator) {
+                if (isCoordinator) {
                   await proposalApi.coordinatorReview(accessToken, id, selected, comment.trim());
                 } else if (isDirector) {
                   await proposalApi.directorDecision(accessToken, id, selected, comment.trim());
@@ -239,7 +259,7 @@ if (isCoordinator) {
                 setComment("");
                 await load();
               } catch (e) {
-setError(e?.response?.data?.message || "Action failed");
+                setError(e?.response?.data?.message || "Action failed");
               } finally {
                 setBusy(false);
               }

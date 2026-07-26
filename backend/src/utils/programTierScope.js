@@ -49,6 +49,47 @@ function tierWhere(req, base = {}) {
   return { ...base, programTier: req.programTier };
 }
 
+/**
+ * User collection filter: researchers are portal-scoped; shared staff (Leadership, Finance, …)
+ * are one account for UG + PG — never hide them behind programTier.
+ */
+function userWhere(req, base = {}) {
+  const role = base?.role;
+  // Explicit shared-staff role (e.g. leadership for peer assign) — never portal-filter
+  if (typeof role === "string" && isCrossTierRole(role)) {
+    const { programTier: _drop, ...rest } = base;
+    return rest;
+  }
+  // Director "all users" (role ≠ director): this portal's researchers + shared staff accounts
+  if (role && typeof role === "object" && role.$ne) {
+    const { programTier: _drop, role: _role, ...rest } = base;
+    const sharedRoles = CROSS_TIER_ROLES.filter(
+      (r) => r !== role.$ne && r !== ROLES.RESEARCH_DIRECTOR
+    );
+    return {
+      $or: [
+        {
+          ...rest,
+          role: ROLES.RESEARCHER,
+          ...(req.programTier ? { programTier: req.programTier } : {}),
+        },
+        { ...rest, role: { $in: sharedRoles } },
+      ],
+    };
+  }
+  if (base?._id || base?.id) {
+    const id = base._id || base.id;
+    const { programTier: _p, _id, id: _i, ...rest } = base;
+    return {
+      $or: [
+        { _id: id, ...rest, ...(req.programTier ? { programTier: req.programTier } : {}) },
+        { _id: id, ...rest, role: { $in: [...CROSS_TIER_ROLES] } },
+      ],
+    };
+  }
+  return tierWhere(req, base);
+}
+
 function tierAssign(req, data = {}) {
   if (data.programTier && isValidProgramTier(data.programTier)) {
     return data;
@@ -98,6 +139,7 @@ function assertTierDocument(req, doc) {
 function attachProgramTierHelpers(req) {
   req.isCrossTierStaff = isCrossTierRole(req.user?.role);
   req.tierWhere = (base = {}) => tierWhere(req, base);
+  req.userWhere = (base = {}) => userWhere(req, base);
   req.tierAssign = (data = {}) => tierAssign(req, data);
   req.requireWriteProgramTier = (preferred, label) =>
     requireWriteProgramTier(req, preferred, label);
@@ -110,6 +152,7 @@ module.exports = {
   isCrossTierRole,
   resolveProgramTier,
   tierWhere,
+  userWhere,
   tierAssign,
   requireWriteProgramTier,
   notifyProgramTier,

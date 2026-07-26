@@ -74,6 +74,22 @@ const proposalSchema = new mongoose.Schema(
         assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
       },
     ],
+    /** Faculty committee members (faculty_coordinator) sent for stage 3 */
+    assignedCommittee: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        assignedAt: { type: Date, default: Date.now },
+        assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+      },
+    ],
+    /** Finance officers sent for stage 4 — grant_fund_call only */
+    assignedFinance: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+        assignedAt: { type: Date, default: Date.now },
+        assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+      },
+    ],
     reviewerComments: [
       {
         role: { type: String, required: true },

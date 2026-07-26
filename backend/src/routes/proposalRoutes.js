@@ -96,6 +96,22 @@ router.post(
 );
 
 router.post(
+  "/:id/assign-committee",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("research_director"),
+  asyncHandler(proposalController.assignCommittee)
+);
+
+router.post(
+  "/:id/assign-finance",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("research_director"),
+  asyncHandler(proposalController.assignFinance)
+);
+
+router.post(
   "/:id/admin-screening",
   authenticateUser,
   requireActiveUser,

@@ -134,6 +134,24 @@ export async function assignReviewers(accessToken, id, reviewerIds) {
   return data;
 }
 
+export async function assignCommittee(accessToken, id, memberIds) {
+  const { data } = await api.post(
+    `/api/proposals/${id}/assign-committee`,
+    { memberIds },
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return data;
+}
+
+export async function assignFinance(accessToken, id, officerIds) {
+  const { data } = await api.post(
+    `/api/proposals/${id}/assign-finance`,
+    { officerIds },
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  return data;
+}
+
 export async function listMyReviewAssignments(accessToken) {
   const { data } = await api.get("/api/proposals/my-review-assignments", {
     headers: { Authorization: `Bearer ${accessToken}` },

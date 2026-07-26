@@ -14,7 +14,7 @@ const {
   submitLinkedEthics,
 } = require("../utils/proposalEthicsLink");
 const { applyEthicsPayload, parseEthicsJson } = require("../utils/ethicsFormMerge");
-const { ensureReviewPipeline, getCurrentReviewStage, defaultReviewPipeline, STAGE_STATUS, isVoluntaryProposal, peerReviewAssignedToUserFilter, clearPeerAssigneesIfInactive } = require("../utils/proposalReviewPipeline");
+const { ensureReviewPipeline, getCurrentReviewStage, defaultReviewPipeline, STAGE_STATUS, isVoluntaryProposal, peerReviewAssignedToUserFilter, clearPeerAssigneesIfInactive, assertStagesBeforeDirector } = require("../utils/proposalReviewPipeline");
 const { recordAudit } = require("../utils/audit");
 
 function resolveProposalKind(doc) {
@@ -91,6 +91,8 @@ function sanitizeProposal(p) {
     ethicsComments: p.ethicsComments || [],
     ethicsApplicationId: p.ethicsApplicationId,
     assignedReviewers: sanitizeAssignedReviewers(p.assignedReviewers),
+    assignedCommittee: sanitizeAssignedReviewers(p.assignedCommittee),
+    assignedFinance: sanitizeAssignedReviewers(p.assignedFinance),
     reviewerComments: p.reviewerComments,
     peerReviews: (p.peerReviews || []).map((r) => ({
       userId: refId(r.userId),
@@ -587,6 +589,8 @@ async function getProposal(req, res) {
   const { id } = req.params;
   const proposal = await Proposal.findOne(req.tierWhere({ _id: id }))
     .populate("assignedReviewers.userId", "fullName email role department")
+    .populate("assignedCommittee.userId", "fullName email role department")
+    .populate("assignedFinance.userId", "fullName email role department")
     .populate("peerReviews.userId", "fullName email role")
     .populate("fundingCallId", "title status amountCap currency deadline");
   if (!proposal) throw new AppError("Proposal not found", 404);
@@ -711,45 +715,13 @@ async function directorDecision(req, res) {
     throw new AppError("Ethics must be approved before final proposal decision", 400);
   }
 
-  // Soft-pass incomplete oversight stages (except Finance — Finance Officer must act).
-  // Never soft-pass a FAILED stage.
   if (decision === PROPOSAL_STATUSES.APPROVED) {
-    const pipe = ensureReviewPipeline(proposal);
-    const softPassStages = [pipe.adminScreening, pipe.peerReview, pipe.committeeReview];
-    const failedCheck = [...softPassStages];
-    if (!isVoluntaryProposal(proposal)) failedCheck.push(pipe.financeReview);
-    const failed = failedCheck.filter((s) => s?.status === STAGE_STATUS.FAILED);
-    if (failed.length) {
-      throw new AppError(
-        "Cannot approve: a review stage failed. Request revision or reject the proposal.",
-        400
-      );
+    try {
+      assertStagesBeforeDirector(proposal);
+    } catch (e) {
+      throw new AppError(e.message || "Complete Multi-stage review before final approval", e.statusCode || 400);
     }
-    if (!isVoluntaryProposal(proposal)) {
-      const fr = pipe.financeReview?.status;
-      if (fr !== STAGE_STATUS.PASSED && fr !== STAGE_STATUS.SKIPPED) {
-        throw new AppError(
-          "Finance review must be completed by the Finance Officer before final proposal approval.",
-          400
-        );
-      }
-    }
-    const now = new Date();
-    for (const stage of softPassStages) {
-      if (!stage) continue;
-      if (stage.status === STAGE_STATUS.PENDING || stage.status === STAGE_STATUS.IN_PROGRESS) {
-        stage.status = STAGE_STATUS.PASSED;
-        stage.completedAt = stage.completedAt || now;
-        if (stage.decision === "" || stage.decision == null) {
-          stage.decision = "soft_passed_on_director_approval";
-        }
-        if (stage.comment === "" || stage.comment == null) {
-          stage.comment = "Soft-passed when Director approved the proposal";
-        }
-      }
-    }
-    proposal.markModified("reviewPipeline");
-}
+  }
 
   proposal.status = decision;
   proposal.reviewerComments.push({ role: "research_director", comment });
@@ -865,11 +837,14 @@ if (!Array.isArray(reviewerIds) || reviewerIds.length === 0) {
   const proposal = await Proposal.findOne(req.tierWhere({ _id: id }));
   if (!proposal) throw new AppError("Proposal not found", 404);
 
-  const users = await User.find(req.tierWhere({ _id: { $in: reviewerIds }, status: "active" }));
-  if (users.length !== reviewerIds.length) throw new AppError("One or more reviewers not found", 400);
-  const notLeadership = users.filter((u) => u.role !== "leadership");
-  if (notLeadership.length) {
-    throw new AppError("Peer reviewers must be University Leadership accounts", 400);
+  // Leadership is shared across UG/PG — do not filter reviewers by portal programTier
+  const users = await User.find({
+    _id: { $in: reviewerIds },
+    status: "active",
+    role: ROLES.LEADERSHIP,
+  });
+  if (users.length !== reviewerIds.length) {
+    throw new AppError("One or more Leadership reviewers not found", 400);
   }
 
   const prevIds = new Set((proposal.assignedReviewers || []).map((r) => String(r.userId)));
@@ -994,6 +969,151 @@ async function deleteProposal(req, res) {
 res.json({ message: "Proposal deleted", id: String(id), ethicsDeleted });
 }
 
+async function assignCommittee(req, res) {
+  const { id } = req.params;
+  const { memberIds } = req.body || {};
+  if (!Array.isArray(memberIds) || memberIds.length === 0) {
+    throw new AppError("memberIds array is required", 400);
+  }
+
+  const proposal = await Proposal.findOne(req.tierWhere({ _id: id }));
+  if (!proposal) throw new AppError("Proposal not found", 404);
+
+  const pipe = ensureReviewPipeline(proposal);
+  if (pipe.peerReview?.status !== STAGE_STATUS.PASSED) {
+    throw new AppError("Complete peer review before assigning committee", 400);
+  }
+
+  const users = await User.find({
+    _id: { $in: memberIds },
+    status: "active",
+    role: ROLES.FACULTY_COORDINATOR,
+  });
+  if (users.length !== memberIds.length) {
+    throw new AppError("One or more committee members not found (must be Faculty Coordinators)", 400);
+  }
+
+  proposal.assignedCommittee = memberIds.map((userId) => ({
+    userId,
+    assignedBy: req.user.id,
+    assignedAt: new Date(),
+  }));
+  if (
+    pipe.committeeReview?.status === STAGE_STATUS.PENDING ||
+    pipe.committeeReview?.status === "pending"
+  ) {
+    pipe.committeeReview = {
+      ...(pipe.committeeReview || {}),
+      status: STAGE_STATUS.IN_PROGRESS,
+      startedAt: new Date(),
+    };
+  }
+  proposal.markModified("reviewPipeline");
+  proposal.markModified("assignedCommittee");
+  await proposal.save();
+
+  for (const u of users) {
+    try {
+      await notifyUser(u._id, {
+        type: "proposal",
+        title: "Committee review assignment",
+        body: `You were assigned to committee-review: ${proposal.title}`,
+        link: `/proposals/${proposal._id}/review`,
+        programTier: req.programTier,
+      });
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  const populated = await Proposal.findById(proposal._id)
+    .populate("assignedCommittee.userId", "fullName email role")
+    .populate("assignedReviewers.userId", "fullName email role")
+    .populate("assignedFinance.userId", "fullName email role")
+    .populate("fundingCallId", "title status deadline");
+
+  const names = users.map((u) => u.fullName || u.email).join(", ");
+  res.json({
+    message: `Sent to committee: ${names}`,
+    sentToCommittee: true,
+    proposal: sanitizeProposal(populated),
+  });
+}
+
+async function assignFinance(req, res) {
+  const { id } = req.params;
+  const { officerIds } = req.body || {};
+  if (!Array.isArray(officerIds) || officerIds.length === 0) {
+    throw new AppError("officerIds array is required", 400);
+  }
+
+  const proposal = await Proposal.findOne(req.tierWhere({ _id: id }));
+  if (!proposal) throw new AppError("Proposal not found", 404);
+  const voluntary = isVoluntaryProposal(proposal);
+  const pipe = ensureReviewPipeline(proposal);
+  if (voluntary) {
+    throw new AppError("Finance assignment is only for grant fund call proposals", 400);
+  }
+  if (pipe.committeeReview?.status !== STAGE_STATUS.PASSED) {
+    throw new AppError("Committee must pass before assigning finance", 400);
+  }
+
+  const users = await User.find({
+    _id: { $in: officerIds },
+    status: "active",
+    role: ROLES.FINANCE_OFFICER,
+  });
+  if (users.length !== officerIds.length) {
+    throw new AppError("One or more finance officers not found", 400);
+  }
+
+  proposal.assignedFinance = officerIds.map((userId) => ({
+    userId,
+    assignedBy: req.user.id,
+    assignedAt: new Date(),
+  }));
+  if (
+    pipe.financeReview?.status === STAGE_STATUS.PENDING ||
+    pipe.financeReview?.status === "pending"
+  ) {
+    pipe.financeReview = {
+      ...(pipe.financeReview || {}),
+      status: STAGE_STATUS.IN_PROGRESS,
+      startedAt: new Date(),
+    };
+  }
+  proposal.markModified("reviewPipeline");
+  proposal.markModified("assignedFinance");
+  await proposal.save();
+
+  for (const u of users) {
+    try {
+      await notifyUser(u._id, {
+        type: "proposal",
+        title: "Finance review assignment",
+        body: `You were assigned to finance-review: ${proposal.title}`,
+        link: `/finance/reviews/${proposal._id}`,
+        programTier: req.programTier,
+      });
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  const populated = await Proposal.findById(proposal._id)
+    .populate("assignedFinance.userId", "fullName email role")
+    .populate("assignedCommittee.userId", "fullName email role")
+    .populate("assignedReviewers.userId", "fullName email role")
+    .populate("fundingCallId", "title status deadline");
+
+  const names = users.map((u) => u.fullName || u.email).join(", ");
+  res.json({
+    message: `Sent to finance: ${names}`,
+    sentToFinance: true,
+    proposal: sanitizeProposal(populated),
+  });
+}
+
 module.exports = {
   createProposal,
   updateProposal,
@@ -1005,5 +1125,7 @@ module.exports = {
   directorDecision,
   ethicsDecision,
   assignReviewers,
+  assignCommittee,
+  assignFinance,
   deleteProposal,
 };
