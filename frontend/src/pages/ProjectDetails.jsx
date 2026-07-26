@@ -94,9 +94,8 @@ export function ProjectDetailsPage() {
   const isOwner = String(project.researcherId) === String(user?.id);
   const canEdit = isOwner || user?.role === "research_director";
   const isVoluntary = Boolean(project.isVoluntary || project.proposalKind === "voluntary");
-  const closureItems = isVoluntary
-    ? CLOSURE_CHECKLIST_ITEMS.filter((item) => item.key !== "financialCleared")
-    : CLOSURE_CHECKLIST_ITEMS;
+  // Finance clears money on Project closure (Finance) — PI never self-certifies financialCleared
+  const closureItems = CLOSURE_CHECKLIST_ITEMS.filter((item) => item.key !== "financialCleared");
 
   return (
     <div>
@@ -468,8 +467,33 @@ export function ProjectDetailsPage() {
         onLogCommunication={logCommunication}
       />
 
-      <div className="card" style={{ marginTop: 12 }} id="closure">
+      <div
+        className="card"
+        style={{
+          marginTop: 12,
+          borderColor:
+            user?.role === "research_director" && project.closure?.status === "submitted"
+              ? "rgba(56,189,248,0.55)"
+              : undefined,
+        }}
+        id="closure"
+      >
         <div style={{ fontWeight: 800, marginBottom: 8 }}>Project closure (Phase 6) — Complete project</div>
+        {user?.role === "research_director" && project.closure?.status === "submitted" ? (
+          <div
+            style={{
+              marginBottom: 12,
+              padding: 12,
+              borderRadius: 8,
+              background: "rgba(14,165,233,0.12)",
+              border: "1px solid rgba(56,189,248,0.4)",
+            }}
+          >
+            <strong>Action needed:</strong> PI submitted project closure — use{" "}
+            <strong>Director approve closure</strong> below. It will then appear in Finance automatically
+            (grant-funded).
+          </div>
+        ) : null}
         <p className="muted" style={{ fontSize: 13 }}>
           Status: {project.closure?.status || "none"} · Project: {project.status}
           {["completed", "closed"].includes(project.status) ? " · Done" : ""}
@@ -532,21 +556,6 @@ export function ProjectDetailsPage() {
                 try {
                   await projectApi.submitClosure(accessToken, id, closureForm);
                   setMessage("Closure submitted — Director will review. Project is now Closing.");
-                  // #region agent log
-                  fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-                    body: JSON.stringify({
-                      sessionId: "f558f7",
-                      runId: "project-complete",
-                      hypothesisId: "PC1",
-                      location: "ProjectDetails.jsx:submitClosure",
-                      message: "UI closure submit ok",
-                      data: { projectId: id },
-                      timestamp: Date.now(),
-                    }),
-                  }).catch(() => {});
-                  // #endregion
                   await load();
                 } catch (e) {
                   setError(e?.response?.data?.message || "Submit failed");
@@ -568,15 +577,15 @@ export function ProjectDetailsPage() {
           <button
             type="button"
             className="btn primary"
-            style={{ marginTop: 8 }}
+            style={{ marginTop: 12, padding: "10px 18px", fontWeight: 800 }}
             onClick={async () => {
               try {
                 setError("");
                 await projectApi.directorClosureApproval(accessToken, id, "Approved");
                 setMessage(
                   isVoluntary
-                    ? "Director approved — ready to archive (finance skipped for voluntary)."
-                    : "Director approved — if grant was already finance-authorized, archive is ready; otherwise waiting for Finance closure."
+                    ? "Director approved — project closed."
+                    : "Director approved — waiting for Finance clearance. After Finance approves, the project closes automatically."
                 );
                 await load();
               } catch (e) {
@@ -591,46 +600,12 @@ export function ProjectDetailsPage() {
         !isVoluntary &&
         project.closure?.status === "director_approved" ? (
           <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
-            Waiting for Finance → <strong>Project closure (Finance)</strong> queue.
+            Waiting for Finance clearance. When Finance approves, this project will close automatically.
           </p>
         ) : null}
-        {user?.role === "research_director" && project.closure?.status === "finance_approved" ? (
-          <button
-            type="button"
-            className="btn primary"
-            style={{ marginTop: 8 }}
-            onClick={async () => {
-              try {
-                setError("");
-                await projectApi.archiveProject(accessToken, id);
-                setMessage("Project completed and archived.");
-                // #region agent log
-                fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-                  body: JSON.stringify({
-                    sessionId: "f558f7",
-                    runId: "project-complete",
-                    hypothesisId: "PC1",
-                    location: "ProjectDetails.jsx:archive",
-                    message: "UI archive ok",
-                    data: { projectId: id },
-                    timestamp: Date.now(),
-                  }),
-                }).catch(() => {});
-                // #endregion
-                await load();
-              } catch (e) {
-                setError(e?.response?.data?.message || "Archive failed");
-              }
-            }}
-          >
-            Archive / mark project completed
-          </button>
-        ) : null}
-        {["completed", "closed"].includes(project.status) ? (
+        {["completed", "closed"].includes(project.status) || project.closure?.status === "archived" ? (
           <div className="card" style={{ marginTop: 10, borderColor: "rgba(34,197,94,0.45)" }}>
-            <strong>Project completed.</strong>
+            <strong>Project closed.</strong>
             <span className="muted" style={{ marginLeft: 8, fontSize: 13 }}>
               Closure: {project.closure?.status || "—"}
             </span>

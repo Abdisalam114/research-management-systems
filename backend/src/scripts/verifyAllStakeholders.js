@@ -9,10 +9,18 @@ const { INSTITUTIONAL_USERS } = require("./seedData");
 const BASE = process.env.API_BASE || "http://localhost:5000";
 const { PROGRAM_TIER_HEADER } = require("../constants/programTier");
 
+const CROSS_TIER = new Set([
+  "research_director",
+  "faculty_coordinator",
+  "finance_officer",
+  "leadership",
+]);
+
 const ROLE_CHECKS = {
   research_director: [
     ["GET", "/api/analytics/dashboard", [200]],
     ["GET", "/api/proposals", [200]],
+    ["GET", "/api/projects", [200]],
     ["GET", "/api/funding-calls", [200]],
     ["GET", "/api/grants", [200]],
   ],
@@ -27,6 +35,7 @@ const ROLE_CHECKS = {
     ["GET", "/api/budgets", [200]],
     ["GET", "/api/analytics/finance-report", [200]],
     ["GET", "/api/grants", [200]],
+    ["GET", "/api/projects", [200]],
     ["GET", "/api/policies", [200]],
   ],
   leadership: [
@@ -36,16 +45,10 @@ const ROLE_CHECKS = {
     ["GET", "/api/proposals/my-review-assignments", [200]],
     ["GET", "/api/policies", [200]],
   ],
-    ["GET", "/api/projects", [200]],
-    ["GET", "/api/thesis-groups", [200]],
-    ["GET", "/api/policies", [200]],
-  ],
-    ["GET", "/api/analytics/donor-report", [200]],
-    ["GET", "/api/grants", [200]],
-  ],
   researcher: [
     ["GET", "/api/analytics/dashboard", [200]],
     ["GET", "/api/proposals", [200]],
+    ["GET", "/api/projects", [200]],
     ["GET", "/api/funding-calls", [200]],
     ["GET", "/api/grants", [200]],
   ],
@@ -91,8 +94,9 @@ async function main() {
     const token = login.data.accessToken;
     const me = await api("GET", "/api/auth/me", token);
     const role = me.data?.user?.role || spec.role;
-    const tierHeader =
-      role === "research_director" ? spec.programTier || "undergraduate" : undefined;
+    const tierHeader = CROSS_TIER.has(role)
+      ? spec.programTier || "undergraduate"
+      : undefined;
     const checks = ROLE_CHECKS[role] || [["GET", "/api/analytics/dashboard", [200]]];
     let roleFail = 0;
 
@@ -115,7 +119,9 @@ async function main() {
 
   console.log("=== ALL STAKEHOLDER USERS ===\n");
   for (const r of rows) {
-    console.log(`${r.login === "OK" && r.api === "OK" ? "OK" : "BAD"} | ${r.email} | ${r.role} | ${r.tier} | login=${r.login} api=${r.api}`);
+    console.log(
+      `${r.login === "OK" && r.api === "OK" ? "OK" : "BAD"} | ${r.email} | ${r.role} | ${r.tier} | login=${r.login} api=${r.api}`
+    );
   }
   const ok = rows.filter((r) => r.login === "OK" && r.api === "OK").length;
   console.log(`\nRESULT: ${ok}/${INSTITUTIONAL_USERS.length} users fully working`);

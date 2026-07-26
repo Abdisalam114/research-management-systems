@@ -5,13 +5,16 @@
 const fs = require("fs");
 const path = require("path");
 
-const LOG = path.join(__dirname, "..", "debug-6113cc.log");
+const LOG = path.join(__dirname, "..", "debug-f558f7.log");
 const BASE = "http://localhost:5000";
+const TIER_HEADER = "X-Program-Tier";
+const CROSS_TIER = new Set(["research_director", "faculty_coordinator", "finance_officer", "leadership"]);
 
 const USERS = [
-  { role: "research_director", email: "director@rms.edu", password: "Director2024!" },
-  { role: "faculty_coordinator", email: "coordinator@rms.edu", password: "Coordinator2024!" },
-  { role: "finance_officer", email: "finance@rms.edu", password: "Finance2024!" },
+  { role: "research_director", email: "director@rms.edu", password: "Director2024!", tier: "undergraduate" },
+  { role: "faculty_coordinator", email: "coordinator@rms.edu", password: "Coordinator2024!", tier: "undergraduate" },
+  { role: "finance_officer", email: "finance@rms.edu", password: "Finance2024!", tier: "undergraduate" },
+  { role: "leadership", email: "leadership@rms.edu", password: "Leadership2024!", tier: "undergraduate" },
   { role: "researcher", email: "asha@rms.edu", password: "Researcher2024!" },
   { role: "researcher_2", email: "mahad@rms.edu", password: "Researcher2024!" },
 ];
@@ -57,6 +60,14 @@ const ROLE_CHECKS = {
     ["GET", "/api/conversations/users", [200], "messageable users"],
     ["GET", "/api/notifications/me/unread-count", [200], "notifications"],
   ],
+  leadership: [
+    ["GET", "/api/analytics/dashboard", [200], "dashboard metrics"],
+    ["GET", "/api/grants", [200], "grants list"],
+    ["GET", "/api/analytics/kpi-dashboard", [200], "kpi dashboard"],
+    ["GET", "/api/proposals/my-review-assignments", [200], "peer review assignments"],
+    ["GET", "/api/policies", [200], "policies"],
+    ["GET", "/api/notifications/me/unread-count", [200], "notifications"],
+  ],
   researcher_2: [
     ["GET", "/api/analytics/dashboard", [200], "dashboard metrics"],
     ["GET", "/api/proposals", [200], "own proposals"],
@@ -79,22 +90,20 @@ const ROLE_CHECKS = {
 };
 
 function log(entry) {
-  fs.appendFileSync(LOG, JSON.stringify({ sessionId: "6113cc", runId: "verify-all-roles", timestamp: Date.now(), ...entry }) + "\n");
+  fs.appendFileSync(LOG, JSON.stringify({ sessionId: "f558f7", runId: "verify-all-roles", timestamp: Date.now(), ...entry }) + "\n");
 }
 
-async function req(method, url, { token, body } = {}) {
+async function req(method, url, { token, body, programTier } = {}) {
   const headers = { "Content-Type": "application/json" };
   if (token) headers.Authorization = `Bearer ${token}`;
+  if (programTier) headers[TIER_HEADER] = programTier;
   const res = await fetch(`${BASE}${url}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
   const data = await res.json().catch(() => ({}));
   return { status: res.status, data };
 }
 
 (async () => {
-  try {
-    fs.writeFileSync(LOG, "");
-  } catch (_) {}
-
+  // append to session log (do not wipe)
   const health = await req("GET", "/api/health");
   log({ hypothesisId: "H0", message: "backend health", data: health });
   if (health.status !== 200) {
@@ -118,8 +127,10 @@ async function req(method, url, { token, body } = {}) {
 
     const token = login.data.accessToken;
     const me = await req("GET", "/api/auth/me", { token });
-    log({ hypothesisId: "ME", role: user.role, message: "auth me", data: { status: me.status, role: me.data?.user?.role } });
+    const actualRole = me.data?.user?.role || user.role;
+    log({ hypothesisId: "ME", role: user.role, message: "auth me", data: { status: me.status, role: actualRole } });
 
+    const programTier = CROSS_TIER.has(actualRole) ? user.tier || "undergraduate" : undefined;
     const checks = ROLE_CHECKS[user.role] || [];
     const roleResults = [];
 
@@ -128,7 +139,7 @@ async function req(method, url, { token, body } = {}) {
       if (method === "POST" && url === "/api/grants") {
         body = { title: `Role test grant ${Date.now()}`, fundingSource: "Test", amountRequested: 500, currency: "USD" };
       }
-      const r = await req(method, url, { token, body });
+      const r = await req(method, url, { token, body, programTier });
       const ok = expected.includes(r.status);
       if (!ok) totalFail++;
       roleResults.push({ desc, url, status: r.status, expected, ok: ok ? "PASS" : "FAIL" });
@@ -136,7 +147,7 @@ async function req(method, url, { token, body } = {}) {
         hypothesisId: "ROLE",
         role: user.role,
         message: `${desc}`,
-        data: { method, url, status: r.status, expected, ok },
+        data: { method, url, status: r.status, expected, ok, programTier: programTier || null },
       });
     }
 

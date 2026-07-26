@@ -138,6 +138,7 @@ function sanitizeProjectForFinanceClosure(p, { isVoluntary = false, proposalKind
     isVoluntary,
     proposalKind,
     financeView: true,
+    programTier: p.programTier || null,
     principalInvestigator: researcher?._id
       ? {
           fullName: researcher.fullName || researcher.name || null,
@@ -156,7 +157,13 @@ async function listProjects(req, res) {
   if (role === "finance_officer") {
     const projects = await Project.find({
       ...tierFilter,
-      "closure.status": { $in: [CLOSURE_STATUSES.DIRECTOR_APPROVED, CLOSURE_STATUSES.FINANCE_APPROVED, CLOSURE_STATUSES.ARCHIVED] },
+      "closure.status": {
+        $in: [
+          CLOSURE_STATUSES.DIRECTOR_APPROVED,
+          CLOSURE_STATUSES.FINANCE_APPROVED,
+          CLOSURE_STATUSES.ARCHIVED,
+        ],
+      },
     })
       .sort({ updatedAt: -1 })
       .populate(PROJECT_POPULATE);
@@ -176,6 +183,8 @@ async function listProjects(req, res) {
         return sanitizeProjectForFinanceClosure(p, { isVoluntary, proposalKind });
       })
     );
+
+
     return res.json({ projects: out });
   }
 
@@ -193,37 +202,6 @@ async function listProjects(req, res) {
     })
   );
 
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const pth = require("path");
-    const voluntary = sanitized.filter((p) => p.isVoluntary).length;
-    const grantFund = sanitized.filter((p) => !p.isVoluntary).length;
-    fs.appendFileSync(
-      pth.join(__dirname, "..", "..", "..", "debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "project-kind-split",
-        hypothesisId: "K1",
-        location: "projectController.listProjects",
-        message: "projects split by kind",
-        data: {
-          role,
-          total: sanitized.length,
-          voluntary,
-          grantFund,
-          sample: sanitized.slice(0, 6).map((p) => ({
-            id: String(p.id),
-            title: p.title,
-            proposalKind: p.proposalKind,
-            isVoluntary: p.isVoluntary,
-          })),
-        },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch (_) { /* debug */ }
-  // #endregion
 
   res.json({ projects: sanitized });
 }
@@ -241,18 +219,9 @@ async function getProject(req, res) {
 
   // Finance: return closure/finance payload only — never general project dossier.
   if (req.user.role === "finance_officer") {
-    let proposalKind = "voluntary";
-    let fundingCallId = null;
-    if (project.proposalId) {
-      const linkedProposal = await Proposal.findOne(req.tierWhere({ _id: project.proposalId })).select("proposalKind fundingCallId");
-      if (linkedProposal) {
-        fundingCallId = linkedProposal.fundingCallId || null;
-        proposalKind =
-          linkedProposal.proposalKind ||
-          (linkedProposal.fundingCallId ? "grant_fund_call" : "voluntary");
-      }
-    }
-    const isVoluntary = proposalKind === "voluntary" || (!fundingCallId && proposalKind !== "grant_fund_call");
+    const kindMeta = await resolveProjectKindMeta(req, project);
+    const isVoluntary = kindMeta.isVoluntary;
+    const proposalKind = kindMeta.proposalKind;
     let budgetSummary = null;
     try {
       const { ensureBudgetForProject } = require("../utils/ensureBudgetForProject");
@@ -267,70 +236,14 @@ async function getProject(req, res) {
           currency: budget.currency || "USD",
         };
       }
-      // #region agent log
-      try {
-        const fs = require("fs");
-        const path = require("path");
-        fs.appendFileSync(
-          path.join(__dirname, "..", "..", "..", "debug-f558f7.log"),
-          `${JSON.stringify({
-            sessionId: "f558f7",
-            hypothesisId: "BA1",
-            location: "projectController.getProject:finance",
-            message: "ensure budget on project open",
-            data: {
-              projectId: String(id),
-              created: ensured.created,
-              updated: ensured.updated,
-              amount: ensured.amount || 0,
-              totalAllocated: budget?.totalAllocated || 0,
-            },
-            timestamp: Date.now(),
-            runId: "post-fix",
-          })}\n`
-        );
-      } catch (_) { /* debug */ }
-      // #endregion
     } catch (_) { /* optional */ }
 
-    // #region agent log
-    try {
-      const p = require("path");
-      const fs = require("fs");
-      const line = `${JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "H7",
-        location: "projectController.getProject",
-        message: "finance closure view only",
-        data: { projectId: String(id), closureStatus: project.closure?.status || null, financeView: true },
-        timestamp: Date.now(),
-      })}\n`;
-      fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
-      fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
-    } catch (_) { /* debug */ }
-    // #endregion
 
     return res.json({
       project: sanitizeProjectForFinanceClosure(project, { isVoluntary, proposalKind, budgetSummary }),
     });
   }
 
-  // #region agent log
-  try {
-    const p = require("path");
-    const fs = require("fs");
-    const line = `${JSON.stringify({
-      sessionId: "f558f7",
-      hypothesisId: "H1",
-      location: "projectController.getProject",
-      message: "project access ok",
-      data: { role: req.user.role, projectId: String(id), closureStatus: project.closure?.status || null },
-      timestamp: Date.now(),
-    })}\n`;
-    fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
-    fs.appendFileSync(p.join(__dirname, "..", "..", "..", ".cursor", "debug-f558f7.log"), line);
-  } catch (_) { /* debug */ }
-  // #endregion
 
   const grantDocs = await Grant.find(req.tierWhere({
     $or: [
@@ -398,57 +311,9 @@ async function getProject(req, res) {
           budgetId: String(ensured.budget._id),
         };
       }
-      // #region agent log
-      try {
-        const fs = require("fs");
-        const pth = require("path");
-        fs.appendFileSync(
-          pth.join(__dirname, "..", "..", "..", "debug-f558f7.log"),
-          `${JSON.stringify({
-            sessionId: "f558f7",
-            hypothesisId: "BA1",
-            location: "projectController.getProject",
-            message: "ensure budget on project open",
-            data: {
-              projectId: String(id),
-              created: ensured.created,
-              updated: ensured.updated,
-              amount: ensured.amount || 0,
-              totalAllocated: ensured.budget?.totalAllocated || 0,
-            },
-            timestamp: Date.now(),
-            runId: "post-fix",
-          })}\n`
-        );
-      } catch (_) { /* debug */ }
-      // #endregion
     } catch (_) { /* best-effort */ }
   }
 
-  // #region agent log
-  try {
-    const p = require("path");
-    const fs = require("fs");
-    const line = `${JSON.stringify({
-      sessionId: "f558f7",
-      runId: "grant-to-project",
-      hypothesisId: "G4",
-      location: "projectController.getProject",
-      message: "project linked grants visibility",
-      data: {
-        projectId: String(id),
-        projectStatus: project.status,
-        isVoluntary,
-        grantsVisible: out.grantsVisible,
-        linkedGrantCount: out.linkedGrants?.length || 0,
-        grantIds: grantDocs.map((g) => String(g._id)),
-        totalAllocated: out.budgetSummary?.totalAllocated || 0,
-      },
-      timestamp: Date.now(),
-    })}\n`;
-    fs.appendFileSync(p.join(__dirname, "..", "..", "..", "debug-f558f7.log"), line);
-  } catch (_) { /* debug */ }
-  // #endregion
 
   out.workflow = await buildWorkflowForProject(id, tierFilter, req.user.role);
   res.json({ project: out });
@@ -533,19 +398,18 @@ async function submitClosure(req, res) {
   }
 
   const isVoluntary = await resolveProjectIsVoluntary(req, project);
-  const financeAlreadyCleared = isVoluntary || (await grantAlreadyFinanceCleared(req, project));
   const checklistData = checklist || {};
   const mergedChecklist = {
     publicationsArchived: Boolean(checklistData.publicationsArchived),
     assetsHandedOver: Boolean(checklistData.assetsHandedOver),
     dataArchived: Boolean(checklistData.dataArchived),
-    // Voluntary / already-funded grants — finance cleared automatically
-    financialCleared: financeAlreadyCleared ? true : Boolean(checklistData.financialCleared),
+    // Grant-funded: Finance clears money on Project closure (Finance) queue.
+    // Voluntary: no grant funds — treat as cleared.
+    financialCleared: isVoluntary ? true : false,
     ethicsClosed: Boolean(checklistData.ethicsClosed),
   };
-  const requiredKeys = isVoluntary
-    ? ["publicationsArchived", "assetsHandedOver", "dataArchived", "ethicsClosed"]
-    : Object.keys(mergedChecklist);
+  // PI never self-certifies financial clearance for grant projects.
+  const requiredKeys = ["publicationsArchived", "assetsHandedOver", "dataArchived", "ethicsClosed"];
   const allChecked = requiredKeys.every((k) => Boolean(mergedChecklist[k]));
   if (!allChecked) {
     throw new AppError("Complete the closure checklist before submitting", 400);
@@ -563,29 +427,6 @@ async function submitClosure(req, res) {
   project.status = PROJECT_STATUSES.CLOSING;
   await project.save();
 
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const p = require("path");
-    fs.appendFileSync(
-      p.join(__dirname, "../../../debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "project-complete",
-        hypothesisId: "PC1",
-        location: "projectController.submitClosure",
-        message: "closure submitted",
-        data: {
-          projectId: String(project._id),
-          status: project.status,
-          closure: project.closure?.status,
-          isVoluntary,
-        },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch { /* ignore */ }
-  // #endregion
 
   try {
     await notifyUsersByRole("research_director", {
@@ -593,6 +434,7 @@ async function submitClosure(req, res) {
       title: "Project closure submitted",
       body: project.title,
       link: `/projects/${project._id}#closure`,
+      programTier: req.notifyProgramTier?.(project) || req.programTier,
     }, req.programTier);
   } catch { /* best-effort */ }
 
@@ -611,17 +453,6 @@ async function submitClosure(req, res) {
   res.json({ message: "Closure submitted", project: sanitizeProject(updated) });
 }
 
-async function grantAlreadyFinanceCleared(req, project) {
-  const awarded = await Grant.findOne(
-    req.tierWhere({
-      projectId: project._id,
-      status: { $in: [GRANT_STATUSES.ACTIVE, GRANT_STATUSES.APPROVED, GRANT_STATUSES.CLOSED] },
-      amountAwarded: { $gt: 0 },
-    })
-  ).select("_id status amountAwarded");
-  return Boolean(awarded);
-}
-
 async function directorClosureApproval(req, res) {
   const { comment } = req.body || {};
   const project = await Project.findOne(req.tierWhere({ _id: req.params.id }));
@@ -631,13 +462,12 @@ async function directorClosureApproval(req, res) {
   }
 
   const isVoluntary = await resolveProjectIsVoluntary(req, project);
-  const financeAlreadyCleared = isVoluntary || (await grantAlreadyFinanceCleared(req, project));
   project.closure.directorApprovedAt = new Date();
   project.closure.directorApprovedBy = req.user.id;
   if (comment) project.closure.auditNotes = `${project.closure.auditNotes || ""}\n[Director] ${comment}`.trim();
 
-  if (financeAlreadyCleared) {
-    // Voluntary — or grant already finance-authorized — skip second finance queue
+  // Only voluntary projects skip Finance. Grant-funded always enter the Finance closure queue.
+  if (isVoluntary) {
     project.closure.status = CLOSURE_STATUSES.FINANCE_APPROVED;
     project.closure.financeApprovedAt = new Date();
     project.closure.financeApprovedBy = req.user.id;
@@ -647,72 +477,55 @@ async function directorClosureApproval(req, res) {
     };
   } else {
     project.closure.status = CLOSURE_STATUSES.DIRECTOR_APPROVED;
+    project.closure.checklist = {
+      ...(project.closure.checklist || {}),
+      financialCleared: false,
+    };
   }
   await project.save();
 
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const p = require("path");
-    fs.appendFileSync(
-      p.join(__dirname, "../../../debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "project-complete",
-        hypothesisId: "CS1",
-        location: "projectController.directorClosureApproval",
-        message: "director closure decision",
-        data: {
-          projectId: String(project._id),
-          isVoluntary,
-          financeAlreadyCleared,
-          closureStatus: project.closure.status,
-        },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch { /* ignore */ }
-  // #endregion
+  // Voluntary: final approval is Director → close project immediately.
+  if (isVoluntary) {
+    await finalizeClosedProject(req, project);
+  }
 
-  if (!financeAlreadyCleared) {
+
+  if (!isVoluntary) {
     try {
-      await notifyUsersByRole("finance_officer", {
-        type: "project",
-        title: "Project closure pending finance",
-        body: project.title,
-        link: `/finance/closures/${project._id}`,
-      }, req.programTier);
-    } catch { /* best-effort */ }
-  } else {
-    try {
-      await notifyUser(project.researcherId, {
-        type: "project",
-        title: "Closure approved — ready to archive",
-        body: project.title,
-        link: `/projects/${project._id}`,
-        programTier: req.programTier,
-      });
+      await notifyUsersByRole(
+        "finance_officer",
+        {
+          type: "project",
+          title: "Project closure pending finance",
+          body: project.title,
+          link: `/finance/closures/${project._id}`,
+          programTier: req.notifyProgramTier?.(project) || project.programTier || req.programTier,
+        },
+        project.programTier || req.programTier
+      );
     } catch { /* best-effort */ }
   }
 
   await recordAudit({
     entityType: "project",
     entityId: project._id,
-    action: financeAlreadyCleared
-      ? (isVoluntary ? "closure_director_approved_voluntary" : "closure_director_approved_grant_cleared")
-      : "closure_director_approved",
-    label: financeAlreadyCleared
-      ? isVoluntary
-        ? "Director approved voluntary closure (finance skipped)"
-        : "Director approved closure (grant finance already cleared)"
-      : "Director approved closure",
+    action: isVoluntary ? "closure_director_approved_voluntary" : "closure_director_approved",
+    label: isVoluntary
+      ? "Director approved voluntary closure — project closed"
+      : "Director approved closure — queued for Finance",
     detail: project.title,
     actorId: req.user.id,
     actorRole: req.user.role,
     programTier: req.programTier,
   });
 
-  res.json({ message: "Director closure approval saved", project: sanitizeProject(project) });
+  const updated = await Project.findById(project._id).populate(PROJECT_POPULATE);
+  res.json({
+    message: isVoluntary
+      ? "Director approved — project closed"
+      : "Director approved — waiting for Finance clearance",
+    project: sanitizeProject(updated),
+  });
 }
 
 async function financeClosureApproval(req, res) {
@@ -726,37 +539,41 @@ async function financeClosureApproval(req, res) {
   project.closure.status = CLOSURE_STATUSES.FINANCE_APPROVED;
   project.closure.financeApprovedAt = new Date();
   project.closure.financeApprovedBy = req.user.id;
+  project.closure.checklist = {
+    ...(project.closure.checklist || {}),
+    financialCleared: true,
+  };
   if (comment) project.closure.auditNotes = `${project.closure.auditNotes || ""}\n[Finance] ${comment}`.trim();
   await project.save();
+
+  // Final clearance → project closes automatically (no separate archive click).
+  await finalizeClosedProject(req, project);
+
 
   await recordAudit({
     entityType: "project",
     entityId: project._id,
     action: "closure_finance_approved",
-    label: "Finance approved closure",
+    label: "Finance approved closure — project closed",
     detail: project.title,
     actorId: req.user.id,
     actorRole: req.user.role,
     programTier: req.programTier,
   });
 
-  res.json({ message: "Finance closure approval saved", project: sanitizeProject(project) });
+  const updated = await Project.findById(project._id).populate(PROJECT_POPULATE);
+  res.json({ message: "Finance cleared — project closed", project: sanitizeProject(updated) });
 }
 
-async function archiveProject(req, res) {
-  const project = await Project.findOne(req.tierWhere({ _id: req.params.id }));
-  if (!project) throw new AppError("Project not found", 404);
-  if (project.closure?.status !== CLOSURE_STATUSES.FINANCE_APPROVED) {
-    throw new AppError("Closure must be finance-approved before archive", 400);
-  }
-
+/**
+ * Mark project fully closed after final clearance (Director for voluntary, Finance for grant).
+ */
+async function finalizeClosedProject(req, project) {
   project.closure.status = CLOSURE_STATUSES.ARCHIVED;
   project.closure.archivedAt = new Date();
-  // Final user-facing status = completed (also accepted as closed in older filters)
   project.status = PROJECT_STATUSES.COMPLETED;
   await project.save();
 
-  // Linked grants follow the project into closed so Lists stay consistent
   try {
     await Grant.updateMany(
       req.tierWhere({ projectId: project._id, status: { $ne: GRANT_STATUSES.REJECTED } }),
@@ -764,68 +581,71 @@ async function archiveProject(req, res) {
     );
   } catch { /* best-effort */ }
 
-  // #region agent log
+
   try {
-    const fs = require("fs");
-    const p = require("path");
-    fs.appendFileSync(
-      p.join(__dirname, "../../../debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        runId: "project-complete",
-        hypothesisId: "PC1",
-        location: "projectController.archiveProject",
-        message: "project archived as completed",
-        data: { projectId: String(project._id), status: project.status, closure: project.closure?.status },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch { /* ignore */ }
-  // #endregion
+    const archiveDir = path.join(process.cwd(), "uploads", "repository", String(project._id));
+    const archiveFile = path.join(archiveDir, `closure-${Date.now()}.pdf`);
+    const lines = [
+      `Project: ${project.title}`,
+      `Status: Closed / Archived`,
+      `Final report: ${project.closure?.finalReport || "—"}`,
+      `Lessons learned: ${project.closure?.lessonsLearned || "—"}`,
+      `Archived at: ${new Date().toISOString()}`,
+    ];
+    await writeSimplePdf({
+      filePath: archiveFile,
+      title: "Project Closure Archive",
+      author: "Jamhuriya RMS",
+      bodyLines: lines,
+    });
 
-  const archiveDir = path.join(process.cwd(), "uploads", "repository", String(project._id));
-  const archiveFile = path.join(archiveDir, `closure-${Date.now()}.pdf`);
-  const lines = [
-    `Project: ${project.title}`,
-    `Status: Closed / Archived`,
-    `Final report: ${project.closure?.finalReport || "—"}`,
-    `Lessons learned: ${project.closure?.lessonsLearned || "—"}`,
-    `Archived at: ${new Date().toISOString()}`,
-  ];
-  await writeSimplePdf({
-    filePath: archiveFile,
-    title: "Project Closure Archive",
-    author: "Jamhuriya RMS",
-    bodyLines: lines,
-  });
-
-  const existingRepo = await RepositoryItem.findOne({
-    projectId: project._id,
-    title: { $regex: /^Project closure archive:/i },
-  });
-  if (!existingRepo) {
-    await RepositoryItem.create(req.tierAssign({
-      type: REPOSITORY_ITEM_TYPES.DOCUMENT,
-      title: `Project closure archive: ${project.title}`,
-      description: project.closure?.finalReport || "Archived on project closure",
-      filePath: archiveFile.replace(/\\/g, "/"),
-      fileSize: 0,
-      access: REPOSITORY_ACCESS.INSTITUTION,
+    const existingRepo = await RepositoryItem.findOne({
       projectId: project._id,
-      uploadedBy: project.researcherId,
-      programTier: project.programTier,
-    }));
-  }
+      title: { $regex: /^Project closure archive:/i },
+    });
+    if (!existingRepo) {
+      await RepositoryItem.create(
+        req.tierAssign({
+          type: REPOSITORY_ITEM_TYPES.DOCUMENT,
+          title: `Project closure archive: ${project.title}`,
+          description: project.closure?.finalReport || "Archived on project closure",
+          filePath: archiveFile.replace(/\\/g, "/"),
+          fileSize: 0,
+          access: REPOSITORY_ACCESS.INSTITUTION,
+          projectId: project._id,
+          uploadedBy: project.researcherId,
+          programTier: project.programTier,
+        })
+      );
+    }
+  } catch { /* best-effort archive PDF */ }
 
   try {
     await notifyUser(project.researcherId, {
       type: "project",
-      title: "Project archived",
+      title: "Project closed",
       body: project.title,
       link: `/projects/${project._id}`,
       programTier: project.programTier || req.programTier,
     });
   } catch { /* best-effort */ }
+
+  return project;
+}
+
+async function archiveProject(req, res) {
+  const project = await Project.findOne(req.tierWhere({ _id: req.params.id }));
+  if (!project) throw new AppError("Project not found", 404);
+  if (
+    project.closure?.status !== CLOSURE_STATUSES.FINANCE_APPROVED &&
+    project.closure?.status !== CLOSURE_STATUSES.ARCHIVED
+  ) {
+    throw new AppError("Closure must be finance-approved before archive", 400);
+  }
+
+  if (project.closure.status !== CLOSURE_STATUSES.ARCHIVED) {
+    await finalizeClosedProject(req, project);
+  }
 
   await recordAudit({
     entityType: "project",
@@ -976,30 +796,6 @@ async function deleteProject(req, res) {
   const budgets = await Budget.find({ projectId }).select("_id totalAllocated");
   const allocatedBudgets = budgets.filter((b) => Number(b.totalAllocated || 0) > 0);
   if (allocatedBudgets.length) {
-    // #region agent log
-    try {
-      const fs = require("fs");
-      const path = require("path");
-      fs.appendFileSync(
-        path.join(__dirname, "../../..", "debug-f558f7.log"),
-        `${JSON.stringify({
-          sessionId: "f558f7",
-          hypothesisId: "DEL3",
-          location: "projectController.deleteProject",
-          message: "blocked delete — budget allocated",
-          data: {
-            id: String(projectId),
-            allocatedCount: allocatedBudgets.length,
-            amounts: allocatedBudgets.map((b) => Number(b.totalAllocated || 0)),
-          },
-          timestamp: Date.now(),
-          runId: "post-fix",
-        })}\n`
-      );
-    } catch {
-      /* ignore */
-    }
-    // #endregion
     throw new AppError(
       "Cannot delete project: Budget allocated is locked system-wide. Allocated budgets cannot be deleted.",
       400
@@ -1018,25 +814,6 @@ async function deleteProject(req, res) {
   await Grant.updateMany({ projectId }, { $set: { projectId: null } });
   await Project.deleteOne({ _id: projectId });
 
-  // #region agent log
-  try {
-    const fs = require("fs");
-    const path = require("path");
-    fs.appendFileSync(
-      path.join(__dirname, "../../..", "debug-f558f7.log"),
-      `${JSON.stringify({
-        sessionId: "f558f7",
-        hypothesisId: "DEL2",
-        location: "projectController.deleteProject",
-        message: "project deleted",
-        data: { id: String(projectId), title, by: req.user.role, userId: String(req.user.id) },
-        timestamp: Date.now(),
-      })}\n`
-    );
-  } catch {
-    /* ignore */
-  }
-  // #endregion
 
   try {
     await recordAudit(req, {

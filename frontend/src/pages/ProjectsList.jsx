@@ -20,13 +20,21 @@ function kindLabel(p) {
   return projectKind(p) === "grant_fund_call" ? "Grant Fund Call" : "Voluntary";
 }
 
-function ProjectCard({ p }) {
+function ProjectCard({ p, isDirector, onApproveClosure, busyId }) {
+  const needsDirectorClosure = isDirector && p.closure?.status === "submitted";
   return (
-    <div className="card">
+    <div
+      className="card"
+      style={
+        needsDirectorClosure
+          ? { borderColor: "rgba(56,189,248,0.55)", boxShadow: "0 0 0 1px rgba(14,165,233,0.2)" }
+          : undefined
+      }
+    >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <Link
-            to={`/projects/${p.id}#workflow`}
+            to={`/projects/${p.id}#${needsDirectorClosure ? "closure" : "workflow"}`}
             style={{ fontWeight: 800, fontSize: 16, color: "inherit", textDecoration: "none" }}
           >
             {p.title}
@@ -50,6 +58,22 @@ function ProjectCard({ p }) {
             >
               {kindLabel(p)}
             </span>
+            {needsDirectorClosure ? (
+              <span
+                style={{
+                  display: "inline-block",
+                  marginRight: 8,
+                  padding: "2px 8px",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  background: "rgba(14,165,233,0.2)",
+                  color: "#7dd3fc",
+                }}
+              >
+                Closure awaiting Director
+              </span>
+            ) : null}
             {p.principalInvestigatorName || p.principalInvestigator?.fullName ? (
               <>
                 PI:{" "}
@@ -68,8 +92,18 @@ function ProjectCard({ p }) {
             }
           />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <Link className="btn primary" to={`/projects/${p.id}#workflow`}>
-              Open workflow
+            {needsDirectorClosure ? (
+              <button
+                type="button"
+                className="btn primary"
+                disabled={busyId === p.id}
+                onClick={() => onApproveClosure?.(p)}
+              >
+                {busyId === p.id ? "Saving…" : "Director approve closure"}
+              </button>
+            ) : null}
+            <Link className="btn primary" to={`/projects/${p.id}#${needsDirectorClosure ? "closure" : "workflow"}`}>
+              {needsDirectorClosure ? "Open closure" : "Open workflow"}
             </Link>
             <Link className="btn" to={`/research-workflow?projectId=${p.id}`}>
               Publish pipeline
@@ -81,7 +115,7 @@ function ProjectCard({ p }) {
   );
 }
 
-function ProjectSection({ title, hint, items, emptyText }) {
+function ProjectSection({ title, hint, items, emptyText, isDirector, onApproveClosure, busyId }) {
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div style={{ marginBottom: 10 }}>
@@ -97,7 +131,13 @@ function ProjectSection({ title, hint, items, emptyText }) {
       ) : (
         <div style={{ display: "grid", gap: 10 }}>
           {items.map((p) => (
-            <ProjectCard key={p.id} p={p} />
+            <ProjectCard
+              key={p.id}
+              p={p}
+              isDirector={isDirector}
+              onApproveClosure={onApproveClosure}
+              busyId={busyId}
+            />
           ))}
         </div>
       )}
@@ -114,60 +154,47 @@ export function ProjectsListPage({
   const { programTier } = useProgramTier();
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [busyId, setBusyId] = useState("");
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
+  const isDirector = user?.role === "research_director";
 
   async function load() {
     setError("");
     const res = await projectApi.listProjects(accessToken);
     const list = res.projects || [];
     setProjects(list);
-    // #region agent log
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify({
-        sessionId: "f558f7",
-        runId: "project-kind-split",
-        hypothesisId: "K2",
-        location: "ProjectsList.jsx:load",
-        message: "frontend received project kinds",
-        data: {
-          total: list.length,
-          voluntary: list.filter((p) => projectKind(p) === "voluntary").length,
-          grantFund: list.filter((p) => projectKind(p) === "grant_fund_call").length,
-          completed: list.filter((p) => ["completed", "closed"].includes(p.status)).map((p) => p.title),
-          campus: list
-            .filter((p) => /Campus Sustainability/i.test(p.title || ""))
-            .map((p) => ({ title: p.title, status: p.status, kind: projectKind(p) })),
-          predictive: list
-            .filter((p) => /Predictive Analytics/i.test(p.title || ""))
-            .map((p) => ({ title: p.title, status: p.status, kind: projectKind(p) })),
-          statusBreakdown: {
-            total: list.length,
-            active: list.filter((p) => p.status === "active").length,
-            closing: list.filter((p) => p.status === "closing").length,
-            completed: list.filter((p) => ["completed", "closed"].includes(p.status)).length,
-            on_hold: list.filter((p) => p.status === "on_hold").length,
-          },
-          benchmarking: list
-            .filter((p) => /Benchmarking Gradient Boosting/i.test(p.title || ""))
-            .map((p) => ({
-              title: p.title,
-              status: p.status,
-              kind: projectKind(p),
-              isVoluntary: p.isVoluntary,
-              proposalKind: p.proposalKind,
-            })),
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
   }
 
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load projects"));
   }, [accessToken, programTier]);
+
+  const pendingDirectorClosures = useMemo(
+    () => (isDirector ? projects.filter((p) => p.closure?.status === "submitted") : []),
+    [projects, isDirector]
+  );
+
+
+  async function approveClosure(p) {
+    if (!p?.id || busyId) return;
+    setBusyId(p.id);
+    setError("");
+    setMessage("");
+    try {
+      await projectApi.directorClosureApproval(accessToken, p.id, "Director approved");
+      setMessage(
+        p.isVoluntary || p.proposalKind === "voluntary"
+          ? `${p.title}: approved — project closed.`
+          : `${p.title}: Director approved — waiting for Finance. After Finance clears, the project closes automatically.`
+      );
+      await load();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Director approval failed");
+    } finally {
+      setBusyId("");
+    }
+  }
 
   const title =
     pageTitle || (user?.role === "researcher" ? "My Projects" : "Projects");
@@ -187,29 +214,6 @@ export function ProjectsListPage({
     const grantCount = projects.filter((p) => projectKind(p) === "grant_fund_call").length;
     // Total = Active + Closing + Completed (+ On hold if any)
     const sumParts = activeCount + closingCount + completedCount + onHoldCount;
-    // #region agent log
-    fetch("http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Debug-Session-Id": "f558f7" },
-      body: JSON.stringify({
-        sessionId: "f558f7",
-        runId: "stats-formula",
-        hypothesisId: "H1",
-        location: "ProjectsList.jsx:stats",
-        message: "Total vs Active+Closing+Completed",
-        data: {
-          total: projects.length,
-          active: activeCount,
-          closing: closingCount,
-          completed: completedCount,
-          onHold: onHoldCount,
-          sumParts,
-          equals: sumParts === projects.length,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     return [
       { label: "Total", value: projects.length, filterKey: "all" },
       { label: "Voluntary", value: voluntaryCount, filterKey: "kind:voluntary", accent: "#38bdf8" },
@@ -288,6 +292,40 @@ export function ProjectsListPage({
         </p>
       ) : null}
       {error ? <div className="card" style={{ borderColor: "rgba(255, 99, 132, 0.55)" }}>{error}</div> : null}
+      {message ? (
+        <div className="card" style={{ borderColor: "rgba(45,212,191,0.35)", marginTop: 12 }}>
+          {message}
+        </div>
+      ) : null}
+
+      {isDirector && pendingDirectorClosures.length > 0 ? (
+        <div
+          className="card"
+          style={{
+            marginTop: 12,
+            borderColor: "rgba(56,189,248,0.55)",
+            background: "rgba(14,165,233,0.08)",
+          }}
+        >
+          <div style={{ fontWeight: 800, fontSize: 16, marginBottom: 6 }}>
+            Closures awaiting Director approval ({pendingDirectorClosures.length})
+          </div>
+          <div className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
+            Appears automatically when a PI submits project closure.
+          </div>
+          <div style={{ display: "grid", gap: 10 }}>
+            {pendingDirectorClosures.map((p) => (
+              <ProjectCard
+                key={`closure-${p.id}`}
+                p={p}
+                isDirector
+                onApproveClosure={approveClosure}
+                busyId={busyId}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {filtered.length === 0 ? (
         <div className="card" style={{ marginTop: 12 }}>
@@ -299,7 +337,13 @@ export function ProjectsListPage({
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ display: "grid", gap: 10 }}>
             {filtered.map((p) => (
-              <ProjectCard key={p.id} p={p} />
+              <ProjectCard
+                key={p.id}
+                p={p}
+                isDirector={isDirector}
+                onApproveClosure={approveClosure}
+                busyId={busyId}
+              />
             ))}
           </div>
         </div>
@@ -312,6 +356,9 @@ export function ProjectsListPage({
               hint="Projects from voluntary proposals — no funding-call award."
               items={voluntaryProjects}
               emptyText="No voluntary projects in this filter."
+              isDirector={isDirector}
+              onApproveClosure={approveClosure}
+              busyId={busyId}
             />
           ) : null}
           {(statusFilter === "all" || grantProjects.length > 0) &&
@@ -321,6 +368,9 @@ export function ProjectsListPage({
               hint="Projects linked to an accepted funding-call grant or fund-call proposal."
               items={grantProjects}
               emptyText="No grant-funded projects in this filter."
+              isDirector={isDirector}
+              onApproveClosure={approveClosure}
+              busyId={busyId}
             />
           ) : null}
         </>
