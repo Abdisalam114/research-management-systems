@@ -16,3 +16,19 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    if (
+      error?.response?.status === 428 &&
+      error?.response?.data?.code === "PROGRAM_TIER_REQUIRED" &&
+      typeof window !== "undefined" &&
+      !window.location.pathname.includes("/program-tier") &&
+      !window.location.pathname.includes("/login")
+    ) {
+      window.location.assign("/program-tier");
+    }
+    return Promise.reject(error);
+  }
+);

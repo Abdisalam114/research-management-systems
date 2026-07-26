@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
-import { isCrossTierRole, programTierLabel } from "../constants/programTier";
 import * as searchApi from "../services/searchApi";
 import { PageHeader } from "../components/PageHeader";
 
@@ -16,7 +15,7 @@ const SECTIONS = [
 ];
 
 export function GlobalSearchPage() {
-  const { accessToken, user } = useAuth();
+  const { accessToken } = useAuth();
   const { programTier, programTierLabel } = useProgramTier();
   const [q, setQ] = useState("");
   const [results, setResults] = useState(null);
@@ -51,9 +50,7 @@ export function GlobalSearchPage() {
     <div className="pageStack">
       <PageHeader
         title="Global search"
-        subtitle={`Search proposals, projects, grants, publications, funding calls, and repository — ${
-          isCrossTierRole(user?.role) ? "all programs (UG + PG)" : `${programTierLabel} portal`
-        }`}
+        subtitle={`Search proposals, projects, grants, publications, funding calls, and repository — ${programTierLabel} portal`}
       />
       <form className="card" onSubmit={runSearch} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
         <input

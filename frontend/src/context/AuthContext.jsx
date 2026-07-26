@@ -6,6 +6,7 @@ import {
   initAuthStorage,
   setAuthTokens,
 } from "../utils/authStorage";
+import { isCrossTierRole } from "../constants/programTier";
 import { clearProgramTier } from "../utils/programTierStorage";
 
 export const AuthContext = createContext(null);
@@ -78,8 +79,10 @@ export function AuthProvider({ children }) {
       const res = await authApi.login({ email, password });
       applyTokens({ accessToken: res.accessToken, refreshToken: res.refreshToken });
       setUser(res.user);
-      // Shared staff see UG+PG together — never lock to a portal filter
-      clearProgramTier();
+      // Shared staff must re-select UG or PG portal after each sign-in
+      if (isCrossTierRole(res.user?.role)) {
+        clearProgramTier();
+      }
       return res;
     },
     [applyTokens]

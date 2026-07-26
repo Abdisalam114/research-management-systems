@@ -3,7 +3,7 @@ export const PROGRAM_TIERS = {
   POSTGRADUATE: "postgraduate",
 };
 
-/** Roles that see UG + PG together (one account each, system-wide). */
+/** Roles with one system-wide account that can switch UG ↔ PG portals. */
 export const CROSS_TIER_ROLES = [
   "research_director",
   "faculty_coordinator",

@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { useModuleLoad } from "../hooks/useModuleLoad";
+import { isCrossTierRole } from "../constants/programTier";
 import * as notificationApi from "../services/notificationApi";
 
 function formatWhen(at) {
@@ -14,8 +16,9 @@ function formatWhen(at) {
 }
 
 export function NotificationsPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const navigate = useNavigate();
+  const { programTier, selectProgramTier } = useProgramTier();
   const [notifications, setNotifications] = useState([]);
 
   const load = useCallback(async () => {
@@ -40,9 +43,23 @@ export function NotificationsPage() {
     } catch {
       /* still navigate */
     }
-    // Shared staff see UG+PG together — open links directly (no portal switch)
+
+    const needsPortalSwitch =
+      n.programTier &&
+      n.programTier !== programTier &&
+      isCrossTierRole(user?.role);
+
+    if (needsPortalSwitch) {
+      selectProgramTier(n.programTier);
+    }
+
     if (n.link) {
-      navigate(n.link);
+      if (needsPortalSwitch) {
+        // Allow storage + React state to settle before detail pages fetch
+        window.setTimeout(() => navigate(n.link), 0);
+      } else {
+        navigate(n.link);
+      }
     } else {
       await reload().catch(() => {});
     }
@@ -102,13 +119,15 @@ export function NotificationsPage() {
                   >
                     Mark read
                   </button>
-                ) : (
-                  <span className="muted">Read</span>
-                )}
+                ) : null}
               </div>
             </div>
           ))}
-          {notifications.length === 0 ? <div className="muted">No notifications yet.</div> : null}
+          {!loading && notifications.length === 0 ? (
+            <p className="muted" style={{ margin: 0 }}>
+              No notifications yet.
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

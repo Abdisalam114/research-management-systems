@@ -6,7 +6,7 @@ const {
   isValidProgramTier,
 } = require("../constants/programTier");
 
-/** Shared institutional staff — one account each, see UG + PG together. */
+/** Shared institutional staff — one account each; must pick UG or PG portal per session. */
 const CROSS_TIER_ROLES = Object.freeze([
   ROLES.RESEARCH_DIRECTOR,
   ROLES.FACULTY_COORDINATOR,
@@ -20,16 +20,21 @@ function isCrossTierRole(role) {
 
 /**
  * Resolve active program-tier scope for the request.
- * Cross-tier staff: optional X-Program-Tier header filters to one portal;
- * omit header → null (all UG + PG).
+ * Cross-tier staff: require valid X-Program-Tier (UG or PG portal).
  * Researchers (and other portal users): always locked to user.programTier.
  */
 function resolveProgramTier(req, user) {
   const headerTier = String(req.headers[PROGRAM_TIER_HEADER] || "").toLowerCase();
 
   if (isCrossTierRole(user.role)) {
-    if (isValidProgramTier(headerTier)) return headerTier;
-    return null;
+    if (!isValidProgramTier(headerTier)) {
+      throw new AppError(
+        "Program tier selection required. Choose Undergraduate or Postgraduate.",
+        428,
+        "PROGRAM_TIER_REQUIRED"
+      );
+    }
+    return headerTier;
   }
 
   if (user.programTier && isValidProgramTier(user.programTier)) {

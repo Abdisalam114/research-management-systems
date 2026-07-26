@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
+import { isCrossTierRole } from "../constants/programTier";
 import "./auth.css";
 import logo from "../assets/jamhuriya-logo.png";
 
@@ -70,7 +71,11 @@ export function LoginPage() {
               const trimmedPassword = password;
               try {
                 const res = await signIn(trimmedEmail, trimmedPassword);
-                clearProgramTier();
+                if (isCrossTierRole(res.user?.role)) {
+                  clearProgramTier();
+                  navigate("/program-tier", { replace: true });
+                  return;
+                }
                 const roleHome = {
                   finance_officer: "/budgets",
                   leadership: "/grants",

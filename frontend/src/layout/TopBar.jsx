@@ -1,22 +1,24 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { BackButton } from "../components/BackButton";
 import { GlobalSearchBar } from "../components/GlobalSearchBar";
 import * as notificationApi from "../services/notificationApi";
 import logo from "../assets/jamhuriya-logo.png";
-import { isCrossTierRole, programTierLabel } from "../constants/programTier";
+import { isCrossTierRole, PROGRAM_TIER_OPTIONS, programTierLabel } from "../constants/programTier";
 
 export function TopBar({ title = "Dashboard" }) {
   const { user, accessToken } = useAuth();
-  const { programTier } = useProgramTier();
+  const { programTier, clearProgramTier } = useProgramTier();
+  const navigate = useNavigate();
   const [unread, setUnread] = useState(0);
 
-  const sharedStaff = isCrossTierRole(user?.role);
-  const badgeLabel = sharedStaff
-    ? "All programs (UG + PG)"
-    : programTierLabel(user?.programTier || programTier);
+  const canSwitchTier = isCrossTierRole(user?.role);
+  const activeTier = canSwitchTier ? programTier : user?.programTier || programTier;
+  const tierMeta = PROGRAM_TIER_OPTIONS.find((o) => o.value === activeTier);
+  const badgeLabel = programTierLabel(activeTier);
+  const showTierBadge = Boolean(activeTier);
 
   useEffect(() => {
     if (!accessToken) return undefined;
@@ -52,28 +54,34 @@ export function TopBar({ title = "Dashboard" }) {
 
       <div className="topBarActions">
         <GlobalSearchBar />
-        {badgeLabel ? (
-          <span
+        {showTierBadge ? (
+          <button
+            type="button"
             className="topBarTierBadge"
-            title={
-              sharedStaff
-                ? "Shared staff account — Undergraduate and Postgraduate records together"
-                : "Your program portal"
+            title={canSwitchTier ? "Switch Undergraduate / Postgraduate portal" : "Your program portal"}
+            onClick={
+              canSwitchTier
+                ? () => {
+                    clearProgramTier();
+                    navigate("/program-tier", { replace: true });
+                  }
+                : undefined
             }
             style={{
-              border: "1px solid rgba(56,189,248,0.35)",
-              background: "rgba(14,165,233,0.12)",
-              color: "#7dd3fc",
+              border: `1px solid ${(tierMeta?.accent || "#38bdf8")}55`,
+              background: `${tierMeta?.accent || "#38bdf8"}18`,
+              color: tierMeta?.accent || "#38bdf8",
               borderRadius: 999,
               padding: "6px 12px",
               fontSize: 12,
               fontWeight: 800,
+              cursor: canSwitchTier ? "pointer" : "default",
               marginRight: 4,
-              display: "inline-block",
             }}
           >
-            {sharedStaff ? "🌐" : "📍"} {badgeLabel}
-          </span>
+            {tierMeta?.icon || "📍"} {badgeLabel}
+            {canSwitchTier ? " ▾" : ""}
+          </button>
         ) : null}
         <Link className="topBarIconBtn" to="/messages" title="Messages">
           💬
