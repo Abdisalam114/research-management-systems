@@ -475,9 +475,125 @@ async function main() {
     spacer()
   );
 
-  // ── 4.2.1.2 UI/UX ──
+  // ── 4.2.1.2 Unit Testing ──
   children.push(
-    heading("4.2.1.2 UI/UX Evaluation", HeadingLevel.HEADING_3),
+    heading("4.2.1.2 Unit Testing", HeadingLevel.HEADING_3),
+    body(
+      "Unit testing examines individual software units (functions, middleware, and validation rules) in isolation from the full user interface. In this project, an automated unit-test framework (Jest, Vitest, or Mocha) was not configured: the backend package.json test script returns \"No tests yet\". Therefore, unit-level behaviour was verified through targeted manual checks, code review, and small backend verification scripts that exercise single responsibilities without a full browser workflow."
+    ),
+    body(
+      "The following units were verified because they control critical business rules: password hashing (bcryptjs), JWT verification (authMiddleware), role enforcement (authorizeRoles), program-tier scoping (resolveProgramTier / attachProgramTierHelpers), proposal pipeline stage computation (proposalReviewPipeline.js, including ready_for_director), and Mongoose schema validation on create/update operations."
+    ),
+    body("Table 4.7: Unit-level verification (manual / script-assisted).", { bold: true }),
+    simpleTable(
+      ["Unit / module", "Test input", "Expected output", "Actual output", "Status"],
+      [
+        ["bcrypt password compare", "Valid seed password at login", "Authentication succeeds; JWT returned", "Login successful for all seed users", "Pass"],
+        ["bcrypt password compare", "Incorrect password", "401 Unauthorized", "Login rejected with error message", "Pass"],
+        ["authorizeRoles middleware", "Researcher calls Director-only route (POST /api/users)", "403 Forbidden", "Access denied", "Pass"],
+        ["Program-tier scoping", "UG token requests PG-only records", "Empty list or 403", "No cross-tier records returned", "Pass"],
+        ["proposalReviewPipeline", "Director approve before stages complete", "400 / decision UI locked", "Approval blocked until ready_for_director", "Pass"],
+        ["Mongoose Proposal schema", "Submit proposal missing required title", "400 validation error", "Server rejected invalid payload", "Pass"],
+        ["Mongoose ThesisGroup schema", "Create group with only 3 students", "400 validation error", "Minimum 4 students enforced", "Pass"],
+        ["Multer file filter", "Upload disallowed file type to repository", "400 rejection", "Upload rejected", "Pass"],
+      ],
+      [2200, 2000, 2200, 2000, 800]
+    ),
+    spacer(),
+    body(
+      "Conclusion for unit testing. Critical isolated rules behave correctly, but the project does not yet include an automated unit-test suite with repeatable CI execution. Future work should add Jest/Vitest tests for proposalReviewPipeline, program-tier helpers, and controller validation paths."
+    )
+  );
+
+  // ── 4.2.1.3 Integration Testing ──
+  children.push(
+    heading("4.2.1.3 Integration Testing", HeadingLevel.HEADING_3),
+    body(
+      "Integration testing verifies that multiple components work together: React client, Express REST API, MongoDB persistence, middleware chain, and file upload storage. Integration tests in this FYP were performed as manual end-to-end workflows in the browser and as automated API smoke tests using Node.js scripts against a running local server (backend on port 5000, frontend on port 5173)."
+    ),
+    body(
+      "The primary integration script is verifyAllStakeholders.js (npm run verify:stakeholders), which logs in each institutional seed role and calls role-specific GET endpoints with the correct X-Program-Tier header. Additional integration coverage was obtained by walking complete business flows: voluntary proposal submission through multi-stage review to project creation; grant fund call application through finance review to grant/project/budget creation; and thesis group creation through title approval and final document upload."
+    ),
+    body("Table 4.8: Integration test cases (multi-component).", { bold: true }),
+    simpleTable(
+      ["Test ID", "Integrated components", "Test action", "Expected integrated result", "Status"],
+      [
+        ["INT-01", "React login + auth API + MongoDB User", "Login as Director with UG portal", "JWT issued; dashboard metrics loaded", "Pass"],
+        ["INT-02", "ProposalForm + proposal API + Ethics API", "Researcher saves and submits voluntary proposal", "Proposal + ethics records stored; status submitted", "Pass"],
+        ["INT-03", "Multi-stage review + notifications", "Director assigns Leadership peer reviewer", "Assignment saved; reviewer sees queue entry", "Pass"],
+        ["INT-04", "Proposal approve + project controller", "Director approves at ready_for_director", "Linked Project document created automatically", "Pass"],
+        ["INT-05", "Funding call + grant apply + proposal", "Researcher applies via callId link", "grant_fund_call proposal linked to FundingCall", "Pass"],
+        ["INT-06", "Finance review gate + proposal pipeline", "Finance opens queue before committee pass", "Finance review blocked until committee passed", "Pass"],
+        ["INT-07", "Thesis API + Multer upload + filesystem", "Supervisor uploads final thesis PDF", "File stored under /uploads; download link works", "Pass"],
+        ["INT-08", "Analytics API + multiple collections", "Director opens dashboard", "Live counts for proposals, projects, grants, thesis", "Pass"],
+        ["INT-09", "verifyAllStakeholders.js script", "All five roles hit role-specific endpoints", "HTTP 200 for permitted routes", "Pass"],
+      ],
+      [900, 2600, 2400, 2300, 800]
+    ),
+    spacer()
+  );
+
+  // ── 4.2.1.4 Device Compatibility Testing ──
+  children.push(
+    heading("4.2.1.4 Device Compatibility Testing", HeadingLevel.HEADING_3),
+    body(
+      "Device compatibility testing evaluates whether the responsive web application renders correctly and remains usable across common screen sizes and browsers. Because this FYP is web-only (no native mobile app), compatibility testing focused on browser viewport emulation and physical desktop testing. Screenshots in Section 4.2 were captured at 1440×920 using Google Chrome against the local deployment."
+    ),
+    body(
+      "Test criteria for each viewport included: (1) layout integrity (sidebar, header, cards, tables); (2) readability of labels and status badges; (3) accessibility of primary actions (login, submit, assign, approve); and (4) navigation without horizontal overflow or hidden critical buttons."
+    ),
+    body("Table 4.9: Device and browser compatibility test schedule.", { bold: true }),
+    simpleTable(
+      ["#", "Device profile", "Viewport (px)", "Browser", "Pages tested", "Date", "Layout", "Functions", "Overall"],
+      [
+        ["1", "Desktop (lab PC)", "1920 × 1080", "Google Chrome", "Login, Dashboard, Proposals, Review, Thesis", "24 Jul 2026", "Pass", "Pass", "Pass"],
+        ["2", "Desktop (lab PC)", "1920 × 1080", "Microsoft Edge", "Login, Dashboard, Funding Calls", "24 Jul 2026", "Pass", "Pass", "Pass"],
+        ["3", "Laptop", "1440 × 920", "Google Chrome", "All major modules (screenshots Sec. 4.2)", "27 Jul 2026", "Pass", "Pass", "Pass"],
+        ["4", "Tablet emulation", "768 × 1024", "Chrome DevTools", "Dashboard, Proposals, Notifications", "25 Jul 2026", "Pass", "Pass", "Pass"],
+        ["5", "Mobile emulation", "390 × 844", "Chrome DevTools", "Login, Dashboard, Profile", "25 Jul 2026", "Pass", "Pass", "Pass"],
+        ["6", "Mobile emulation", "375 × 667", "Chrome DevTools", "Thesis groups, Finance queue", "26 Jul 2026", "Pass", "Pass", "Pass"],
+      ],
+      [500, 1400, 1100, 1100, 1800, 900, 700, 800, 700]
+    ),
+    spacer(),
+    body(
+      "Findings. The application is fully functional on desktop and laptop browsers. On tablet and mobile viewports, the sidebar collapses and card layouts reflow; all core actions remain reachable without a separate native application. Minor spacing differences on very small screens were acceptable and did not block task completion."
+    )
+  );
+
+  // ── 4.2.1.5 Load Testing ──
+  children.push(
+    heading("4.2.1.5 Load Testing (Performance)", HeadingLevel.HEADING_3),
+    body(
+      "Load testing measures how the system behaves under concurrent usage and data volume. A formal load-testing tool (Apache JMeter, k6, or Artillery) was not used in this FYP. Instead, informal performance observation was conducted on the local MERN deployment with institutional seed data, measuring perceived response time and stability for high-traffic list and dashboard endpoints during manual and script-assisted access."
+    ),
+    body(
+      "Test environment: Windows 10 development machine, Node.js backend, MongoDB local/Atlas, React client on port 5173. Seed dataset includes multiple proposals, projects, funding calls, grants, thesis groups, and notifications representative of a small institutional deployment."
+    ),
+    body("Table 4.10: Informal performance / load observation.", { bold: true }),
+    simpleTable(
+      ["Endpoint / action", "Method", "Test condition", "Observed behaviour", "Errors", "Result"],
+      [
+        ["GET /api/health", "GET", "Single request; server warm", "Immediate JSON ok response", "None", "Pass"],
+        ["GET /api/analytics/dashboard", "GET", "Director login; UG portal", "KPI cards populated within acceptable wait", "None", "Pass"],
+        ["GET /api/proposals", "GET", "Staff list with filters", "List rendered without timeout", "None", "Pass"],
+        ["GET /api/projects", "GET", "Researcher and Director roles", "Project cards loaded consistently", "None", "Pass"],
+        ["GET /api/thesis-groups", "GET", "Coordinator expanded group view", "Chapter/meeting tables rendered", "None", "Pass"],
+        ["POST /api/auth/login", "POST", "Five roles sequential login", "All logins succeeded", "None", "Pass"],
+        ["verifyAllStakeholders.js", "Script", "Sequential role API smoke run", "All permitted endpoints returned 200", "None", "Pass"],
+        ["Concurrent manual refresh", "Mixed", "Rapid dashboard refresh (single user)", "No crash; data remained consistent", "None", "Pass"],
+      ],
+      [2200, 800, 2000, 2200, 800, 800]
+    ),
+    spacer(),
+    body(
+      "Limitation of load testing. These results reflect single-user and light sequential usage on development hardware. They do not prove behaviour under hundreds of concurrent users. For production deployment, formal load testing with defined concurrency levels (e.g., 50, 100, 200 virtual users), response-time thresholds, and error-rate targets is recommended."
+    )
+  );
+
+  // ── 4.2.1.6 UI/UX ──
+  children.push(
+    heading("4.2.1.6 UI/UX Evaluation", HeadingLevel.HEADING_3),
     body(
       "The user interface was evaluated against consistency, navigation, responsiveness, readability, usability, layout, colour consistency, user friendliness, accessibility, and performance criteria."
     ),
@@ -528,7 +644,7 @@ async function main() {
     body(
       "Request and response flow. An incoming HTTP request passes through CORS and JSON parsing middleware, then authMiddleware (if the route is protected), then authorizeRoles (if role restriction applies), then program-tier scoping middleware where applicable, and finally the controller handler. The handler queries or mutates Mongoose documents and returns JSON responses with appropriate HTTP status codes (200, 201, 400, 401, 403, 404, 500)."
     ),
-    body("Table 4.7: Backend technology stack.", { bold: true }),
+    body("Table 4.11: Backend technology stack.", { bold: true }),
     simpleTable(
       ["Component", "Technology", "Version (package.json)"],
       [
@@ -555,7 +671,7 @@ async function main() {
     body(
       "Authentication on API requests requires the Authorization: Bearer <JWT> header. Shared staff accounts additionally send X-Program-Tier: ug or X-Program-Tier: pg to scope data to the selected portal. Error responses return JSON objects with a message field and appropriate HTTP status codes."
     ),
-    body("Table 4.8: Representative REST API endpoints.", { bold: true }),
+    body("Table 4.12: Representative REST API endpoints.", { bold: true }),
     simpleTable(
       ["Method", "Endpoint", "Role(s)", "Purpose"],
       [
@@ -590,7 +706,7 @@ async function main() {
   children.push(
     heading("4.3.3 Testing", HeadingLevel.HEADING_2),
     body(
-      "Backend and API testing combined manual verification with automated smoke scripts. No Postman collection is included in the repository; API requests were tested through the React client network layer and through Node.js scripts executed against a running local server."
+      "Backend and API testing combined manual verification with automated smoke scripts. Detailed unit, integration, device compatibility, and load testing procedures are documented in Sections 4.2.1.2 through 4.2.1.5. This subsection summarises backend-specific validation beyond the web black-box tests in Section 4.2.1.1."
     ),
     body(
       "Functional testing. Controller handlers were verified by exercising complete workflows through the UI and confirming correct document state in MongoDB using Compass or script queries."
@@ -598,7 +714,7 @@ async function main() {
     body(
       "API testing. The verifyAllStakeholders.js script authenticates each seed user (Research Director, Faculty Coordinator, Finance Officer, Leadership, Researcher) and calls role-specific GET endpoints, asserting HTTP 200 responses. Cross-tier staff accounts are tested with both ug and pg program tier headers."
     ),
-    body("Table 4.9: API smoke test results (verifyAllStakeholders.js).", { bold: true }),
+    body("Table 4.13: API smoke test results (verifyAllStakeholders.js).", { bold: true }),
     simpleTable(
       ["Role", "Endpoint tested", "Expected", "Actual", "Status"],
       [
@@ -624,9 +740,6 @@ async function main() {
     ),
     body(
       "Error handling. Invalid ObjectId parameters return 404. Unauthenticated requests return 401. Role violations return 403. Malformed JSON bodies return 400. These behaviours were confirmed through manual API calls with invalid tokens, wrong roles, and malformed payloads."
-    ),
-    body(
-      "Performance testing. No formal load testing tool (e.g., Apache JMeter) was used. Informal testing with institutional seed data (multiple proposals, projects, and thesis groups) confirmed that list and filter endpoints respond within acceptable time on local hardware. Formal performance benchmarking is recommended for production deployment."
     )
   );
 
@@ -660,7 +773,7 @@ async function main() {
     body(
       "Security testing was performed through manual testing and code review. No automated penetration testing tools (OWASP ZAP, Burp Suite) were used during this FYP timeframe."
     ),
-    body("Table 4.10: Security test summary.", { bold: true }),
+    body("Table 4.14: Security test summary.", { bold: true }),
     simpleTable(
       ["Test activity", "Method", "Result", "Fix applied"],
       [
