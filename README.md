@@ -115,8 +115,9 @@ Accounts and passwords are listed above under **Users and passwords (demo)**.
 | Document | Purpose |
 |----------|---------|
 | **[docs/SYSTEM_HOW_IT_WORKS.docx](docs/SYSTEM_HOW_IT_WORKS.docx)** | Official system flow (start here) |
-| **[docs/SYSTEM_ARCHITECTURE.docx](docs/SYSTEM_ARCHITECTURE.docx)** | System architecture (layers, APIs, roles) |
-| **[docs/DATABASE_STRUCTURE.docx](docs/DATABASE_STRUCTURE.docx)** | Database collections & relationships |
+| **[docs/SYSTEM_ARCHITECTURE.docx](docs/SYSTEM_ARCHITECTURE.docx)** | System architecture **with diagrams** |
+| **[docs/SYSTEM_ARCHITECTURE_WITH_FIGURES.docx](docs/SYSTEM_ARCHITECTURE_WITH_FIGURES.docx)** | Same architecture doc (use if `.docx` is open/locked) |
+| **[docs/DATABASE_STRUCTURE.docx](docs/DATABASE_STRUCTURE.docx)** | Database structure **with ER diagram** |
 | [docs/USER_GUIDE_SOM_EN.docx](docs/USER_GUIDE_SOM_EN.docx) | Short user guide (SO + EN) |
 | [docs/HOW_TO_USE_SYSTEM_SOM_EN.docx](docs/HOW_TO_USE_SYSTEM_SOM_EN.docx) | How to use |
 | [docs/FULL_SYSTEM_GUIDE_SOM_EN.docx](docs/FULL_SYSTEM_GUIDE_SOM_EN.docx) | Full journey by role |
