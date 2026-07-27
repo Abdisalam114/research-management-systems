@@ -1,7 +1,0 @@
-JUST RMS — Full system (text)
-=============================
-
-See: docs/SYSTEM_HOW_IT_WORKS.md and docs/FULL_SYSTEM_GUIDE_SOM_EN.md
-
-Flow: Submit → Assign peer → Peer review → Assign committee → Committee
-      → (grant) Assign finance → Finance → Director Approve → Project
