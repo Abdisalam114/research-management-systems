@@ -110,19 +110,20 @@ Accounts and passwords are listed above under **Users and passwords (demo)**.
 | `npm run verify:stakeholders` | Login + API check per role |
 | `npm run db:audit` | Document counts per collection |
 
-## Documentation (Word only — current system)
+## Documentation (Word only — complete current system)
 
 | Document | Purpose |
 |----------|---------|
-| **[docs/SYSTEM_HOW_IT_WORKS.docx](docs/SYSTEM_HOW_IT_WORKS.docx)** | How the system works (users, flow) |
-| **[docs/SYSTEM_ARCHITECTURE.docx](docs/SYSTEM_ARCHITECTURE.docx)** | Current architecture + diagrams |
-| **[docs/DATABASE_STRUCTURE.docx](docs/DATABASE_STRUCTURE.docx)** | Current MongoDB schema + ER diagram |
+| **[docs/SYSTEM_COMPLETE.docx](docs/SYSTEM_COMPLETE.docx)** | **Whole system in one Word file** (start here) |
+| **[docs/SYSTEM_ARCHITECTURE_CURRENT.docx](docs/SYSTEM_ARCHITECTURE_CURRENT.docx)** | Full architecture (modules, APIs, roles, diagrams) |
+| **[docs/DATABASE_STRUCTURE.docx](docs/DATABASE_STRUCTURE.docx)** | Full MongoDB schema (all 18 collections) |
+| **[docs/SYSTEM_HOW_IT_WORKS.docx](docs/SYSTEM_HOW_IT_WORKS.docx)** | Full how-to + users/passwords |
 | [docs/USER_GUIDE_SOM_EN.docx](docs/USER_GUIDE_SOM_EN.docx) | Short user guide (SO + EN) |
 | [docs/HOW_TO_USE_SYSTEM_SOM_EN.docx](docs/HOW_TO_USE_SYSTEM_SOM_EN.docx) | How to use |
-| [docs/FULL_SYSTEM_GUIDE_SOM_EN.docx](docs/FULL_SYSTEM_GUIDE_SOM_EN.docx) | Full journey by role |
+| [docs/FULL_SYSTEM_GUIDE_SOM_EN.docx](docs/FULL_SYSTEM_GUIDE_SOM_EN.docx) | Journey by role |
 | [docs/ROLES_AND_STAGES_GUIDE.docx](docs/ROLES_AND_STAGES_GUIDE.docx) | Roles & stages |
 
-Regenerate architecture/database Word files:
+Close Word if `SYSTEM_ARCHITECTURE.docx` is locked; use `SYSTEM_ARCHITECTURE_CURRENT.docx` instead.
 
 ```bash
 cd backend
