@@ -200,6 +200,36 @@ export function ProposalsListPage() {
                         Sent to reviewer
                       </span>
                     ) : null}
+                    {(p.assignedCommittee || []).length > 0 &&
+                    ["submitted", "under_review", "revision_requested"].includes(p.status) ? (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: 6,
+                          background: "rgba(34,197,94,0.18)",
+                          color: "#86efac",
+                        }}
+                      >
+                        Sent to committee
+                      </span>
+                    ) : null}
+                    {(p.assignedFinance || []).length > 0 &&
+                    ["submitted", "under_review", "revision_requested"].includes(p.status) ? (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "2px 8px",
+                          borderRadius: 6,
+                          background: "rgba(251,191,36,0.18)",
+                          color: "#fcd34d",
+                        }}
+                      >
+                        Sent to finance
+                      </span>
+                    ) : null}
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                       <Link className="btn" to={`/proposals/${p.id}`}>
                         Details
@@ -210,7 +240,7 @@ export function ProposalsListPage() {
                         </Link>
                       ) : null}
                       {isFinance ? (
-                        <Link className="btn primary" to={`/proposals/${p.id}/review`}>
+                        <Link className="btn primary" to={`/finance/reviews/${p.id}`}>
                           Finance review
                         </Link>
                       ) : null}

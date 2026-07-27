@@ -611,24 +611,8 @@ async function financeDecision(req, res) {
       } catch { /* best-effort */ }
     }
     if (grant.proposalId) {
-      try {
-        const { STAGE_STATUS } = require("../utils/proposalReviewPipeline");
-        const proposal = await Proposal.findById(grant.proposalId);
-        if (proposal?.reviewPipeline?.financeReview) {
-          const fr = proposal.reviewPipeline.financeReview;
-          if (fr.status !== STAGE_STATUS.PASSED && fr.status !== STAGE_STATUS.FAILED) {
-            proposal.reviewPipeline.financeReview = {
-              status: STAGE_STATUS.PASSED,
-              completedAt: new Date(),
-              completedBy: req.user.id,
-              decision: "budget_authorized",
-              comment: comment ? String(comment) : "Budget authorized (allocation only — not paid)",
-            };
-            proposal.markModified("reviewPipeline");
-            await proposal.save();
-          }
-        }
-      } catch { /* best-effort */ }
+      // Do not soft-pass proposal financeReview from grant budget auth —
+      // Phase-3 finance assign/review stays independent of grant authorization.
     }
 try {
       const projectId = projectResult?.project?._id || grant.projectId;

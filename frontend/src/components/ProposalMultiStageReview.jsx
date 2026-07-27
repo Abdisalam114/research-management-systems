@@ -53,8 +53,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
   const isFinance = user?.role === "finance_officer";
   const isLeadershipReviewer = user?.role === "leadership";
   const isVoluntary =
-    proposal.proposalKind === "voluntary" ||
-    (!proposal.fundingCallId && proposal.proposalKind !== "grant_fund_call");
+    proposal.proposalKind !== "grant_fund_call" && !proposal.fundingCallId;
   const assigned = (proposal.assignedReviewers || []).some(
     (r) => reviewerRefId(r.userId) === String(user?.id)
   );
@@ -69,16 +68,24 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
   );
   const peerStageOpen = pipe.peerReview?.status !== "passed";
   const hasPeerReviews = (proposal.peerReviews || []).length > 0;
+  const hasCommitteeAssignees = (proposal.assignedCommittee || []).length > 0;
   const canSubmitPeerReview =
     assigned && !peerDone && peerStageOpen && (isLeadershipReviewer || isDirector);
   const canDirectorSubmitPeer =
     isDirector && !peerDone && peerStageOpen && !hasPeerReviews && !isLeadershipReviewer;
   const showPeerSubmitForm = canSubmitPeerReview || canDirectorSubmitPeer;
   const canAssignReviewers = isDirector;
-  const canAssignCommittee = isDirector && pipe.peerReview?.status === "passed";
+  const canAssignCommittee =
+    isDirector &&
+    pipe.peerReview?.status === "passed" &&
+    stageOpen(pipe.committeeReview?.status);
   const canAssignFinance =
-    isDirector && !isVoluntary && pipe.committeeReview?.status === "passed";
+    isDirector &&
+    !isVoluntary &&
+    pipe.committeeReview?.status === "passed" &&
+    stageOpen(pipe.financeReview?.status);
   const canDecideCommittee =
+    hasCommitteeAssignees &&
     (isDirector || (isCoordinator && assignedToCommittee)) &&
     pipe.peerReview?.status === "passed" &&
     stageOpen(pipe.committeeReview?.status);

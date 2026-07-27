@@ -28,6 +28,17 @@ const {
   grantSuccessRate: computeGrantSuccessRate,
 } = require("../utils/metricsDefinitions");
 const { enrichProjectsResearcher } = require("../utils/projectPi");
+
+function reviewerRefId(ref) {
+  if (ref == null) return "";
+  if (typeof ref === "object") {
+    if (ref._id != null) return String(ref._id);
+    if (typeof ref.toHexString === "function") return ref.toHexString();
+    if (typeof ref.id === "string" || typeof ref.id === "number") return String(ref.id);
+    return String(ref);
+  }
+  return String(ref);
+}
 const { AppError } = require("../utils/AppError");
 const { userDisplayName } = require("../utils/userDisplay");
 const { ACTIVE_PEER_REVIEW_STATUSES, peerReviewSentToReviewersFilter, peerReviewAssignedToUserFilter } = require("../utils/proposalReviewPipeline");
@@ -178,7 +189,7 @@ async function getDashboardMetrics(req, res) {
       ).select("peerReviews assignedReviewers");
       reviewAssignments = assigned.length;
       reviewAssignmentsPending = assigned.filter(
-        (p) => !(p.peerReviews || []).some((r) => String(r.userId) === String(userId))
+        (p) => !(p.peerReviews || []).some((r) => reviewerRefId(r.userId) === String(userId))
       ).length;
     } else {
       // Director Peer Reviews tile = active queue (same filter as Peer Reviews page)
@@ -190,7 +201,10 @@ async function getDashboardMetrics(req, res) {
       reviewAssignmentsPending = sentActive.filter((p) => {
         const reviewers = p.assignedReviewers || [];
         const pending = reviewers.some(
-          (r) => !(p.peerReviews || []).some((pr) => String(pr.userId) === String(r.userId))
+          (r) =>
+            !(p.peerReviews || []).some(
+              (pr) => reviewerRefId(pr.userId) === reviewerRefId(r.userId)
+            )
         );
         const peerStage = p.reviewPipeline?.peerReview?.status || "pending";
         return pending || ["pending", "in_progress"].includes(peerStage);

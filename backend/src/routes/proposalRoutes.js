@@ -13,6 +13,7 @@ router.get(
   "/my-review-assignments",
   authenticateUser,
   requireActiveUser,
+  authorizeRoles("leadership", "research_director"),
   asyncHandler(proposalReviewController.listMyReviewAssignments)
 );
 router.get(
@@ -122,6 +123,7 @@ router.post(
   "/:id/peer-review",
   authenticateUser,
   requireActiveUser,
+  authorizeRoles("leadership", "research_director"),
   asyncHandler(proposalReviewController.submitPeerReview)
 );
 router.post(

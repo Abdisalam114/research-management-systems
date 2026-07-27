@@ -472,7 +472,7 @@ export function EthicsPage() {
           linkedProposalId={editing.proposalId || proposalIdFromUrl}
           hideFundingFields={
             editing.proposalKind === "voluntary" ||
-            String(editing.form?.fundingSource || "").includes("voluntary")
+            (!editing.fundingCallId && editing.proposalKind !== "grant_fund_call")
           }
           formComplete={isEthicsFormComplete(editing.form)}
           validationIssues={validationIssues}

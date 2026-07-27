@@ -22,12 +22,15 @@ export function FinanceProposalReviewsPage() {
   const queue = useMemo(() => {
     return (proposals || []).filter((p) => {
       const kind = p.proposalKind || (p.fundingCallId ? "grant_fund_call" : "voluntary");
-      if (kind === "voluntary") return false;
+      if (kind === "voluntary" || (!p.fundingCallId && p.proposalKind !== "grant_fund_call")) {
+        return false;
+      }
       const pipe = p.reviewPipeline || {};
-      const financePending = pipe.financeReview?.status === "pending";
-      const committeePassed = pipe.committeeReview?.status === "passed";
-      const stage = p.currentReviewStage || "";
-      return financePending || stage === "finance_review" || (committeePassed && pipe.financeReview?.status !== "passed" && pipe.financeReview?.status !== "failed");
+      if (pipe.committeeReview?.status !== "passed") return false;
+      const fr = pipe.financeReview?.status;
+      if (fr === "passed" || fr === "failed" || fr === "skipped") return false;
+      // Prefer assigned queue; if none assigned yet, still show after committee so Director can assign
+      return fr === "pending" || fr === "in_progress" || p.currentReviewStage === "finance_review";
     });
   }, [proposals]);
 

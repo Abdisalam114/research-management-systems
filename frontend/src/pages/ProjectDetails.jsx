@@ -93,7 +93,10 @@ export function ProjectDetailsPage() {
 
   const isOwner = String(project.researcherId) === String(user?.id);
   const canEdit = isOwner || user?.role === "research_director";
-  const isVoluntary = Boolean(project.isVoluntary || project.proposalKind === "voluntary");
+  const isVoluntary =
+    typeof project.isVoluntary === "boolean"
+      ? project.isVoluntary
+      : project.proposalKind !== "grant_fund_call" && !project.fundingCallId;
   // Finance clears money on Project closure (Finance) — PI never self-certifies financialCleared
   const closureItems = CLOSURE_CHECKLIST_ITEMS.filter((item) => item.key !== "financialCleared");
 
@@ -223,7 +226,7 @@ export function ProjectDetailsPage() {
               ))}
             </div>
           </div>
-        ) : project.isVoluntary || project.proposalKind === "voluntary" ? null : project.grantsVisible ? (
+        ) : isVoluntary ? null : project.grantsVisible ? (
           <div className="muted" style={{ marginTop: 14, fontSize: 13 }}>
             No funding-call grants linked to this project yet.
           </div>
@@ -264,7 +267,7 @@ export function ProjectDetailsPage() {
           ...(project.workflow || {}),
           projectStatus: project.status,
           awardsVisible: project.awardsVisible,
-          isVoluntary: project.isVoluntary || project.proposalKind === "voluntary",
+          isVoluntary,
         }}
       />
 
@@ -290,7 +293,7 @@ export function ProjectDetailsPage() {
           <Link className="btn" to={`/budgets?projectId=${id}`}>
             Budgets
           </Link>
-          {!(project.isVoluntary || project.proposalKind === "voluntary") ? (
+          {!isVoluntary ? (
             <>
               <Link className="btn" to={`/grants?projectId=${id}`}>
                 Grants

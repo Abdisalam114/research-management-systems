@@ -602,44 +602,19 @@ async function getProposal(req, res) {
   );
   if (!isOwner && !isStaff && !isAssignedReviewer) throw new AppError("Forbidden", 403);
 
-  // Repair: ethics already approved but Committee stage left pending
+  // Keep ethicsStatus in sync only — do NOT soft-pass committee (assign-first Phase 3).
   try {
     const ethicsDoc = await getEthicsForProposal(proposal._id);
-    const ethicsOk =
-      proposal.ethicsStatus === ETHICS_STATUSES.APPROVED || ethicsDoc?.status === "approved";
-    if (ethicsOk) {
-      const pipe = ensureReviewPipeline(proposal);
-      if (
-        pipe.committeeReview?.status === STAGE_STATUS.PENDING ||
-        pipe.committeeReview?.status === STAGE_STATUS.IN_PROGRESS
-      ) {
-        pipe.committeeReview = {
-          status: STAGE_STATUS.PASSED,
-          completedAt: new Date(),
-          completedBy: null,
-          decision: "recommend_approval",
-          comment: "Completed with JUREC ethics approval",
-        };
-        proposal.ethicsStatus = ETHICS_STATUSES.APPROVED;
-        proposal.markModified("reviewPipeline");
-        await proposal.save();
-        try {
-          const { notifyFinanceProposalReviewReady } = require("../utils/notifyFinanceProposalReview");
-          await notifyFinanceProposalReviewReady(proposal, { force: true });
-        } catch {
-          /* best-effort */
-        }
-} else {
-        // Already committee-passed — ensure finance was notified (deduped)
-        try {
-          const { notifyFinanceProposalReviewReady } = require("../utils/notifyFinanceProposalReview");
-          const sent = await notifyFinanceProposalReviewReady(proposal);
-} catch {
-          /* best-effort */
-        }
-      }
+    if (
+      ethicsDoc?.status === "approved" &&
+      proposal.ethicsStatus !== ETHICS_STATUSES.APPROVED
+    ) {
+      proposal.ethicsStatus = ETHICS_STATUSES.APPROVED;
+      await proposal.save();
     }
-  } catch (_) { /* best-effort repair */ }
+  } catch (_) {
+    /* best-effort */
+  }
 
   // Backfill budgetTotal from funding-call cap when proposal has no amount
   try {
@@ -655,10 +630,12 @@ async function getProposal(req, res) {
         proposal.budgetTotal = cap;
         if (!proposal.budgetCurrency) proposal.budgetCurrency = call.currency || "USD";
         await proposal.save();
-}
+      }
     }
-  } catch (_) { /* best-effort */ }
-res.json({ proposal: await attachEthicsSummary(proposal) });
+  } catch (_) {
+    /* best-effort */
+  }
+  res.json({ proposal: await attachEthicsSummary(proposal) });
 }
 
 async function coordinatorReview(req, res) {

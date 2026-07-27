@@ -184,7 +184,8 @@ export function ProjectsListPage({
     try {
       await projectApi.directorClosureApproval(accessToken, p.id, "Director approved");
       setMessage(
-        p.isVoluntary || p.proposalKind === "voluntary"
+        p.isVoluntary === true ||
+        (p.isVoluntary !== false && p.proposalKind === "voluntary")
           ? `${p.title}: approved — project closed.`
           : `${p.title}: Director approved — waiting for Finance. After Finance clears, the project closes automatically.`
       );

@@ -101,7 +101,9 @@ throw e;
         <h2 style={{ marginTop: 0 }}>
           {isLeadershipReviewer
             ? "Peer review — Proposal"
-            : "Director review — Proposal + Ethics"}
+            : isCoordinator
+              ? "Committee review — Proposal + Ethics"
+              : "Director review — Proposal + Ethics"}
         </h2>
         <Link
           className="btn"
@@ -193,10 +195,9 @@ throw e;
         <div className="card muted" style={{ marginTop: 12, fontSize: 13 }}>
           <strong>Proposal decision</strong> is locked until Multi-stage review (Phase 3) is complete
           (peer → committee
-          {proposal.proposalKind === "voluntary" ||
-          (!proposal.fundingCallId && proposal.proposalKind !== "grant_fund_call")
-            ? ""
-            : " → finance"}
+          {proposal.proposalKind === "grant_fund_call" || proposal.fundingCallId
+            ? " → finance"
+            : ""}
           ). Use Assign &amp; send above to move the proposal forward.
         </div>
       ) : null}

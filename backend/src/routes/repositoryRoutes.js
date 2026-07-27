@@ -27,6 +27,7 @@ router.post(
   "/upload",
   authenticateUser,
   requireActiveUser,
+  authorizeRoles("researcher", "faculty_coordinator", "research_director"),
   repositoryUpload.single("file"),
   asyncHandler(repositoryController.uploadItem)
 );

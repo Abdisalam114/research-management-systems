@@ -1,117 +1,12 @@
-================================================================================
-JAMHURIYA RMS — HOW TO USE THE SYSTEM (ENGLISH)
-User Guide — Jamhuriya University Research Management System
-Updated: July 25, 2026
-================================================================================
+JUST RMS — How to use (English)
+===============================
 
+See docs/SYSTEM_HOW_IT_WORKS.md for the full system description.
 
-1. OVERVIEW
-
-JUST RMS manages university research from funding calls through proposals, multi-stage review, project execution, finance, publications, and formal closure.
-
-Undergraduate (UG) and Postgraduate (PG) research share one system. Staff see both, with UG/PG labels on projects and items. Researchers work within their own program tier.
-
-Open the app at http://localhost:5173 after starting backend (:5000) and frontend (:5173).
-
-
-2. USER JOBS — WHAT EACH ROLE DOES
-
-Ethics = Research Director. Peer review = University Leadership. Purchase order review = Finance (before Director approval). Donor reports = Director (and Finance for financial views).
-
-Research Director (director@rms.edu)
-  • Sees UG and PG together with labels (no portal switch)
-  • Create/publish funding calls; final Approve/Reject proposals
-  • Decide ethics (JUREC); approve POs after Finance review
-  • Donor reports; manage Users & Departments; analytics, KPI, audit trail
-
-University Leadership (leadership@rms.edu)
-  • Peer review: score 1–5 + comment on assigned proposals
-  • Peer Reviews + Proposals menus; KPI
-  • Sees UG and PG together with labels
-  • Does NOT publish funding calls
-
-Faculty Coordinator (coordinator@rms.edu)
-  • Faculty proposal queue; thesis groups (min 4 students), titles, supervisors
-  • Publication workflow; Validate → Published
-  • Faculty monitoring / reports; sees UG and PG with labels
-
-Finance Officer (finance@rms.edu) — MONEY + PO REVIEW
-  • Grant funding approval → Authorize budget (allocate only, not pay)
-  • Proposal finance review; budgets; payment requests; pay approved items
-  • Review Purchase Orders (approve/reject) before Director
-  • Pay POs after Director approval; finance reports; finance closure
-  • Sees UG and PG finance items with labels
-  • Flow: Researcher PO → Finance review → Director → Finance pays
-
-Researcher (asha@rms.edu UG / mahad@rms.edu PG)
-  • Apply to calls; write proposals (budget + ethics + docs)
-  • Run projects; budgets; payment requests; create POs
-  • Publications Create & submit; repository; thesis supervision; closure checklist
-
-
-3. LOGIN — DEMO ACCOUNTS
-
-Run: cd backend && npm run seed
-
-Shared staff (UG + PG together):
-  director@rms.edu / Director2024!
-  coordinator@rms.edu / Coordinator2024!
-  finance@rms.edu / Finance2024!
-  leadership@rms.edu / Leadership2024!
-
-Researchers:
-  asha@rms.edu / Researcher2024! — Undergraduate
-  mahad@rms.edu / Researcher2024! — Postgraduate
-
-Staff do not switch portals — they see all research with UG/PG labels.
-
-
-4. FUNDING CALLS
-
-Director creates Internal or External calls. Required documents auto-fill. Choose eligibility (UG / PG / all / PGD).
-
-Director publishes the call themselves. Eligible researchers get notifications with a direct link.
-
-Researcher: Funding Calls → Apply via this call.
-
-
-5. REVIEW WORKFLOW
-
-Admin screening → Leadership peer review (score 1–5 + comment) → Committee → Ethics (Research Director) → Finance review → Director Approve.
-
-Approved funding-call proposals create a Project and queue a Grant for finance (status: pending_finance).
-
-
-6. AUTHORIZE BUDGET (FINANCE)
-
-Path: Sidebar → Grant funding approval (/finance/grant-approvals)
-
-Login as finance@rms.edu.
-
-Click Authorize budget. This ALLOCATES the budget only — it does not pay money. Disburse later under Finance & Budgets.
-
-
-7. PUBLICATIONS
-
-One output per project (1:1). Researcher Create & submit → status submitted.
-
-Coordinator/Director Validate → status validated and workflow stage Published.
-
-You can also advance Submitted → In process → Pipeline → Published on Research Workflow Status.
-
-Use the Published filter to find published outputs (do not leave Submitted filter selected).
-
-
-8. FULL JOURNEY
-
-Funding call → Grant → Proposal (budget + ethics + docs) → Review → Project → Finance authorize → Work plan + budgets → Payments + PO → Publications (Validate = Published) → Closure checklist → Archived.
-
-
-9. KEY MENUS
-
-Funding Calls, Grants, Proposals, Peer Reviews, Projects, Publications, Research Workflow, Finance & Budgets, Grant funding approval (Finance only), Policies, Search, Notifications, Audit Trail (Director/Coordinator).
-
-
-================================================================================
-END OF ENGLISH GUIDE
-================================================================================
+1. Login. Staff select Undergraduate or Postgraduate.
+2. Researcher submits a Voluntary or Grant fund call proposal (and ethics when required).
+3. Director assigns Leadership reviewers (Assign & send to reviewer).
+4. After peer review, Director assigns Faculty Coordinators (Assign & send to committee).
+5. For grant proposals only, Director assigns Finance (Assign & send to finance).
+6. Proposal decision (Approve / Reject) stays locked until multi-stage review is complete.
+7. Approve creates a Project. Finance uses /finance/reviews for grant finance review.

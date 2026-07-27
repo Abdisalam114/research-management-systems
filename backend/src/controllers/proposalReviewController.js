@@ -69,7 +69,7 @@ async function adminScreening(req, res) {
           type: "proposal",
           title: "Proposal ready for peer review",
           body: `Admin screening passed: ${proposal.title}`,
-          link: `/proposals/${proposal._id}`,
+          link: `/proposals/${proposal._id}/review`,
           programTier: req.programTier,
         });
       } catch (_) {
@@ -119,7 +119,9 @@ async function submitPeerReview(req, res) {
     throw new AppError("Peer review stage already completed", 400);
   }
 
-  const existing = (proposal.peerReviews || []).find((r) => String(r.userId) === String(req.user.id));
+  const existing = (proposal.peerReviews || []).find(
+    (r) => reviewerUserId(r.userId) === String(req.user.id)
+  );
   if (existing) throw new AppError("You already submitted a peer review", 400);
 
   // Director may only submit a score when no peer reviews exist yet (otherwise complete stage)
@@ -145,11 +147,11 @@ async function submitPeerReview(req, res) {
   );
   const allAssignedDone =
     assignedIds.length > 0 && assignedIds.every((id) => reviewedIds.has(id));
-  // Single leadership review (or director review) is enough to complete the stage
+  // Complete only when all assignees done, or when no assignees and at least one review exists.
+  // Do NOT auto-complete just because the director submitted while Leadership assignees remain.
   const peerComplete =
     allAssignedDone ||
-    (assignedIds.length === 0 && (proposal.peerReviews || []).length > 0) ||
-    (isDirector && (proposal.peerReviews || []).length > 0);
+    (assignedIds.length === 0 && (proposal.peerReviews || []).length > 0);
 
   if (peerComplete) {
     pipe.peerReview.status = STAGE_STATUS.PASSED;
@@ -203,14 +205,28 @@ await recordAudit({
 }
 
 async function completePeerReview(req, res) {
-const proposal = await Proposal.findOne(proposalScopeFilter(req, { _id: req.params.id }));
+  const proposal = await Proposal.findOne(proposalScopeFilter(req, { _id: req.params.id }));
   if (!proposal) {
-throw new AppError("Proposal not found", 404);
+    throw new AppError("Proposal not found", 404);
   }
   if (req.user.role !== "research_director") throw new AppError("Forbidden", 403);
 
   const reviews = proposal.peerReviews || [];
   if (reviews.length === 0) throw new AppError("No peer reviews submitted yet", 400);
+
+  const assignedIds = (proposal.assignedReviewers || [])
+    .map((r) => reviewerUserId(r.userId))
+    .filter(Boolean);
+  const reviewedIds = new Set(reviews.map((r) => reviewerUserId(r.userId)).filter(Boolean));
+  if (assignedIds.length > 0) {
+    const pending = assignedIds.filter((id) => !reviewedIds.has(id));
+    if (pending.length > 0) {
+      throw new AppError(
+        `Cannot complete peer review: ${pending.length} assigned reviewer(s) have not submitted yet`,
+        400
+      );
+    }
+  }
 
   const pipe = ensureReviewPipeline(proposal);
   pipe.peerReview.status = STAGE_STATUS.PASSED;
@@ -219,8 +235,7 @@ throw new AppError("Proposal not found", 404);
   proposal.markModified("reviewPipeline");
   await proposal.save();
 
-  const fresh = await Proposal.findById(proposal._id).select("reviewPipeline programTier peerReviews");
-try {
+  try {
     const { notifyUsersByRole } = require("../utils/notify");
     await notifyUsersByRole(
       "research_director",
@@ -250,7 +265,11 @@ async function committeeReview(req, res) {
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const isDirector = req.user.role === "research_director";
-  const assigned = (proposal.assignedCommittee || []).some(
+  const assignedList = proposal.assignedCommittee || [];
+  if (assignedList.length === 0) {
+    throw new AppError("Assign committee members before committee review", 400);
+  }
+  const assigned = assignedList.some(
     (r) => reviewerUserId(r.userId) === String(req.user.id)
   );
   if (!isDirector && !assigned) {
@@ -260,6 +279,12 @@ async function committeeReview(req, res) {
   const pipe = ensureReviewPipeline(proposal);
   if (pipe.peerReview?.status !== STAGE_STATUS.PASSED) {
     throw new AppError("Peer review must be completed first", 400);
+  }
+  if (
+    pipe.committeeReview?.status === STAGE_STATUS.PASSED ||
+    pipe.committeeReview?.status === STAGE_STATUS.FAILED
+  ) {
+    throw new AppError("Committee review stage already completed", 400);
   }
 
   let committeeStatus = STAGE_STATUS.PASSED;
@@ -323,6 +348,9 @@ async function financeProposalReview(req, res) {
   }
 
   const pipe = ensureReviewPipeline(proposal);
+  if (pipe.committeeReview?.status !== STAGE_STATUS.PASSED) {
+    throw new AppError("Committee must pass before finance review", 400);
+  }
   pipe.financeReview = {
     status: decision === "approve" ? STAGE_STATUS.PASSED : STAGE_STATUS.FAILED,
     completedAt: new Date(),
@@ -357,9 +385,13 @@ async function listMyReviewAssignments(req, res) {
     await Proposal.updateMany(
       {
         status: { $nin: [...ACTIVE_PEER_REVIEW_STATUSES] },
-        "assignedReviewers.0": { $exists: true },
+        $or: [
+          { "assignedReviewers.0": { $exists: true } },
+          { "assignedCommittee.0": { $exists: true } },
+          { "assignedFinance.0": { $exists: true } },
+        ],
       },
-      { $set: { assignedReviewers: [] } }
+      { $set: { assignedReviewers: [], assignedCommittee: [], assignedFinance: [] } }
     );
   } catch {
     /* best-effort */
@@ -379,14 +411,16 @@ async function listMyReviewAssignments(req, res) {
     );
 
   const items = proposals.map((p) => {
-    const reviewed = (p.peerReviews || []).some((r) => String(r.userId) === String(userId));
+    const reviewed = (p.peerReviews || []).some(
+      (r) => reviewerUserId(r.userId) === String(userId)
+    );
     const reviewers = (p.assignedReviewers || []).map((r) => ({
-      id: r.userId?._id ? String(r.userId._id) : String(r.userId || ""),
+      id: reviewerUserId(r.userId),
       fullName: r.userId?.fullName || null,
       email: r.userId?.email || null,
       assignedAt: r.assignedAt || null,
       peerReviewSubmitted: (p.peerReviews || []).some(
-        (pr) => String(pr.userId) === String(r.userId?._id || r.userId)
+        (pr) => reviewerUserId(pr.userId) === reviewerUserId(r.userId)
       ),
     }));
     const pendingReviewers = reviewers.filter((r) => !r.peerReviewSubmitted).length;

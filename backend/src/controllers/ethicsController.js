@@ -13,7 +13,6 @@ const {
   renderJurecCertificatePdf,
   JUREC_CHAIRPERSON_OPTIONS,
 } = require("../utils/jurecCertificate");
-const { ensureReviewPipeline, STAGE_STATUS } = require("../utils/proposalReviewPipeline");
 
 function sanitize(a) {
   return {
@@ -108,49 +107,20 @@ async function syncLinkedProposalEthics(proposalId, ethicsStatus, ethicsAppId) {
   }
   if (!linked) return;
   linked.ethicsStatus = ethicsStatus;
-  // Director issues JUREC as the ethics committee � keep stage 3 Committee in sync
-  if (ethicsStatus === PROPOSAL_ETHICS_STATUSES.APPROVED) {
-    const pipe = ensureReviewPipeline(linked);
-    if (
-      pipe.committeeReview?.status === STAGE_STATUS.PENDING ||
-      pipe.committeeReview?.status === STAGE_STATUS.IN_PROGRESS
-    ) {
-      pipe.committeeReview = {
-        status: STAGE_STATUS.PASSED,
-        completedAt: new Date(),
-        completedBy: null,
-        decision: "recommend_approval",
-        comment: "Completed with JUREC ethics approval",
-      };
-      linked.markModified("reviewPipeline");
-    }
-  } else if (ethicsStatus === PROPOSAL_ETHICS_STATUSES.REJECTED) {
-    const pipe = ensureReviewPipeline(linked);
-    if (pipe.committeeReview?.status !== STAGE_STATUS.FAILED) {
-      pipe.committeeReview = {
-        status: STAGE_STATUS.FAILED,
-        completedAt: new Date(),
-        completedBy: null,
-        decision: "reject",
-        comment: "Failed with JUREC ethics rejection",
-      };
-      linked.markModified("reviewPipeline");
-    }
-    // Ethics reject ? proposal is rejected (cannot proceed)
+  // Ethics clearance is separate from Phase-3 faculty committee assign/review.
+  if (ethicsStatus === PROPOSAL_ETHICS_STATUSES.REJECTED) {
     const { PROPOSAL_STATUSES } = require("../models/Proposal");
     if (linked.status !== PROPOSAL_STATUSES.REJECTED) {
       linked.status = PROPOSAL_STATUSES.REJECTED;
     }
-  }
-  await linked.save();
-if (ethicsStatus === PROPOSAL_ETHICS_STATUSES.APPROVED) {
     try {
-      const { notifyFinanceProposalReviewReady } = require("../utils/notifyFinanceProposalReview");
-      await notifyFinanceProposalReviewReady(linked, { force: true });
+      const { clearPeerAssigneesIfInactive } = require("../utils/proposalReviewPipeline");
+      clearPeerAssigneesIfInactive(linked);
     } catch {
-      /* best-effort */
+      /* ignore */
     }
   }
+  await linked.save();
 }
 
 async function listEthicsApplications(req, res) {
