@@ -114,6 +114,7 @@ Accounts and passwords are listed above under **Users and passwords (demo)**.
 
 | Document | Purpose |
 |----------|---------|
+| **[docs/SOLUTIONS_ARCHITECTURE.docx](docs/SOLUTIONS_ARCHITECTURE.docx)** | Senior solutions architecture (stack, security, scale)
 | **[docs/SYSTEM_COMPLETE.docx](docs/SYSTEM_COMPLETE.docx)** | **Whole system in one Word file** (start here) |
 | **[docs/SYSTEM_ARCHITECTURE_CURRENT.docx](docs/SYSTEM_ARCHITECTURE_CURRENT.docx)** | Full architecture (modules, APIs, roles, diagrams) |
 | **[docs/DATABASE_STRUCTURE.docx](docs/DATABASE_STRUCTURE.docx)** | Full MongoDB schema (all 18 collections) |
