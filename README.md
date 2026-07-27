@@ -38,6 +38,32 @@ App: `http://localhost:5173` (Vite proxies `/api` to the backend in dev)
 
 After login, all roles open **Dashboard**. Shared staff pick **Undergraduate (UG)** or **Postgraduate (PG)** portal.
 
+## Users and passwords (demo)
+
+Run `cd backend && npm run seed` once, then log in with:
+
+| Role | Name | Email | Password | Portal |
+|------|------|-------|----------|--------|
+| Research Director | Dr. Catherine Morrison | `director@rms.edu` | `Director2024!` | Pick UG or PG |
+| Faculty Coordinator | Dr. Emma Richardson | `coordinator@rms.edu` | `Coordinator2024!` | Pick UG or PG |
+| Finance Officer | Michael Brooks | `finance@rms.edu` | `Finance2024!` | Pick UG or PG |
+| Leadership (peer review) | Prof. Ibrahim Warsame | `leadership@rms.edu` | `Leadership2024!` | Pick UG or PG |
+| Researcher | Dr. Sarah Chen | `asha@rms.edu` | `Researcher2024!` | Undergraduate only |
+| Researcher | Dr. James Okonkwo | `mahad@rms.edu` | `Researcher2024!` | Postgraduate only |
+
+Copy-paste:
+
+```
+director@rms.edu       / Director2024!
+coordinator@rms.edu    / Coordinator2024!
+finance@rms.edu        / Finance2024!
+leadership@rms.edu     / Leadership2024!
+asha@rms.edu           / Researcher2024!   (UG)
+mahad@rms.edu          / Researcher2024!   (PG)
+```
+
+Override via `backend/.env`: `SEED_DIRECTOR_PASSWORD`, `SEED_COORDINATOR_PASSWORD`, `SEED_FINANCE_PASSWORD`, `SEED_LEADERSHIP_PASSWORD`, `SEED_RESEARCHER_PASSWORD`.
+
 ## How proposals are reviewed (UG + PG same)
 
 ```
@@ -54,7 +80,7 @@ Submit → Assign peer (Leadership) → Peer reviews
 
 Full Word guide: **[docs/SYSTEM_HOW_IT_WORKS.docx](docs/SYSTEM_HOW_IT_WORKS.docx)**
 
-## Seed accounts
+## Seed / verify
 
 ```bash
 cd backend
@@ -63,23 +89,7 @@ node src/scripts/verifySeedUsers.js
 npm run verify:stakeholders
 ```
 
-### Shared staff (pick UG or PG after login)
-
-| Role | Email | Password |
-|------|-------|----------|
-| Research Director | `director@rms.edu` | `Director2024!` |
-| Faculty Coordinator | `coordinator@rms.edu` | `Coordinator2024!` |
-| Finance Officer | `finance@rms.edu` | `Finance2024!` |
-| Leadership (peer review) | `leadership@rms.edu` | `Leadership2024!` |
-
-### Researchers (locked to one portal)
-
-| Role | Email | Password | Portal |
-|------|-------|----------|--------|
-| Researcher | `asha@rms.edu` | `Researcher2024!` | Undergraduate |
-| Researcher | `mahad@rms.edu` | `Researcher2024!` | Postgraduate |
-
-Override passwords via `backend/.env` (`SEED_*_PASSWORD`).
+Accounts and passwords are listed above under **Users and passwords (demo)**.
 
 ### Role summary
 
