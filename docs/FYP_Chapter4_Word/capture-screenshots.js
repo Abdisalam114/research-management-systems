@@ -51,8 +51,12 @@ async function clickNav(page, href, label) {
 
 async function main() {
   fs.mkdirSync(OUT, { recursive: true });
+  const chromePath =
+    process.env.PUPPETEER_EXECUTABLE_PATH ||
+    "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
   const browser = await puppeteer.launch({
     headless: true,
+    executablePath: chromePath,
     defaultViewport: { width: 1440, height: 920 },
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
