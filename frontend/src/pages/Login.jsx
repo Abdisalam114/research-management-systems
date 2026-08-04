@@ -9,7 +9,7 @@ import logo from "../assets/jamhuriya-logo.png";
 
 export function LoginPage() {
   const { signIn } = useAuth();
-  const { clearProgramTier } = useProgramTier();
+  const { clearProgramTier, selectProgramTier } = useProgramTier();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -68,6 +68,9 @@ export function LoginPage() {
                   clearProgramTier();
 navigate("/program-tier", { replace: true });
                   return;
+                }
+                if (res.user?.programTier) {
+                  selectProgramTier(res.user.programTier);
                 }
                 const dest = homeAfterAuth();
 navigate(dest, { replace: true });

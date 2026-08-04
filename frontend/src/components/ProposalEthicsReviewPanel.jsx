@@ -17,6 +17,14 @@ function personLabel(p) {
   return `${name}${p.department ? ` • ${p.department}` : ""}${p.email ? ` • ${p.email}` : ""}`;
 }
 
+function signatureLabel(ethics) {
+  const sig = String(ethics?.applicantSignature?.name || "").trim();
+  if (!sig) return null;
+  const pi = personLabel(ethics?.principal);
+  if (pi !== "—" && sig.toLowerCase() === pi.split(" •")[0].trim().toLowerCase()) return null;
+  return sig;
+}
+
 export function ProposalEthicsReviewPanel({
   ethics,
   isDirector,
@@ -75,7 +83,7 @@ export function ProposalEthicsReviewPanel({
         <Row label="Settings" value={ethics.settings} />
         <Row label="Instruments" value={(ethics.instruments || []).join(", ") || "—"} />
         <Row label="Sample size" value={ethics.sampleSize} />
-        <Row label="Applicant signature" value={ethics.applicantSignature?.name} />
+        <Row label="Applicant signature" value={signatureLabel(ethics)} />
         {ethics.approval?.certificateNumber || ethics.approval?.certificateId ? (
           <Row label="Certificate Number" value={ethics.approval.certificateNumber || ethics.approval.certificateId} />
         ) : null}

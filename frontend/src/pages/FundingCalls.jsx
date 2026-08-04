@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import * as fundingCallApi from "../services/fundingCallApi";
@@ -109,6 +110,7 @@ function formatMoney(amount, currency) {
 
 export function FundingCallsPage() {
   const { accessToken, user } = useAuth();
+  const { programTier } = useProgramTier();
   const [searchParams] = useSearchParams();
   const projectIdFromUrl = searchParams.get("projectId") || "";
   const callIdFromUrl = searchParams.get("callId") || "";
@@ -148,7 +150,7 @@ export function FundingCallsPage() {
     }
   }, [accessToken, isResearcher, canSeeAllApps, user?.role]);
 
-  const { loading, error, setError, reload } = useModuleLoad(accessToken, load, [isResearcher, canSeeAllApps]);
+  const { loading, error, setError, reload } = useModuleLoad(accessToken, load, [isResearcher, canSeeAllApps, programTier]);
 
   // Deep-link from notification "Open" → scroll/highlight that funding call
   useEffect(() => {
@@ -204,13 +206,13 @@ if (!match) {
   );
 
   function resetForm() {
-    setForm(EMPTY_INTERNAL);
+    setForm({ ...EMPTY_INTERNAL, programTier: programTier || "undergraduate" });
     setEditingId(null);
     setShowForm(false);
   }
 
   function startCreate() {
-    const base = { ...EMPTY_INTERNAL };
+    const base = { ...EMPTY_INTERNAL, programTier: programTier || "undergraduate" };
     base.requiredDocuments = defaultRequiredDocuments(base.callType);
     setForm(base);
     setEditingId(null);
@@ -232,7 +234,7 @@ if (!match) {
       deadline: call.deadline ? call.deadline.slice(0, 10) : "",
       eligibilityTier: call.eligibilityTier || "all",
       requiredDocuments: call.requiredDocuments || defaultRequiredDocuments(callType),
-      programTier: call.programTier || "undergraduate",
+      programTier: call.programTier || programTier || "undergraduate",
     });
     setShowForm(true);
     setMessage("");
@@ -290,6 +292,7 @@ if (!match) {
       const payload = {
         ...form,
         callType: resolvedType,
+        programTier: programTier || form.programTier || "undergraduate",
         title: form.title.trim(),
         fundingSource: form.fundingSource.trim(),
         description: form.description.trim(),
@@ -633,13 +636,16 @@ await fundingCallApi.publishFundingCall(accessToken, id);
                 <label htmlFor="fc-program">Home program (UG / PG label)</label>
                 <select
                   id="fc-program"
-                  value={form.programTier || "undergraduate"}
+                  value={form.programTier || programTier || "undergraduate"}
                   onChange={(e) => setForm({ ...form, programTier: e.target.value })}
-                  disabled={Boolean(editingId)}
+                  disabled
                 >
                   <option value="undergraduate">Undergraduate (UG)</option>
                   <option value="postgraduate">Postgraduate (PG)</option>
                 </select>
+                <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                  Locked to your active portal ({programTier === "postgraduate" ? "PG" : "UG"}).
+                </p>
               </div>
               <div className="field">
                 <label htmlFor="fc-eligibility">Eligible researchers</label>

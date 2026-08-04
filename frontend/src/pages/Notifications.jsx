@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import { isCrossTierRole } from "../constants/programTier";
+import { SYSTEM_REFRESH_MS } from "../constants/systemRefresh";
 import * as notificationApi from "../services/notificationApi";
 import * as ethicsApi from "../services/ethicsApi";
 import { apiOrigin } from "../config/apiBase";
@@ -39,9 +40,19 @@ export function NotificationsPage() {
   useEffect(() => {
     const timer = setInterval(() => {
       reload().catch(() => {});
-    }, 8000);
+    }, SYSTEM_REFRESH_MS);
     return () => clearInterval(timer);
   }, [reload]);
+
+  function downloadPublicationSummary(n) {
+    const text = `${n.title || "Publication"}\n\n${n.body || ""}`.trim();
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(n.title || "notification").slice(0, 60).replace(/[^\w\-]+/g, "_")}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
 
   async function openNotification(n) {
     try {
@@ -96,11 +107,34 @@ export function NotificationsPage() {
         await notificationApi.markNotificationRead(accessToken, n.id);
         await reload();
       }
+      return;
+    }
+
+    if (n.downloadLink && /^https?:\/\//i.test(n.downloadLink)) {
+      window.open(n.downloadLink, "_blank", "noopener,noreferrer");
+      if (!n.readAt) {
+        await notificationApi.markNotificationRead(accessToken, n.id);
+        await reload();
+      }
+      return;
+    }
+
+    if (n.type === "publication" && n.body) {
+      downloadPublicationSummary(n);
+      if (!n.readAt) {
+        await notificationApi.markNotificationRead(accessToken, n.id);
+        await reload();
+      }
     }
   }
 
   const canDownload = (n) =>
-    Boolean(ethicsIdFromDownloadLink(n.downloadLink) || n.downloadLink?.startsWith("/uploads/"));
+    Boolean(
+      ethicsIdFromDownloadLink(n.downloadLink) ||
+        n.downloadLink?.startsWith("/uploads/") ||
+        (n.downloadLink && /^https?:\/\//i.test(n.downloadLink)) ||
+        (n.type === "publication" && n.body)
+    );
 
   return (
     <div className="dashboardPage">
@@ -164,7 +198,7 @@ export function NotificationsPage() {
                     disabled={downloadBusy === n.id}
                     onClick={() => downloadDocument(n)}
                   >
-                    {downloadBusy === n.id ? "Downloading…" : "Download document"}
+                    {downloadBusy === n.id ? "Downloading…" : n.type === "publication" ? "Download details" : "Download document"}
                   </button>
                 ) : null}
                 {!n.readAt ? (

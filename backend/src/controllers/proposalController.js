@@ -149,7 +149,7 @@ function ethicsBlocksSubmission(proposal) {
 
 async function attachEthicsSummary(proposal) {
   const base = sanitizeProposal(proposal);
-  const ethics = await getEthicsForProposal(proposal._id);
+  const ethics = await getEthicsForProposal(proposal._id, proposal.programTier);
   if (!ethics) {
     return {
       ...base,
@@ -196,7 +196,7 @@ async function createLinkedEthicsApplication(proposal, user) {
 
 async function persistProposalEthics(proposal, user, reqBody) {
   if (!proposal.requiresEthics) return;
-  let ethics = await getEthicsForProposal(proposal._id);
+  let ethics = await getEthicsForProposal(proposal._id, proposal.programTier);
   if (!ethics) {
     ethics = await createLinkedEthicsApplication(proposal, user || {});
   }
@@ -400,7 +400,7 @@ async function getProposalEthicsApplication(req, res) {
   );
   if (!isOwner && !isStaff && !isAssignedReviewer) throw new AppError("Forbidden", 403);
 
-  let ethics = await getEthicsForProposal(proposal._id);
+  let ethics = await getEthicsForProposal(proposal._id, proposal.programTier);
   if (!ethics && isOwner && proposal.requiresEthics) {
     const user = await User.findById(req.user.id);
     ethics = await createLinkedEthicsApplication(proposal, user || {});
@@ -604,7 +604,7 @@ async function getProposal(req, res) {
 
   // Keep ethicsStatus in sync only — do NOT soft-pass committee (assign-first Phase 3).
   try {
-    const ethicsDoc = await getEthicsForProposal(proposal._id);
+    const ethicsDoc = await getEthicsForProposal(proposal._id, proposal.programTier);
     if (
       ethicsDoc?.status === "approved" &&
       proposal.ethicsStatus !== ETHICS_STATUSES.APPROVED
@@ -705,7 +705,7 @@ async function directorDecision(req, res) {
   clearPeerAssigneesIfInactive(proposal);
   // Keep proposal.ethicsStatus in sync if ethics app is approved
   if (decision === PROPOSAL_STATUSES.APPROVED && proposal.requiresEthics) {
-    const ethicsDoc = await getEthicsForProposal(proposal._id);
+    const ethicsDoc = await getEthicsForProposal(proposal._id, proposal.programTier);
     if (ethicsDoc?.status === "approved") {
       proposal.ethicsStatus = ETHICS_STATUSES.APPROVED;
     }
@@ -772,7 +772,7 @@ async function directorDecision(req, res) {
     try {
       const { ensureBudgetForProject } = require("../utils/ensureBudgetForProject");
       const projectDoc =
-        (await Project.findOne({ proposalId: proposal._id })) ||
+        (await Project.findOne(req.tierWhere({ proposalId: proposal._id }))) ||
         existing ||
         null;
       if (projectDoc) {
@@ -911,7 +911,9 @@ async function deleteProposal(req, res) {
     throw new AppError("Only draft, rejected, or revision-requested proposals can be deleted", 400);
   }
 
-  const linkedProject = await Project.findOne({ proposalId: proposal._id }).select("_id title status");
+  const linkedProject = await Project.findOne(
+    req.tierWhere({ proposalId: proposal._id })
+  ).select("_id title status");
   if (linkedProject && ![PROPOSAL_STATUSES.DRAFT, PROPOSAL_STATUSES.REJECTED].includes(proposal.status)) {
     throw new AppError("Cannot delete a proposal that already has a project. Close the project first.", 400);
   }
@@ -919,6 +921,7 @@ async function deleteProposal(req, res) {
   // Delete linked ethics with the proposal (required — no orphan ethics left behind).
   let ethicsDeleted = 0;
   const ethFilter = {
+    programTier: proposal.programTier || req.programTier,
     $or: [
       { proposalId: proposal._id },
       ...(proposal.ethicsApplicationId ? [{ _id: proposal.ethicsApplicationId }] : []),

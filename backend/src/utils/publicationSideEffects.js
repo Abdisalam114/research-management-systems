@@ -116,11 +116,15 @@ async function logPublicationOnProject(projectId, req, { subject, body, type = "
  * Notify researcher + staff and mirror activity onto the project.
  * link always points at the project outputs section when possible.
  */
-async function notifyPublicationEvent(req, pub, { title, body, alsoNotifyRoles = [], notifyOwner = true, logType = "decision" }) {
+async function notifyPublicationEvent(req, pub, { title, body, alsoNotifyRoles = [], notifyOwner = true, logType = "decision", downloadLink = "" }) {
   const projectId = pubProjectId(pub);
   const link = projectLink(projectId);
-  const programTier = req.programTier || null;
-  const effects = { notifiedOwner: false, notifiedRoles: [], projectLogUpdated: false, link };
+  const programTier = req.programTier || pub.programTier || null;
+  const resolvedDownload =
+    downloadLink ||
+    (pub.url && String(pub.url).startsWith("http") ? pub.url : "") ||
+    (pub.doi ? `https://doi.org/${String(pub.doi).replace(/^https?:\/\/doi.org\//i, "")}` : "");
+  const effects = { notifiedOwner: false, notifiedRoles: [], projectLogUpdated: false, link, downloadLink: resolvedDownload };
 
   if (notifyOwner && pub.researcherId) {
     const ownerId = pub.researcherId._id || pub.researcherId;
@@ -132,6 +136,7 @@ async function notifyPublicationEvent(req, pub, { title, body, alsoNotifyRoles =
           title,
           body,
           link,
+          downloadLink: resolvedDownload,
           programTier,
         });
         effects.notifiedOwner = true;
@@ -150,6 +155,7 @@ async function notifyPublicationEvent(req, pub, { title, body, alsoNotifyRoles =
           title,
           body,
           link,
+          downloadLink: resolvedDownload,
           programTier,
         },
         programTier
@@ -255,4 +261,5 @@ module.exports = {
   notifyPublicationEvent,
   isSubmittedOrBetter,
   buildPublicationSubmitNotificationBody,
+  loadPublicationForNotification,
 };

@@ -63,6 +63,40 @@ export function PublicationsPage() {
   const [successMsg, setSuccessMsg] = useState("");
   const [decisionModal, setDecisionModal] = useState(null); // { publication, decision, comment, project, loading }
   const [decisionBusy, setDecisionBusy] = useState(false);
+  const [viewPub, setViewPub] = useState(null);
+
+  function publicationExternalUrl(p) {
+    if (p?.url && /^https?:\/\//i.test(String(p.url))) return p.url;
+    if (p?.doi) {
+      const doi = String(p.doi).replace(/^https?:\/\/doi.org\//i, "").trim();
+      return doi ? `https://doi.org/${doi}` : null;
+    }
+    return null;
+  }
+
+  function downloadPublicationSummary(p) {
+    const external = publicationExternalUrl(p);
+    const lines = [
+      `Title: ${p.title || "—"}`,
+      `Type: ${publicationTypeLabel(p.type)}`,
+      `Year: ${p.year ?? "—"}`,
+      `Venue: ${p.venue || "—"}`,
+      `Status: ${p.statusLabel || p.status || "—"}`,
+      `Workflow: ${p.workflowStageLabel || p.workflowStage || "—"}`,
+      `Authors: ${Array.isArray(p.authors) ? p.authors.join(", ") : "—"}`,
+      `DOI: ${p.doi || "—"}`,
+      `ORCID: ${p.orcid || "—"}`,
+      `URL: ${external || "—"}`,
+      p.communityImpact ? `Community impact: ${p.communityImpact}` : "",
+      p.validationComment ? `Latest review: ${p.validationComment}` : "",
+    ].filter(Boolean);
+    const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(p.title || "publication").slice(0, 60).replace(/[^\w\-]+/g, "_")}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
 
   const canCreate = user?.role === "researcher";
   const canValidate = ["faculty_coordinator", "research_director"].includes(user?.role);
@@ -739,6 +773,14 @@ setPublications(list);
                     </div>
                   ) : null}
                   {p.doi ? <div className="muted">DOI: {p.doi}</div> : null}
+                  {publicationExternalUrl(p) ? (
+                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                      Link:{" "}
+                      <a href={publicationExternalUrl(p)} target="_blank" rel="noopener noreferrer">
+                        {publicationExternalUrl(p)}
+                      </a>
+                    </div>
+                  ) : null}
                   {p.orcid ? <div className="muted">ORCID: {p.orcid}</div> : null}
                   {typeof p.citationCount === "number" ? (
                     <div className="muted">
@@ -752,6 +794,26 @@ setPublications(list);
                   ) : null}
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {p.status !== "draft" ? (
+                    <>
+                      <button type="button" className="btn" onClick={() => setViewPub(p)}>
+                        View details
+                      </button>
+                      <button type="button" className="btn" onClick={() => downloadPublicationSummary(p)}>
+                        Download summary
+                      </button>
+                      {publicationExternalUrl(p) ? (
+                        <a
+                          className="btn"
+                          href={publicationExternalUrl(p)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open published link
+                        </a>
+                      ) : null}
+                    </>
+                  ) : null}
                   {p.doi ? (
                     <button
                       type="button"
@@ -1010,6 +1072,73 @@ setPublications(list);
                       ? "Confirm Revise"
                       : "Confirm Reject"}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {viewPub ? (
+        <div
+          className="modalBackdrop"
+          role="presentation"
+          onClick={() => setViewPub(null)}
+          onKeyDown={(e) => e.key === "Escape" && setViewPub(null)}
+        >
+          <div
+            className="card modalPanel"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 640, width: "92vw" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+              <div style={{ fontWeight: 800, fontSize: 18 }}>{viewPub.title}</div>
+              <button type="button" className="btn" onClick={() => setViewPub(null)}>
+                Close
+              </button>
+            </div>
+            <div style={{ display: "grid", gap: 8, marginTop: 12, fontSize: 14 }}>
+              <div><strong>Type:</strong> {publicationTypeLabel(viewPub.type)}</div>
+              <div><strong>Year:</strong> {viewPub.year ?? "—"}</div>
+              <div><strong>Venue:</strong> {viewPub.venue || "—"}</div>
+              <div><strong>Status:</strong> {viewPub.statusLabel || viewPub.status}</div>
+              {viewPub.workflowStage ? (
+                <div><strong>Workflow:</strong> {viewPub.workflowStageLabel || viewPub.workflowStage}</div>
+              ) : null}
+              {Array.isArray(viewPub.authors) && viewPub.authors.length ? (
+                <div><strong>Authors:</strong> {viewPub.authors.join(", ")}</div>
+              ) : null}
+              {viewPub.doi ? <div><strong>DOI:</strong> {viewPub.doi}</div> : null}
+              {viewPub.orcid ? <div><strong>ORCID:</strong> {viewPub.orcid}</div> : null}
+              {publicationExternalUrl(viewPub) ? (
+                <div>
+                  <strong>Published link:</strong>{" "}
+                  <a href={publicationExternalUrl(viewPub)} target="_blank" rel="noopener noreferrer">
+                    {publicationExternalUrl(viewPub)}
+                  </a>
+                </div>
+              ) : null}
+              {viewPub.communityImpact ? (
+                <div><strong>Community impact:</strong> {viewPub.communityImpact}</div>
+              ) : null}
+              {viewPub.validationComment ? (
+                <div><strong>Latest review:</strong> {viewPub.validationComment}</div>
+              ) : null}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+              <button type="button" className="btn primary" onClick={() => downloadPublicationSummary(viewPub)}>
+                Download summary
+              </button>
+              {publicationExternalUrl(viewPub) ? (
+                <a className="btn" href={publicationExternalUrl(viewPub)} target="_blank" rel="noopener noreferrer">
+                  Open published link
+                </a>
+              ) : null}
+              {viewPub.projectId ? (
+                <Link className="btn" to={`/projects/${viewPub.projectId}#project-outputs`}>
+                  Open project
+                </Link>
+              ) : null}
             </div>
           </div>
         </div>

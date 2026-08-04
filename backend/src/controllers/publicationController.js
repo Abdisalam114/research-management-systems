@@ -31,6 +31,8 @@ const {
   afterPublicationDecision,
   afterPublicationComment,
   notifyPublicationEvent,
+  buildPublicationSubmitNotificationBody,
+  loadPublicationForNotification,
 } = require("../utils/publicationSideEffects");
 
 const EDITABLE_STATUSES = [
@@ -716,8 +718,9 @@ async function updateWorkflowStage(req, res) {
 
   await notifyPublicationEvent(req, pub, {
     title: `Research output: ${workflowStageLabel(stage)}`,
-    body: `${pub.title} — see project details for full comments and status.`,
+    body: buildPublicationSubmitNotificationBody(await loadPublicationForNotification(pub), req),
     notifyOwner: true,
+    alsoNotifyRoles: stage === WORKFLOW_STAGES.PUBLISHED ? ["faculty_coordinator", "research_director"] : [],
   });
 
   res.json({ message: "Workflow stage updated", publication: sanitizePublication(pub), projectCompletion });

@@ -370,7 +370,7 @@ export function ThesisGroupsPage() {
         setError("Select a department under the chosen faculty.");
         return;
       }
-      const body = { ...form, students: cleanStudents, programTier: form.programTier || programTier || "undergraduate" };
+      const body = { ...form, students: cleanStudents, programTier: programTier || form.programTier || "undergraduate" };
       // #region agent log
       fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'THESIS1',location:'ThesisGroups.jsx:submit',message:'thesis save attempt',data:{editingId,supervisorId:body.supervisorId||null,programTier:body.programTier,studentCount:cleanStudents.length},timestamp:Date.now()})}).catch(()=>{});
       // #endregion
@@ -646,14 +646,16 @@ export function ThesisGroupsPage() {
             <div className="field">
               <label>Program (UG / PG)</label>
               <select
-                value={form.programTier || "undergraduate"}
-                onChange={(e) => setForm({ ...form, programTier: e.target.value })}
-                disabled={Boolean(editingId)}
+                value={form.programTier || programTier || "undergraduate"}
+                disabled
                 required
               >
                 <option value="undergraduate">Undergraduate (UG)</option>
                 <option value="postgraduate">Postgraduate (PG)</option>
               </select>
+              <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                Locked to active portal ({programTier === "postgraduate" ? "PG" : "UG"}).
+              </p>
             </div>
           </div>
 

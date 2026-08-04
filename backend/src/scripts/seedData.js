@@ -55,7 +55,7 @@ const SHARED_STAFF_USERS = [
 const PORTAL_USER_SPECS = {
   [PROGRAM_TIERS.UNDERGRADUATE]: [
     {
-      fullName: "Dr. Sarah Chen",
+      fullName: "Sarah Chen",
       email: "asha@rms.edu",
       password: process.env.SEED_RESEARCHER_PASSWORD || "Researcher2024!",
       role: ROLES.RESEARCHER,
@@ -66,7 +66,7 @@ const PORTAL_USER_SPECS = {
   ],
   [PROGRAM_TIERS.POSTGRADUATE]: [
     {
-      fullName: "Dr. James Okonkwo",
+      fullName: "Mahad Hassan",
       email: "mahad@rms.edu",
       password: process.env.SEED_RESEARCHER_PASSWORD || "Researcher2024!",
       role: ROLES.RESEARCHER,

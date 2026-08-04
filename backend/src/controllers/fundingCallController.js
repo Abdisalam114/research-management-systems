@@ -169,6 +169,7 @@ async function getFundingCall(req, res) {
     const applied = await Grant.exists({
       researcherId: req.user.id,
       callId: call._id,
+      programTier: req.programTier,
     });
     if (call.status !== CALL_STATUSES.OPEN && !applied) {
       throw new AppError("Funding call not available", 404);
@@ -296,7 +297,32 @@ async function publishFundingCall(req, res) {
   await call.save();
 
   const listLink = `/funding-calls?callId=${call._id}`;
-  const applyLink = `/grants/apply?callId=${call._id}`;
+  const applyLink = `/funding-calls?callId=${call._id}`;
+  const deadlineStr = call.deadline ? new Date(call.deadline).toLocaleDateString() : "—";
+  const amountStr =
+    Number(call.amountCap) > 0 ? `${call.currency || "USD"} ${Number(call.amountCap).toLocaleString()}` : "—";
+  const eligLabel =
+    call.eligibilityTier === "ug"
+      ? "Undergraduate (UG)"
+      : call.eligibilityTier === "pg" || call.eligibilityTier === "pgd"
+        ? "Postgraduate (PG)"
+        : "All researchers";
+  const notifyBody = [
+    call.title,
+    "",
+    `Type: ${call.callType === "external" ? "External" : "Internal"}`,
+    `Eligibility: ${eligLabel}`,
+    `Deadline: ${deadlineStr}`,
+    `Amount cap: ${amountStr}`,
+    call.description ? `\n${String(call.description).trim().slice(0, 600)}` : "",
+    call.requiredDocuments
+      ? `\nRequired documents:\n${String(call.requiredDocuments).trim().slice(0, 500)}`
+      : "",
+    "",
+    "Open below to view the call and start your application.",
+  ]
+    .filter((r) => r !== null)
+    .join("\n");
   // Notify by eligibility — each portal gets its own researchers with that portal's programTier
   let tiersToNotify = [call.programTier || req.programTier].filter(Boolean);
   if (!tiersToNotify.length) {
@@ -323,7 +349,7 @@ async function publishFundingCall(req, res) {
         {
           type: "grant",
           title: "New funding call open — apply now",
-          body: `${call.title} (${call.callType === "external" ? "External" : "Internal"}) · Open to apply`,
+          body: notifyBody,
           link: applyLink,
           programTier: tier,
         },
@@ -348,7 +374,7 @@ async function publishFundingCall(req, res) {
         {
           type: "grant",
           title: "New funding call published",
-          body: call.title,
+          body: notifyBody,
           link: listLink,
           programTier: tier,
         },

@@ -20,8 +20,9 @@ const { RepositoryItem } = require("../models/RepositoryItem");
 const { ResearchGroup } = require("../models/ResearchGroup");
 const { ThesisGroup } = require("../models/ThesisGroup");
 const { Department } = require("../models/Department");
-const { Notification } = require("../models/Notification");
-const { Conversation } = require("../models/Conversation");
+const { FundingCall } = require("../models/FundingCall");
+const { InstitutionalPolicy } = require("../models/InstitutionalPolicy");
+const { AuditEvent } = require("../models/AuditEvent");
 
 const MODELS = [
   User,
@@ -39,6 +40,9 @@ const MODELS = [
   Department,
   Notification,
   Conversation,
+  FundingCall,
+  InstitutionalPolicy,
+  AuditEvent,
 ];
 
 async function migrate() {

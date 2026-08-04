@@ -7,6 +7,7 @@ import { GlobalSearchBar } from "../components/GlobalSearchBar";
 import * as notificationApi from "../services/notificationApi";
 import logo from "../assets/jamhuriya-logo.png";
 import { isCrossTierRole, PROGRAM_TIER_OPTIONS, programTierLabel } from "../constants/programTier";
+import { SYSTEM_REFRESH_MS } from "../constants/systemRefresh";
 
 export function TopBar({ title = "Dashboard" }) {
   const { user, accessToken } = useAuth();
@@ -34,7 +35,7 @@ export function TopBar({ title = "Dashboard" }) {
     }
 
     poll();
-    const timer = setInterval(poll, 8000);
+    const timer = setInterval(poll, SYSTEM_REFRESH_MS);
     return () => {
       cancelled = true;
       clearInterval(timer);

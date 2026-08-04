@@ -383,14 +383,14 @@ async function listMyReviewAssignments(req, res) {
   // Self-heal: strip assignees left on closed proposals (updateMany bypasses pre-save).
   try {
     await Proposal.updateMany(
-      {
+      req.tierWhere({
         status: { $nin: [...ACTIVE_PEER_REVIEW_STATUSES] },
         $or: [
           { "assignedReviewers.0": { $exists: true } },
           { "assignedCommittee.0": { $exists: true } },
           { "assignedFinance.0": { $exists: true } },
         ],
-      },
+      }),
       { $set: { assignedReviewers: [], assignedCommittee: [], assignedFinance: [] } }
     );
   } catch {

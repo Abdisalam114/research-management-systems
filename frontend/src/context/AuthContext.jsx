@@ -8,6 +8,7 @@ import {
 } from "../utils/authStorage";
 import { isCrossTierRole } from "../constants/programTier";
 import { clearProgramTier } from "../utils/programTierStorage";
+import { SYSTEM_REFRESH_MS } from "../constants/systemRefresh";
 
 export const AuthContext = createContext(null);
 
@@ -73,6 +74,43 @@ export function AuthProvider({ children }) {
       cancelled = true;
     };
   }, [applyTokens, loadMe]);
+
+  useEffect(() => {
+    function onTokensUpdated(event) {
+      const next = event?.detail?.accessToken;
+      if (next) {
+        applyTokens({ accessToken: next, refreshToken: getRefreshToken() });
+      }
+    }
+    window.addEventListener("rms:tokens-updated", onTokensUpdated);
+    return () => window.removeEventListener("rms:tokens-updated", onTokensUpdated);
+  }, [applyTokens]);
+
+  useEffect(() => {
+    if (!accessToken || !getRefreshToken()) return undefined;
+    let cancelled = false;
+
+    async function refreshSession() {
+      try {
+        const storedRefresh = getRefreshToken();
+        if (!storedRefresh || cancelled) return;
+        const refreshed = await authApi.refresh(storedRefresh);
+        applyTokens({
+          accessToken: refreshed.accessToken,
+          refreshToken: refreshed.refreshToken || storedRefresh,
+        });
+        await loadMe(refreshed.accessToken);
+      } catch {
+        /* next API 401 will surface if refresh truly failed */
+      }
+    }
+
+    const timer = setInterval(refreshSession, SYSTEM_REFRESH_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [accessToken, applyTokens, loadMe]);
 
   const signIn = useCallback(
     async (email, password) => {

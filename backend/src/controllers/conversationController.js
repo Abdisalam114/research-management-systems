@@ -64,7 +64,9 @@ async function enrichConversation(c, currentUserId) {
 }
 
 async function listMessageableUsers(req, res) {
-  const users = await User.find(req.tierWhere({ status: USER_STATUSES.ACTIVE, _id: { $ne: req.user.id } }))
+  const users = await User.find(
+    req.userWhere({ status: USER_STATUSES.ACTIVE, _id: { $ne: req.user.id } })
+  )
     .select("fullName name email role department")
     .sort({ fullName: 1, name: 1 })
     .limit(300);

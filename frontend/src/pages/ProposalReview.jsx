@@ -90,10 +90,15 @@ throw e;
 
   // Final Approve / Reject waits until Multi-stage review (Phase 3) is complete (UG + PG).
   const multiStageReady = proposal.currentReviewStage === "ready_for_director";
-  const showFinalDecision =
-    (isCoordinator || isDirector) &&
-    multiStageReady &&
-    ["submitted", "under_review", "revision_requested"].includes(proposal.status);
+  const pipe = proposal.reviewPipeline || {};
+  const adminScreeningOpen =
+    pipe.adminScreening?.status === "pending" || pipe.adminScreening?.status === "in_progress";
+  const reviewableStatuses = ["submitted", "under_review", "revision_requested"];
+  const showCoordinatorReview =
+    isCoordinator && reviewableStatuses.includes(proposal.status) && (adminScreeningOpen || multiStageReady);
+  const showDirectorDecision =
+    isDirector && multiStageReady && reviewableStatuses.includes(proposal.status);
+  const showFinalDecision = showCoordinatorReview || showDirectorDecision;
 
   return (
     <div>

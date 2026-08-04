@@ -4,6 +4,15 @@ const { sendEmailToUser } = require("./emailNotify");
 
 async function notifyUser(userId, { title, body, link, downloadLink, type = "info", programTier }) {
   if (!userId) return;
+  let resolvedTier = programTier;
+  if (!resolvedTier) {
+    try {
+      const u = await User.findById(userId).select("programTier role");
+      if (u?.role === "researcher" && u.programTier) resolvedTier = u.programTier;
+    } catch {
+      /* best-effort */
+    }
+  }
   try {
     await Notification.create({
       userId,
@@ -12,7 +21,7 @@ async function notifyUser(userId, { title, body, link, downloadLink, type = "inf
       body: body || "",
       link: link || "",
       downloadLink: downloadLink || "",
-      ...(programTier ? { programTier } : {}),
+      ...(resolvedTier ? { programTier: resolvedTier } : {}),
     });
   } catch (err) {
     throw err;

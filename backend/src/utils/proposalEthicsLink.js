@@ -12,8 +12,10 @@ function isEthicsFormComplete(a) {
   return hasTitle && hasPrincipal && hasLevel && hasAims && hasDesign && hasSignature;
 }
 
-async function getEthicsForProposal(proposalId) {
-  return EthicsApplication.findOne({ proposalId });
+async function getEthicsForProposal(proposalId, programTier = null) {
+  const filter = { proposalId };
+  if (programTier) filter.programTier = programTier;
+  return EthicsApplication.findOne(filter);
 }
 
 async function syncProposalEthicsStatus(proposalId, ethicsStatus) {

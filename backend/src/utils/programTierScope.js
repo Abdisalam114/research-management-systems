@@ -41,6 +41,14 @@ function resolveProgramTier(req, user) {
     return user.programTier;
   }
 
+  if (user.role === ROLES.RESEARCHER) {
+    throw new AppError(
+      "Researcher account missing program tier (UG/PG). Contact Research Director.",
+      400,
+      "PROGRAM_TIER_REQUIRED"
+    );
+  }
+
   return PROGRAM_TIERS.UNDERGRADUATE;
 }
 

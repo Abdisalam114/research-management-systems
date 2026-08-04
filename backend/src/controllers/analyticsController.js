@@ -61,7 +61,7 @@ const DASHBOARD_ACTIVE_PROJECTS_LIMIT = 10;
 
 function mapProjectDashboardRow(p, piName) {
   const reports = p.progressReports || [];
-  const latest = reports.length ? reports[reports.length - 1] : null;
+  const latest = reports.length ? reports[0] : null;
   const progressPercent =
     latest?.progressPercent ??
     (p.status === PROJECT_STATUSES.COMPLETED ? 100 : p.status === PROJECT_STATUSES.ACTIVE ? 50 : 0);
