@@ -407,9 +407,6 @@ async function createGroup(req, res) {
   });
 
   const group = await ThesisGroup.create(groupData);
-  // #region agent log
-  fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'THESIS1',location:'thesisGroupController.js:createGroup',message:'thesis group created',data:{groupId:String(group._id),programTier:writeTier,supervisorId:resolvedSupervisorId?String(resolvedSupervisorId):null,studentCount:cleanStudents.length},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   if (resolvedSupervisorId) {
     await notifySupervisorAssignment(group, writeTier);
   }

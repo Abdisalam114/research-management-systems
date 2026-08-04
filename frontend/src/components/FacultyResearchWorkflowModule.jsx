@@ -47,21 +47,12 @@ export function FacultyResearchWorkflowModule({
     if (!next) return;
     setBusyId(pub.id);
     setError("");
-    // #region agent log
-    fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'WF1',location:'FacultyResearchWorkflowModule.jsx:advance',message:'workflow advance start',data:{pubId:pub.id,currentStage:pub.workflowStage,nextStage:next,status:pub.status},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     try {
       await publicationApi.updateWorkflowStage(accessToken, pub.id, next);
-      // #region agent log
-      fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'WF1',location:'FacultyResearchWorkflowModule.jsx:advance',message:'workflow advance ok',data:{pubId:pub.id,nextStage:next},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       // Follow the item into its new stage so it doesn't look stuck on Submitted
       setStageFilter(next);
       await load();
     } catch (e) {
-      // #region agent log
-      fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'WF1',location:'FacultyResearchWorkflowModule.jsx:advance',message:'workflow advance failed',data:{pubId:pub.id,error:e?.response?.data?.message||e?.message||'unknown'},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       setError(e?.response?.data?.message || "Failed to update workflow");
     } finally {
       setBusyId(null);

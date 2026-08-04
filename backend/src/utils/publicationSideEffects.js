@@ -199,9 +199,6 @@ async function afterPublicationSubmitted(req, pub) {
     alsoNotifyRoles: ["faculty_coordinator", "research_director"],
     notifyOwner: false,
   });
-  // #region agent log
-  fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'PUBNOTIF',location:'publicationSideEffects.js:afterPublicationSubmitted',message:'publish notifications sent',data:{pubId:String(enriched._id),notifiedDirector:notify.notifiedRoles.includes('research_director'),notifiedCoordinator:notify.notifiedRoles.includes('faculty_coordinator'),bodyLength:notificationBody.length},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
   effects.notifiedCoordinator = notify.notifiedRoles.includes("faculty_coordinator");
   effects.notifiedDirector = notify.notifiedRoles.includes("research_director");
   effects.projectLogUpdated = notify.projectLogUpdated;

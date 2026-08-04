@@ -371,9 +371,6 @@ export function ThesisGroupsPage() {
         return;
       }
       const body = { ...form, students: cleanStudents, programTier: programTier || form.programTier || "undergraduate" };
-      // #region agent log
-      fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'THESIS1',location:'ThesisGroups.jsx:submit',message:'thesis save attempt',data:{editingId,supervisorId:body.supervisorId||null,programTier:body.programTier,studentCount:cleanStudents.length},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       if (editingId) {
         await thesisApi.updateThesisGroup(accessToken, editingId, body);
       } else {

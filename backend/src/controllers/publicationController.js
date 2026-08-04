@@ -702,10 +702,6 @@ async function updateWorkflowStage(req, res) {
     pub.validatedAt = pub.validatedAt || new Date();
   }
   await pub.save();
-  // #region agent log
-  fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'WF1',location:'publicationController.js:updateWorkflowStage',message:'workflow stage saved',data:{pubId:String(pub._id),stage,status:pub.status,projectId:pub.projectId?String(pub.projectId):null},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-
   let projectCompletion = null;
   if (pub.projectId && (stage === WORKFLOW_STAGES.PUBLISHED || pub.status === PUBLICATION_STATUSES.VALIDATED)) {
     try {
