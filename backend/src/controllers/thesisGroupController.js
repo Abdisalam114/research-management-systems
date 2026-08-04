@@ -231,14 +231,15 @@ async function notifySupervisorAssignment(group, programTier) {
   });
 }
 
-async function findSupervisorResearcher(supervisorId) {
+async function findSupervisorResearcher(supervisorId, req) {
   if (!supervisorId) return null;
-  const sup = await User.findOne({
+  const filter = {
     _id: supervisorId,
     role: ROLES.RESEARCHER,
     status: USER_STATUSES.ACTIVE,
-  });
-  return sup;
+  };
+  const scoped = req?.userWhere ? req.userWhere(filter) : filter;
+  return User.findOne(scoped);
 }
 
 /** Notify Research Director + Faculty Coordinator when the supervisor updates a thesis group. */
@@ -348,7 +349,7 @@ async function createGroup(req, res) {
 
   let resolvedSupervisorId = null;
   if (supervisorId) {
-    const sup = await findSupervisorResearcher(supervisorId);
+    const sup = await findSupervisorResearcher(supervisorId, req);
     if (!sup) throw new AppError("Supervisor user not found (active researcher required)", 404);
     resolvedSupervisorId = sup._id;
   }
@@ -463,7 +464,7 @@ async function updateGroup(req, res) {
       group.supervisorId = null;
       group.supervisorAssignedAt = null;
     } else {
-      const sup = await findSupervisorResearcher(supervisorId);
+      const sup = await findSupervisorResearcher(supervisorId, req);
       if (!sup) throw new AppError("Supervisor user not found (active researcher required)", 404);
       group.supervisorId = sup._id;
     }
@@ -610,6 +611,14 @@ async function reviewTitleProposal(req, res) {
   group.titleProposal.reviewNote = note ? String(note) : "";
 
   if (accepting) {
+    try {
+      await assertThesisTitleNotUsedElsewhere(ThesisGroup, group.titleProposal.title, {
+        excludeGroupId: group._id,
+        tierFilter: req.tierWhere({}),
+      });
+    } catch (e) {
+      throw new AppError(e.message, e.statusCode || 400);
+    }
     group.title = group.titleProposal.title;
     if (group.status === THESIS_STATUSES.PROPOSED) {
       group.status = THESIS_STATUSES.IN_PROGRESS;

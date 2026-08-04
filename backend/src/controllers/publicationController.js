@@ -34,6 +34,7 @@ const {
   buildPublicationSubmitNotificationBody,
   loadPublicationForNotification,
 } = require("../utils/publicationSideEffects");
+const { coordinatorMatchesResearcherDept } = require("../utils/facultyMatcher");
 
 const EDITABLE_STATUSES = [
   PUBLICATION_STATUSES.DRAFT,
@@ -222,7 +223,9 @@ async function getFacultyWorkflow(req, res) {
       return ownerOk && projectOk;
     });
   } else if (role === "faculty_coordinator" && dept) {
-    pubs = pubs.filter((p) => p.researcherId && p.researcherId.department === dept);
+    pubs = pubs.filter(
+      (p) => p.researcherId && coordinatorMatchesResearcherDept(dept, p.researcherId.department)
+    );
   }
 const sanitized = pubs.map(sanitizePublication);
   const byStage = {};
@@ -677,7 +680,9 @@ async function updateWorkflowStage(req, res) {
 
   if (req.user.role === "faculty_coordinator") {
     const dept = (req.user.department || "").trim();
-    if (dept && pub.researcherId?.department !== dept) {
+    const researcherDept = pub.researcherId?.department || "";
+    const inScope = coordinatorMatchesResearcherDept(dept, researcherDept);
+    if (dept && !inScope) {
       throw new AppError("Publication is outside your faculty", 403);
     }
   }

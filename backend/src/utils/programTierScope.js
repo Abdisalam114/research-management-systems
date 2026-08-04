@@ -62,6 +62,12 @@ function tierWhere(req, base = {}) {
  * are one account for UG + PG — never hide them behind programTier.
  */
 function userWhere(req, base = {}) {
+  // Director manages all accounts (UG + PG); never portal-filter the users collection.
+  if (req.user?.role === ROLES.RESEARCH_DIRECTOR) {
+    const { programTier: _drop, ...rest } = base;
+    return rest;
+  }
+
   const role = base?.role;
   // Explicit shared-staff role (e.g. leadership for peer assign) — never portal-filter
   if (typeof role === "string" && isCrossTierRole(role)) {

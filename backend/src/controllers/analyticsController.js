@@ -12,6 +12,7 @@ const { Department } = require("../models/Department");
 const { EthicsApplication } = require("../models/EthicsApplication");
 const { ThesisGroup } = require("../models/ThesisGroup");
 const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
+const { InstitutionalPolicy } = require("../models/InstitutionalPolicy");
 const { AuditEvent } = require("../models/AuditEvent");
 const {
   buildResearchJourneyForResearcher,
@@ -1088,7 +1089,8 @@ async function getSystemReport(req, res) {
     throw new AppError("Forbidden", 403);
   }
 
-  const tf = (extra = {}) => req.tierWhere(extra);
+  const isDirector = role === ROLES.RESEARCH_DIRECTOR;
+  const tf = (extra = {}) => (isDirector ? extra : req.tierWhere(extra));
   const dept =
     role === "faculty_coordinator" ? String(req.user.department || "").trim() : "";
 
@@ -1108,6 +1110,7 @@ async function getSystemReport(req, res) {
     fundingCalls,
     users,
     repositoryItems,
+    policies,
   ] = await Promise.all([
     Proposal.find(proposalQ).select("status ethicsStatus department").lean(),
     Project.find(projectQ).select("status department kind").lean(),
@@ -1119,11 +1122,29 @@ async function getSystemReport(req, res) {
     Publication.find(tf({})).select("status workflowStage type").lean(),
     ThesisGroup.find(tf({})).select("status titleProposal").lean(),
     FundingCall.find(tf({})).select("status").lean(),
-    role === "research_director"
-      ? User.find(tf({ role: { $ne: ROLES.RESEARCH_DIRECTOR } })).select("role status").lean()
+    isDirector
+      ? User.find({ role: { $ne: ROLES.RESEARCH_DIRECTOR } }).select("role status programTier").lean()
       : Promise.resolve([]),
-    RepositoryItem.find(tf({})).select("_id").lean(),
+    RepositoryItem.find(tf({})).select("title").lean(),
+    InstitutionalPolicy.find(isDirector ? {} : tf({})).select("status category").lean(),
   ]);
+
+  const { REPOSITORY_ITEMS } = require("../scripts/seedRecords");
+  const seedRepoTitles = new Set(
+    REPOSITORY_ITEMS.map((r) =>
+      String(r.title || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+    )
+  );
+  const visibleRepository = repositoryItems.filter((item) => {
+    const key = String(item.title || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+    return !seedRepoTitles.has(key);
+  });
 
   const paidPayments = payments.filter((p) => p.status === PAYMENT_STATUSES.PAID || p.status === "paid");
   const allocated = sum(budgets.map((b) => Number(b.allocatedAmount ?? b.totalAmount ?? 0)));
@@ -1132,14 +1153,18 @@ async function getSystemReport(req, res) {
 
   const report = {
     generatedAt: new Date().toISOString(),
-    programTier: req.programTier || null,
-    scope: dept ? `faculty:${dept}` : req.programTier ? "portal" : "all",
+    programTier: isDirector ? null : req.programTier || null,
+    scope: isDirector ? "all_programs" : dept ? `faculty:${dept}` : req.programTier ? "portal" : "all",
     users:
-      role === "research_director"
+      isDirector
         ? {
             total: users.length,
             byRole: countByField(users, "role"),
             byStatus: countByField(users, "status"),
+            byProgramTier: countByField(
+              users.filter((u) => u.role === ROLES.RESEARCHER),
+              "programTier"
+            ),
           }
         : undefined,
     proposals: {
@@ -1187,7 +1212,12 @@ async function getSystemReport(req, res) {
       ).length,
     },
     repository: {
-      total: repositoryItems.length,
+      total: visibleRepository.length,
+    },
+    policies: {
+      total: policies.length,
+      byStatus: countByField(policies, "status"),
+      byCategory: countByField(policies, "category"),
     },
   };
 
@@ -1215,6 +1245,10 @@ async function getSystemReport(req, res) {
     push("thesis", "total", report.thesis.total);
     push("thesis", "titlesPending", report.thesis.titlesPending);
     push("repository", "total", report.repository.total);
+    push("policies", "total", report.policies?.total ?? 0);
+    if (report.policies?.byStatus) {
+      Object.entries(report.policies.byStatus).forEach(([k, v]) => push("policies", k, v));
+    }
     if (report.users) {
       push("users", "total", report.users.total);
       Object.entries(report.users.byRole).forEach(([k, v]) => push("users_role", k, v));

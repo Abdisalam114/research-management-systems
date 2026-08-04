@@ -185,8 +185,9 @@ res.json({ message: "Repository item deleted", id });
 
 async function buildExportRows(req) {
   const items = await fetchItemsForUser(req);
+  const visible = items.filter((item) => !isSeedRepositoryItem(item));
   const baseUrl = getPublicBaseUrl(req);
-  return itemsToExportRows(items, baseUrl);
+  return itemsToExportRows(visible, baseUrl);
 }
 
 function logRepositoryExport(format, rowCount) {

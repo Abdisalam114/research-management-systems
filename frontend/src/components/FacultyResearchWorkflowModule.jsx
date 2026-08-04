@@ -43,7 +43,8 @@ export function FacultyResearchWorkflowModule({
   }, [load]);
 
   async function advance(pub) {
-    const next = nextWorkflowStage(pub.workflowStage);
+    const current = pub.workflowStage && pub.workflowStage !== "null" ? pub.workflowStage : "submitted";
+    const next = nextWorkflowStage(current);
     if (!next) return;
     setBusyId(pub.id);
     setError("");
@@ -248,8 +249,9 @@ export function FacultyResearchWorkflowModule({
 }
 
 function WorkflowRow({ pub, canManage, busyId, onAdvance }) {
-  const next = nextWorkflowStage(pub.workflowStage);
-  const meta = workflowStageMeta(pub.workflowStage);
+  const current = pub.workflowStage && pub.workflowStage !== "null" ? pub.workflowStage : "submitted";
+  const next = nextWorkflowStage(current);
+  const meta = workflowStageMeta(current);
 
   return (
     <div

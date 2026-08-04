@@ -82,6 +82,19 @@ export function DonorReportsPage() {
                 <td>${(d.totalRequested || 0).toLocaleString()}</td>
               </tr>
             ))}
+            {(report.donors || []).length ? (
+              <tr style={{ fontWeight: 800, background: "rgba(14,165,233,0.06)" }}>
+                <td colSpan={2}>Total</td>
+                <td>${(report.totals?.awarded || 0).toLocaleString()}</td>
+                <td>${(report.totals?.requested || 0).toLocaleString()}</td>
+              </tr>
+            ) : (
+              <tr>
+                <td colSpan={4} className="muted">
+                  No donor grant records in this portal.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

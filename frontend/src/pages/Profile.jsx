@@ -17,12 +17,15 @@ export function ProfilePage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!accessToken) return;
+    if (!accessToken || user?.role !== "researcher") {
+      setPublications([]);
+      return;
+    }
     publicationApi
       .listPublications(accessToken)
       .then((r) => setPublications(r.publications || []))
       .catch(() => {});
-  }, [accessToken, programTier]);
+  }, [accessToken, programTier, user?.role]);
 
   return (
     <div>
@@ -85,6 +88,7 @@ export function ProfilePage() {
         </button>
       </div>
 
+      {user?.role === "researcher" ? (
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ fontWeight: 800, marginBottom: 8 }}>My publications</div>
         {publications.length === 0 ? (
@@ -99,6 +103,7 @@ export function ProfilePage() {
           </ul>
         )}
       </div>
+      ) : null}
     </div>
   );
 }

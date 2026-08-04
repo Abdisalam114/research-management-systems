@@ -126,4 +126,19 @@ function matchFacultyByName(name) {
   return DEFAULT_FACULTY;
 }
 
-module.exports = { FACULTIES, DEFAULT_FACULTY, matchFacultyByName };
+/** Coordinator dept may be faculty-level ("Faculty of Computing") while researcher dept is a department name. */
+function coordinatorMatchesResearcherDept(coordinatorDept, researcherDept) {
+  const cd = String(coordinatorDept || "").trim();
+  const rd = String(researcherDept || "").trim();
+  if (!cd) return true;
+  if (!rd) return false;
+  if (cd.toLowerCase() === rd.toLowerCase()) return true;
+  return matchFacultyByName(cd) === matchFacultyByName(rd);
+}
+
+module.exports = {
+  FACULTIES,
+  DEFAULT_FACULTY,
+  matchFacultyByName,
+  coordinatorMatchesResearcherDept,
+};

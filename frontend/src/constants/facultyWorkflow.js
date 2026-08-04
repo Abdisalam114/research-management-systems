@@ -7,7 +7,8 @@ export const FACULTY_WORKFLOW_STAGES = [
 
 export function nextWorkflowStage(current) {
   const order = FACULTY_WORKFLOW_STAGES.map((s) => s.id);
-  const i = order.indexOf(current);
+  const normalized = current && order.includes(current) ? current : "submitted";
+  const i = order.indexOf(normalized);
   return i >= 0 && i < order.length - 1 ? order[i + 1] : null;
 }
 

@@ -431,7 +431,8 @@ export function PendingUsersPage() {
         <div style={{ fontWeight: 800, marginBottom: 8 }}>All users ({allUsers.length})</div>
         <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
           Edit and Delete are Research Director only. You cannot change your own role/status or delete yourself.
-          Protected accounts cannot be deleted.
+          Protected accounts cannot be deleted. The list shows <strong>all users (UG + PG)</strong> regardless of the
+          active portal badge.
         </p>
         <table className="dashTable">
           <thead>

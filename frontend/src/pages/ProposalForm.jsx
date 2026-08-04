@@ -86,7 +86,6 @@ export function ProposalFormPage() {
         setCallTitle(res.call?.title || "");
         setProposal((prev) => ({
           ...prev,
-          title: prev.title || res.call?.title || "",
           department: prev.department || user?.department || "",
         }));
       } catch {

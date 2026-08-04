@@ -130,6 +130,10 @@ function titleProposalStatus(g) {
   return g.titleProposal?.status || "none";
 }
 
+function normStudentId(id) {
+  return String(id || "").trim().toLowerCase();
+}
+
 function validateStudentsLocally(students) {
   const clean = students
     .map((s) => ({
@@ -142,8 +146,45 @@ function validateStudentsLocally(students) {
   const ids = clean.map((s) => s.studentId).filter(Boolean);
   const dupEmail = emails.find((e, i) => emails.indexOf(e) !== i);
   if (dupEmail) return `Duplicate student email: ${dupEmail}`;
-  const dupId = ids.find((id, i) => ids.indexOf(id) !== i);
+  const dupId = ids.find((id, i) => ids.findIndex((x) => normStudentId(x) === normStudentId(id)) !== i);
   if (dupId) return `Duplicate student ID: ${dupId}`;
+  return null;
+}
+
+function validateStudentsAgainstGroups(students, groups, editingId) {
+  const clean = students
+    .map((s) => ({
+      fullName: s.fullName?.trim(),
+      studentId: s.studentId?.trim(),
+      email: s.email?.trim().toLowerCase(),
+    }))
+    .filter((s) => s.fullName);
+  for (const g of groups) {
+    if (editingId && String(g.id) === String(editingId)) continue;
+    for (const s of clean) {
+      if (s.email && (g.students || []).some((x) => String(x.email || "").trim().toLowerCase() === s.email)) {
+        return `Student email already used in another thesis group: ${s.email}`;
+      }
+      if (s.studentId && (g.students || []).some((x) => normStudentId(x.studentId) === normStudentId(s.studentId))) {
+        return `Student ID already used in another thesis group: ${s.studentId}`;
+      }
+    }
+  }
+  return null;
+}
+
+function normTitleKey(title) {
+  return String(title || "").trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function validateTitleAgainstGroups(title, groups, excludeGroupId) {
+  const key = normTitleKey(title);
+  if (!key) return null;
+  for (const g of groups) {
+    if (excludeGroupId && String(g.id) === String(excludeGroupId)) continue;
+    const titles = [g.title, g.titleProposal?.title].map(normTitleKey).filter(Boolean);
+    if (titles.includes(key)) return "This thesis title is already used by another group";
+  }
   return null;
 }
 
@@ -231,8 +272,13 @@ export function ThesisGroupsPage() {
   }, [researchers, researcherQuery]);
 
   const activeResearchers = useMemo(
-    () => filteredResearchers.filter((r) => !r.status || r.status === "active"),
-    [filteredResearchers]
+    () =>
+      filteredResearchers.filter((r) => {
+        if (r.status && r.status !== "active") return false;
+        const tier = programTier || "undergraduate";
+        return !r.programTier || r.programTier === tier;
+      }),
+    [filteredResearchers, programTier]
   );
 
   const departmentsByFaculty = useMemo(() => {
@@ -366,6 +412,11 @@ export function ThesisGroupsPage() {
         setError(studentDup);
         return;
       }
+      const crossGroupDup = validateStudentsAgainstGroups(form.students, groups, editingId);
+      if (crossGroupDup) {
+        setError(crossGroupDup);
+        return;
+      }
       if (!form.departmentId && !form.department?.trim()) {
         setError("Select a department under the chosen faculty.");
         return;
@@ -422,6 +473,11 @@ export function ThesisGroupsPage() {
       setMessage("");
       if (!titleForm.title?.trim()) {
         setError("Student thesis title is required");
+        return;
+      }
+      const titleDup = validateTitleAgainstGroups(titleForm.title, groups, groupId);
+      if (titleDup) {
+        setError(titleDup);
         return;
       }
       const res = await thesisApi.proposeThesisTitle(accessToken, groupId, { title: titleForm.title.trim() });
@@ -641,17 +697,20 @@ export function ThesisGroupsPage() {
               </select>
             </div>
             <div className="field">
-              <label>Program (UG / PG)</label>
-              <select
-                value={form.programTier || programTier || "undergraduate"}
-                disabled
-                required
+              <label>Program</label>
+              <div
+                style={{
+                  fontWeight: 800,
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  background: "rgba(14,165,233,0.08)",
+                  border: "1px solid rgba(56,189,248,0.35)",
+                }}
               >
-                <option value="undergraduate">Undergraduate (UG)</option>
-                <option value="postgraduate">Postgraduate (PG)</option>
-              </select>
+                {programTier === "postgraduate" ? "Postgraduate (PG)" : "Undergraduate (UG)"}
+              </div>
               <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                Locked to active portal ({programTier === "postgraduate" ? "PG" : "UG"}).
+                Locked to active portal — no UG/PG switch on this form.
               </p>
             </div>
           </div>

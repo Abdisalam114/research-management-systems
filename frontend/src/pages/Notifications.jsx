@@ -44,6 +44,18 @@ export function NotificationsPage() {
     return () => clearInterval(timer);
   }, [reload]);
 
+  function viewPublicationDetails(n) {
+    if (n.link) {
+      window.open(n.link, "_blank", "noopener,noreferrer");
+      return;
+    }
+    const text = `${n.title || "Publication"}\n\n${n.body || ""}`.trim();
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }
+
   function downloadPublicationSummary(n) {
     const text = `${n.title || "Publication"}\n\n${n.body || ""}`.trim();
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
@@ -189,6 +201,11 @@ export function NotificationsPage() {
                 {n.link ? (
                   <button type="button" className="btn primary" onClick={() => openNotification(n)}>
                     {n.type === "message" ? "Open chat" : "Open"}
+                  </button>
+                ) : null}
+                {n.type === "publication" && n.body ? (
+                  <button type="button" className="btn" onClick={() => viewPublicationDetails(n)}>
+                    View details
                   </button>
                 ) : null}
                 {canDownload(n) ? (

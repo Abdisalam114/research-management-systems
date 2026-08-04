@@ -136,6 +136,10 @@ function buildActivityTimeline(group) {
   return items.sort((a, b) => new Date(b.at) - new Date(a.at));
 }
 
+function normStudentId(id) {
+  return String(id || "").trim().toLowerCase();
+}
+
 function normalizeStudentRows(students) {
   if (!Array.isArray(students)) return [];
   return students
@@ -167,7 +171,7 @@ function assertNoDuplicateStudentsWithinGroup(students) {
     err.statusCode = 400;
     throw err;
   }
-  const dupId = ids.find((id, i) => ids.indexOf(id) !== i);
+  const dupId = ids.find((id, i) => ids.findIndex((x) => String(x).trim().toLowerCase() === String(id).trim().toLowerCase()) !== i);
   if (dupId) {
     const err = new Error(`Duplicate student ID in this group: ${dupId}`);
     err.statusCode = 400;
@@ -197,14 +201,11 @@ async function assertThesisStudentsNotUsedElsewhere(ThesisGroup, students, { exc
   const filter = { ...tierFilter };
   if (excludeGroupId) filter._id = { $ne: excludeGroupId };
 
-  const emails = [...new Set(clean.map((s) => s.email).filter(Boolean))];
-  const ids = [...new Set(clean.map((s) => s.studentId).filter(Boolean))];
-  if (!emails.length && !ids.length) return clean;
+  const hasEmail = clean.some((s) => s.email);
+  const hasId = clean.some((s) => s.studentId);
+  if (!hasEmail && !hasId) return clean;
 
-  const or = [];
-  if (emails.length) or.push({ "students.email": { $in: emails } });
-  if (ids.length) or.push({ "students.studentId": { $in: ids } });
-  const existing = await ThesisGroup.find({ ...filter, $or: or }).select("students title titleProposal");
+  const existing = await ThesisGroup.find(filter).select("students");
 
   for (const g of existing) {
     for (const s of clean) {
@@ -213,7 +214,10 @@ async function assertThesisStudentsNotUsedElsewhere(ThesisGroup, students, { exc
         err.statusCode = 400;
         throw err;
       }
-      if (s.studentId && (g.students || []).some((x) => String(x.studentId || "").trim() === s.studentId)) {
+      if (
+        s.studentId &&
+        (g.students || []).some((x) => normStudentId(x.studentId) === normStudentId(s.studentId))
+      ) {
         const err = new Error(`Student ID already used in another thesis group: ${s.studentId}`);
         err.statusCode = 400;
         throw err;

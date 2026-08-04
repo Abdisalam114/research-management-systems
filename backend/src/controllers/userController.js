@@ -53,8 +53,21 @@ function assertNotSelfTarget(req, targetUserId, actionLabel) {
   }
 }
 
+function isDirectorReq(req) {
+  return req.user?.role === ROLES.RESEARCH_DIRECTOR;
+}
+
+function userFind(req, filter) {
+  return isDirectorReq(req) ? User.find(filter) : User.find(req.userWhere(filter));
+}
+
+function userFindOne(req, filter, select = "") {
+  const q = isDirectorReq(req) ? User.findOne(filter) : User.findOne(req.userWhere(filter));
+  return select ? q.select(select) : q;
+}
+
 async function listPendingUsers(req, res) {
-  const users = await User.find(req.userWhere({ status: USER_STATUSES.PENDING })).sort({ createdAt: -1 });
+  const users = await userFind(req, { status: USER_STATUSES.PENDING }).sort({ createdAt: -1 });
   res.json({ users: users.map(sanitizeUser) });
 }
 
@@ -160,7 +173,7 @@ async function listUsers(req, res) {
     }
   }
 
-  const users = await User.find(req.userWhere ? req.userWhere(filter) : req.tierWhere(filter)).sort({
+  const users = await userFind(req, filter).sort({
     createdAt: -1,
   });
   res.json({ users: users.map(sanitizeUser) });
@@ -168,7 +181,7 @@ async function listUsers(req, res) {
 
 async function approveUser(req, res) {
   const { id } = req.params;
-  const user = await User.findOne(req.userWhere ? req.userWhere({ _id: id }) : req.tierWhere({ _id: id }));
+  const user = await userFindOne(req, { _id: id });
   if (!user) throw new AppError("User not found", 404);
 
   user.status = USER_STATUSES.ACTIVE;
@@ -179,7 +192,7 @@ async function approveUser(req, res) {
 
 async function rejectUser(req, res) {
   const { id } = req.params;
-  const user = await User.findOne(req.userWhere ? req.userWhere({ _id: id }) : req.tierWhere({ _id: id }));
+  const user = await userFindOne(req, { _id: id });
   if (!user) throw new AppError("User not found", 404);
 
   assertNotSelfTarget(req, user._id, "reject/deactivate");
@@ -193,9 +206,7 @@ async function rejectUser(req, res) {
 async function updateUserByDirector(req, res) {
   const { id } = req.params;
   assertValidObjectId(id);
-  const user = await User.findOne(req.userWhere ? req.userWhere({ _id: id }) : req.tierWhere({ _id: id })).select(
-    "+refreshToken"
-  );
+  const user = await userFindOne(req, { _id: id }, "+refreshToken");
   if (!user) throw new AppError("User not found", 404);
 
   const { role, status, fullName, department, rank, isProtected } = req.body || {};
@@ -236,7 +247,7 @@ async function updateUserByDirector(req, res) {
 async function deleteUserByDirector(req, res) {
   const { id } = req.params;
   assertValidObjectId(id);
-  const user = await User.findOne(req.userWhere ? req.userWhere({ _id: id }) : req.tierWhere({ _id: id }));
+  const user = await userFindOne(req, { _id: id });
   if (!user) throw new AppError("User not found", 404);
 
   // Never allow self-delete (prevents self-lockout and accidental removal).

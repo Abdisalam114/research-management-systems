@@ -2,6 +2,7 @@
 
 import { PROGRAM_TIERS } from "../constants/programTier";
 import { normalizeProjectLevel } from "../constants/ethicsFormOptions";
+import { matchFacultyByName } from "../constants/faculties";
 
 export function defaultProjectLevelFromTier(programTier) {
   if (programTier === PROGRAM_TIERS.UNDERGRADUATE) return "undergraduate";
@@ -74,6 +75,7 @@ export function buildEthicsFromProposalAndUser(proposal, user, programTier) {
   const firstName = parts[0] || "";
   const lastName = parts.slice(1).join(" ") || "";
   const tier = programTier || proposal?.programTier;
+  const dept = proposal?.department || user?.department || "";
   return {
     ...emptyEthicsForm(),
     projectTitle: proposal?.title || "",
@@ -84,7 +86,8 @@ export function buildEthicsFromProposalAndUser(proposal, user, programTier) {
       firstName,
       lastName,
       email: user?.email || "",
-      department: proposal?.department || user?.department || "",
+      department: dept,
+      faculty: matchFacultyByName(dept),
     },
     applicantSignature: { name: user?.fullName || "" },
   };
@@ -95,6 +98,7 @@ export function syncEthicsFromProposal(ethics, proposal, user, programTier) {
   const parts = (user?.fullName || "").trim().split(/\s+/);
   const tier = programTier || proposal?.programTier;
   const defaultLevel = defaultProjectLevelFromTier(tier);
+  const dept = proposal.department || user?.department || ethics.principal?.department || "";
   return {
     ...ethics,
     projectTitle: proposal.title || "",
@@ -102,7 +106,8 @@ export function syncEthicsFromProposal(ethics, proposal, user, programTier) {
     aimsObjectives: ethics.aimsObjectives || proposal.abstract || "",
     principal: {
       ...ethics.principal,
-      department: proposal.department || user?.department || ethics.principal?.department || "",
+      department: dept,
+      faculty: ethics.principal?.faculty || matchFacultyByName(dept),
       email: user?.email || ethics.principal?.email || "",
       firstName: ethics.principal?.firstName || parts[0] || "",
       lastName: ethics.principal?.lastName || parts.slice(1).join(" ") || "",

@@ -96,6 +96,9 @@ export function SystemReportsPage() {
             <Link className="btn" to="/finance-reports">
               Finance report
             </Link>
+            <Link className="btn" to="/policies">
+              Policies
+            </Link>
             <Link className="btn" to="/kpi-dashboard">
               KPI dashboard
             </Link>
@@ -119,7 +122,8 @@ export function SystemReportsPage() {
       {report ? (
         <>
           <p className="muted" style={{ marginTop: 0 }}>
-            Generated {new Date(report.generatedAt).toLocaleString()} · scope {report.scope || "portal"}
+            Generated {new Date(report.generatedAt).toLocaleString()} · scope{" "}
+            <strong>{report.scope === "all_programs" ? "All programs (UG + PG — 100%)" : report.scope || "portal"}</strong>
           </p>
 
           <div
@@ -153,6 +157,10 @@ export function SystemReportsPage() {
             <div className="card" style={{ padding: 12 }}>
               <div className="muted" style={{ fontSize: 12 }}>Thesis groups</div>
               <div style={{ fontWeight: 800, fontSize: 22 }}>{report.thesis?.total ?? 0}</div>
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <div className="muted" style={{ fontSize: 12 }}>Policies</div>
+              <div style={{ fontWeight: 800, fontSize: 22 }}>{report.policies?.total ?? 0}</div>
             </div>
           </div>
 
@@ -188,6 +196,9 @@ export function SystemReportsPage() {
             <StatusTable title="Thesis by status" total={report.thesis?.total} byStatus={report.thesis?.byStatus} />
             {report.users ? (
               <StatusTable title="Users by role" total={report.users.total} byStatus={report.users.byRole} />
+            ) : null}
+            {report.policies ? (
+              <StatusTable title="Policies by status" total={report.policies.total} byStatus={report.policies.byStatus} />
             ) : null}
             <div className="card" style={{ padding: 14 }}>
               <div style={{ fontWeight: 800, marginBottom: 8 }}>Other</div>

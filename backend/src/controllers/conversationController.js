@@ -1,10 +1,11 @@
 const { Conversation } = require("../models/Conversation");
 const { ResearchGroup } = require("../models/ResearchGroup");
-const { User, USER_STATUSES } = require("../models/User");
+const { User, USER_STATUSES, ROLES } = require("../models/User");
 const { NOTIFICATION_TYPES } = require("../models/Notification");
 const { AppError } = require("../utils/AppError");
 const { notifyUser } = require("../utils/notify");
 const { userDisplayName } = require("../utils/userDisplay");
+const { CROSS_TIER_ROLES } = require("../utils/programTierScope");
 
 function sanitizeConversation(c) {
   return {
@@ -64,10 +65,23 @@ async function enrichConversation(c, currentUserId) {
 }
 
 async function listMessageableUsers(req, res) {
-  const users = await User.find(
-    req.userWhere({ status: USER_STATUSES.ACTIVE, _id: { $ne: req.user.id } })
-  )
-    .select("fullName name email role department")
+  const tier = req.programTier;
+  const base = {
+    status: USER_STATUSES.ACTIVE,
+    _id: { $ne: req.user.id },
+  };
+  const query = tier
+    ? {
+        ...base,
+        $or: [
+          { role: { $in: CROSS_TIER_ROLES } },
+          { role: ROLES.RESEARCHER, programTier: tier },
+        ],
+      }
+    : base;
+
+  const users = await User.find(query)
+    .select("fullName name email role department programTier")
     .sort({ fullName: 1, name: 1 })
     .limit(300);
 
