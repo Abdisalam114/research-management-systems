@@ -64,10 +64,26 @@ function sanitizeItem(i) {
   };
 }
 
+const { REPOSITORY_ITEMS } = require("../scripts/seedRecords");
+
+function normSeedTitle(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+const SEED_REPOSITORY_TITLES = new Set(REPOSITORY_ITEMS.map((r) => normSeedTitle(r.title)));
+
+function isSeedRepositoryItem(item) {
+  return SEED_REPOSITORY_TITLES.has(normSeedTitle(item.title));
+}
+
 async function listItems(req, res) {
   const items = await fetchItemsForUser(req);
   const populated = await RepositoryItem.populate(items, { path: "projectId", select: "title status" });
-return res.json({ items: populated.map(sanitizeItem) });
+  const visible = populated.filter((item) => !isSeedRepositoryItem(item));
+  return res.json({ items: visible.map(sanitizeItem) });
 }
 
 async function uploadItem(req, res) {

@@ -335,6 +335,7 @@ const issueDate = parseOptionalDate(signedAt, new Date());
       title: "JUREC Ethical Approval Certificate Issued",
       body: certBody,
       link: `/ethics?applicationId=${a._id}`,
+      downloadLink: `ethics-certificate:${a._id}`,
       programTier: a.programTier,
     });
   } catch { /* best-effort */ }

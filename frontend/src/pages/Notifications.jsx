@@ -5,6 +5,8 @@ import { useProgramTier } from "../hooks/useProgramTier";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import { isCrossTierRole } from "../constants/programTier";
 import * as notificationApi from "../services/notificationApi";
+import * as ethicsApi from "../services/ethicsApi";
+import { apiOrigin } from "../config/apiBase";
 
 function formatWhen(at) {
   if (!at) return "";
@@ -15,11 +17,17 @@ function formatWhen(at) {
   }
 }
 
+function ethicsIdFromDownloadLink(link) {
+  if (!link?.startsWith("ethics-certificate:")) return null;
+  return link.slice("ethics-certificate:".length);
+}
+
 export function NotificationsPage() {
   const { accessToken, user } = useAuth();
   const navigate = useNavigate();
   const { programTier, selectProgramTier } = useProgramTier();
   const [notifications, setNotifications] = useState([]);
+  const [downloadBusy, setDownloadBusy] = useState("");
 
   const load = useCallback(async () => {
     const res = await notificationApi.listMyNotifications(accessToken);
@@ -55,7 +63,6 @@ export function NotificationsPage() {
 
     if (n.link) {
       if (needsPortalSwitch) {
-        // Allow storage + React state to settle before detail pages fetch
         window.setTimeout(() => navigate(n.link), 0);
       } else {
         navigate(n.link);
@@ -64,6 +71,36 @@ export function NotificationsPage() {
       await reload().catch(() => {});
     }
   }
+
+  async function downloadDocument(n) {
+    const ethicsId = ethicsIdFromDownloadLink(n.downloadLink);
+    if (ethicsId) {
+      setDownloadBusy(n.id);
+      try {
+        await ethicsApi.downloadCertificate(accessToken, ethicsId);
+        if (!n.readAt) {
+          await notificationApi.markNotificationRead(accessToken, n.id);
+          await reload();
+        }
+      } catch (e) {
+        setError(e?.message || "Could not download certificate");
+      } finally {
+        setDownloadBusy("");
+      }
+      return;
+    }
+
+    if (n.downloadLink?.startsWith("/uploads/")) {
+      window.open(`${apiOrigin()}${n.downloadLink}`, "_blank", "noopener,noreferrer");
+      if (!n.readAt) {
+        await notificationApi.markNotificationRead(accessToken, n.id);
+        await reload();
+      }
+    }
+  }
+
+  const canDownload = (n) =>
+    Boolean(ethicsIdFromDownloadLink(n.downloadLink) || n.downloadLink?.startsWith("/uploads/"));
 
   return (
     <div className="dashboardPage">
@@ -99,13 +136,35 @@ export function NotificationsPage() {
                   {formatWhen(n.createdAt)}
                 </span>
               </div>
-              <div className="muted" style={{ marginTop: 4, whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.5 }}>
+              <div
+                className="muted"
+                style={{
+                  marginTop: 8,
+                  whiteSpace: "pre-wrap",
+                  fontSize: 13,
+                  lineHeight: 1.55,
+                  padding: n.type === "publication" ? "10px 12px" : undefined,
+                  borderRadius: n.type === "publication" ? 8 : undefined,
+                  background: n.type === "publication" ? "rgba(15,23,42,0.04)" : undefined,
+                  fontFamily: n.type === "publication" ? "inherit" : undefined,
+                }}
+              >
                 {n.body}
               </div>
-              <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 {n.link ? (
                   <button type="button" className="btn primary" onClick={() => openNotification(n)}>
                     {n.type === "message" ? "Open chat" : "Open"}
+                  </button>
+                ) : null}
+                {canDownload(n) ? (
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={downloadBusy === n.id}
+                    onClick={() => downloadDocument(n)}
+                  >
+                    {downloadBusy === n.id ? "Downloading…" : "Download document"}
                   </button>
                 ) : null}
                 {!n.readAt ? (

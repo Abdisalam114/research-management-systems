@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   SUBJECT_OPTS,
   INSTRUMENT_OPTS,
@@ -6,9 +6,17 @@ import {
   PROJECT_LEVEL_OPTS,
   normalizeProjectLevel,
 } from "../constants/ethicsFormOptions";
+import { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } from "../constants/faculties";
 import { getEthicsMissingFields } from "../utils/proposalSubmitValidation";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
 import "./ethicsLevelPicker.css";
+
+function facultyKeyForDepartment(d) {
+  if (d?.faculty && FACULTIES.some((f) => f.value === d.faculty)) return d.faculty;
+  const inferred = matchFacultyByName(d?.name || d?.faculty || "");
+  if (inferred && FACULTIES.some((f) => f.value === inferred)) return inferred;
+  return DEFAULT_FACULTY;
+}
 
 const REQUIRED_FIELD_IDS = {
   projectTitle: "ethics-req-projectTitle",
@@ -52,8 +60,24 @@ export function EthicsApplicationForm({
   embeddedInProposal = false,
   autoFillHint = false,
   hideFundingFields = false,
+  departments = [],
 }) {
   const set = (path, value) => setForm((prev) => patchForm(prev, path, value));
+  const departmentsByFaculty = useMemo(() => {
+    const map = {};
+    FACULTIES.forEach((f) => {
+      map[f.value] = [];
+    });
+    departments.forEach((d) => {
+      const key = facultyKeyForDepartment(d);
+      if (!map[key]) map[key] = [];
+      map[key].push(d);
+    });
+    for (const key of Object.keys(map)) {
+      map[key].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    }
+    return map;
+  }, [departments]);
   const missing = getEthicsMissingFields(form);
   const consentOptions = hideFundingFields
     ? CONSENT_ITEMS.filter((v) => v !== "compensation" && v !== "cost_reimbursement").map((v) => ({
@@ -234,12 +258,14 @@ export function EthicsApplicationForm({
           onChange={(field, v) => set(`principal.${field}`, v)}
           readOnly={readOnly}
           hideNameFields={!readOnly}
+          departmentsByFaculty={departmentsByFaculty}
         />
         <PersonFields
           label="Co-researcher / Supervisor"
           person={form.coResearcher}
           onChange={(field, v) => set(`coResearcher.${field}`, v)}
           readOnly={readOnly}
+          departmentsByFaculty={departmentsByFaculty}
         />
         <div className="field">
           <label>Other investigators (one per line, up to 6)</label>
@@ -539,7 +565,26 @@ function Section({ title, children, highlight = false }) {
   );
 }
 
-function PersonFields({ label, person, onChange, readOnly, hideNameFields = false }) {
+function PersonFields({ label, person, onChange, readOnly, hideNameFields = false, departmentsByFaculty = {} }) {
+  const facultyValue =
+    person.faculty && FACULTIES.some((f) => f.value === person.faculty)
+      ? person.faculty
+      : matchFacultyByName(person.department) || DEFAULT_FACULTY;
+  const deptOptions = departmentsByFaculty[facultyValue] || [];
+
+  function onFacultyChange(faculty) {
+    onChange("faculty", faculty);
+    onChange("department", "");
+  }
+
+  function onDepartmentChange(departmentName) {
+    onChange("department", departmentName);
+    const dept = deptOptions.find((d) => d.name === departmentName);
+    if (dept?.faculty && FACULTIES.some((f) => f.value === dept.faculty)) {
+      onChange("faculty", dept.faculty);
+    }
+  }
+
   return (
     <div style={{ marginBottom: 14 }}>
       <div style={{ fontWeight: 700, marginBottom: 6 }}>{label}</div>
@@ -568,11 +613,38 @@ function PersonFields({ label, person, onChange, readOnly, hideNameFields = fals
       <div className="row">
         <div className="field">
           <label>Faculty</label>
-          <input disabled={readOnly} value={person.faculty} onChange={(e) => onChange("faculty", e.target.value)} />
+          <select disabled={readOnly} value={facultyValue} onChange={(e) => onFacultyChange(e.target.value)}>
+            {FACULTIES.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.value}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="field">
           <label>Department</label>
-          <input disabled={readOnly} value={person.department} onChange={(e) => onChange("department", e.target.value)} />
+          {deptOptions.length ? (
+            <select
+              disabled={readOnly}
+              value={person.department || ""}
+              onChange={(e) => onDepartmentChange(e.target.value)}
+            >
+              <option value="">— Select department —</option>
+              {deptOptions.map((d) => (
+                <option key={d.id || d.name} value={d.name}>
+                  {d.name}
+                  {d.code ? ` (${d.code})` : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              disabled={readOnly}
+              value={person.department || ""}
+              onChange={(e) => onChange("department", e.target.value)}
+              placeholder="Select faculty first or type department"
+            />
+          )}
         </div>
       </div>
       <div className="row">

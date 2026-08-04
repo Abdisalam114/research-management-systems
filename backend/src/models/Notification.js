@@ -20,6 +20,7 @@ const notificationSchema = new mongoose.Schema(
     title: { type: String, required: true, trim: true },
     body: { type: String, default: "" },
     link: { type: String, default: "" },
+    downloadLink: { type: String, default: "" },
     readAt: { type: Date, default: null, index: true },
     ...programTierField,
   },

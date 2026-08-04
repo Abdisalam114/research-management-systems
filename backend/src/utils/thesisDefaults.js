@@ -157,6 +157,91 @@ function assertMinThesisStudents(students) {
   return clean;
 }
 
+function assertNoDuplicateStudentsWithinGroup(students) {
+  const clean = normalizeStudentRows(students);
+  const emails = clean.map((s) => s.email).filter(Boolean);
+  const ids = clean.map((s) => s.studentId).filter(Boolean);
+  const dupEmail = emails.find((e, i) => emails.indexOf(e) !== i);
+  if (dupEmail) {
+    const err = new Error(`Duplicate student email in this group: ${dupEmail}`);
+    err.statusCode = 400;
+    throw err;
+  }
+  const dupId = ids.find((id, i) => ids.indexOf(id) !== i);
+  if (dupId) {
+    const err = new Error(`Duplicate student ID in this group: ${dupId}`);
+    err.statusCode = 400;
+    throw err;
+  }
+  return clean;
+}
+
+function normalizedTitleKey(title) {
+  return String(title || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function collectThesisTitles(group) {
+  const keys = new Set();
+  for (const raw of [group.title, group.titleProposal?.title]) {
+    const key = normalizedTitleKey(raw);
+    if (key) keys.add(key);
+  }
+  return keys;
+}
+
+async function assertThesisStudentsNotUsedElsewhere(ThesisGroup, students, { excludeGroupId, tierFilter }) {
+  const clean = normalizeStudentRows(students);
+  const filter = { ...tierFilter };
+  if (excludeGroupId) filter._id = { $ne: excludeGroupId };
+
+  const emails = [...new Set(clean.map((s) => s.email).filter(Boolean))];
+  const ids = [...new Set(clean.map((s) => s.studentId).filter(Boolean))];
+  if (!emails.length && !ids.length) return clean;
+
+  const or = [];
+  if (emails.length) or.push({ "students.email": { $in: emails } });
+  if (ids.length) or.push({ "students.studentId": { $in: ids } });
+  const existing = await ThesisGroup.find({ ...filter, $or: or }).select("students title titleProposal");
+
+  for (const g of existing) {
+    for (const s of clean) {
+      if (s.email && (g.students || []).some((x) => String(x.email || "").trim().toLowerCase() === s.email)) {
+        const err = new Error(`Student email already used in another thesis group: ${s.email}`);
+        err.statusCode = 400;
+        throw err;
+      }
+      if (s.studentId && (g.students || []).some((x) => String(x.studentId || "").trim() === s.studentId)) {
+        const err = new Error(`Student ID already used in another thesis group: ${s.studentId}`);
+        err.statusCode = 400;
+        throw err;
+      }
+    }
+  }
+  return clean;
+}
+
+async function assertThesisTitleNotUsedElsewhere(ThesisGroup, title, { excludeGroupId, tierFilter }) {
+  const key = normalizedTitleKey(title);
+  if (!key) return;
+
+  const filter = { ...tierFilter };
+  if (excludeGroupId) filter._id = { $ne: excludeGroupId };
+
+  const groups = await ThesisGroup.find(filter).select("title titleProposal");
+  for (const g of groups) {
+    for (const existing of collectThesisTitles(g)) {
+      if (existing === key) {
+        const err = new Error("This thesis title is already used by another group");
+        err.statusCode = 400;
+        throw err;
+      }
+    }
+  }
+}
+
 module.exports = {
   MIN_THESIS_GROUP_STUDENTS,
   CHAPTER_STATUSES,
@@ -167,4 +252,8 @@ module.exports = {
   buildActivityTimeline,
   normalizeStudentRows,
   assertMinThesisStudents,
+  assertNoDuplicateStudentsWithinGroup,
+  assertThesisStudentsNotUsedElsewhere,
+  assertThesisTitleNotUsedElsewhere,
+  normalizedTitleKey,
 };

@@ -130,6 +130,23 @@ function titleProposalStatus(g) {
   return g.titleProposal?.status || "none";
 }
 
+function validateStudentsLocally(students) {
+  const clean = students
+    .map((s) => ({
+      fullName: s.fullName?.trim(),
+      studentId: s.studentId?.trim(),
+      email: s.email?.trim().toLowerCase(),
+    }))
+    .filter((s) => s.fullName);
+  const emails = clean.map((s) => s.email).filter(Boolean);
+  const ids = clean.map((s) => s.studentId).filter(Boolean);
+  const dupEmail = emails.find((e, i) => emails.indexOf(e) !== i);
+  if (dupEmail) return `Duplicate student email: ${dupEmail}`;
+  const dupId = ids.find((id, i) => ids.indexOf(id) !== i);
+  if (dupId) return `Duplicate student ID: ${dupId}`;
+  return null;
+}
+
 export function ThesisGroupsPage() {
   const { accessToken, user } = useAuth();
   const { programTier } = useProgramTier();
@@ -274,14 +291,14 @@ export function ThesisGroupsPage() {
   );
 
   function resetForm() {
-    setForm({ ...EMPTY_FORM, faculty: defaultFacultyForUser(user) });
+    setForm({ ...EMPTY_FORM, faculty: defaultFacultyForUser(user), programTier: programTier || "undergraduate" });
     setEditingId(null);
     setShowForm(false);
   }
 
   function openCreate() {
     setEditingId(null);
-    setForm({ ...EMPTY_FORM, faculty: defaultFacultyForUser(user) });
+    setForm({ ...EMPTY_FORM, faculty: defaultFacultyForUser(user), programTier: programTier || "undergraduate" });
     setShowForm(true);
   }
 
@@ -344,11 +361,19 @@ export function ThesisGroupsPage() {
         setError(`Each thesis group requires at least ${MIN_THESIS_GROUP_STUDENTS} students`);
         return;
       }
+      const studentDup = validateStudentsLocally(form.students);
+      if (studentDup) {
+        setError(studentDup);
+        return;
+      }
       if (!form.departmentId && !form.department?.trim()) {
         setError("Select a department under the chosen faculty.");
         return;
       }
-      const body = { ...form, students: cleanStudents };
+      const body = { ...form, students: cleanStudents, programTier: form.programTier || programTier || "undergraduate" };
+      // #region agent log
+      fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'THESIS1',location:'ThesisGroups.jsx:submit',message:'thesis save attempt',data:{editingId,supervisorId:body.supervisorId||null,programTier:body.programTier,studentCount:cleanStudents.length},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       if (editingId) {
         await thesisApi.updateThesisGroup(accessToken, editingId, body);
       } else {
@@ -646,11 +671,9 @@ export function ThesisGroupsPage() {
                 value={form.supervisorId}
                 onChange={(e) => {
                   const id = e.target.value;
-                  const picked = activeResearchers.find((r) => String(r.id || r._id) === String(id));
                   setForm({
                     ...form,
                     supervisorId: id,
-                    ...(picked?.programTier ? { programTier: picked.programTier } : {}),
                   });
                 }}
                 size={Math.min(8, Math.max(4, activeResearchers.length + 1))}

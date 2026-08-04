@@ -6,13 +6,64 @@ import * as analyticsApi from "../services/analyticsApi";
 import { PageHeader } from "../components/PageHeader";
 import "../pages/dashboard.css";
 
-function KpiCard({ label, value, sub }) {
-  return (
-    <div className="card" style={{ padding: 14 }}>
+const KPI_ROUTES = [
+  { key: "grantSuccessRate", label: "Grant success rate", format: (v) => `${v ?? 0}%`, to: "/grants" },
+  { key: "proposalApprovalRate", label: "Proposal approval", format: (v) => `${v ?? 0}%`, to: "/proposals" },
+  {
+    key: "totalFundingAwarded",
+    label: "Funding awarded",
+    format: (v) => `$${Number(v || 0).toLocaleString()}`,
+    to: "/finance/reports",
+  },
+  { key: "activeProjects", label: "Active projects", format: (v) => v ?? 0, to: "/projects" },
+  { key: "projectsArchived", label: "Archived projects", format: (v) => v ?? 0, to: "/projects" },
+  { key: "publicationsValidated", label: "Validated publications", format: (v) => v ?? 0, to: "/publications" },
+  { key: "totalCitations", label: "Citations", format: (v) => v ?? 0, to: "/publications" },
+  {
+    key: "openFundingCalls",
+    label: "Open funding calls",
+    format: (v) => v ?? 0,
+    sub: (kpis) => `Internal ${kpis.internalFundingCalls ?? 0} · External ${kpis.externalFundingCalls ?? 0}`,
+    to: "/funding-calls",
+  },
+];
+
+function KpiCard({ label, value, sub, to }) {
+  const inner = (
+    <>
       <div className="muted" style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase" }}>{label}</div>
       <div style={{ fontWeight: 900, fontSize: 22, marginTop: 6 }}>{value}</div>
       {sub ? <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{sub}</div> : null}
-    </div>
+      {to ? (
+        <div className="muted" style={{ fontSize: 11, marginTop: 8, fontWeight: 700 }}>
+          Open module →
+        </div>
+      ) : null}
+    </>
+  );
+
+  if (!to) {
+    return (
+      <div className="card" style={{ padding: 14 }}>
+        {inner}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      to={to}
+      className="card"
+      style={{
+        padding: 14,
+        textDecoration: "none",
+        color: "inherit",
+        display: "block",
+        transition: "border-color 0.15s ease",
+      }}
+    >
+      {inner}
+    </Link>
   );
 }
 
@@ -46,22 +97,19 @@ export function KpiDashboardPage() {
       {data ? (
         <>
           <p className="muted" style={{ marginTop: 0 }}>
-            Generated {new Date(data.generatedAt).toLocaleString()}
+            Generated {new Date(data.generatedAt).toLocaleString()} — click a card to open the related module.
           </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
-            <KpiCard label="Grant success rate" value={`${kpis.grantSuccessRate ?? 0}%`} />
-            <KpiCard label="Proposal approval" value={`${kpis.proposalApprovalRate ?? 0}%`} />
-            <KpiCard label="Funding awarded" value={`$${Number(kpis.totalFundingAwarded || 0).toLocaleString()}`} />
-            <KpiCard label="Active projects" value={kpis.activeProjects ?? 0} />
-            <KpiCard label="Archived projects" value={kpis.projectsArchived ?? 0} />
-            <KpiCard label="Validated publications" value={kpis.publicationsValidated ?? 0} />
-            <KpiCard label="Citations" value={kpis.totalCitations ?? 0} />
-            <KpiCard
-              label="Open funding calls"
-              value={kpis.openFundingCalls ?? 0}
-              sub={`Internal ${kpis.internalFundingCalls ?? 0} · External ${kpis.externalFundingCalls ?? 0}`}
-            />
+            {KPI_ROUTES.map((k) => (
+              <KpiCard
+                key={k.key}
+                label={k.label}
+                value={k.format(kpis[k.key])}
+                sub={k.sub ? k.sub(kpis) : null}
+                to={k.to}
+              />
+            ))}
           </div>
         </>
       ) : null}

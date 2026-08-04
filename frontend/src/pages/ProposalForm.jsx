@@ -21,6 +21,7 @@ import {
   SUBMIT_SUCCESS_MESSAGE,
 } from "../utils/proposalSubmitValidation";
 import * as fundingCallApi from "../services/fundingCallApi";
+import * as departmentApi from "../services/departmentApi";
 
 export function ProposalFormPage() {
   const { id } = useParams();
@@ -33,6 +34,7 @@ export function ProposalFormPage() {
   const { programTier } = useProgramTier();
 
   const [callTitle, setCallTitle] = useState("");
+  const [departments, setDepartments] = useState([]);
   const [proposal, setProposal] = useState({
     title: "",
     abstract: "",
@@ -66,8 +68,14 @@ export function ProposalFormPage() {
     return isVoluntary ? "New Voluntary Proposal + Ethics" : "New Grant Fund Call Proposal + Ethics";
   }, [isEdit, isVoluntary]);
 
-  // New grant-fund-call proposal: auto applicant + department only.
-  // Do NOT copy funding-call title into the research proposal title (that caused wrong titles end-to-end).
+  // New grant-fund-call proposal: auto-fill call title + department from portal.
+  useEffect(() => {
+    if (!accessToken) return;
+    departmentApi.listDepartments(accessToken).then((res) => {
+      setDepartments(res.departments || []);
+    }).catch(() => setDepartments([]));
+  }, [accessToken]);
+
   useEffect(() => {
     if (isEdit || !isGrantFundCall || !accessToken || !fundingCallId) return;
     let cancelled = false;
@@ -78,6 +86,7 @@ export function ProposalFormPage() {
         setCallTitle(res.call?.title || "");
         setProposal((prev) => ({
           ...prev,
+          title: prev.title || res.call?.title || "",
           department: prev.department || user?.department || "",
         }));
       } catch {
@@ -416,6 +425,7 @@ requestAnimationFrame(() => {
             embeddedInProposal
             autoFillHint={!readOnly}
             hideFundingFields={isVoluntary}
+            departments={departments}
           />
         </div>
       ) : null}

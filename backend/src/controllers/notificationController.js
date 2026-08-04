@@ -9,6 +9,7 @@ function sanitizeNotification(n) {
     title: n.title,
     body: n.body,
     link: n.link,
+    downloadLink: n.downloadLink || "",
     programTier: n.programTier || null,
     readAt: n.readAt,
     createdAt: n.createdAt,

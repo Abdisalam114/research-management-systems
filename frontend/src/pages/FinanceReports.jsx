@@ -36,6 +36,9 @@ export function FinanceReportsPage() {
   }
 
   const s = report.summary;
+  const grantRows = report.grantSummary || [];
+  const totalAwarded = grantRows.reduce((acc, g) => acc + Number(g.amountAwarded || 0), 0);
+  const totalRequested = grantRows.reduce((acc, g) => acc + Number(g.amountRequested || 0), 0);
 
   return (
     <div>
@@ -48,15 +51,19 @@ export function FinanceReportsPage() {
         </div>
         <div className="overviewTile">
           <div className="label">Allocated</div>
-          <div className="value">${s.totalAllocated?.toLocaleString()}</div>
+          <div className="value">${Number(s.totalAllocated || 0).toLocaleString()}</div>
         </div>
         <div className="overviewTile">
           <div className="label">Paid</div>
-          <div className="value">${s.totalPaid?.toLocaleString()}</div>
+          <div className="value">${Number(s.totalPaid || 0).toLocaleString()}</div>
         </div>
         <div className="overviewTile">
           <div className="label">Utilization</div>
-          <div className="value">{s.utilizationPercent}%</div>
+          <div className="value">{s.utilizationPercent ?? 0}%</div>
+        </div>
+        <div className="overviewTile">
+          <div className="label">Grants awarded (total)</div>
+          <div className="value">${Number(s.awardedTotal ?? totalAwarded).toLocaleString()}</div>
         </div>
       </div>
 
@@ -68,18 +75,33 @@ export function FinanceReportsPage() {
               <th>Grant</th>
               <th>Source</th>
               <th>Status</th>
+              <th>Requested</th>
               <th>Awarded</th>
             </tr>
           </thead>
           <tbody>
-            {(report.grantSummary || []).map((g) => (
+            {grantRows.map((g) => (
               <tr key={g.title + g.status}>
                 <td>{g.title}</td>
                 <td>{g.fundingSource}</td>
                 <td>{g.status}</td>
-                <td>${(g.amountAwarded || 0).toLocaleString()}</td>
+                <td>${Number(g.amountRequested || 0).toLocaleString()}</td>
+                <td>${Number(g.amountAwarded || 0).toLocaleString()}</td>
               </tr>
             ))}
+            {grantRows.length ? (
+              <tr style={{ fontWeight: 800, background: "rgba(14,165,233,0.06)" }}>
+                <td colSpan={3}>Total</td>
+                <td>${totalRequested.toLocaleString()}</td>
+                <td>${totalAwarded.toLocaleString()}</td>
+              </tr>
+            ) : (
+              <tr>
+                <td colSpan={5} className="muted">
+                  No grant financial records in this portal.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

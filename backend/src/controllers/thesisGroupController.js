@@ -1,5 +1,5 @@
 const { ThesisGroup, THESIS_STATUSES } = require("../models/ThesisGroup");
-const { User, ROLES } = require("../models/User");
+const { User, ROLES, USER_STATUSES } = require("../models/User");
 const { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } = require("../utils/facultyMatcher");
 function canonicalFaculty(value, fallbackName) {
   const raw = String(value || "").trim();
@@ -21,6 +21,9 @@ const {
   emptyTitleProposal,
   buildActivityTimeline,
   assertMinThesisStudents,
+  assertNoDuplicateStudentsWithinGroup,
+  assertThesisStudentsNotUsedElsewhere,
+  assertThesisTitleNotUsedElsewhere,
   MIN_THESIS_GROUP_STUDENTS,
 } = require("../utils/thesisDefaults");
 
@@ -228,14 +231,25 @@ async function notifySupervisorAssignment(group, programTier) {
   });
 }
 
+async function findSupervisorResearcher(supervisorId) {
+  if (!supervisorId) return null;
+  const sup = await User.findOne({
+    _id: supervisorId,
+    role: ROLES.RESEARCHER,
+    status: USER_STATUSES.ACTIVE,
+  });
+  return sup;
+}
+
 /** Notify Research Director + Faculty Coordinator when the supervisor updates a thesis group. */
-async function notifyStaffOfSupervisorUpdate(group, programTier, { title, body }) {
+async function notifyStaffOfSupervisorUpdate(group, programTier, { title, body, downloadLink }) {
   const link = `/thesis?groupId=${group._id}`;
   const payload = {
     type: "system",
     title: title || "Thesis supervisor update",
     body: body || "The thesis supervisor made an update.",
     link,
+    downloadLink: downloadLink || "",
   };
   try {
     await notifyUsersByRole(ROLES.RESEARCH_DIRECTOR, payload, programTier);
@@ -324,22 +338,23 @@ async function createGroup(req, res) {
   let cleanStudents;
   try {
     cleanStudents = assertMinThesisStudents(students);
+    assertNoDuplicateStudentsWithinGroup(cleanStudents);
+    await assertThesisStudentsNotUsedElsewhere(ThesisGroup, cleanStudents, {
+      tierFilter: req.tierWhere({}),
+    });
   } catch (e) {
     throw new AppError(e.message, e.statusCode || 400);
   }
 
   let resolvedSupervisorId = null;
-  let supervisorTier = null;
   if (supervisorId) {
-    const sup = await User.findOne(req.tierWhere({ _id: supervisorId }));
-    if (!sup) throw new AppError("Supervisor user not found", 404);
-    if (sup.role !== ROLES.RESEARCHER) throw new AppError("Supervisor must have researcher role", 400);
+    const sup = await findSupervisorResearcher(supervisorId);
+    if (!sup) throw new AppError("Supervisor user not found (active researcher required)", 404);
     resolvedSupervisorId = sup._id;
-    supervisorTier = sup.programTier || null;
   }
 
   const writeTier = req.requireWriteProgramTier(
-    supervisorTier || req.body?.programTier,
+    req.body?.programTier,
     "programTier (undergraduate or postgraduate)"
   );
 
@@ -392,6 +407,9 @@ async function createGroup(req, res) {
   });
 
   const group = await ThesisGroup.create(groupData);
+  // #region agent log
+  fetch('http://127.0.0.1:7722/ingest/c087732c-3b1c-46dd-980e-52f3f7e71eec',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'f558f7'},body:JSON.stringify({sessionId:'f558f7',hypothesisId:'THESIS1',location:'thesisGroupController.js:createGroup',message:'thesis group created',data:{groupId:String(group._id),programTier:writeTier,supervisorId:resolvedSupervisorId?String(resolvedSupervisorId):null,studentCount:cleanStudents.length},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   if (resolvedSupervisorId) {
     await notifySupervisorAssignment(group, writeTier);
   }
@@ -432,7 +450,13 @@ async function updateGroup(req, res) {
 
   if (Array.isArray(students)) {
     try {
-      group.students = assertMinThesisStudents(students);
+      const clean = assertMinThesisStudents(students);
+      assertNoDuplicateStudentsWithinGroup(clean);
+      await assertThesisStudentsNotUsedElsewhere(ThesisGroup, clean, {
+        excludeGroupId: group._id,
+        tierFilter: req.tierWhere({}),
+      });
+      group.students = clean;
     } catch (e) {
       throw new AppError(e.message, e.statusCode || 400);
     }
@@ -442,9 +466,8 @@ async function updateGroup(req, res) {
       group.supervisorId = null;
       group.supervisorAssignedAt = null;
     } else {
-      const sup = await User.findOne(req.tierWhere({ _id: supervisorId }));
-      if (!sup) throw new AppError("Supervisor user not found", 404);
-      if (sup.role !== ROLES.RESEARCHER) throw new AppError("Supervisor must have researcher role", 400);
+      const sup = await findSupervisorResearcher(supervisorId);
+      if (!sup) throw new AppError("Supervisor user not found (active researcher required)", 404);
       group.supervisorId = sup._id;
     }
   }
@@ -520,6 +543,15 @@ async function proposeTitle(req, res) {
 
   if (titleIsLocked(group)) {
     throw new AppError("Title is already accepted; contact coordinator to change it", 400);
+  }
+
+  try {
+    await assertThesisTitleNotUsedElsewhere(ThesisGroup, trimmed, {
+      excludeGroupId: group._id,
+      tierFilter: req.tierWhere({}),
+    });
+  } catch (e) {
+    throw new AppError(e.message, e.statusCode || 400);
   }
 
   applyStudentTitleProposal(group, trimmed, userId);
@@ -745,6 +777,7 @@ async function uploadFinalDocument(req, res) {
     body: `Supervisor uploaded "${fileLabel}" for ${thesisGroupLabel(group)}${
       group.status === THESIS_STATUSES.COMPLETED ? " (marked completed)." : "."
     }`,
+    downloadLink: group.finalDocument.path,
   });
 
   res.json({

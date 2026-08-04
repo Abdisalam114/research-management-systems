@@ -2,7 +2,7 @@ const { Notification } = require("../models/Notification");
 const { User, USER_STATUSES } = require("../models/User");
 const { sendEmailToUser } = require("./emailNotify");
 
-async function notifyUser(userId, { title, body, link, type = "info", programTier }) {
+async function notifyUser(userId, { title, body, link, downloadLink, type = "info", programTier }) {
   if (!userId) return;
   try {
     await Notification.create({
@@ -11,6 +11,7 @@ async function notifyUser(userId, { title, body, link, type = "info", programTie
       title: title || "Notification",
       body: body || "",
       link: link || "",
+      downloadLink: downloadLink || "",
       ...(programTier ? { programTier } : {}),
     });
   } catch (err) {

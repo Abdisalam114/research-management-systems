@@ -53,6 +53,10 @@ export function DonorReportsPage() {
           <div className="value">${(report.totals?.awarded || 0).toLocaleString()}</div>
         </div>
         <div className="overviewTile">
+          <div className="label">Total requested</div>
+          <div className="value">${(report.totals?.requested || 0).toLocaleString()}</div>
+        </div>
+        <div className="overviewTile">
           <div className="label">Open calls</div>
           <div className="value">{report.totals?.openCalls || 0}</div>
         </div>

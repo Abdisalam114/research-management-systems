@@ -5,6 +5,7 @@ import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as ethicsApi from "../services/ethicsApi";
 import * as proposalApi from "../services/proposalApi";
+import * as departmentApi from "../services/departmentApi";
 import { PageHeader } from "../components/PageHeader";
 import { EthicsBrandingHeader } from "../components/EthicsBrandingHeader";
 import { EthicsApplicationForm } from "../components/EthicsApplicationForm";
@@ -37,6 +38,7 @@ export function EthicsPage() {
   const isStaff = ["research_director", "faculty_coordinator"].includes(user?.role);
 
   const [applications, setApplications] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [editing, setEditing] = useState(null); // {id, form, status, proposalId?}
   const [validationIssues, setValidationIssues] = useState([]);
   const [infoMsg, setInfoMsg] = useState("");
@@ -50,8 +52,12 @@ export function EthicsPage() {
   const autoOpenedRef = useRef(false);
   const applicationIdFromUrl = searchParams.get("applicationId");
   const load = useCallback(async () => {
-    const res = await ethicsApi.listEthicsApplications(accessToken);
+    const [res, deptRes] = await Promise.all([
+      ethicsApi.listEthicsApplications(accessToken),
+      departmentApi.listDepartments(accessToken).catch(() => ({ departments: [] })),
+    ]);
     setApplications(res.applications || []);
+    setDepartments(deptRes.departments || []);
   }, [accessToken]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
@@ -548,6 +554,7 @@ function EthicsEditor({
         formComplete={formComplete}
         embeddedInProposal={linkedToProposal}
         hideFundingFields={hideFundingFields}
+        departments={departments}
       />
 
       {isApproved ? (

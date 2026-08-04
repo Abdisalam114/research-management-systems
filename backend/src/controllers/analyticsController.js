@@ -1056,7 +1056,7 @@ async function getWorkflowOverview(req, res) {
         thesisGroups.filter((t) => t.titleProposal?.status === TITLE_PROPOSAL_STATUSES.PENDING),
         (t) => ({
           id: String(t._id),
-          title: t.groupName || t.titleProposal?.title || "Thesis group",
+          title: t.titleProposal?.title || t.title || "Thesis group",
           link: "/thesis",
           status: t.titleProposal?.status,
         })
