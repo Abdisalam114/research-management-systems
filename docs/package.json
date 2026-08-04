@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "build:defense-pptx": "node FYP_Defense_Presentation/build-defense-pptx.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -12,6 +13,7 @@
   "type": "commonjs",
   "dependencies": {
     "docx": "^9.7.1",
+    "pptxgenjs": "^4.0.1",
     "puppeteer": "^25.3.0"
   }
 }
