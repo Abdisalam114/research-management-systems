@@ -9,9 +9,10 @@ import { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } from "../constants/fac
 export function DepartmentsPage() {
   const { accessToken } = useAuth();
   const { programTier } = useProgramTier();
+  const portalTier = programTier || "undergraduate";
   const [departments, setDepartments] = useState([]);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ name: "", code: "", faculty: FACULTIES[0].value, programTier: "undergraduate" });
+  const [form, setForm] = useState({ name: "", code: "", faculty: FACULTIES[0].value, programTier: portalTier });
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
@@ -30,6 +31,10 @@ export function DepartmentsPage() {
     load();
   }, [accessToken, programTier]);
 
+  useEffect(() => {
+    setForm((f) => ({ ...f, programTier: portalTier }));
+  }, [portalTier]);
+
   async function submit(e) {
     e.preventDefault();
     try {
@@ -38,7 +43,7 @@ export function DepartmentsPage() {
       } else {
         await departmentApi.createDepartment(accessToken, form);
       }
-      setForm({ name: "", code: "", faculty: FACULTIES[0].value, programTier: "undergraduate" });
+      setForm({ name: "", code: "", faculty: FACULTIES[0].value, programTier: portalTier });
       setEditingId(null);
       setShowForm(false);
       await load();
@@ -53,13 +58,14 @@ export function DepartmentsPage() {
       name: dept.name || "",
       code: dept.code || "",
       faculty: dept.faculty || FACULTIES[0].value,
+      programTier: dept.programTier || portalTier,
     });
     setShowForm(true);
   }
 
   function startAddForFaculty(faculty) {
     setEditingId(null);
-    setForm({ name: "", code: "", faculty, programTier: "undergraduate" });
+    setForm({ name: "", code: "", faculty, programTier: portalTier });
     setShowForm(true);
   }
 
@@ -145,7 +151,7 @@ export function DepartmentsPage() {
               setShowForm((v) => !v);
               if (!showForm) {
                 setEditingId(null);
-                setForm({ name: "", code: "", faculty: FACULTIES[0].value, programTier: "undergraduate" });
+                setForm({ name: "", code: "", faculty: FACULTIES[0].value, programTier: portalTier });
               }
             }}
           >
@@ -185,9 +191,8 @@ export function DepartmentsPage() {
             <div className="field">
               <label>Program (UG / PG)</label>
               <select
-                value={form.programTier || "undergraduate"}
-                onChange={(e) => setForm({ ...form, programTier: e.target.value })}
-                disabled={Boolean(editingId)}
+                value={form.programTier || portalTier}
+                disabled
                 required
               >
                 <option value="undergraduate">Undergraduate (UG)</option>
@@ -198,7 +203,7 @@ export function DepartmentsPage() {
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn primary" type="submit">{editingId ? "Update" : "Create"}</button>
             {editingId ? (
-              <button type="button" className="btn" onClick={() => { setEditingId(null); setForm({ name: "", code: "", faculty: FACULTIES[0].value, programTier: "undergraduate" }); setShowForm(false); }}>Cancel</button>
+              <button type="button" className="btn" onClick={() => { setEditingId(null); setForm({ name: "", code: "", faculty: FACULTIES[0].value, programTier: portalTier }); setShowForm(false); }}>Cancel</button>
             ) : null}
           </div>
         </form>

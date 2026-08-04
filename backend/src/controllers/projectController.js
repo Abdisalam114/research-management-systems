@@ -826,11 +826,15 @@ async function deleteProject(req, res) {
 
 
   try {
-    await recordAudit(req, {
-      action: "project.deleted",
+    await recordAudit({
       entityType: "project",
-      entityId: String(projectId),
-      summary: `Deleted project: ${title}`,
+      entityId: projectId,
+      action: "deleted",
+      label: "Project deleted",
+      detail: title,
+      actorId: req.user?.id,
+      actorRole: req.user?.role,
+      programTier: project.programTier || req.programTier,
     });
   } catch {
     /* optional */

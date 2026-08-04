@@ -54,7 +54,7 @@ function assertNotSelfTarget(req, targetUserId, actionLabel) {
 }
 
 async function listPendingUsers(req, res) {
-  const users = await User.find(req.tierWhere({ status: USER_STATUSES.PENDING })).sort({ createdAt: -1 });
+  const users = await User.find(req.userWhere({ status: USER_STATUSES.PENDING })).sort({ createdAt: -1 });
   res.json({ users: users.map(sanitizeUser) });
 }
 

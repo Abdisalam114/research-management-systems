@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as analyticsApi from "../services/analyticsApi";
 import * as proposalApi from "../services/proposalApi";
 import { ActiveProjectsPanel } from "../components/ActiveProjectsPanel";
@@ -10,6 +11,7 @@ import "./dashboard.css";
 
 export function CoordinatorDashboardPage() {
   const { accessToken, user } = useAuth();
+  const { programTier } = useProgramTier();
   const [metrics, setMetrics] = useState(null);
   const [facultyReport, setFacultyReport] = useState(null);
   const [queue, setQueue] = useState([]);
@@ -47,7 +49,7 @@ export function CoordinatorDashboardPage() {
         setFacultyReport(null);
       }
 })();
-  }, [accessToken, user?.department]);
+  }, [accessToken, user?.department, programTier]);
 
   async function downloadFacultyPdf() {
     try {

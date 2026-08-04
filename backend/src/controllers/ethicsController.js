@@ -99,11 +99,12 @@ function ethicsScopeFilter(req, base = {}) {
   return req.tierWhere(base);
 }
 
-async function syncLinkedProposalEthics(proposalId, ethicsStatus, ethicsAppId) {
+async function syncLinkedProposalEthics(proposalId, ethicsStatus, ethicsAppId, programTier = null) {
   let linked = null;
-  if (proposalId) linked = await Proposal.findById(proposalId);
+  const tierFilter = programTier ? { programTier } : {};
+  if (proposalId) linked = await Proposal.findOne({ _id: proposalId, ...tierFilter });
   if (!linked && ethicsAppId) {
-    linked = await Proposal.findOne({ ethicsApplicationId: ethicsAppId });
+    linked = await Proposal.findOne({ ethicsApplicationId: ethicsAppId, ...tierFilter });
   }
   if (!linked) return;
   linked.ethicsStatus = ethicsStatus;
@@ -182,7 +183,7 @@ async function submitEthicsApplication(req, res) {
     };
   }
   await a.save();
-  await syncLinkedProposalEthics(a.proposalId, PROPOSAL_ETHICS_STATUSES.PENDING, a._id);
+  await syncLinkedProposalEthics(a.proposalId, PROPOSAL_ETHICS_STATUSES.PENDING, a._id, a.programTier);
 
   try {
     await notifyUsersByRole("research_director", {
@@ -261,7 +262,7 @@ async function directorDecision(req, res) {
       signedAt: new Date(),
       rejectionReason: rejectionReason ? String(rejectionReason) : "Rejected by Research Director",
     };
-    await syncLinkedProposalEthics(a.proposalId, PROPOSAL_ETHICS_STATUSES.REJECTED, a._id);
+    await syncLinkedProposalEthics(a.proposalId, PROPOSAL_ETHICS_STATUSES.REJECTED, a._id, a.programTier);
     await a.save();
 
     try {
@@ -325,7 +326,7 @@ const issueDate = parseOptionalDate(signedAt, new Date());
     displayProjectTitle: projectTitle ? String(projectTitle).trim() : "",
     rejectionReason: "",
   };
-  await syncLinkedProposalEthics(a.proposalId, PROPOSAL_ETHICS_STATUSES.APPROVED, a._id);
+  await syncLinkedProposalEthics(a.proposalId, PROPOSAL_ETHICS_STATUSES.APPROVED, a._id, a.programTier);
   await a.save();
 
   try {

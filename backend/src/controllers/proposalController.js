@@ -472,6 +472,10 @@ async function submitProposal(req, res) {
   if (proposal.status === PROPOSAL_STATUSES.REVISION_REQUESTED) {
     pushVersionHistory(proposal, "Submitted after revision");
     proposal.version += 1;
+    proposal.assignedReviewers = [];
+    proposal.assignedCommittee = [];
+    proposal.assignedFinance = [];
+    proposal.peerReviews = [];
   }
 
   proposal.status = PROPOSAL_STATUSES.SUBMITTED;

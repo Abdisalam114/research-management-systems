@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { api } from "../services/api";
 import * as publicationApi from "../services/publicationApi";
 
 export function ProfilePage() {
   const { user, accessToken, loadMe } = useAuth();
+  const { programTier } = useProgramTier();
   const [fullName, setFullName] = useState(user?.fullName || "");
   const [department, setDepartment] = useState(user?.department || "");
   const [rank, setRank] = useState(user?.rank || "");
@@ -20,7 +22,7 @@ export function ProfilePage() {
       .listPublications(accessToken)
       .then((r) => setPublications(r.publications || []))
       .catch(() => {});
-  }, [accessToken]);
+  }, [accessToken, programTier]);
 
   return (
     <div>

@@ -137,6 +137,10 @@ export function PendingUsersPage() {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load users"));
   }, [accessToken, programTier]);
 
+  useEffect(() => {
+    setForm((f) => ({ ...f, programTier: programTier || "undergraduate" }));
+  }, [programTier]);
+
   async function handleCreate(e) {
     e.preventDefault();
     setCreating(true);
@@ -145,7 +149,7 @@ export function PendingUsersPage() {
     try {
       const res = await userApi.createUser(accessToken, form);
       setSuccess(res.message || "User created");
-      setForm(emptyForm);
+      setForm({ ...emptyForm, programTier: programTier || "undergraduate" });
       await load();
     } catch (err) {
       setError(err?.response?.data?.message || "Create user failed");
@@ -321,8 +325,9 @@ export function PendingUsersPage() {
               </label>
               {form.role === "researcher" ? (
                 <select
-                  value={form.programTier}
+                  value={form.programTier || programTier || "undergraduate"}
                   onChange={(e) => setForm({ ...form, programTier: e.target.value })}
+                  disabled={Boolean(programTier)}
                   required
                 >
                   <option value="undergraduate">Undergraduate (UG)</option>

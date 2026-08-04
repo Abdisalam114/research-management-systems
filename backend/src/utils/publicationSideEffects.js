@@ -95,18 +95,23 @@ async function loadPublicationForNotification(pub) {
 async function logPublicationOnProject(projectId, req, { subject, body, type = "note" }) {
   if (!projectId || !req.user?.id) return false;
   try {
-    await Project.findByIdAndUpdate(projectId, {
-      $push: {
-        communicationLog: {
-          type,
-          subject: String(subject || "").slice(0, 200),
-          body: String(body || "").slice(0, 4000),
-          loggedBy: req.user.id,
-          loggedAt: new Date(),
+    const filter = req?.tierWhere ? req.tierWhere({ _id: projectId }) : { _id: projectId };
+    const updated = await Project.findOneAndUpdate(
+      filter,
+      {
+        $push: {
+          communicationLog: {
+            type,
+            subject: String(subject || "").slice(0, 200),
+            body: String(body || "").slice(0, 4000),
+            loggedBy: req.user.id,
+            loggedAt: new Date(),
+          },
         },
       },
-    });
-    return true;
+      { new: true }
+    );
+    return Boolean(updated);
   } catch {
     return false;
   }
