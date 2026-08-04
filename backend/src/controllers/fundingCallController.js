@@ -1,4 +1,5 @@
 const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
+const { ROLES } = require("../models/User");
 const { Grant } = require("../models/Grant");
 const { Proposal } = require("../models/Proposal");
 const { AppError } = require("../utils/AppError");
@@ -7,6 +8,42 @@ const { recordAudit } = require("../utils/audit");
 const { tierMatchesCall } = require("../utils/fundingCallEligibility");
 const { closeExpiredOpenCalls } = require("../utils/fundingCallAutoClose");
 const { PROGRAM_TIERS, isValidProgramTier } = require("../constants/programTier");
+const { isCrossTierRole } = require("../utils/programTierScope");
+
+function isDirectorReq(req) {
+  return req.user?.role === ROLES.RESEARCH_DIRECTOR;
+}
+
+/** Director / shared staff see cross-portal calls when eligibility is all. */
+function callListWhere(req, base = {}) {
+  if (isDirectorReq(req)) return base;
+  if (isCrossTierRole(req.user?.role)) {
+    const tier = req.programTier;
+    if (!tier) return base;
+    return {
+      $and: [
+        base,
+        {
+          $or: [{ programTier: tier }, { eligibilityTier: "all" }],
+        },
+      ],
+    };
+  }
+  return req.tierWhere(base);
+}
+
+function callFindWhere(req, id) {
+  if (isDirectorReq(req)) return { _id: id };
+  if (isCrossTierRole(req.user?.role)) {
+    const tier = req.programTier;
+    if (!tier) return { _id: id };
+    return {
+      _id: id,
+      $or: [{ programTier: tier }, { eligibilityTier: "all" }],
+    };
+  }
+  return req.tierWhere({ _id: id });
+}
 
 function defaultRequiredDocuments(callType) {
   if (callType === "external") {
@@ -142,7 +179,7 @@ async function listFundingCalls(req, res) {
       calls = await FundingCall.find(researcherFilter).sort({ deadline: 1, createdAt: -1 });
     }
   } else {
-    calls = await FundingCall.find(req.tierWhere(filter)).sort({ deadline: 1, createdAt: -1 });
+    calls = await FundingCall.find(callListWhere(req, filter)).sort({ deadline: 1, createdAt: -1 });
   }
 
   const visible = req.user.role === "researcher"
@@ -159,9 +196,11 @@ async function getFundingCall(req, res) {
     programTier: req.programTier,
   });
 
-  let call = await FundingCall.findOne(req.tierWhere({ _id: req.params.id }));
-  // Researchers may open an eligible call from the other portal via notification deep-link
+  let call = await FundingCall.findOne(callFindWhere(req, req.params.id));
   if (!call && req.user.role === "researcher") {
+    call = await FundingCall.findById(req.params.id);
+  }
+  if (!call && isCrossTierRole(req.user?.role)) {
     call = await FundingCall.findById(req.params.id);
   }
   if (!call) throw new AppError("Funding call not found", 404);
@@ -245,7 +284,7 @@ async function createFundingCall(req, res) {
 }
 
 async function updateFundingCall(req, res) {
-  const call = await FundingCall.findOne(req.tierWhere({ _id: req.params.id }));
+  const call = await FundingCall.findOne(callFindWhere(req, req.params.id));
   if (!call) throw new AppError("Funding call not found", 404);
   if (call.status !== CALL_STATUSES.DRAFT) throw new AppError("Only draft calls can be edited", 400);
 
@@ -281,7 +320,7 @@ async function updateFundingCall(req, res) {
 
 /** Research Director publishes draft calls (Leadership is not required). */
 async function publishFundingCall(req, res) {
-  const call = await FundingCall.findOne(req.tierWhere({ _id: req.params.id }));
+  const call = await FundingCall.findOne(callFindWhere(req, req.params.id));
   if (!call) throw new AppError("Funding call not found", 404);
   if (call.status !== CALL_STATUSES.DRAFT) throw new AppError("Only draft calls can be published", 400);
 
@@ -401,7 +440,7 @@ await recordAudit({
 }
 
 async function closeFundingCall(req, res) {
-  const call = await FundingCall.findOne(req.tierWhere({ _id: req.params.id }));
+  const call = await FundingCall.findOne(callFindWhere(req, req.params.id));
   if (!call) throw new AppError("Funding call not found", 404);
   if (call.status !== CALL_STATUSES.OPEN) throw new AppError("Only open calls can be closed", 400);
 

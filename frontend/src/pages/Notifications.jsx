@@ -29,6 +29,7 @@ export function NotificationsPage() {
   const { programTier, selectProgramTier } = useProgramTier();
   const [notifications, setNotifications] = useState([]);
   const [downloadBusy, setDownloadBusy] = useState("");
+  const [detailNote, setDetailNote] = useState(null);
 
   const load = useCallback(async () => {
     const res = await notificationApi.listMyNotifications(accessToken);
@@ -45,15 +46,17 @@ export function NotificationsPage() {
   }, [reload]);
 
   function viewPublicationDetails(n) {
-    if (n.link) {
-      window.open(n.link, "_blank", "noopener,noreferrer");
+    if (n.body?.trim()) {
+      setDetailNote(n);
       return;
     }
-    const text = `${n.title || "Publication"}\n\n${n.body || ""}`.trim();
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank", "noopener,noreferrer");
-    window.setTimeout(() => URL.revokeObjectURL(url), 5000);
+    if (n.link) {
+      if (n.link.startsWith("http")) {
+        window.open(n.link, "_blank", "noopener,noreferrer");
+      } else {
+        navigate(n.link);
+      }
+    }
   }
 
   function downloadPublicationSummary(n) {
@@ -240,6 +243,79 @@ export function NotificationsPage() {
           ) : null}
         </div>
       </div>
+
+      {detailNote ? (
+        <>
+          <div
+            role="presentation"
+            onClick={() => setDetailNote(null)}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 999,
+              background: "rgba(0,0,0,0.45)",
+            }}
+          />
+          <div
+            className="card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pub-detail-title"
+            style={{
+              position: "fixed",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              zIndex: 1000,
+              width: "min(640px, calc(100vw - 32px))",
+              maxHeight: "min(85vh, 720px)",
+              overflow: "auto",
+              boxShadow: "0 24px 48px rgba(0,0,0,0.35)",
+            }}
+          >
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+            <div id="pub-detail-title" style={{ fontWeight: 800, fontSize: 18 }}>
+              {detailNote.title}
+            </div>
+            <button type="button" className="btn" onClick={() => setDetailNote(null)}>
+              Close
+            </button>
+          </div>
+          <pre
+            style={{
+              whiteSpace: "pre-wrap",
+              fontFamily: "inherit",
+              fontSize: 13,
+              lineHeight: 1.55,
+              marginTop: 12,
+              marginBottom: 0,
+              padding: 12,
+              borderRadius: 8,
+              background: "rgba(15,23,42,0.04)",
+            }}
+          >
+            {detailNote.body}
+          </pre>
+          <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {detailNote.link ? (
+              <button
+                type="button"
+                className="btn primary"
+                onClick={() => {
+                  setDetailNote(null);
+                  openNotification(detailNote);
+                }}
+              >
+                Open in project
+              </button>
+            ) : null}
+            <button type="button" className="btn" onClick={() => downloadPublicationSummary(detailNote)}>
+              Download summary
+            </button>
+          </div>
+        </div>
+        </>
+      ) : null}
     </div>
   );
 }

@@ -22,7 +22,7 @@ export function ProfilePage() {
       return;
     }
     publicationApi
-      .listPublications(accessToken)
+      .listPublications(accessToken, { mine: "1" })
       .then((r) => setPublications(r.publications || []))
       .catch(() => {});
   }, [accessToken, programTier, user?.role]);

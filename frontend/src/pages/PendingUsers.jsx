@@ -80,6 +80,7 @@ export function PendingUsersPage() {
       status: u.status || "active",
       isProtected: Boolean(u.isProtected),
       email: u.email || "",
+      programTier: u.programTier || "undergraduate",
       isSelf: String(u.id) === String(me?.id),
     });
   }
@@ -101,6 +102,9 @@ export function PendingUsersPage() {
         body.role = edit.role;
         body.status = edit.status;
         body.isProtected = Boolean(edit.isProtected);
+        if (edit.role === "researcher") {
+          body.programTier = edit.programTier || "undergraduate";
+        }
       }
       const res = await userApi.updateUser(accessToken, edit.id, body);
       setSuccess(res.message || `Updated ${edit.fullName}`);
@@ -239,6 +243,34 @@ export function PendingUsersPage() {
                   ))}
                 </select>
               </div>
+              {edit.role === "researcher" && !edit.isSelf ? (
+                <div className="field">
+                  <label>Program (UG / PG)</label>
+                  <select
+                    value={edit.programTier || "undergraduate"}
+                    onChange={(e) => setEdit({ ...edit, programTier: e.target.value })}
+                  >
+                    <option value="undergraduate">Undergraduate (UG)</option>
+                    <option value="postgraduate">Postgraduate (PG)</option>
+                  </select>
+                </div>
+              ) : (
+              <div className="field">
+                <label>Protection</label>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(edit.isProtected)}
+                    disabled={edit.isSelf}
+                    onChange={(e) => setEdit({ ...edit, isProtected: e.target.checked })}
+                  />
+                  Protected (cannot be deleted)
+                </label>
+              </div>
+              )}
+            </div>
+            {edit.role === "researcher" && !edit.isSelf ? (
+            <div className="row">
               <div className="field">
                 <label>Protection</label>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
@@ -252,6 +284,7 @@ export function PendingUsersPage() {
                 </label>
               </div>
             </div>
+            ) : null}
             <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
               <button className="btn primary" type="submit" disabled={savingEdit}>
                 {savingEdit ? "Saving…" : "Save changes"}

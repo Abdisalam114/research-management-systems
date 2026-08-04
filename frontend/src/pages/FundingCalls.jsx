@@ -155,22 +155,46 @@ export function FundingCallsPage() {
   // Deep-link from notification "Open" → scroll/highlight that funding call
   useEffect(() => {
     if (!callIdFromUrl || loading) return;
-    const match = calls.find((c) => String(c.id) === String(callIdFromUrl));
-if (!match) {
-      if (!calls.length) return;
-      setMessage(`Funding call not found on this portal list (id ${callIdFromUrl}). Switch portal or check eligibility.`);
-      return;
+    let cancelled = false;
+
+    async function resolveCall() {
+      let match = calls.find((c) => String(c.id) === String(callIdFromUrl));
+      if (!match) {
+        try {
+          const res = await fundingCallApi.getFundingCall(accessToken, callIdFromUrl);
+          if (res.call && !cancelled) {
+            match = res.call;
+            setCalls((prev) => {
+              if (prev.some((c) => String(c.id) === String(res.call.id))) return prev;
+              return [...prev, res.call];
+            });
+          }
+        } catch {
+          if (!cancelled) {
+            setMessage(
+              "Funding call not found or you are not eligible. Try switching Undergraduate / Postgraduate portal."
+            );
+          }
+          return;
+        }
+      }
+      if (!match || cancelled) return;
+      setHighlightedCallId(String(match.id));
+      setMessage("");
+      if (match.status && match.status !== "all") {
+        setStatusFilter(match.status === "open" || match.status === "draft" || match.status === "closed" ? match.status : "all");
+      }
+      window.setTimeout(() => {
+        const el = document.getElementById(`funding-call-${match.id}`);
+        if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 80);
     }
-    setHighlightedCallId(String(match.id));
-    if (match.status && match.status !== "all") {
-      setStatusFilter(match.status === "open" || match.status === "draft" || match.status === "closed" ? match.status : "all");
-    }
-    const t = window.setTimeout(() => {
-      const el = document.getElementById(`funding-call-${match.id}`);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 80);
-    return () => window.clearTimeout(t);
-  }, [callIdFromUrl, calls, loading, setStatusFilter, user?.role]);
+
+    resolveCall();
+    return () => {
+      cancelled = true;
+    };
+  }, [callIdFromUrl, calls, loading, setStatusFilter, accessToken]);
 
   const grantsByCallId = useMemo(() => {
     const map = {};

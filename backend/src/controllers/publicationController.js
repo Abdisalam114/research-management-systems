@@ -153,6 +153,8 @@ function sanitizePublication(p) {
 async function listPublications(req, res) {
   const { role } = req.user;
   const filter = {};
+  const mineOnly =
+    req.query.mine === "1" || req.query.mine === "true" || req.query.scope === "mine";
 
   // Researcher: NEVER see another person's outputs
   if (role === "researcher") {
@@ -160,7 +162,7 @@ async function listPublications(req, res) {
     if (req.query.projectId) {
       await validateProjectQuery(req, req.query.projectId, { ownerOnly: true });
       filter.projectId = req.query.projectId;
-    } else {
+    } else if (!mineOnly) {
       const myProjects = await Project.find(req.tierWhere({ researcherId: req.user.id })).select("_id");
       filter.projectId = { $in: myProjects.map((p) => p._id) };
     }

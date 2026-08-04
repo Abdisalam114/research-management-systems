@@ -209,7 +209,7 @@ async function updateUserByDirector(req, res) {
   const user = await userFindOne(req, { _id: id }, "+refreshToken");
   if (!user) throw new AppError("User not found", 404);
 
-  const { role, status, fullName, department, rank, isProtected } = req.body || {};
+  const { role, status, fullName, department, rank, isProtected, programTier: bodyTier } = req.body || {};
 
   // Prevent administrators from locking themselves out via role/status edits.
   if (role !== undefined || status !== undefined || isProtected !== undefined) {
@@ -238,6 +238,11 @@ async function updateUserByDirector(req, res) {
 
   if (isProtected !== undefined) {
     user.isProtected = Boolean(isProtected);
+  }
+
+  if (bodyTier !== undefined && user.role === ROLES.RESEARCHER) {
+    if (!isValidProgramTier(bodyTier)) throw new AppError("Invalid program tier (undergraduate or postgraduate)", 400);
+    user.programTier = bodyTier;
   }
 
   await user.save();
