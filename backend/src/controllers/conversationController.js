@@ -7,6 +7,15 @@ const { notifyUser } = require("../utils/notify");
 const { userDisplayName } = require("../utils/userDisplay");
 const { CROSS_TIER_ROLES } = require("../utils/programTierScope");
 
+function isDirectorReq(req) {
+  return req.user?.role === ROLES.RESEARCH_DIRECTOR;
+}
+
+/** Director sees/messages across UG+PG; others stay portal-scoped. */
+function convWhere(req, base = {}) {
+  return isDirectorReq(req) ? base : req.tierWhere(base);
+}
+
 function sanitizeConversation(c) {
   return {
     id: c._id,
@@ -70,15 +79,18 @@ async function listMessageableUsers(req, res) {
     status: USER_STATUSES.ACTIVE,
     _id: { $ne: req.user.id },
   };
-  const query = tier
-    ? {
-        ...base,
-        $or: [
-          { role: { $in: CROSS_TIER_ROLES } },
-          { role: ROLES.RESEARCHER, programTier: tier },
-        ],
-      }
-    : base;
+  const query =
+    isDirectorReq(req)
+      ? base
+      : tier
+        ? {
+            ...base,
+            $or: [
+              { role: { $in: CROSS_TIER_ROLES } },
+              { role: ROLES.RESEARCHER, programTier: tier },
+            ],
+          }
+        : base;
 
   const users = await User.find(query)
     .select("fullName name email role department programTier")
@@ -97,7 +109,7 @@ async function listMessageableUsers(req, res) {
 }
 
 async function listMyConversations(req, res) {
-  const conversations = await Conversation.find(req.tierWhere({ participants: req.user.id })).sort({
+  const conversations = await Conversation.find(convWhere(req, { participants: req.user.id })).sort({
     lastMessageAt: -1,
     updatedAt: -1,
   });
@@ -107,7 +119,7 @@ async function listMyConversations(req, res) {
 
 async function openGroupChat(req, res) {
   const { groupId } = req.params;
-  const group = await ResearchGroup.findOne(req.tierWhere({ _id: groupId }));
+  const group = await ResearchGroup.findOne(convWhere(req, { _id: groupId }));
   if (!group) throw new AppError("Group not found", 404);
 
   const isMember = (group.members || []).some((m) => String(m.userId) === String(req.user.id));
@@ -116,7 +128,7 @@ async function openGroupChat(req, res) {
     throw new AppError("Forbidden", 403);
   }
 
-  let conversation = await Conversation.findOne(req.tierWhere({ groupId }));
+  let conversation = await Conversation.findOne(convWhere(req, { groupId }));
   if (!conversation) {
     const participantIds = Array.from(
       new Set([String(group.createdBy), ...(group.members || []).map((m) => String(m.userId))])
@@ -160,10 +172,11 @@ async function createConversation(req, res) {
   const others = participantIds.map(String).filter((id) => id && id !== String(req.user.id));
   if (!others.length) throw new AppError("Select at least one other user", 400);
 
-  const activeUsers = await User.find(req.tierWhere({
-    _id: { $in: others },
-    status: USER_STATUSES.ACTIVE,
-  })).select("_id");
+  const activeUsers = await User.find(
+    isDirectorReq(req)
+      ? { _id: { $in: others }, status: USER_STATUSES.ACTIVE }
+      : convWhere(req, { _id: { $in: others }, status: USER_STATUSES.ACTIVE })
+  ).select("_id");
   if (activeUsers.length !== others.length) {
     throw new AppError("One or more selected users are invalid or inactive", 400);
   }
@@ -171,7 +184,7 @@ async function createConversation(req, res) {
   const ids = Array.from(new Set([String(req.user.id), ...others])).slice(0, 20);
 
   if (ids.length === 2) {
-    const existing = await Conversation.findOne(req.tierWhere({
+    const existing = await Conversation.findOne(convWhere(req, {
       groupId: null,
       participants: { $all: ids, $size: ids.length },
     }));
@@ -202,7 +215,7 @@ async function sendMessage(req, res) {
   const { body } = req.body || {};
   if (!body || !String(body).trim()) throw new AppError("body is required", 400);
 
-  const conversation = await Conversation.findOne(req.tierWhere({ _id: id }));
+  const conversation = await Conversation.findOne(convWhere(req, { _id: id }));
   if (!conversation) throw new AppError("Conversation not found", 404);
 
   const isParticipant = (conversation.participants || []).some((p) => String(p) === String(req.user.id));
@@ -236,7 +249,7 @@ res.json({ message: "Sent", conversation: await enrichConversation(conversation,
 
 async function getConversation(req, res) {
   const { id } = req.params;
-  const conversation = await Conversation.findOne(req.tierWhere({ _id: id }));
+  const conversation = await Conversation.findOne(convWhere(req, { _id: id }));
   if (!conversation) throw new AppError("Conversation not found", 404);
 
   const isParticipant = (conversation.participants || []).some((p) => String(p) === String(req.user.id));
