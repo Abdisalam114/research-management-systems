@@ -81,9 +81,9 @@ const EMPTY_EXTERNAL = {
 };
 
 const ELIGIBILITY_OPTIONS = [
-  { value: "all", label: "All researchers (UG & PG)" },
-  { value: "ug", label: "Undergraduate portal only" },
-  { value: "pg", label: "Postgraduate portal only" },
+  { value: "all", label: "Both portals (UG & PG)" },
+  { value: "ug", label: "Undergraduate (UG) only" },
+  { value: "pg", label: "Postgraduate (PG) only" },
   { value: "pgd", label: "Postgraduate diploma (PGD)" },
 ];
 
@@ -97,6 +97,17 @@ function statusClass(status) {
 
 function eligibilityLabel(tier) {
   return ELIGIBILITY_OPTIONS.find((o) => o.value === tier)?.label || tier;
+}
+
+function defaultEligibilityForPortal(tier) {
+  return tier === "postgraduate" ? "pg" : "ug";
+}
+
+function eligibilityOptionsForPortal(tier) {
+  if (tier === "postgraduate") {
+    return ELIGIBILITY_OPTIONS.filter((o) => ["pg", "pgd", "all"].includes(o.value));
+  }
+  return ELIGIBILITY_OPTIONS.filter((o) => ["ug", "all"].includes(o.value));
 }
 
 function formatMoney(amount, currency) {
@@ -231,13 +242,23 @@ export function FundingCallsPage() {
   );
 
   function resetForm() {
-    setForm({ ...EMPTY_INTERNAL, programTier: programTier || "undergraduate" });
+    const tier = programTier || "undergraduate";
+    setForm({
+      ...EMPTY_INTERNAL,
+      programTier: tier,
+      eligibilityTier: defaultEligibilityForPortal(tier),
+    });
     setEditingId(null);
     setShowForm(false);
   }
 
   function startCreate() {
-    const base = { ...EMPTY_INTERNAL, programTier: programTier || "undergraduate" };
+    const tier = programTier || "undergraduate";
+    const base = {
+      ...EMPTY_INTERNAL,
+      programTier: tier,
+      eligibilityTier: defaultEligibilityForPortal(tier),
+    };
     base.requiredDocuments = defaultRequiredDocuments(base.callType);
     setForm(base);
     setEditingId(null);
@@ -679,7 +700,7 @@ await fundingCallApi.publishFundingCall(accessToken, id);
                   value={form.eligibilityTier}
                   onChange={(e) => setForm({ ...form, eligibilityTier: e.target.value })}
                 >
-                  {ELIGIBILITY_OPTIONS.map((o) => (
+                  {eligibilityOptionsForPortal(form.programTier || programTier || "undergraduate").map((o) => (
                     <option key={o.value} value={o.value}>
                       {o.label}
                     </option>

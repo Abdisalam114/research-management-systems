@@ -14,7 +14,7 @@ function isDirectorReq(req) {
   return req.user?.role === ROLES.RESEARCH_DIRECTOR;
 }
 
-/** Director / shared staff see cross-portal calls when eligibility is all. */
+/** Director sees all calls; other staff see active portal + cross-portal (all) calls. */
 function callListWhere(req, base = {}) {
   if (isDirectorReq(req)) return base;
   if (isCrossTierRole(req.user?.role)) {
@@ -23,9 +23,7 @@ function callListWhere(req, base = {}) {
     return {
       $and: [
         base,
-        {
-          $or: [{ programTier: tier }, { eligibilityTier: "all" }],
-        },
+        { $or: [{ programTier: tier }, { eligibilityTier: "all" }] },
       ],
     };
   }
@@ -146,30 +144,25 @@ async function listFundingCalls(req, res) {
 
   let calls;
   if (req.user.role === "researcher") {
-    // Researchers see: (1) open calls they are eligible for (any portal), (2) calls they already applied to
-    const eligCodes =
+    // Researchers see open calls on their portal only + calls they already applied to
+    const tierOnlyCodes =
       req.programTier === "undergraduate"
-        ? ["ug", "all"]
+        ? ["ug"]
         : req.programTier === "postgraduate"
-          ? ["pg", "pgd", "all"]
-          : ["ug", "pg", "pgd", "all"];
-    const researcherFilter = {
+          ? ["pg", "pgd"]
+          : ["ug", "pg", "pgd"];
+    const openPortalFilter = {
+      status: CALL_STATUSES.OPEN,
       $or: [
-        {
-          status: CALL_STATUSES.OPEN,
-          $or: [
-            { programTier: req.programTier },
-            { eligibilityTier: { $in: eligCodes } },
-          ],
-        },
-        ...(appliedCallIds.length ? [{ _id: { $in: appliedCallIds } }] : []),
+        { eligibilityTier: "all" },
+        { programTier: req.programTier, eligibilityTier: { $in: tierOnlyCodes } },
       ],
     };
+    const researcherFilter = {
+      $or: [openPortalFilter, ...(appliedCallIds.length ? [{ _id: { $in: appliedCallIds } }] : [])],
+    };
     if (status === CALL_STATUSES.OPEN) {
-      calls = await FundingCall.find({
-        status: CALL_STATUSES.OPEN,
-        $or: [{ programTier: req.programTier }, { eligibilityTier: { $in: eligCodes } }],
-      }).sort({ deadline: 1, createdAt: -1 });
+      calls = await FundingCall.find(openPortalFilter).sort({ deadline: 1, createdAt: -1 });
     } else if (status && status !== CALL_STATUSES.OPEN) {
       calls = await FundingCall.find({
         _id: { $in: appliedCallIds.length ? appliedCallIds : ["000000000000000000000000"] },
@@ -211,10 +204,14 @@ async function getFundingCall(req, res) {
     if (call.status === CALL_STATUSES.OPEN && !tierMatchesCall(req, call) && !applied) {
       throw new AppError("Not eligible for this call", 403);
     }
-  } else if (!isDirectorReq(req) && !isCrossTierRole(req.user?.role)) {
-    if (req.programTier && call.programTier && call.programTier !== req.programTier && call.eligibilityTier !== "all") {
-      throw new AppError("Funding call not found", 404);
-    }
+  } else if (
+    !isDirectorReq(req) &&
+    req.programTier &&
+    call.programTier &&
+    call.programTier !== req.programTier &&
+    call.eligibilityTier !== "all"
+  ) {
+    throw new AppError("Funding call not found", 404);
   }
   res.json({ call: sanitizeCall(call) });
 }
@@ -237,11 +234,6 @@ async function createFundingCall(req, res) {
     throw new AppError("Donor / agency reference is required for external funding calls", 400);
   }
 
-  const eligibility = ["ug", "pg", "pgd", "all"].includes(eligibilityTier) ? eligibilityTier : "all";
-  const docs =
-    requiredDocuments && String(requiredDocuments).trim()
-      ? String(requiredDocuments).trim()
-      : defaultRequiredDocuments(resolvedType);
   // Prefer explicit body programTier; otherwise current filter; else require choice
   const portalTier = isValidProgramTier(req.body?.programTier)
     ? req.body.programTier
@@ -249,6 +241,14 @@ async function createFundingCall(req, res) {
   if (!isValidProgramTier(portalTier)) {
     throw new AppError("programTier is required (undergraduate or postgraduate)", 400);
   }
+
+  const defaultElig =
+    portalTier === PROGRAM_TIERS.UNDERGRADUATE ? "ug" : portalTier === PROGRAM_TIERS.POSTGRADUATE ? "pg" : "all";
+  const eligibility = ["ug", "pg", "pgd", "all"].includes(eligibilityTier) ? eligibilityTier : defaultElig;
+  const docs =
+    requiredDocuments && String(requiredDocuments).trim()
+      ? String(requiredDocuments).trim()
+      : defaultRequiredDocuments(resolvedType);
 
   const call = await FundingCall.create(
     req.tierAssign({
@@ -344,7 +344,7 @@ async function publishFundingCall(req, res) {
       ? "Undergraduate (UG)"
       : call.eligibilityTier === "pg" || call.eligibilityTier === "pgd"
         ? "Postgraduate (PG)"
-        : "All researchers";
+        : "All researchers (UG & PG)";
   const notifyBody = [
     call.title,
     "",
