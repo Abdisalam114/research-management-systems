@@ -1,5 +1,5 @@
 const { Proposal, PROPOSAL_STATUSES } = require("../models/Proposal");
-const { User } = require("../models/User");
+const { User, ROLES } = require("../models/User");
 const { AppError } = require("../utils/AppError");
 const { notifyUser } = require("../utils/notify");
 const { recordAudit } = require("../utils/audit");
@@ -93,7 +93,22 @@ function reviewerUserId(ref) {
 }
 
 function proposalScopeFilter(req, base = {}) {
+  if (req.user?.role === ROLES.RESEARCH_DIRECTOR) return base;
   return req.tierWhere(base);
+}
+
+async function findProposalForReview(req, id) {
+  let proposal = await Proposal.findOne(proposalScopeFilter(req, { _id: id }));
+  const crossPortalRoles = [
+    ROLES.RESEARCH_DIRECTOR,
+    ROLES.FACULTY_COORDINATOR,
+    ROLES.LEADERSHIP,
+    ROLES.FINANCE_OFFICER,
+  ];
+  if (!proposal && crossPortalRoles.includes(req.user?.role)) {
+    proposal = await Proposal.findById(id);
+  }
+  return proposal;
 }
 
 async function submitPeerReview(req, res) {
@@ -105,7 +120,7 @@ async function submitPeerReview(req, res) {
     throw new AppError("comment is required", 400);
   }
 
-  const proposal = await Proposal.findOne(proposalScopeFilter(req, { _id: req.params.id }));
+  const proposal = await findProposalForReview(req, req.params.id);
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const assigned = (proposal.assignedReviewers || []).some(
@@ -205,7 +220,7 @@ await recordAudit({
 }
 
 async function completePeerReview(req, res) {
-  const proposal = await Proposal.findOne(proposalScopeFilter(req, { _id: req.params.id }));
+  const proposal = await findProposalForReview(req, req.params.id);
   if (!proposal) {
     throw new AppError("Proposal not found", 404);
   }
@@ -255,13 +270,19 @@ async function completePeerReview(req, res) {
 }
 
 async function committeeReview(req, res) {
-  const { decision, comment } = req.body || {};
+  const { decision, comment, score } = req.body || {};
   if (!comment) throw new AppError("comment is required", 400);
+  if (score !== undefined && score !== null) {
+    const n = Number(score);
+    if (!Number.isFinite(n) || n < 1 || n > 5) {
+      throw new AppError("score must be 1–5 when provided", 400);
+    }
+  }
   if (!["recommend_approval", "recommend_revision", "reject"].includes(decision)) {
     throw new AppError("Invalid decision", 400);
   }
 
-  const proposal = await Proposal.findOne(proposalScopeFilter(req, { _id: req.params.id }));
+  const proposal = await findProposalForReview(req, req.params.id);
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const isDirector = req.user.role === "research_director";
@@ -297,6 +318,7 @@ async function committeeReview(req, res) {
     completedBy: req.user.id,
     decision,
     comment: String(comment),
+    score: score !== undefined && score !== null ? Number(score) : null,
   };
   if (decision === "recommend_revision") {
     proposal.status = PROPOSAL_STATUSES.REVISION_REQUESTED;

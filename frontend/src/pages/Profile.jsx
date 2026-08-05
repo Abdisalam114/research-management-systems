@@ -3,18 +3,34 @@ import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { api } from "../services/api";
 import * as publicationApi from "../services/publicationApi";
+import * as departmentApi from "../services/departmentApi";
+import { FacultyDepartmentSelect } from "../components/FacultyDepartmentSelect";
+import { matchFacultyByName } from "../constants/faculties";
 
 export function ProfilePage() {
   const { user, accessToken, loadMe } = useAuth();
   const { programTier } = useProgramTier();
   const [fullName, setFullName] = useState(user?.fullName || "");
   const [department, setDepartment] = useState(user?.department || "");
+  const [deptPick, setDeptPick] = useState({
+    faculty: matchFacultyByName(user?.department),
+    department: user?.department || "",
+    departmentId: "",
+  });
+  const [departments, setDepartments] = useState([]);
   const [rank, setRank] = useState(user?.rank || "");
   const [researchInterests, setResearchInterests] = useState(user?.researchInterests || "");
   const [publications, setPublications] = useState([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!accessToken || user?.role !== "researcher") return;
+    departmentApi.listDepartments(accessToken).then((res) => {
+      setDepartments(res.departments || []);
+    }).catch(() => {});
+  }, [accessToken, programTier, user?.role]);
 
   useEffect(() => {
     if (!accessToken || user?.role !== "researcher") {
@@ -49,7 +65,20 @@ export function ProfilePage() {
           </div>
           <div className="field">
             <label>Department</label>
-            <input value={department} onChange={(e) => setDepartment(e.target.value)} />
+            {user?.role === "researcher" ? (
+              <div className="row" style={{ marginTop: 0 }}>
+                <FacultyDepartmentSelect
+                  departments={departments}
+                  value={deptPick}
+                  onChange={(next) => {
+                    setDeptPick(next);
+                    setDepartment(next.department || "");
+                  }}
+                />
+              </div>
+            ) : (
+              <input value={department} onChange={(e) => setDepartment(e.target.value)} />
+            )}
           </div>
         </div>
         <div className="field">

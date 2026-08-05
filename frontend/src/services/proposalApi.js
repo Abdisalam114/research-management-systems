@@ -186,10 +186,10 @@ export async function completePeerReview(accessToken, id) {
   return data;
 }
 
-export async function committeeReview(accessToken, id, decision, comment) {
+export async function committeeReview(accessToken, id, decision, comment, score) {
   const { data } = await api.post(
     `/api/proposals/${id}/committee-review`,
-    { decision, comment },
+    { decision, comment, score },
     { headers: { Authorization: `Bearer ${accessToken}` } }
   );
   return data;

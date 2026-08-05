@@ -22,6 +22,8 @@ import {
 } from "../utils/proposalSubmitValidation";
 import * as fundingCallApi from "../services/fundingCallApi";
 import * as departmentApi from "../services/departmentApi";
+import { FacultyDepartmentSelect } from "../components/FacultyDepartmentSelect";
+import { matchFacultyByName } from "../constants/faculties";
 
 export function ProposalFormPage() {
   const { id } = useParams();
@@ -35,6 +37,11 @@ export function ProposalFormPage() {
 
   const [callTitle, setCallTitle] = useState("");
   const [departments, setDepartments] = useState([]);
+  const [deptPick, setDeptPick] = useState({
+    faculty: matchFacultyByName(user?.department),
+    department: user?.department || "",
+    departmentId: "",
+  });
   const [proposal, setProposal] = useState({
     title: "",
     abstract: "",
@@ -376,14 +383,30 @@ requestAnimationFrame(() => {
           />
         </div>
         <div className="row">
-          <div className="field">
-            <label>Department *</label>
-            <input
-              disabled={readOnly || (isGrantFundCall && Boolean(user?.department))}
-              value={proposal.department}
-              onChange={(e) => setProposal({ ...proposal, department: e.target.value })}
+          {user?.role === "researcher" ? (
+            <FacultyDepartmentSelect
+              departments={departments}
+              value={{
+                faculty: deptPick.faculty || matchFacultyByName(proposal.department),
+                department: proposal.department,
+                departmentId: deptPick.departmentId,
+              }}
+              disabled={readOnly}
+              onChange={(next) => {
+                setDeptPick(next);
+                setProposal({ ...proposal, department: next.department || "" });
+              }}
             />
-          </div>
+          ) : (
+            <div className="field">
+              <label>Department *</label>
+              <input
+                disabled={readOnly || (isGrantFundCall && Boolean(user?.department))}
+                value={proposal.department}
+                onChange={(e) => setProposal({ ...proposal, department: e.target.value })}
+              />
+            </div>
+          )}
           <div className="field">
             <label>Research area *</label>
             <input

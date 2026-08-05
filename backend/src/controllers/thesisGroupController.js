@@ -697,6 +697,10 @@ async function addMeeting(req, res) {
   const { date, location, agenda, notes, chaptersDiscussed } = req.body || {};
   if (!date) throw new AppError("date is required", 400);
 
+  if ([THESIS_STATUSES.COMPLETED, THESIS_STATUSES.DEFENDED, THESIS_STATUSES.SUBMITTED].includes(group.status)) {
+    throw new AppError("Cannot log supervision meetings after the thesis is submitted, defended, or completed", 400);
+  }
+
   const validKeys = new Set((group.chapters || []).map((c) => c.key));
   const chapterKeys = Array.isArray(chaptersDiscussed)
     ? chaptersDiscussed.map((k) => String(k).trim()).filter((k) => validKeys.has(k))
@@ -705,6 +709,13 @@ async function addMeeting(req, res) {
   const dateStr = String(date).slice(0, 10);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     throw new AppError("Invalid meeting date", 400);
+  }
+
+  const meetingDay = new Date(`${dateStr}T23:59:59.999Z`);
+  const todayEnd = new Date();
+  todayEnd.setUTCHours(23, 59, 59, 999);
+  if (meetingDay.getTime() > todayEnd.getTime()) {
+    throw new AppError("Meeting date cannot be in the future", 400);
   }
 
   group.meetings.push({

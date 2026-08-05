@@ -833,7 +833,9 @@ export function ThesisGroupsPage() {
           const titleStatus = titleProposalStatus(g);
           const isAssignedSupervisor =
             user?.role === "researcher" && supervisorIdValue && String(supervisorIdValue) === String(user?.id);
-          const canLogMeeting = canManage || isAssignedSupervisor;
+          const canLogMeeting =
+            (canManage || isAssignedSupervisor) &&
+            !["submitted", "defended", "completed"].includes(g.status);
           const canUpdateChapters = canManage || isAssignedSupervisor;
           const canUploadFinalDoc = canManage || isAssignedSupervisor;
           const canEnterTitle = isAssignedSupervisor && titleStatus !== "accepted";
@@ -1140,7 +1142,13 @@ export function ThesisGroupsPage() {
                         <div className="row">
                           <div className="field">
                             <label>Date</label>
-                            <input type="date" value={meetingForm.date} onChange={(e) => setMeetingForm({ ...meetingForm, date: e.target.value })} required />
+                            <input
+                              type="date"
+                              max={new Date().toISOString().slice(0, 10)}
+                              value={meetingForm.date}
+                              onChange={(e) => setMeetingForm({ ...meetingForm, date: e.target.value })}
+                              required
+                            />
                           </div>
                           <div className="field">
                             <label>Location</label>

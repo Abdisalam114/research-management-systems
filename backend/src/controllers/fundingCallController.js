@@ -196,25 +196,24 @@ async function getFundingCall(req, res) {
     programTier: req.programTier,
   });
 
-  let call = await FundingCall.findOne(callFindWhere(req, req.params.id));
-  if (!call && req.user.role === "researcher") {
-    call = await FundingCall.findById(req.params.id);
-  }
-  if (!call && isCrossTierRole(req.user?.role)) {
-    call = await FundingCall.findById(req.params.id);
-  }
+  const call = await FundingCall.findById(req.params.id);
   if (!call) throw new AppError("Funding call not found", 404);
+
   if (req.user.role === "researcher") {
-    const applied = await Grant.exists({
-      researcherId: req.user.id,
-      callId: call._id,
-      programTier: req.programTier,
-    });
+    const [grantApplied, proposalApplied] = await Promise.all([
+      Grant.exists({ researcherId: req.user.id, callId: call._id }),
+      Proposal.exists({ researcherId: req.user.id, fundingCallId: call._id }),
+    ]);
+    const applied = Boolean(grantApplied || proposalApplied);
     if (call.status !== CALL_STATUSES.OPEN && !applied) {
       throw new AppError("Funding call not available", 404);
     }
     if (call.status === CALL_STATUSES.OPEN && !tierMatchesCall(req, call) && !applied) {
       throw new AppError("Not eligible for this call", 403);
+    }
+  } else if (!isDirectorReq(req) && !isCrossTierRole(req.user?.role)) {
+    if (req.programTier && call.programTier && call.programTier !== req.programTier && call.eligibilityTier !== "all") {
+      throw new AppError("Funding call not found", 404);
     }
   }
   res.json({ call: sanitizeCall(call) });

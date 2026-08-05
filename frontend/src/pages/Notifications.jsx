@@ -23,6 +23,10 @@ function ethicsIdFromDownloadLink(link) {
   return link.slice("ethics-certificate:".length);
 }
 
+function hasDetailBody(n) {
+  return Boolean(n?.body?.trim());
+}
+
 export function NotificationsPage() {
   const { accessToken, user } = useAuth();
   const navigate = useNavigate();
@@ -45,7 +49,7 @@ export function NotificationsPage() {
     return () => clearInterval(timer);
   }, [reload]);
 
-  function viewPublicationDetails(n) {
+  function viewNotificationDetails(n) {
     if (n.body?.trim()) {
       setDetailNote(n);
       return;
@@ -59,8 +63,8 @@ export function NotificationsPage() {
     }
   }
 
-  function downloadPublicationSummary(n) {
-    const text = `${n.title || "Publication"}\n\n${n.body || ""}`.trim();
+  function downloadNotificationSummary(n) {
+    const text = `${n.title || "Notification"}\n\n${n.body || ""}`.trim();
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -134,8 +138,8 @@ export function NotificationsPage() {
       return;
     }
 
-    if (n.type === "publication" && n.body) {
-      downloadPublicationSummary(n);
+    if (hasDetailBody(n)) {
+      downloadNotificationSummary(n);
       if (!n.readAt) {
         await notificationApi.markNotificationRead(accessToken, n.id);
         await reload();
@@ -148,7 +152,7 @@ export function NotificationsPage() {
       ethicsIdFromDownloadLink(n.downloadLink) ||
         n.downloadLink?.startsWith("/uploads/") ||
         (n.downloadLink && /^https?:\/\//i.test(n.downloadLink)) ||
-        (n.type === "publication" && n.body)
+        hasDetailBody(n)
     );
 
   return (
@@ -206,8 +210,8 @@ export function NotificationsPage() {
                     {n.type === "message" ? "Open chat" : "Open"}
                   </button>
                 ) : null}
-                {n.type === "publication" && n.body ? (
-                  <button type="button" className="btn" onClick={() => viewPublicationDetails(n)}>
+                {(n.type === "publication" || n.type === "grant" || n.type === "proposal") && hasDetailBody(n) ? (
+                  <button type="button" className="btn" onClick={() => viewNotificationDetails(n)}>
                     View details
                   </button>
                 ) : null}
@@ -218,7 +222,11 @@ export function NotificationsPage() {
                     disabled={downloadBusy === n.id}
                     onClick={() => downloadDocument(n)}
                   >
-                    {downloadBusy === n.id ? "Downloading…" : n.type === "publication" ? "Download details" : "Download document"}
+                    {downloadBusy === n.id
+                      ? "Downloading…"
+                      : hasDetailBody(n)
+                        ? "Download summary"
+                        : "Download document"}
                   </button>
                 ) : null}
                 {!n.readAt ? (
@@ -309,7 +317,7 @@ export function NotificationsPage() {
                 Open in project
               </button>
             ) : null}
-            <button type="button" className="btn" onClick={() => downloadPublicationSummary(detailNote)}>
+            <button type="button" className="btn" onClick={() => downloadNotificationSummary(detailNote)}>
               Download summary
             </button>
           </div>

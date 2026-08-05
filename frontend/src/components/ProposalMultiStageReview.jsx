@@ -580,23 +580,36 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
 
       {canDecideCommittee ? (
         <div style={{ marginBottom: 12 }}>
+          <label>
+            Committee score (1–5)
+            <input
+              type="number"
+              min={1}
+              max={5}
+              value={score}
+              onChange={(e) => setScore(Number(e.target.value))}
+              style={{ marginLeft: 8, width: 64 }}
+            />
+          </label>
           <input
             placeholder="Committee comment"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
+            style={{ marginTop: 8 }}
           />
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
             <button
               type="button"
               className="btn primary"
-              disabled={busy || !comment.trim()}
+              disabled={busy || !comment.trim() || score < 1 || score > 5}
               onClick={() =>
                 run(() =>
                   proposalApi.committeeReview(
                     accessToken,
                     proposal.id,
                     "recommend_approval",
-                    comment.trim()
+                    comment.trim(),
+                    score
                   )
                 )
               }
@@ -606,14 +619,15 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
             <button
               type="button"
               className="btn"
-              disabled={busy || !comment.trim()}
+              disabled={busy || !comment.trim() || score < 1 || score > 5}
               onClick={() =>
                 run(() =>
                   proposalApi.committeeReview(
                     accessToken,
                     proposal.id,
                     "recommend_revision",
-                    comment.trim()
+                    comment.trim(),
+                    score
                   )
                 )
               }
@@ -623,10 +637,16 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
             <button
               type="button"
               className="btn"
-              disabled={busy || !comment.trim()}
+              disabled={busy || !comment.trim() || score < 1 || score > 5}
               onClick={() =>
                 run(() =>
-                  proposalApi.committeeReview(accessToken, proposal.id, "reject", comment.trim())
+                  proposalApi.committeeReview(
+                    accessToken,
+                    proposal.id,
+                    "reject",
+                    comment.trim(),
+                    score
+                  )
                 )
               }
             >
