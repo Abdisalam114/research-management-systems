@@ -83,11 +83,17 @@ export function SystemReportsPage() {
     }
   }
 
+  const isDirector = user?.role === "research_director";
+
   return (
     <div>
       <PageHeader
         title="System Reports"
-        subtitle="Live counts across Undergraduate and Postgraduate — proposals, ethics, projects, grants, finance, publications, thesis."
+        subtitle={
+          isDirector
+            ? "Live counts across Undergraduate and Postgraduate — proposals, ethics, projects, grants, finance, publications, thesis."
+            : `Live counts for the active ${programTier === "postgraduate" ? "PG" : "UG"} portal — proposals, ethics, projects, grants, finance, publications, thesis.`
+        }
         actions={
           <>
             <button type="button" className="btn primary" disabled={busy || !report} onClick={downloadCsv}>

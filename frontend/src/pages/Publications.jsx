@@ -323,23 +323,28 @@ setPublications(list);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
+  const statusFilteredPublications = useMemo(
+    () =>
+      filterByStatKey(publications, statusFilter, {
+        customFilters: {
+          published: (p) => p.workflowStage === "published",
+        },
+      }),
+    [publications, statusFilter]
+  );
+
   const trackingStats = useMemo(
     () =>
       OUTPUT_TRACKING_CATEGORIES.map((cat) => ({
         ...cat,
-        count: countByTrackingCategory(publications, cat),
+        count: countByTrackingCategory(statusFilteredPublications, cat),
       })),
-    [publications]
+    [statusFilteredPublications]
   );
 
   const filtered = useMemo(() => {
-    let list = filterByStatKey(publications, statusFilter, {
-      customFilters: {
-        published: (p) => p.workflowStage === "published",
-      },
-    });
-    return list.filter((p) => matchesTrackingFilter(p, typeFilter));
-  }, [publications, statusFilter, typeFilter]);
+    return statusFilteredPublications.filter((p) => matchesTrackingFilter(p, typeFilter));
+  }, [statusFilteredPublications, typeFilter]);
 
   /** Publication Tracking reads from Projects — group outputs under each project (no silo list). */
   const groupedByProject = useMemo(() => {

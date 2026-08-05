@@ -52,6 +52,17 @@ function GrantAmounts({ grant }) {
   );
 }
 
+const GRANT_STATUS_FILTERS = [
+  "all",
+  "draft",
+  "submitted",
+  "accepted",
+  "pending_finance",
+  "awarded",
+  "active",
+  "rejected",
+];
+
 export function GrantsPage() {
   const { accessToken, user } = useAuth();
   const navigate = useNavigate();
@@ -60,7 +71,7 @@ export function GrantsPage() {
   const callIdFromUrl = searchParams.get("callId") || "";
   const [grants, setGrants] = useState([]);
   const [donorFilter, setDonorFilter] = useState(false);
-  const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
+  const [statusFilter, setStatusFilter] = useUrlStatFilter("all", GRANT_STATUS_FILTERS);
 
   const canCreate = user?.role === "researcher";
   const isDirector = user?.role === "research_director";

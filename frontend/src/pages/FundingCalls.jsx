@@ -119,6 +119,8 @@ function formatMoney(amount, currency) {
   }
 }
 
+const FUNDING_CALL_STATUS_FILTERS = ["all", "open", "draft", "closed", "accepted"];
+
 export function FundingCallsPage() {
   const { accessToken, user } = useAuth();
   const { programTier } = useProgramTier();
@@ -139,7 +141,7 @@ export function FundingCallsPage() {
   const [showForm, setShowForm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
+  const [statusFilter, setStatusFilter] = useUrlStatFilter("all", FUNDING_CALL_STATUS_FILTERS);
   const [highlightedCallId, setHighlightedCallId] = useState("");
 
   const load = useCallback(async () => {
@@ -236,10 +238,25 @@ export function FundingCallsPage() {
   const draftCount = calls.filter((c) => c.status === "draft").length;
   const closedCount = calls.filter((c) => c.status === "closed").length;
 
-  const filteredCalls = useMemo(
-    () => filterByStatKey(calls, statusFilter),
-    [calls, statusFilter]
-  );
+  const filteredCalls = useMemo(() => {
+    if (statusFilter === "accepted") {
+      return calls.filter((c) => {
+        const key = String(c.id);
+        const grants = grantsByCallId[key] || [];
+        const props = proposalsByCallId[key] || [];
+        return grants.some(isAcceptedGrant) || props.some(isAcceptedProposal);
+      });
+    }
+    return filterByStatKey(calls, statusFilter);
+  }, [calls, statusFilter, grantsByCallId, proposalsByCallId]);
+
+  const fundingCallStatTiles = [
+    { label: "Total calls", filterKey: "all" },
+    { label: "Open", filterKey: "open" },
+    { label: "Drafts", filterKey: "draft" },
+    { label: "Closed", filterKey: "closed" },
+    { label: "Accepted", filterKey: "accepted" },
+  ];
 
   function resetForm() {
     const tier = programTier || "undergraduate";
@@ -418,7 +435,7 @@ await fundingCallApi.publishFundingCall(accessToken, id);
           {
             label: "Accepted",
             value: acceptedTotal,
-            filterKey: "all",
+            filterKey: "accepted",
             accent: "#38bdf8",
             sub: "Proposals + grants",
           },
@@ -473,20 +490,12 @@ await fundingCallApi.publishFundingCall(accessToken, id);
 
       {statusFilter !== "all" ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          Showing: <strong>{statFilterLabel(
-            [
-              { label: "Total calls", filterKey: "all" },
-              { label: "Open", filterKey: "open" },
-              { label: "Drafts", filterKey: "draft" },
-              { label: "Closed", filterKey: "closed" },
-            ],
-            statusFilter
-          )}</strong>{" "}
-          ({filteredCalls.length})
+          Showing: <strong>{statFilterLabel(fundingCallStatTiles, statusFilter)}</strong>{" "}
+          ({statusFilter === "accepted" ? acceptedTotal : filteredCalls.length})
         </p>
       ) : null}
 
-      {(isResearcher || canSeeAllApps) && acceptedTotal ? (
+      {(isResearcher || canSeeAllApps) && acceptedTotal && (statusFilter === "all" || statusFilter === "accepted") ? (
         <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.45)" }}>
           <div style={{ fontWeight: 800 }}>Accepted funding-call applications</div>
           <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>

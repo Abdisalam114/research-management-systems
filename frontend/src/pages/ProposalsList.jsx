@@ -7,7 +7,7 @@ import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { ProgramTierBadge } from "../components/ProgramTierBadge";
-import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
+import { filterByStatKey, hideEmptyStatTiles, statFilterLabel } from "../utils/pageHeaderFilters";
 
 export function ProposalsListPage() {
   const { accessToken, user } = useAuth();
@@ -36,23 +36,23 @@ export function ProposalsListPage() {
   const stats = useMemo(() => {
     const by = (s) => proposals.filter((p) => p.status === s).length;
     if (isStaffQueue) {
-      return [
+      return hideEmptyStatTiles([
         { label: "Total", value: proposals.length, filterKey: "all" },
         { label: "Submitted", value: by("submitted"), filterKey: "submitted", accent: "#38bdf8" },
         { label: "Under review", value: by("under_review"), filterKey: "under_review", accent: "#fcd34d" },
         { label: "Revision", value: by("revision_requested"), filterKey: "revision_requested", accent: "#fb923c" },
         { label: "Approved", value: by("approved"), filterKey: "approved", accent: "#16a34a" },
         { label: "Rejected", value: by("rejected"), filterKey: "rejected" },
-      ];
+      ]);
     }
-    return [
+    return hideEmptyStatTiles([
       { label: "Total", value: proposals.length, filterKey: "all" },
       { label: "Draft", value: by("draft"), filterKey: "draft" },
       { label: "Submitted", value: by("submitted"), filterKey: "submitted", accent: "#38bdf8" },
       { label: "Under review", value: by("under_review"), filterKey: "under_review", accent: "#fcd34d" },
       { label: "Approved", value: by("approved"), filterKey: "approved", accent: "#16a34a" },
       { label: "Rejected", value: by("rejected"), filterKey: "rejected" },
-    ];
+    ]);
   }, [proposals, isStaffQueue]);
 
   const filtered = useMemo(() => filterByStatKey(proposals, statusFilter), [proposals, statusFilter]);

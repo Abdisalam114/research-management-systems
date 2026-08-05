@@ -317,7 +317,7 @@ export function ThesisGroupsPage() {
         filterKey: "hasSupervisor",
         accent: "#0284c7",
       },
-      { label: "Total students", value: totalStudents, filterKey: "hasStudents", accent: "#7dd3fc" },
+      { label: "Total students", value: totalStudents, accent: "#7dd3fc" },
     ];
   }, [groups]);
 
@@ -328,7 +328,7 @@ export function ThesisGroupsPage() {
           validGroups: isValidThesisGroup,
           hasTitle: (g) => Boolean(g.title?.trim()),
           hasSupervisor: (g) => Boolean(g.supervisorId) && isValidThesisGroup(g),
-          hasStudents: isValidThesisGroup,
+          hasStudents: (g) => isValidThesisGroup(g) && (g.students?.length || 0) > 0,
           titleAccepted: (g) => isTitleAccepted(g) && isValidThesisGroup(g),
           titlePending: (g) => titleProposalStatus(g) === "pending" && isValidThesisGroup(g),
         },

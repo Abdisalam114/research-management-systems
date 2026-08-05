@@ -64,6 +64,8 @@ function formatMoney(n, currency = "USD") {
   return `${currency} ${v.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
 }
 
+const BUDGET_STATUS_FILTERS = ["all", "pending", "disbursed"];
+
 export function BudgetsPage() {
   const { accessToken, user } = useAuth();
   const { programTier } = useProgramTier();
@@ -84,7 +86,7 @@ export function BudgetsPage() {
   });
   const [showTopPayment, setShowTopPayment] = useState(false);
   const [showTopPO, setShowTopPO] = useState(false);
-  const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
+  const [statusFilter, setStatusFilter] = useUrlStatFilter("all", BUDGET_STATUS_FILTERS);
   const [actionBusy, setActionBusy] = useState("");
   const [payPoTarget, setPayPoTarget] = useState(null);
 
@@ -323,7 +325,7 @@ export function BudgetsPage() {
         const poList = posByBudget[String(b.id)] || [];
         return (
           pays.some((p) => ["requested", "director_approved"].includes(p.status)) ||
-          poList.some((p) => ["requested", "director_approved"].includes(p.status))
+          poList.some((p) => ["requested", "procurement_approved", "director_approved"].includes(p.status))
         );
       });
     }

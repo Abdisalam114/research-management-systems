@@ -181,11 +181,8 @@ function StepRow({ step, index, highlighted }) {
         {step.link ? (
           <div style={{ marginTop: 6 }}>
             <Link
-              className="btn"
+              className={`btn sm${step.status === "current" ? " primary" : ""}`}
               to={step.link}
-              style={{ fontSize: 12 }}
-              onClick={() => {
-}}
             >
               Open
             </Link>

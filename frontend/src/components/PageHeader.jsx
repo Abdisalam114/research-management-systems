@@ -10,6 +10,7 @@ export function PageHeader({
   showBack = false,
   activeFilter = "all",
   onFilterChange,
+  disableFilterToggle = false,
 }) {
   const filterable = Boolean(onFilterChange);
 
@@ -40,6 +41,7 @@ export function PageHeader({
               ? {
                   type: "button",
                   onClick: () => {
+                    if (disableFilterToggle && activeFilter === key) return;
                     onFilterChange(activeFilter === key && key !== "all" ? "all" : key);
                   },
                   "aria-pressed": isActive,

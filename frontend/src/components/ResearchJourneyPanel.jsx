@@ -1,9 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as analyticsApi from "../services/analyticsApi";
 import { withProjectContext } from "../utils/projectContextLink";
+
+const LC_FILTERS = ["all", "projects", "proposals", "grants", "publications"];
+const STEP_FILTERS = ["completed", "current", "pending", "blocked"];
+
+const LC_FILTER_LABELS = {
+  all: "All",
+  projects: "Projects",
+  proposals: "Proposals",
+  grants: "Grants",
+  publications: "Publications",
+};
 
 const STATUS_STYLE = {
   completed: {
@@ -63,9 +75,33 @@ const STATUS_STYLE = {
   },
 };
 
-const LEGEND_KEYS = ["completed", "current", "pending", "blocked"];
+function itemHasGrantStep(item) {
+  return (item.steps || []).some(
+    (s) => ["grant_apply", "grant_award", "budget"].includes(s.key) && s.status !== "skipped"
+  );
+}
 
-function StatusLegend() {
+function itemHasPublicationStep(item) {
+  return (item.steps || []).some(
+    (s) => ["publication", "repository"].includes(s.key) && s.status !== "skipped"
+  );
+}
+
+function itemMatchesLcFilter(item, kind, lcFilter) {
+  if (!lcFilter || lcFilter === "all") return true;
+  if (lcFilter === "projects") return kind === "project";
+  if (lcFilter === "proposals") return kind === "proposal";
+  if (lcFilter === "grants") return itemHasGrantStep(item);
+  if (lcFilter === "publications") return itemHasPublicationStep(item);
+  return true;
+}
+
+function itemMatchesStepFilter(item, stepFilter) {
+  if (!stepFilter) return true;
+  return (item.steps || []).some((s) => s.status === stepFilter);
+}
+
+function StatusLegend({ activeStepFilter, onStepFilterChange }) {
   return (
     <div
       style={{
@@ -79,43 +115,29 @@ function StatusLegend() {
         border: "1px solid rgba(148,163,184,0.2)",
       }}
     >
-      {LEGEND_KEYS.map((key) => {
+      <button
+        type="button"
+        className={`btn sm${!activeStepFilter ? " primary" : ""}`}
+        onClick={() => onStepFilterChange("")}
+      >
+        All steps
+      </button>
+      {STEP_FILTERS.map((key) => {
         const s = STATUS_STYLE[key];
         return (
-          <span
+          <button
             key={key}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "4px 10px",
-              borderRadius: 999,
-              background: s.badgeBg,
-              color: s.color,
-              fontSize: 12,
-              fontWeight: 700,
-              border: `1px solid ${s.border}`,
-            }}
+            type="button"
+            className={`btn sm${activeStepFilter === key ? " primary" : ""}`}
+            onClick={() => onStepFilterChange(activeStepFilter === key ? "" : key)}
+            style={
+              activeStepFilter === key
+                ? undefined
+                : { borderColor: s.border, color: s.color, background: s.badgeBg }
+            }
           >
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 18,
-                height: 18,
-                borderRadius: "50%",
-                background: s.iconBg,
-                color: s.iconColor,
-                fontSize: 11,
-                fontWeight: 900,
-              }}
-            >
-              {s.icon}
-            </span>
-            {s.label}
-            <span style={{ fontWeight: 500, opacity: 0.85 }}>· {s.labelSo}</span>
-          </span>
+            {s.icon} {s.label}
+          </button>
         );
       })}
     </div>
@@ -181,7 +203,7 @@ function StepRow({ step, index, projectId = null, proposalId = null }) {
         </span>
         {link ? (
           <div style={{ marginTop: 6 }}>
-            <Link className="btn" to={link} style={{ fontSize: 12 }}>
+            <Link className={`btn sm${step.status === "current" ? " primary" : ""}`} to={link}>
               Open
             </Link>
           </div>
@@ -191,12 +213,12 @@ function StepRow({ step, index, projectId = null, proposalId = null }) {
   );
 }
 
-function PipelineCard({ item, kind = "project", onOpen, highlighted = false }) {
+function PipelineCard({ item, kind = "project", highlighted = false, stepFilter = "" }) {
   const isProject = kind === "project";
   const progress = item.progressPercent;
   const projectHref = isProject && item.projectId ? `/projects/${item.projectId}#workflow` : null;
   const proposalHref = !isProject && item.proposalId ? `/proposals/${item.proposalId}` : null;
-  const href = projectHref || proposalHref;
+  const visibleSteps = (item.steps || []).filter((s) => !stepFilter || s.status === stepFilter);
 
   return (
     <div
@@ -210,21 +232,6 @@ function PipelineCard({ item, kind = "project", onOpen, highlighted = false }) {
             : "rgba(148,163,184,0.35)",
         borderStyle: isProject ? "solid" : "dashed",
         boxShadow: highlighted ? "0 0 0 2px rgba(14,165,233,0.25)" : undefined,
-        cursor: href ? "pointer" : "default",
-      }}
-      role={href ? "link" : undefined}
-      tabIndex={href ? 0 : undefined}
-      onClick={(e) => {
-        if (!href || !onOpen) return;
-        if (e.target.closest("a,button")) return;
-        onOpen(href);
-      }}
-      onKeyDown={(e) => {
-        if (!href || !onOpen) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpen(href);
-        }
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
@@ -232,15 +239,7 @@ function PipelineCard({ item, kind = "project", onOpen, highlighted = false }) {
           <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: isProject ? "#0ea5e9" : "#64748b" }}>
             {isProject ? "Project" : "Proposal (before project)"}
           </div>
-          <div style={{ fontWeight: 900, fontSize: 17, marginTop: 4 }}>
-            {href ? (
-              <Link to={href} style={{ color: "inherit", textDecoration: "none" }}>
-                {item.title}
-              </Link>
-            ) : (
-              item.title
-            )}
-          </div>
+          <div style={{ fontWeight: 900, fontSize: 17, marginTop: 4 }}>{item.title}</div>
           <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
             {isProject ? (
               <>
@@ -268,7 +267,7 @@ function PipelineCard({ item, kind = "project", onOpen, highlighted = false }) {
             </div>
           ) : null}
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <div className="workflowItemActions">
           {isProject && progress != null ? (
             <div style={{ minWidth: 120, textAlign: "right" }}>
               <div style={{ fontSize: 12, fontWeight: 700 }}>{progress}% progress</div>
@@ -293,13 +292,18 @@ function PipelineCard({ item, kind = "project", onOpen, highlighted = false }) {
             </div>
           ) : null}
           {projectHref ? (
-            <Link className="btn primary" to={projectHref} style={{ fontSize: 12 }}>
+            <Link className="btn sm primary" to={projectHref}>
               Open project workflow
             </Link>
           ) : null}
           {proposalHref ? (
-            <Link className="btn" to={proposalHref} style={{ fontSize: 12 }}>
+            <Link className="btn sm" to={proposalHref}>
               Open proposal
+            </Link>
+          ) : null}
+          {isProject && item.projectId ? (
+            <Link className="btn sm" to={`/research-workflow?tab=lifecycle&projectId=${item.projectId}`}>
+              Focus here
             </Link>
           ) : null}
         </div>
@@ -308,38 +312,55 @@ function PipelineCard({ item, kind = "project", onOpen, highlighted = false }) {
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid rgba(56,189,248,0.15)" }}>
         <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 8, color: "#64748b" }}>
           Workflow steps for this {isProject ? "project" : "proposal"}
+          {stepFilter ? ` (${visibleSteps.length} matching)` : ""}
         </div>
-        {(item.steps || []).map((step, idx) => (
-          <StepRow
-            key={step.key}
-            step={step}
-            index={idx}
-            projectId={item.projectId || null}
-            proposalId={item.proposalId || null}
-          />
-        ))}
+        {visibleSteps.length ? (
+          visibleSteps.map((step, idx) => (
+            <StepRow
+              key={step.key}
+              step={step}
+              index={idx}
+              projectId={item.projectId || null}
+              proposalId={item.proposalId || null}
+            />
+          ))
+        ) : (
+          <div className="muted" style={{ fontSize: 13 }}>No steps match the active step filter.</div>
+        )}
       </div>
     </div>
   );
 }
 
-/** Projects with embedded workflow steps (Research Workflow Status page). */
+/** Projects with embedded workflow steps (Research Workflow — Lifecycle tab). */
 export function ResearchJourneyPanel() {
   const { accessToken, user } = useAuth();
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { programTier } = useProgramTier();
+  const [searchParams, setSearchParams] = useSearchParams();
   const focusProjectId = searchParams.get("projectId") || "";
+  const lcFilter = LC_FILTERS.includes(searchParams.get("lc")) ? searchParams.get("lc") : "all";
+  const stepFilter = STEP_FILTERS.includes(searchParams.get("lcStep")) ? searchParams.get("lcStep") : "";
   const [data, setData] = useState(null);
   const [selectedResearcherId, setSelectedResearcherId] = useState("");
 
   const isStaff = ["research_director", "faculty_coordinator"].includes(user?.role);
 
-  const openHref = useCallback(
-    (href) => {
-      const [path, hash] = href.split("#");
-      navigate(hash ? { pathname: path, hash } : path);
+  const patchLifecycleParams = useCallback(
+    (patch) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("tab", "lifecycle");
+          Object.entries(patch).forEach(([key, value]) => {
+            if (value == null || value === "" || value === "all") next.delete(key);
+            else next.set(key, value);
+          });
+          return next;
+        },
+        { replace: true }
+      );
     },
-    [navigate]
+    [setSearchParams]
   );
 
   const load = useCallback(async () => {
@@ -348,9 +369,9 @@ export function ResearchJourneyPanel() {
       isStaff && selectedResearcherId ? selectedResearcherId : undefined
     );
     setData(res);
-}, [accessToken, isStaff, selectedResearcherId, focusProjectId]);
+  }, [accessToken, isStaff, selectedResearcherId, programTier]);
 
-  const { loading, error, setError, reload } = useModuleLoad(accessToken, load, [selectedResearcherId]);
+  const { loading, error, setError, reload } = useModuleLoad(accessToken, load, [selectedResearcherId, programTier]);
 
   useEffect(() => {
     if (data?.mode === "picker" && !selectedResearcherId && data.researchers?.length === 1) {
@@ -359,28 +380,64 @@ export function ResearchJourneyPanel() {
   }, [data, selectedResearcherId]);
 
   const allProjects = data?.projects || [];
-  const projectItems = useMemo(() => {
-    if (!focusProjectId) return allProjects;
-    return allProjects.filter((p) => String(p.projectId) === String(focusProjectId));
-  }, [allProjects, focusProjectId]);
-  const pendingItems = focusProjectId ? [] : data?.pendingProposals || [];
+  const allPending = data?.pendingProposals || [];
+
+  const filteredProjects = useMemo(() => {
+    let list = focusProjectId
+      ? allProjects.filter((p) => String(p.projectId) === String(focusProjectId))
+      : allProjects;
+    list = list.filter(
+      (p) => itemMatchesLcFilter(p, "project", lcFilter) && itemMatchesStepFilter(p, stepFilter)
+    );
+    return list;
+  }, [allProjects, focusProjectId, lcFilter, stepFilter]);
+
+  const filteredPending = useMemo(() => {
+    if (focusProjectId) return [];
+    return allPending.filter(
+      (p) => itemMatchesLcFilter(p, "proposal", lcFilter) && itemMatchesStepFilter(p, stepFilter)
+    );
+  }, [allPending, focusProjectId, lcFilter, stepFilter]);
+
   const timeline = data?.timeline || [];
-  const hasContent = projectItems.length > 0 || pendingItems.length > 0;
+  const hasContent = filteredProjects.length > 0 || filteredPending.length > 0;
+  const showProjects = lcFilter === "all" || lcFilter === "projects" || lcFilter === "grants" || lcFilter === "publications";
+  const showPending = !focusProjectId && (lcFilter === "all" || lcFilter === "proposals");
+
+  const summaryStats = useMemo(
+    () => [
+      { key: "all", label: "All items", value: allProjects.length + allPending.length },
+      { key: "projects", label: "Projects", value: data?.summary?.projects ?? allProjects.length },
+      { key: "proposals", label: "Proposals", value: data?.summary?.proposals ?? allPending.length },
+      { key: "grants", label: "Grants track", value: allProjects.filter(itemHasGrantStep).length },
+      {
+        key: "publications",
+        label: "Publications track",
+        value: allProjects.filter(itemHasPublicationStep).length,
+      },
+    ],
+    [allProjects, allPending, data?.summary]
+  );
+
+  function clearAllFilters() {
+    patchLifecycleParams({ lc: null, lcStep: null, projectId: null });
+  }
 
   return (
     <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.35)" }}>
       <div style={{ fontWeight: 800, fontSize: 16 }}>Projects &amp; workflow progress</div>
       <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-        Workflow-ku wuxuu raacaa <strong>project-kasta</strong> aad sameysay — proposal, ethics, project,
-        grant, publication, repository. Guji mid si aad u aragto meesha aad joogto.
+        Dooro filter hoose, kadib guji <strong>Open</strong> si aad u gasho module-ka saxda ah.
       </div>
+
       {focusProjectId ? (
-        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          Filtered to one project —{" "}
-          <Link to="/research-workflow">show all my projects</Link>
-        </p>
+        <div className="workflowItemActions" style={{ marginTop: 8 }}>
+          <span className="muted" style={{ fontSize: 13 }}>Filtered to one project</span>
+          <button type="button" className="btn sm" onClick={() => patchLifecycleParams({ projectId: null })}>
+            Show all projects
+          </button>
+        </div>
       ) : null}
-      <StatusLegend />
 
       {error ? <div style={{ color: "#f87171", marginTop: 12 }}>{error}</div> : null}
 
@@ -405,6 +462,15 @@ export function ResearchJourneyPanel() {
               ))}
             </select>
           </div>
+          <button
+            type="button"
+            className="btn primary"
+            style={{ marginTop: 8 }}
+            disabled={!selectedResearcherId || loading}
+            onClick={() => reload()}
+          >
+            {loading ? "Loading…" : "View workflow"}
+          </button>
         </div>
       ) : null}
 
@@ -412,12 +478,43 @@ export function ResearchJourneyPanel() {
 
       {!loading && data?.mode === "journey" ? (
         <>
-          {data.summary ? (
-            <div className="overviewGrid" style={{ marginTop: 12 }}>
-              <div className="overviewTile"><div className="label">Projects</div><div className="value">{data.summary.projects}</div></div>
-              <div className="overviewTile"><div className="label">Proposals</div><div className="value">{data.summary.proposals}</div></div>
-              <div className="overviewTile"><div className="label">Grants</div><div className="value">{data.summary.grants}</div></div>
-              <div className="overviewTile"><div className="label">Publications</div><div className="value">{data.summary.publications}</div></div>
+          <div className="pageHeaderStats" style={{ marginTop: 12 }}>
+            {summaryStats.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                className={`pageHeaderStat pageHeaderStatBtn${lcFilter === s.key ? " pageHeaderStatActive" : ""}`}
+                onClick={() => patchLifecycleParams({ lc: s.key === lcFilter && s.key !== "all" ? null : s.key })}
+              >
+                <div className="pageHeaderStatLabel">{s.label}</div>
+                <div className="pageHeaderStatValue">{s.value}</div>
+              </button>
+            ))}
+          </div>
+
+          <StatusLegend
+            activeStepFilter={stepFilter}
+            onStepFilterChange={(key) => patchLifecycleParams({ lcStep: key || null })}
+          />
+
+          {lcFilter !== "all" || stepFilter || focusProjectId ? (
+            <div className="workflowItemActions" style={{ marginTop: 12 }}>
+              <span className="muted" style={{ fontSize: 13 }}>
+                Active filters:{" "}
+                {lcFilter !== "all" ? (
+                  <strong>{LC_FILTER_LABELS[lcFilter] || lcFilter}</strong>
+                ) : null}
+                {stepFilter ? (
+                  <>
+                    {lcFilter !== "all" ? " · " : null}
+                    <strong>{STATUS_STYLE[stepFilter]?.label || stepFilter}</strong>
+                  </>
+                ) : null}
+                {focusProjectId ? <> · <strong>One project</strong></> : null}
+              </span>
+              <button type="button" className="btn sm" onClick={clearAllFilters}>
+                Clear filters
+              </button>
             </div>
           ) : null}
 
@@ -427,48 +524,60 @@ export function ResearchJourneyPanel() {
             </div>
           ) : null}
 
-          {projectItems.length > 0 ? (
+          {showProjects && filteredProjects.length > 0 ? (
             <div style={{ marginTop: 8 }}>
               <div style={{ fontWeight: 800, marginTop: 8 }}>
-                Your projects — workflow status ({projectItems.length})
+                Projects — workflow status ({filteredProjects.length})
               </div>
-              {projectItems.map((item) => (
+              {filteredProjects.map((item) => (
                 <PipelineCard
                   key={item.projectId}
                   item={item}
                   kind="project"
-                  onOpen={openHref}
+                  stepFilter={stepFilter}
                   highlighted={focusProjectId && String(item.projectId) === String(focusProjectId)}
                 />
               ))}
             </div>
           ) : null}
 
-          {focusProjectId && !loading && projectItems.length === 0 && data?.mode === "journey" ? (
-            <div className="muted" style={{ marginTop: 12 }}>
-              That project was not found in your workflow.{" "}
-              <Link to="/research-workflow">Show all projects</Link>
+          {focusProjectId && !loading && filteredProjects.length === 0 && showProjects ? (
+            <div className="workflowItemActions" style={{ marginTop: 12 }}>
+              <span className="muted">That project was not found or does not match the filter.</span>
+              <button type="button" className="btn sm" onClick={clearAllFilters}>
+                Show all projects
+              </button>
             </div>
           ) : null}
 
-          {pendingItems.length > 0 ? (
+          {showPending && filteredPending.length > 0 ? (
             <div style={{ marginTop: 8 }}>
-              <div style={{ fontWeight: 800, marginTop: 8 }}>Proposals not yet a project ({pendingItems.length})</div>
+              <div style={{ fontWeight: 800, marginTop: 8 }}>Proposals not yet a project ({filteredPending.length})</div>
               <p className="muted" style={{ fontSize: 13, margin: "4px 0 0" }}>
                 These are still in the proposal / ethics / review stage.
               </p>
-              {pendingItems.map((item) => (
-                <PipelineCard key={item.proposalId} item={item} kind="proposal" onOpen={openHref} />
+              {filteredPending.map((item) => (
+                <PipelineCard key={item.proposalId} item={item} kind="proposal" stepFilter={stepFilter} />
               ))}
             </div>
           ) : null}
 
           {!hasContent ? (
             <div style={{ marginTop: 12 }}>
-              <div className="muted">No projects or proposals yet.</div>
-              <Link className="btn primary" to="/proposals/new" style={{ marginTop: 10, display: "inline-block" }}>
-                New voluntary proposal
-              </Link>
+              <div className="muted">
+                {allProjects.length + allPending.length === 0
+                  ? "No projects or proposals yet."
+                  : "Nothing matches the current filters."}
+              </div>
+              {allProjects.length + allPending.length === 0 ? (
+                <Link className="btn primary" to="/proposals/new" style={{ marginTop: 10, display: "inline-block" }}>
+                  New voluntary proposal
+                </Link>
+              ) : (
+                <button type="button" className="btn sm" style={{ marginTop: 10 }} onClick={clearAllFilters}>
+                  Clear filters
+                </button>
+              )}
             </div>
           ) : null}
 
@@ -477,12 +586,16 @@ export function ResearchJourneyPanel() {
               <div style={{ fontWeight: 800, marginBottom: 10 }}>Recent activity</div>
               <div style={{ display: "grid", gap: 8 }}>
                 {timeline.map((ev, idx) => (
-                  <div key={`${ev.at}-${idx}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                  <div key={`${ev.at}-${idx}`} className="workflowItemRow">
                     <div>
                       <div style={{ fontWeight: 700 }}>{ev.label}</div>
                       <div className="muted" style={{ fontSize: 12 }}>{new Date(ev.at).toLocaleString()}</div>
                     </div>
-                    {ev.link ? <Link className="btn" to={ev.link} style={{ fontSize: 12 }}>View</Link> : null}
+                    {ev.link ? (
+                      <Link className="btn sm" to={ev.link}>
+                        View
+                      </Link>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -490,7 +603,16 @@ export function ResearchJourneyPanel() {
           ) : null}
 
           {isStaff ? (
-            <button type="button" className="btn" style={{ marginTop: 12 }} onClick={() => { setSelectedResearcherId(""); reload(); }}>
+            <button
+              type="button"
+              className="btn"
+              style={{ marginTop: 12 }}
+              onClick={() => {
+                setSelectedResearcherId("");
+                setData(null);
+                reload();
+              }}
+            >
               ← Choose another researcher
             </button>
           ) : null}

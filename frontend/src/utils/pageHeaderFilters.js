@@ -36,6 +36,7 @@ export function filterByStatKey(items, filterKey, options = {}) {
   if (filterKey.startsWith("field:")) {
     const rest = filterKey.slice(6);
     const sep = rest.indexOf(":");
+    if (sep < 0) return items;
     const field = rest.slice(0, sep);
     const value = rest.slice(sep + 1);
     return items.filter((i) => String(i[field] ?? "") === value);
@@ -60,4 +61,11 @@ export function fieldStatTile(label, count, field, value, accent) {
 
 export function typeStatTile(label, count, type, accent) {
   return { label, value: count, filterKey: `type:${type}`, accent };
+}
+
+/** Hide stat tiles with zero counts (keep Total / tiles without filterKey). */
+export function hideEmptyStatTiles(stats) {
+  return stats.filter(
+    (s) => s.filterKey == null || s.filterKey === "all" || s.alwaysShow || Number(s.value) > 0
+  );
 }

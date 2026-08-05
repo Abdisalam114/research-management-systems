@@ -16,7 +16,13 @@ function isDirectorReq(req) {
 
 /** Director sees all calls; other staff see active portal + cross-portal (all) calls. */
 function callListWhere(req, base = {}) {
-  if (isDirectorReq(req)) return base;
+  const tier = req.programTier;
+  if (isDirectorReq(req)) {
+    if (!tier) return base;
+    return {
+      $and: [base, { $or: [{ programTier: tier }, { eligibilityTier: "all" }] }],
+    };
+  }
   if (isCrossTierRole(req.user?.role)) {
     const tier = req.programTier;
     if (!tier) return base;
@@ -31,7 +37,14 @@ function callListWhere(req, base = {}) {
 }
 
 function callFindWhere(req, id) {
-  if (isDirectorReq(req)) return { _id: id };
+  const tier = req.programTier;
+  if (isDirectorReq(req)) {
+    if (!tier) return { _id: id };
+    return {
+      _id: id,
+      $or: [{ programTier: tier }, { eligibilityTier: "all" }],
+    };
+  }
   if (isCrossTierRole(req.user?.role)) {
     const tier = req.programTier;
     if (!tier) return { _id: id };

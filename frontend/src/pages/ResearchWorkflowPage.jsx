@@ -18,7 +18,7 @@ export function ResearchWorkflowPage() {
   const { programTier } = useProgramTier();
   const [searchParams, setSearchParams] = useSearchParams();
   const projectIdFromUrl = searchParams.get("projectId") || "";
-  const tab = searchParams.get("tab") || "ops";
+  const tab = TABS.some((t) => t.id === searchParams.get("tab")) ? searchParams.get("tab") : "ops";
   const canManage = ["faculty_coordinator", "research_director"].includes(user?.role);
   const departmentLabel =
     user?.role === "research_director"
@@ -45,7 +45,7 @@ export function ResearchWorkflowPage() {
   function setTab(next) {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set("tab", next);
-    setSearchParams(nextParams);
+    setSearchParams(nextParams, { replace: true });
   }
 
   return (
@@ -73,18 +73,14 @@ export function ResearchWorkflowPage() {
         }
       />
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 16 }}>
+      <div className="btnGroup" style={{ marginBottom: 16 }}>
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
-            className="btn"
+            className={`btn${tab === t.id ? " primary" : ""}`}
+            aria-pressed={tab === t.id}
             onClick={() => setTab(t.id)}
-            style={
-              tab === t.id
-                ? { background: "rgba(14,165,233,0.25)", borderColor: "rgba(14,165,233,0.7)" }
-                : undefined
-            }
           >
             {t.label}
           </button>
@@ -135,19 +131,24 @@ export function ResearchWorkflowPage() {
                       <div style={{ fontWeight: 800 }}>{stage.label}</div>
                       <div style={{ fontWeight: 800, color: "#38bdf8" }}>{stage.count}</div>
                     </div>
-                    <Link className="btn" to={stage.link} style={{ marginTop: 10, fontSize: 12, padding: "4px 10px" }}>
+                    <Link className="btn sm" to={stage.link} style={{ marginTop: 10 }}>
                       Open module
                     </Link>
-                    <ul style={{ margin: "12px 0 0", paddingLeft: 18 }}>
+                    <ul style={{ margin: "12px 0 0", paddingLeft: 0, listStyle: "none" }}>
                       {(stage.items || []).length === 0 ? (
                         <li className="muted" style={{ fontSize: 13 }}>
                           No open items
                         </li>
                       ) : (
                         stage.items.map((item) => (
-                          <li key={item.id} style={{ marginBottom: 6, fontSize: 13 }}>
-                            <Link to={item.link}>{item.title}</Link>
-                            <span className="muted"> · {item.status}</span>
+                          <li key={item.id} className="workflowItemRow">
+                            <div style={{ flex: 1, minWidth: 0, fontSize: 13 }}>
+                              <div style={{ fontWeight: 700 }}>{item.title}</div>
+                              <span className="muted">{item.status}</span>
+                            </div>
+                            <Link className="btn sm primary" to={item.link}>
+                              Open
+                            </Link>
                           </li>
                         ))
                       )}

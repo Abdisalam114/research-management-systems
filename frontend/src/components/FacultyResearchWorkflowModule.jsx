@@ -108,10 +108,14 @@ export function FacultyResearchWorkflowModule({
       {error ? <div style={{ color: "#f87171", marginTop: standalone ? 0 : 8 }}>{error}</div> : null}
 
       {projectIdFromUrl ? (
-        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          Filtered to project: <strong>{data?.projectFilter?.title || "selected"}</strong> —{" "}
-          <Link to="/research-workflow">show all</Link>
-        </p>
+        <div className="workflowItemActions" style={{ marginTop: 8 }}>
+          <span className="muted" style={{ fontSize: 13 }}>
+            Filtered to project: <strong>{data?.projectFilter?.title || "selected"}</strong>
+          </span>
+          <Link className="btn sm" to="/research-workflow">
+            Show all
+          </Link>
+        </div>
       ) : null}
 
       {showStageTiles ? (
@@ -123,10 +127,8 @@ export function FacultyResearchWorkflowModule({
               <button
                 key={stage.id}
                 type="button"
-                className="overviewTile"
+                className={`btn overviewTile${stageFilter === stage.id ? " is-active" : ""}`}
                 style={{
-                  textAlign: "left",
-                  cursor: "pointer",
                   borderColor: stageFilter === stage.id ? meta.accent : undefined,
                 }}
                 onClick={() => setStageFilter(stageFilter === stage.id ? null : stage.id)}
@@ -263,13 +265,7 @@ function WorkflowRow({ pub, canManage, busyId, onAdvance }) {
         <div className="muted" style={{ fontSize: 12 }}>
           {publicationTypeLabel(pub.type)} • {pub.year} • validation: {pub.status}
           {pub.projectId ? (
-            <>
-              {" "}
-              • Project:{" "}
-              <Link to={`/projects/${pub.projectId}`}>
-                {pub.projectTitle || "Open linked project"}
-              </Link>
-            </>
+            <> • Project: {pub.projectTitle || "Linked project"}</>
           ) : (
             <> • <span style={{ color: "#f87171" }}>No project linked</span></>
           )}
@@ -279,10 +275,31 @@ function WorkflowRow({ pub, canManage, busyId, onAdvance }) {
         </div>
       </div>
       {canManage && next ? (
-        <button type="button" className="btn primary" disabled={busyId === pub.id} onClick={() => onAdvance(pub)}>
-          {busyId === pub.id ? "…" : `→ ${workflowStageMeta(next).label}`}
-        </button>
-      ) : null}
+        <div className="workflowItemActions">
+          <Link className="btn sm" to={`/publications?projectId=${pub.projectId || ""}`}>
+            View output
+          </Link>
+          {pub.projectId ? (
+            <Link className="btn sm" to={`/projects/${pub.projectId}`}>
+              Open project
+            </Link>
+          ) : null}
+          <button type="button" className="btn sm primary" disabled={busyId === pub.id} onClick={() => onAdvance(pub)}>
+            {busyId === pub.id ? "…" : `→ ${workflowStageMeta(next).label}`}
+          </button>
+        </div>
+      ) : (
+        <div className="workflowItemActions">
+          <Link className="btn sm" to={`/publications?projectId=${pub.projectId || ""}`}>
+            View output
+          </Link>
+          {pub.projectId ? (
+            <Link className="btn sm" to={`/projects/${pub.projectId}`}>
+              Open project
+            </Link>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
