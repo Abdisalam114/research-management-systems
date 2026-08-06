@@ -71,6 +71,8 @@ export function getPageTitle(pathname) {
     "/notifications": "Notifications",
     "/profile": "Profile",
     "/faculty-dashboard": "Faculty Dashboard",
+    "/committee-assignments": "Committee Reviews",
+    "/review-assignments": "Peer Reviews",
   };
   if (exact[pathname]) return exact[pathname];
 

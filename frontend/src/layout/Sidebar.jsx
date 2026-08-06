@@ -12,6 +12,7 @@ const MENU = [
   { to: "/ethics", label: "Ethics", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher", "leadership"] },
   { to: "/review-assignments", label: "Peer Reviews", icon: "✍️", roles: ["research_director", "leadership"] },
+  { to: "/committee-assignments", label: "Committee Reviews", icon: "⚖️", roles: ["research_director", "faculty_coordinator"] },
   { to: "/finance/reviews", label: "Proposal finance review", icon: "🧮", roles: ["finance_officer"] },
   { to: "/finance/grant-approvals", label: "Grant funding approval", icon: "💵", roles: ["finance_officer"] },
   { to: "/finance/closures", label: "Project closure (Finance)", icon: "📁", roles: ["finance_officer"] },

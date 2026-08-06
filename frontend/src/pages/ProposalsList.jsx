@@ -23,6 +23,12 @@ export function ProposalsListPage() {
   const isFinance = user?.role === "finance_officer";
   const isLeadershipReviewer = user?.role === "leadership";
   const isDirector = user?.role === "research_director";
+  const isCoordinator = user?.role === "faculty_coordinator";
+
+  function assignedToMyCommittee(p) {
+    if (!isCoordinator || !user?.id) return false;
+    return (p.assignedCommittee || []).some((r) => String(r.userId) === String(user.id));
+  }
 
   const title = useMemo(() => {
     if (user?.role === "researcher") return "My Proposals";
@@ -235,9 +241,15 @@ export function ProposalsListPage() {
                         Details
                       </Link>
                       {isReviewer ? (
-                        <Link className="btn primary" to={`/proposals/${p.id}/review`}>
-                          Review
-                        </Link>
+                        assignedToMyCommittee(p) ? (
+                          <Link className="btn primary" to={`/proposals/${p.id}/review`}>
+                            Committee review
+                          </Link>
+                        ) : (
+                          <Link className="btn primary" to={`/proposals/${p.id}/review`}>
+                            Review
+                          </Link>
+                        )
                       ) : null}
                       {isFinance ? (
                         <Link className="btn primary" to={`/finance/reviews/${p.id}`}>

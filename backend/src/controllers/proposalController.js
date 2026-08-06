@@ -1002,7 +1002,7 @@ async function assignCommittee(req, res) {
         type: "proposal",
         title: "Committee review assignment",
         body: `You were assigned to committee-review: ${proposal.title}`,
-        link: `/proposals/${proposal._id}/review`,
+        link: `/committee-assignments`,
         programTier: req.programTier,
       });
     } catch {

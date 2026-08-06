@@ -33,6 +33,7 @@ import { ResearchWorkflowPage } from "./pages/ResearchWorkflowPage";
 import { FundingCallsPage } from "./pages/FundingCalls";
 import { PoliciesPage } from "./pages/Policies";
 import { ReviewAssignmentsPage } from "./pages/ReviewAssignments";
+import { CommitteeAssignmentsPage } from "./pages/CommitteeAssignments";
 import { ProgramTierSelectPage } from "./pages/ProgramTierSelect";
 import { AuditTrailPage } from "./pages/AuditTrailPage";
 import { FinanceReportsPage } from "./pages/FinanceReports";
@@ -164,6 +165,10 @@ export default function App() {
 
           <Route element={<ProtectedRoute roles={["research_director", "leadership"]} />}>
             <Route path="/review-assignments" element={<ReviewAssignmentsPage />} />
+          </Route>
+
+          <Route element={<ProtectedRoute roles={["research_director", "faculty_coordinator"]} />}>
+            <Route path="/committee-assignments" element={<CommitteeAssignmentsPage />} />
           </Route>
 
           <Route element={<ProtectedRoute roles={["leadership", "faculty_coordinator", "research_director"]} />}>

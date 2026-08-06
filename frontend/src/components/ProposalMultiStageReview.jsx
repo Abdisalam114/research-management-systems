@@ -579,7 +579,21 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
       ) : null}
 
       {canDecideCommittee ? (
-        <div style={{ marginBottom: 12 }}>
+        <div
+          style={{
+            marginBottom: 14,
+            padding: 12,
+            borderRadius: 8,
+            border: isCoordinator ? "1px solid rgba(251,191,36,0.45)" : "1px solid rgba(148,197,255,0.25)",
+            background: isCoordinator ? "rgba(251,191,36,0.08)" : undefined,
+          }}
+        >
+          {isCoordinator ? (
+            <div style={{ fontWeight: 800, marginBottom: 8, color: "#fbbf24" }}>
+              Your committee review — action required
+            </div>
+          ) : null}
+          <div style={{ marginBottom: 12 }}>
           <label>
             Committee score (1–5)
             <input
@@ -652,6 +666,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
             >
               Reject
             </button>
+          </div>
           </div>
         </div>
       ) : null}

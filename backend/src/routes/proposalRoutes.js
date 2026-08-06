@@ -4,6 +4,7 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
 const proposalController = require("../controllers/proposalController");
 const proposalReviewController = require("../controllers/proposalReviewController");
 const { authenticateUser, requireActiveUser, authorizeRoles } = require("../middleware/auth");
+const { requireObjectIdParam } = require("../middleware/validateParams");
 const { upload } = require("../middleware/upload");
 
 const router = express.Router();
@@ -17,12 +18,26 @@ router.get(
   asyncHandler(proposalReviewController.listMyReviewAssignments)
 );
 router.get(
+  "/my-committee-assignments",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("faculty_coordinator", "research_director"),
+  asyncHandler(proposalReviewController.listMyCommitteeAssignments)
+);
+router.get(
   "/:id/ethics-application",
   authenticateUser,
   requireActiveUser,
+  requireObjectIdParam("id"),
   asyncHandler(proposalController.getProposalEthicsApplication)
 );
-router.get("/:id", authenticateUser, requireActiveUser, asyncHandler(proposalController.getProposal));
+router.get(
+  "/:id",
+  authenticateUser,
+  requireActiveUser,
+  requireObjectIdParam("id"),
+  asyncHandler(proposalController.getProposal)
+);
 
 const proposalUpload = upload.fields([
   { name: "document", maxCount: 1 },

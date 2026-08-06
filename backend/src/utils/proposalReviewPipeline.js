@@ -159,6 +159,33 @@ function peerReviewLeadershipQueueFilter(userId, extra = {}) {
   };
 }
 
+const ACTIVE_COMMITTEE_REVIEW_STATUSES = Object.freeze([
+  STAGE_STATUS.PENDING,
+  STAGE_STATUS.IN_PROGRESS,
+]);
+
+/** Coordinator committee queue: assigned while peer review passed and committee stage open. */
+function committeeAssignedToUserFilter(userId, extra = {}) {
+  return {
+    "assignedCommittee.userId": userId,
+    status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+    "reviewPipeline.peerReview.status": STAGE_STATUS.PASSED,
+    "reviewPipeline.committeeReview.status": { $in: [...ACTIVE_COMMITTEE_REVIEW_STATUSES] },
+    ...extra,
+  };
+}
+
+/** Director view: proposals sent to committee (active pipeline). */
+function committeeSentToMembersFilter(extra = {}) {
+  return {
+    "assignedCommittee.0": { $exists: true },
+    status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+    "reviewPipeline.peerReview.status": STAGE_STATUS.PASSED,
+    "reviewPipeline.committeeReview.status": { $in: [...ACTIVE_COMMITTEE_REVIEW_STATUSES] },
+    ...extra,
+  };
+}
+
 module.exports = {
   STAGE_KEYS,
   STAGE_STATUS,
@@ -169,6 +196,9 @@ module.exports = {
   peerReviewAssignedToUserFilter,
   peerReviewDirectorQueueFilter,
   peerReviewLeadershipQueueFilter,
+  ACTIVE_COMMITTEE_REVIEW_STATUSES,
+  committeeAssignedToUserFilter,
+  committeeSentToMembersFilter,
   defaultReviewPipeline,
   ensureReviewPipeline,
   stagePassed,

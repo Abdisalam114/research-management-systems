@@ -15,6 +15,7 @@ export function CoordinatorDashboardPage() {
   const [metrics, setMetrics] = useState(null);
   const [facultyReport, setFacultyReport] = useState(null);
   const [queue, setQueue] = useState([]);
+  const [committeeQueue, setCommitteeQueue] = useState([]);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
 
@@ -33,6 +34,12 @@ export function CoordinatorDashboardPage() {
       } catch (e) {
         setError(e?.response?.data?.message || "Failed to load proposal queue");
         setQueue([]);
+      }
+      try {
+        const c = await proposalApi.listMyCommitteeAssignments(accessToken);
+        setCommitteeQueue(c.assignments || []);
+      } catch {
+        setCommitteeQueue([]);
       }
       try {
         const m = await analyticsApi.dashboardMetrics(accessToken);
@@ -111,6 +118,35 @@ export function CoordinatorDashboardPage() {
             ))}
           </div>
         )}
+        </div>
+      </section>
+
+      <section className="dashboardSection">
+        <div className="dashCard">
+          <div className="dashCardTitle">Committee review assignments</div>
+          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+            Proposals the Research Director assigned to you for committee review.
+          </p>
+          {committeeQueue.filter((a) => a.actionRequired).length === 0 ? (
+            <p className="muted">No pending committee reviews.</p>
+          ) : (
+            <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+              {committeeQueue
+                .filter((a) => a.actionRequired)
+                .map((a) => (
+                  <Link key={a.id} to={`/proposals/${a.id}/review`} className="card" style={{ textDecoration: "none" }}>
+                    <strong>{a.title}</strong>
+                    <div className="muted">
+                      {a.status} • {a.department || "—"}
+                      {a.researcherName ? ` • PI: ${a.researcherName}` : ""}
+                    </div>
+                  </Link>
+                ))}
+            </div>
+          )}
+          <Link className="btn" to="/committee-assignments" style={{ marginTop: 12, display: "inline-block" }}>
+            Open Committee Reviews
+          </Link>
         </div>
       </section>
 

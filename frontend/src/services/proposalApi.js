@@ -159,6 +159,13 @@ export async function listMyReviewAssignments(accessToken) {
   return data;
 }
 
+export async function listMyCommitteeAssignments(accessToken) {
+  const { data } = await api.get("/api/proposals/my-committee-assignments", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return data;
+}
+
 export async function adminScreening(accessToken, id, decision, comment) {
   const { data } = await api.post(
     `/api/proposals/${id}/admin-screening`,

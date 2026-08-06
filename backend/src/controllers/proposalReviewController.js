@@ -13,6 +13,8 @@ const {
   peerReviewAssignedToUserFilter,
   peerReviewDirectorQueueFilter,
   peerReviewLeadershipQueueFilter,
+  committeeAssignedToUserFilter,
+  committeeSentToMembersFilter,
 } = require("../utils/proposalReviewPipeline");
 
 function sanitizeProposalBrief(p) {
@@ -499,6 +501,62 @@ res.json({
   });
 }
 
+async function listMyCommitteeAssignments(req, res) {
+  const userId = req.user.id;
+  const isDirector = req.user.role === "research_director";
+
+  const filter = isDirector
+    ? req.tierWhere(committeeSentToMembersFilter())
+    : req.tierWhere(committeeAssignedToUserFilter(userId));
+
+  const proposals = await Proposal.find(filter)
+    .sort({ submittedAt: -1, updatedAt: -1 })
+    .populate("assignedCommittee.userId", "fullName email role department")
+    .populate("researcherId", "fullName email department")
+    .select(
+      "title status department submittedAt assignedCommittee reviewPipeline researcherId updatedAt"
+    );
+
+  const items = proposals.map((p) => {
+    const members = (p.assignedCommittee || []).map((r) => ({
+      id: reviewerUserId(r.userId),
+      fullName: r.userId?.fullName || null,
+      email: r.userId?.email || null,
+      assignedAt: r.assignedAt || null,
+    }));
+    const assignedToMe = members.some((m) => m.id === String(userId));
+    const committeeStage = p.reviewPipeline?.committeeReview?.status || "pending";
+    const actionRequired = !isDirector && assignedToMe && committeeStage !== STAGE_STATUS.PASSED;
+    return {
+      id: p._id,
+      title: p.title,
+      status: p.status,
+      department: p.department,
+      submittedAt: p.submittedAt,
+      updatedAt: p.updatedAt,
+      researcherName: p.researcherId?.fullName || null,
+      currentReviewStage: getCurrentReviewStage(p),
+      committeeStage,
+      assignedCommittee: members,
+      assignedToMe,
+      actionRequired,
+      scope: isDirector ? "sent_to_committee" : "my_committee",
+    };
+  });
+
+  const pendingCount = items.filter((i) => (isDirector ? i.committeeStage !== STAGE_STATUS.PASSED : i.actionRequired)).length;
+
+  res.json({
+    assignments: items,
+    mode: isDirector ? "director_sent" : "coordinator",
+    summary: {
+      total: items.length,
+      pending: pendingCount,
+      done: items.length - pendingCount,
+    },
+  });
+}
+
 module.exports = {
   adminScreening,
   submitPeerReview,
@@ -506,5 +564,6 @@ module.exports = {
   committeeReview,
   financeProposalReview,
   listMyReviewAssignments,
+  listMyCommitteeAssignments,
   sanitizeProposalBrief,
 };
