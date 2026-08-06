@@ -6,7 +6,7 @@ const { ROLES, USER_STATUSES } = require("../models/User");
 const { PROGRAM_TIERS } = require("../constants/programTier");
 
 const DIRECTOR_USER = {
-  fullName: "Dr. Catherine Morrison",
+  fullName: "Dr. Muse Hussein",
   email: process.env.SEED_DIRECTOR_EMAIL || "director@rms.edu",
   password: process.env.SEED_DIRECTOR_PASSWORD || "Director2024!",
   role: ROLES.RESEARCH_DIRECTOR,
@@ -20,7 +20,7 @@ const DIRECTOR_USER = {
 /** One of each — shared across Undergraduate and Postgraduate. */
 const SHARED_STAFF_USERS = [
   {
-    fullName: "Dr. Emma Richardson",
+    fullName: "Dr. Fardowsa Ahmed",
     email: "coordinator@rms.edu",
     password: process.env.SEED_COORDINATOR_PASSWORD || "Coordinator2024!",
     role: ROLES.FACULTY_COORDINATOR,
@@ -30,7 +30,7 @@ const SHARED_STAFF_USERS = [
     programTier: PROGRAM_TIERS.UNDERGRADUATE,
   },
   {
-    fullName: "Michael Brooks",
+    fullName: "Isse Abdi",
     email: "finance@rms.edu",
     password: process.env.SEED_FINANCE_PASSWORD || "Finance2024!",
     role: ROLES.FINANCE_OFFICER,
@@ -55,11 +55,11 @@ const SHARED_STAFF_USERS = [
 const PORTAL_USER_SPECS = {
   [PROGRAM_TIERS.UNDERGRADUATE]: [
     {
-      fullName: "Sarah Chen",
+      fullName: "aisha chen",
       email: "asha@rms.edu",
       password: process.env.SEED_RESEARCHER_PASSWORD || "Researcher2024!",
       role: ROLES.RESEARCHER,
-      department: "Computer Science",
+      department: "Computer Application",
       rank: "Lecturer",
       status: USER_STATUSES.ACTIVE,
     },

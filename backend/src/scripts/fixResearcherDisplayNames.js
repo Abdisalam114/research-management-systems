@@ -10,7 +10,7 @@ const { User } = require("../models/User");
 const { EthicsApplication } = require("../models/EthicsApplication");
 
 const NAME_FIXES = Object.freeze({
-  "asha@rms.edu": "Sarah Chen",
+  "asha@rms.edu": "aisha chen",
   "mahad@rms.edu": "Mahad Hassan",
 });
 
