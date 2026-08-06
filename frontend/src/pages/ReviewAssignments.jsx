@@ -178,6 +178,20 @@ export function ReviewAssignmentsPage() {
                           ) : null}
                         </div>
                       ) : null}
+                      {(a.peerReviews || []).length > 0 ? (
+                        <div style={{ marginTop: 8, fontSize: 13, display: "grid", gap: 6 }}>
+                          {(a.peerReviews || []).map((r, idx) => (
+                            <div key={`${r.reviewerId || idx}-${idx}`}>
+                              <strong>{r.reviewerName || r.reviewerEmail || "Reviewer"}</strong>
+                              {" · "}
+                              Score: <strong>{r.score}/5</strong>
+                              {r.comment?.trim() ? (
+                                <span className="muted"> — {r.comment.trim().slice(0, 120)}{r.comment.trim().length > 120 ? "…" : ""}</span>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                       <p
                         style={{
                           fontWeight: 600,

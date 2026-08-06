@@ -8,6 +8,8 @@ const router = express.Router();
 
 router.get("/me", authenticateUser, requireActiveUser, asyncHandler(notificationController.listMyNotifications));
 router.get("/me/unread-count", authenticateUser, requireActiveUser, asyncHandler(notificationController.unreadCount));
+router.post("/me/read-all", authenticateUser, requireActiveUser, asyncHandler(notificationController.markAllRead));
+router.post("/me/clear", authenticateUser, requireActiveUser, asyncHandler(notificationController.clearAll));
 router.post("/:id/read", authenticateUser, requireActiveUser, asyncHandler(notificationController.markRead));
 
 module.exports = { notificationRoutes: router };

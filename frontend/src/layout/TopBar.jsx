@@ -36,9 +36,14 @@ export function TopBar({ title = "Dashboard" }) {
 
     poll();
     const timer = setInterval(poll, SYSTEM_REFRESH_MS);
+    const onUpdated = () => {
+      poll();
+    };
+    window.addEventListener("rms-notifications-updated", onUpdated);
     return () => {
       cancelled = true;
       clearInterval(timer);
+      window.removeEventListener("rms-notifications-updated", onUpdated);
     };
   }, [accessToken, user?.id, programTier]);
 

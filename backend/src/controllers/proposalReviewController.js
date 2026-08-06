@@ -11,6 +11,8 @@ const {
   ACTIVE_PEER_REVIEW_STATUSES,
   peerReviewSentToReviewersFilter,
   peerReviewAssignedToUserFilter,
+  peerReviewDirectorQueueFilter,
+  peerReviewLeadershipQueueFilter,
 } = require("../utils/proposalReviewPipeline");
 
 function sanitizeProposalBrief(p) {
@@ -419,14 +421,14 @@ async function listMyReviewAssignments(req, res) {
     /* best-effort */
   }
 
-  // Leadership + Director share the same active peer-review queue filter helpers.
   const filter = isDirector
-    ? req.tierWhere(peerReviewSentToReviewersFilter())
-    : req.tierWhere(peerReviewAssignedToUserFilter(userId));
+    ? req.tierWhere(peerReviewDirectorQueueFilter())
+    : req.tierWhere(peerReviewLeadershipQueueFilter(userId));
 
   const proposals = await Proposal.find(filter)
     .sort({ submittedAt: -1, updatedAt: -1 })
     .populate("assignedReviewers.userId", "fullName email role")
+    .populate("peerReviews.userId", "fullName email role")
     .populate("researcherId", "fullName email")
     .select(
       "title status department submittedAt assignedReviewers peerReviews reviewPipeline researcherId updatedAt"
@@ -445,10 +447,23 @@ async function listMyReviewAssignments(req, res) {
         (pr) => reviewerUserId(pr.userId) === reviewerUserId(r.userId)
       ),
     }));
+    const peerReviews = (p.peerReviews || []).map((r) => ({
+      reviewerId: reviewerUserId(r.userId),
+      reviewerName: r.userId?.fullName || null,
+      reviewerEmail: r.userId?.email || null,
+      score: r.score,
+      comment: r.comment || "",
+      at: r.at || null,
+    }));
     const pendingReviewers = reviewers.filter((r) => !r.peerReviewSubmitted).length;
     const peerStage = p.reviewPipeline?.peerReview?.status || "pending";
-    // Director "awaiting" = at least one assigned Leadership reviewer has not submitted yet
-    const awaitingLeadership = pendingReviewers > 0;
+    const peerReviewCount = peerReviews.length;
+    const awaitingLeadership =
+      reviewers.length > 0
+        ? pendingReviewers > 0
+        : peerReviewCount === 0 ||
+          peerStage === STAGE_STATUS.PENDING ||
+          peerStage === STAGE_STATUS.IN_PROGRESS;
     return {
       id: p._id,
       title: p.title,
@@ -459,10 +474,11 @@ async function listMyReviewAssignments(req, res) {
       researcherName: p.researcherId?.fullName || null,
       currentReviewStage: getCurrentReviewStage(p),
       peerReviewSubmitted: reviewed,
-      peerReviewCount: (p.peerReviews || []).length,
+      peerReviewCount,
+      peerReviews,
       peerStage,
       assignedReviewers: reviewers,
-      sentToReviewers: reviewers.length > 0,
+      sentToReviewers: reviewers.length > 0 || peerReviewCount > 0,
       pendingReviewers,
       awaitingLeadership,
       scope: isDirector ? "sent_to_reviewers" : "my_assignments",

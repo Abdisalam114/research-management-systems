@@ -20,3 +20,22 @@ export async function getUnreadCount(accessToken) {
   });
   return res.data;
 }
+
+export async function markAllNotificationsRead(accessToken) {
+  const res = await api.post("/api/notifications/me/read-all", null, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
+
+export async function clearAllNotifications(accessToken) {
+  const res = await api.post("/api/notifications/me/clear", null, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data;
+}
+
+/** Notify TopBar and other listeners to refresh unread badge immediately. */
+export function notifyNotificationsUpdated() {
+  window.dispatchEvent(new CustomEvent("rms-notifications-updated"));
+}

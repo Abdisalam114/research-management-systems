@@ -34,6 +34,7 @@ export function NotificationsPage() {
   const [notifications, setNotifications] = useState([]);
   const [downloadBusy, setDownloadBusy] = useState("");
   const [detailNote, setDetailNote] = useState(null);
+  const [actionBusy, setActionBusy] = useState("");
 
   const load = useCallback(async () => {
     const res = await notificationApi.listMyNotifications(accessToken);
@@ -155,11 +156,70 @@ export function NotificationsPage() {
         hasDetailBody(n)
     );
 
+  const unreadCount = notifications.filter((n) => !n.readAt).length;
+
+  async function handleMarkAllRead() {
+    if (unreadCount === 0) return;
+    setActionBusy("read-all");
+    setError("");
+    try {
+      await notificationApi.markAllNotificationsRead(accessToken);
+      notificationApi.notifyNotificationsUpdated();
+      await reload();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Could not mark all as read");
+    } finally {
+      setActionBusy("");
+    }
+  }
+
+  async function handleClearAll() {
+    if (notifications.length === 0) return;
+    const ok = window.confirm(
+      "Clear all notifications for this portal?\n\nThis removes them from your list. It cannot be undone."
+    );
+    if (!ok) return;
+    setActionBusy("clear");
+    setError("");
+    try {
+      await notificationApi.clearAllNotifications(accessToken);
+      setDetailNote(null);
+      notificationApi.notifyNotificationsUpdated();
+      await reload();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Could not clear notifications");
+    } finally {
+      setActionBusy("");
+    }
+  }
+
   return (
     <div className="dashboardPage">
       <header className="dashPageHeader">
-        <h1 className="dashPageTitle">Notifications</h1>
-        <p className="dashPageSub">Your personal notifications — messages, grants, ethics, and more.</p>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+          <div>
+            <h1 className="dashPageTitle">Notifications</h1>
+            <p className="dashPageSub">Your personal notifications — messages, grants, ethics, and more.</p>
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="btn"
+              disabled={loading || actionBusy || unreadCount === 0}
+              onClick={handleMarkAllRead}
+            >
+              {actionBusy === "read-all" ? "Working…" : `Mark all read${unreadCount ? ` (${unreadCount})` : ""}`}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={loading || actionBusy || notifications.length === 0}
+              onClick={handleClearAll}
+            >
+              {actionBusy === "clear" ? "Clearing…" : "Clear all"}
+            </button>
+          </div>
+        </div>
       </header>
 
       {loading ? <p className="muted">Loading notifications…</p> : null}
@@ -235,6 +295,7 @@ export function NotificationsPage() {
                     className="btn"
                     onClick={async () => {
                       await notificationApi.markNotificationRead(accessToken, n.id);
+                      notificationApi.notifyNotificationsUpdated();
                       await reload();
                     }}
                   >

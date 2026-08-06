@@ -135,6 +135,30 @@ function peerReviewAssignedToUserFilter(userId, extra = {}) {
   };
 }
 
+/** Director queue: sent to reviewers OR already has submitted peer reviews (assignees may be cleared after completion). */
+function peerReviewDirectorQueueFilter(extra = {}) {
+  return {
+    status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+    $or: [
+      { "assignedReviewers.0": { $exists: true } },
+      { "peerReviews.0": { $exists: true } },
+    ],
+    ...extra,
+  };
+}
+
+/** Leadership queue: currently assigned OR previously submitted a review on an active proposal. */
+function peerReviewLeadershipQueueFilter(userId, extra = {}) {
+  return {
+    status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+    $or: [
+      { "assignedReviewers.userId": userId },
+      { "peerReviews.userId": userId },
+    ],
+    ...extra,
+  };
+}
+
 module.exports = {
   STAGE_KEYS,
   STAGE_STATUS,
@@ -143,6 +167,8 @@ module.exports = {
   clearPeerAssigneesIfInactive,
   peerReviewSentToReviewersFilter,
   peerReviewAssignedToUserFilter,
+  peerReviewDirectorQueueFilter,
+  peerReviewLeadershipQueueFilter,
   defaultReviewPipeline,
   ensureReviewPipeline,
   stagePassed,

@@ -45,4 +45,21 @@ async function unreadCount(req, res) {
   res.json({ unread: count });
 }
 
-module.exports = { listMyNotifications, markRead, unreadCount };
+async function markAllRead(req, res) {
+  const filter = { ...notificationFilter(req), readAt: null };
+  const result = await Notification.updateMany(filter, { $set: { readAt: new Date() } });
+  res.json({
+    message: "All notifications marked as read",
+    updated: result.modifiedCount ?? result.nModified ?? 0,
+  });
+}
+
+async function clearAll(req, res) {
+  const result = await Notification.deleteMany(notificationFilter(req));
+  res.json({
+    message: "Notifications cleared",
+    deleted: result.deletedCount ?? 0,
+  });
+}
+
+module.exports = { listMyNotifications, markRead, unreadCount, markAllRead, clearAll };

@@ -42,7 +42,7 @@ function reviewerRefId(ref) {
 }
 const { AppError } = require("../utils/AppError");
 const { userDisplayName } = require("../utils/userDisplay");
-const { ACTIVE_PEER_REVIEW_STATUSES, peerReviewSentToReviewersFilter, peerReviewAssignedToUserFilter } = require("../utils/proposalReviewPipeline");
+const { ACTIVE_PEER_REVIEW_STATUSES, peerReviewDirectorQueueFilter, peerReviewLeadershipQueueFilter, STAGE_STATUS } = require("../utils/proposalReviewPipeline");
 const PDFDocument = require("pdfkit");
 
 function countByField(docs, field) {
@@ -186,8 +186,8 @@ async function getDashboardMetrics(req, res) {
   if (role === "leadership" || role === "research_director") {
     if (role === "leadership") {
       const assigned = await Proposal.find(
-        tw(peerReviewAssignedToUserFilter(userId))
-      ).select("peerReviews assignedReviewers");
+        tw(peerReviewLeadershipQueueFilter(userId))
+      ).select("peerReviews assignedReviewers reviewPipeline");
       reviewAssignments = assigned.length;
       reviewAssignmentsPending = assigned.filter(
         (p) => !(p.peerReviews || []).some((r) => reviewerRefId(r.userId) === String(userId))
@@ -195,7 +195,7 @@ async function getDashboardMetrics(req, res) {
     } else {
       // Director Peer Reviews tile = active queue (same filter as Peer Reviews page)
       const sentActive = await Proposal.find(
-        tw(peerReviewSentToReviewersFilter())
+        tw(peerReviewDirectorQueueFilter())
       ).select("assignedReviewers peerReviews reviewPipeline");
       proposalsSentToReviewers = sentActive.length;
       reviewAssignments = sentActive.length;
@@ -208,7 +208,15 @@ async function getDashboardMetrics(req, res) {
             )
         );
         const peerStage = p.reviewPipeline?.peerReview?.status || "pending";
-        return pending || ["pending", "in_progress"].includes(peerStage);
+        if (reviewers.length === 0) {
+          const count = (p.peerReviews || []).length;
+          return (
+            count === 0 ||
+            peerStage === STAGE_STATUS.PENDING ||
+            peerStage === STAGE_STATUS.IN_PROGRESS
+          );
+        }
+        return pending || peerStage === STAGE_STATUS.PENDING || peerStage === STAGE_STATUS.IN_PROGRESS;
       }).length;
     }
   }
