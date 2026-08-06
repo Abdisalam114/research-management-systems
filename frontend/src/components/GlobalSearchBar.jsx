@@ -1,52 +1,94 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useProgramTier } from "../hooks/useProgramTier";
 import * as searchApi from "../services/searchApi";
+
+const GROUP_LABELS = {
+  proposals: "Proposal",
+  projects: "Project",
+  grants: "Grant",
+  publications: "Publication",
+  fundingCalls: "Funding call",
+  ethics: "Ethics",
+  thesisGroups: "Thesis",
+  researchGroups: "Group",
+  repository: "Repository",
+  budgets: "Budget",
+  payments: "Payment",
+  policies: "Policy",
+  users: "User",
+  departments: "Department",
+  notifications: "Notification",
+};
 
 export function GlobalSearchBar() {
   const { accessToken } = useAuth();
+  const { programTier } = useProgramTier();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState(null);
+  const [total, setTotal] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const trimmed = q.trim();
 
   useEffect(() => {
-    if (q.trim().length < 2) {
+    setResults(null);
+    setTotal(0);
+    setError("");
+    setOpen(false);
+  }, [programTier]);
+
+  useEffect(() => {
+    if (trimmed.length < 2) {
       setResults(null);
+      setTotal(0);
+      setError("");
       return undefined;
     }
     const timer = setTimeout(async () => {
       setBusy(true);
+      setError("");
       try {
-        const res = await searchApi.globalSearch(accessToken, q.trim());
+        const res = await searchApi.globalSearch(accessToken, trimmed);
         setResults(res.results || {});
+        setTotal(Number(res.total) || 0);
         setOpen(true);
-      } catch {
+      } catch (err) {
         setResults(null);
+        setTotal(0);
+        setError(err?.response?.data?.message || "Search failed");
+        setOpen(true);
       } finally {
         setBusy(false);
       }
     }, 350);
     return () => clearTimeout(timer);
-  }, [q, accessToken]);
+  }, [trimmed, accessToken, programTier]);
 
-  const flat = results
-    ? Object.entries(results).flatMap(([group, items]) =>
-        (items || []).map((item) => ({ ...item, group }))
-      )
-    : [];
+  const flat = useMemo(() => {
+    if (!results) return [];
+    return Object.entries(results).flatMap(([group, items]) =>
+      (items || []).map((item) => ({ ...item, group, groupLabel: GROUP_LABELS[group] || group }))
+    );
+  }, [results]);
+
+  const preview = flat.slice(0, 12);
 
   return (
     <div className="globalSearchWrap" style={{ position: "relative", marginRight: 8 }}>
       <input
         type="search"
-        placeholder="Search system…"
+        placeholder="Search whole system…"
         value={q}
         onChange={(e) => setQ(e.target.value)}
-        onFocus={() => q.length >= 2 && setOpen(true)}
+        onFocus={() => trimmed.length >= 2 && setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 200)}
+        aria-label="Global search"
         style={{
-          minWidth: 180,
+          minWidth: 200,
           padding: "6px 10px",
           borderRadius: 8,
           border: "1px solid rgba(148,163,184,0.35)",
@@ -55,15 +97,15 @@ export function GlobalSearchBar() {
           fontSize: 13,
         }}
       />
-      {open && flat.length > 0 ? (
+      {open && trimmed.length >= 2 && !busy ? (
         <div
           style={{
             position: "absolute",
             top: "100%",
             right: 0,
             marginTop: 4,
-            minWidth: 280,
-            maxHeight: 320,
+            minWidth: 320,
+            maxHeight: 360,
             overflow: "auto",
             background: "#0f172a",
             border: "1px solid rgba(56,189,248,0.25)",
@@ -72,16 +114,47 @@ export function GlobalSearchBar() {
             boxShadow: "0 8px 24px rgba(0,0,0,0.35)",
           }}
         >
-          {flat.slice(0, 12).map((item) => (
+          {error ? (
+            <div style={{ padding: "10px 12px", fontSize: 13, color: "#fca5a5" }}>{error}</div>
+          ) : null}
+          {!error && preview.length === 0 ? (
+            <div style={{ padding: "10px 12px", fontSize: 13 }} className="muted">
+              No results for &ldquo;{trimmed}&rdquo;
+            </div>
+          ) : null}
+          {preview.map((item) => (
             <Link
               key={`${item.group}-${item.id}`}
               to={item.link}
-              style={{ display: "block", padding: "10px 12px", borderBottom: "1px solid rgba(148,163,184,0.15)", fontSize: 13 }}
+              style={{
+                display: "block",
+                padding: "10px 12px",
+                borderBottom: "1px solid rgba(148,163,184,0.15)",
+                fontSize: 13,
+              }}
             >
               <strong>{item.title}</strong>
-              <div className="muted" style={{ fontSize: 11 }}>{item.type} · {item.status || item.group}</div>
+              <div className="muted" style={{ fontSize: 11 }}>
+                {item.groupLabel} · {item.status || item.type}
+              </div>
             </Link>
           ))}
+          {!error && total > preview.length ? (
+            <Link
+              to={`/search?q=${encodeURIComponent(trimmed)}`}
+              style={{ display: "block", padding: "10px 12px", fontSize: 12, fontWeight: 700 }}
+            >
+              View all {total} results
+            </Link>
+          ) : null}
+          {!error && preview.length > 0 && total <= preview.length ? (
+            <Link
+              to={`/search?q=${encodeURIComponent(trimmed)}`}
+              style={{ display: "block", padding: "10px 12px", fontSize: 12, fontWeight: 700 }}
+            >
+              Open full search
+            </Link>
+          ) : null}
         </div>
       ) : null}
       {busy ? <span style={{ fontSize: 10, marginLeft: 4 }}>…</span> : null}
