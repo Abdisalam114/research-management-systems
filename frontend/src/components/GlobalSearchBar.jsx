@@ -16,10 +16,13 @@ const GROUP_LABELS = {
   repository: "Repository",
   budgets: "Budget",
   payments: "Payment",
+  purchaseOrders: "Purchase order",
   policies: "Policy",
+  conversations: "Message",
   users: "User",
   departments: "Department",
   notifications: "Notification",
+  auditEvents: "Audit",
 };
 
 export function GlobalSearchBar() {
@@ -70,9 +73,17 @@ export function GlobalSearchBar() {
 
   const flat = useMemo(() => {
     if (!results) return [];
-    return Object.entries(results).flatMap(([group, items]) =>
-      (items || []).map((item) => ({ ...item, group, groupLabel: GROUP_LABELS[group] || group }))
-    );
+    if (Array.isArray(results.all) && results.all.length) {
+      return results.all.map((item) => ({
+        ...item,
+        group: item.section,
+        groupLabel: GROUP_LABELS[item.section] || item.section,
+      }));
+    }
+    return Object.entries(results).flatMap(([group, items]) => {
+      if (group === "all" || !Array.isArray(items)) return [];
+      return items.map((item) => ({ ...item, group, groupLabel: GROUP_LABELS[group] || group }));
+    });
   }, [results]);
 
   const preview = flat.slice(0, 12);
@@ -134,6 +145,11 @@ export function GlobalSearchBar() {
               }}
             >
               <strong>{item.title}</strong>
+              {item.subtitle ? (
+                <div className="muted" style={{ fontSize: 11 }}>
+                  {item.subtitle}
+                </div>
+              ) : null}
               <div className="muted" style={{ fontSize: 11 }}>
                 {item.groupLabel} · {item.status || item.type}
               </div>

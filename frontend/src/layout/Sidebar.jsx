@@ -24,7 +24,7 @@ const MENU = [
   { to: "/system-reports", label: "System Reports", icon: "📑", roles: ["research_director", "faculty_coordinator", "finance_officer", "leadership"] },
   { to: "/finance-reports", label: "Finance Reports", icon: "📊", roles: ["research_director", "finance_officer"] },
   { to: "/kpi-dashboard", label: "KPI Dashboard", icon: "📈", roles: ["research_director", "faculty_coordinator", "leadership"] },
-  { to: "/search", label: "Search", icon: "🔍", roles: ["research_director", "faculty_coordinator", "researcher", "leadership"] },
+  { to: "/search", label: "Search", icon: "🔍", roles: ["research_director", "faculty_coordinator", "researcher", "leadership", "finance_officer"] },
   { to: "/donor-reports", label: "Donor Reports", icon: "🌍", roles: ["research_director", "finance_officer"] },
   { to: "/audit-trail", label: "Audit Trail", icon: "📝", roles: ["research_director", "faculty_coordinator"] },
   { to: "/repository", label: "Repository", icon: "🗄️", roles: ["research_director", "faculty_coordinator", "researcher"] },

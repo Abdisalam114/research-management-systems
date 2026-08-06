@@ -13,11 +13,35 @@ const { InstitutionalPolicy } = require("../models/InstitutionalPolicy");
 const { User, ROLES } = require("../models/User");
 const { Department } = require("../models/Department");
 const { Notification } = require("../models/Notification");
+const { PurchaseOrder } = require("../models/PurchaseOrder");
+const { Conversation } = require("../models/Conversation");
+const { AuditEvent } = require("../models/AuditEvent");
 const { coordinatorMatchesResearcherDept } = require("../utils/facultyMatcher");
 const { peerReviewLeadershipQueueFilter } = require("../utils/proposalReviewPipeline");
 const { buildRepositoryAccessFilter, isSeedRepositoryItem } = require("./repositoryExportService");
 
 const LIMIT = 8;
+
+const THESIS_TEXT_FIELDS = [
+  "title",
+  "titleProposal",
+  "department",
+  "faculty",
+  "facultyResearchArea",
+  "meetingSchedule",
+  "titleProposal.title",
+  "titleProposal.reviewNote",
+  "students.fullName",
+  "students.email",
+  "students.studentId",
+  "chapters.title",
+  "chapters.notes",
+  "chapters.key",
+  "meetings.agenda",
+  "meetings.notes",
+  "meetings.location",
+  "finalDocument.originalName",
+];
 
 const ACTIVE_COORDINATOR_PROPOSAL_STATUSES = [
   PROPOSAL_STATUSES.SUBMITTED,
@@ -51,10 +75,23 @@ function ethicsTitle(app) {
 }
 
 function thesisTitle(group) {
-  const t = String(group.titleProposal?.title || group.title || "").trim();
+  const tp = group.titleProposal;
+  const proposed =
+    typeof tp === "string"
+      ? tp.trim()
+      : String(tp?.title || "").trim();
+  const legacy = String(group.title || "").trim();
+  const t = proposed || legacy;
   if (t) return t;
   const student = (group.students || [])[0]?.fullName;
   return student ? `Thesis — ${student}` : "Thesis group";
+}
+
+function thesisSubtitle(group) {
+  const students = (group.students || []).map((s) => s.fullName).filter(Boolean);
+  if (students.length) return students.join(", ");
+  if (group.department) return group.department;
+  return "";
 }
 
 async function buildResearcherFundingCallFilter(req, titleRx) {
@@ -174,6 +211,71 @@ async function searchPayments(req, titleRx, tw) {
   }));
 }
 
+async function searchPurchaseOrders(req, titleRx, tw) {
+  const { role, id: userId } = req.user;
+  if (![ROLES.RESEARCHER, ROLES.RESEARCH_DIRECTOR, ROLES.FINANCE_OFFICER, ROLES.PROCUREMENT_OFFICER].includes(role)) {
+    return [];
+  }
+
+  const filter = {
+    ...textMatch(["poNumber", "vendorName", "vendorContact", "notes", "items.description"], titleRx),
+  };
+  if (role === ROLES.RESEARCHER) filter.requestedBy = userId;
+
+  const pos = await PurchaseOrder.find(tw(filter)).sort({ updatedAt: -1 }).limit(LIMIT);
+  return pos.map((po) => ({
+    id: idStr(po),
+    title: po.poNumber ? `${po.poNumber} — ${po.vendorName}` : po.vendorName,
+    status: po.status,
+    type: "purchase_order",
+    link: po.projectId ? `/budgets?projectId=${idStr(po.projectId)}` : "/budgets",
+  }));
+}
+
+async function searchConversations(req, titleRx, tw) {
+  const { id: userId } = req.user;
+  const filter = tw({
+    participants: userId,
+    $or: [{ title: titleRx }, { "messages.body": titleRx }],
+  });
+
+  const conversations = await Conversation.find(filter).sort({ lastMessageAt: -1 }).limit(LIMIT);
+  return conversations.map((c) => {
+    const lastMsg = (c.messages || []).slice(-1)[0];
+    const preview = lastMsg?.body ? String(lastMsg.body).slice(0, 80) : "";
+    return {
+      id: idStr(c),
+      title: String(c.title || "").trim() || preview || "Conversation",
+      subtitle: preview && c.title ? preview : "",
+      status: "message",
+      type: "conversation",
+      link: `/messages?conversationId=${idStr(c)}`,
+    };
+  });
+}
+
+async function searchAuditEvents(req, titleRx, tw) {
+  const { role } = req.user;
+  if (![ROLES.RESEARCH_DIRECTOR, ROLES.FACULTY_COORDINATOR].includes(role)) {
+    return [];
+  }
+
+  const events = await AuditEvent.find(
+    tw(textMatch(["label", "detail", "action", "entityType"], titleRx))
+  )
+    .sort({ createdAt: -1 })
+    .limit(LIMIT);
+
+  return events.map((ev) => ({
+    id: idStr(ev),
+    title: ev.label,
+    subtitle: ev.detail || ev.entityType,
+    status: ev.action,
+    type: "audit",
+    link: "/audit-trail",
+  }));
+}
+
 async function runGlobalSearch(req) {
   const q = String(req.query?.q || "").trim();
   const { role, id: userId, department } = req.user;
@@ -195,9 +297,7 @@ async function runGlobalSearch(req) {
   let pubFilter = tw({ ...textMatch(["title", "venue", "doi", "communityImpact", "authors"], titleRx) });
   let callFilter = tw({ ...textMatch(["title", "description", "fundingSource", "donorRef"], titleRx) });
   let ethicsFilter = tw({ ...textMatch(["projectTitle", "principal.firstName", "principal.lastName", "principal.department", "principal.email", "aimsObjectives", "design", "backgroundLiterature"], titleRx) });
-  let thesisFilter = tw({
-    ...textMatch(["title", "department", "faculty", "facultyResearchArea", "titleProposal.title", "students.fullName", "students.email", "students.studentId"], titleRx),
-  });
+  let thesisFilter = tw({ ...textMatch(THESIS_TEXT_FIELDS, titleRx) });
   let groupFilter = tw({ ...textMatch(["name", "description"], titleRx) });
 
   if (role === ROLES.RESEARCHER) {
@@ -227,6 +327,7 @@ async function runGlobalSearch(req) {
   } else if (role === ROLES.FACULTY_COORDINATOR) {
     proposalFilter.status = { $in: ACTIVE_COORDINATOR_PROPOSAL_STATUSES };
     pubFilter.projectId = { $ne: null, $exists: true };
+    // Match thesis list page — coordinators see all groups in this portal (not only their department)
   } else {
     pubFilter.projectId = { $ne: null, $exists: true };
   }
@@ -257,6 +358,9 @@ async function runGlobalSearch(req) {
     users,
     departments,
     notifications,
+    purchaseOrders,
+    conversations,
+    auditEvents,
   ] = await Promise.all([
     Proposal.find(proposalFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title status updatedAt"),
     includeProjects
@@ -277,7 +381,10 @@ async function runGlobalSearch(req) {
       ? EthicsApplication.find(ethicsFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("projectTitle status principal proposalId")
       : Promise.resolve([]),
     includeThesis
-      ? ThesisGroup.find(thesisFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title titleProposal students status department")
+      ? ThesisGroup.find(thesisFilter)
+          .sort({ updatedAt: -1 })
+          .limit(LIMIT)
+          .select("title titleProposal students status department faculty supervisorId")
       : Promise.resolve([]),
     includeResearchGroups
       ? ResearchGroup.find(groupFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("name description kind")
@@ -299,6 +406,9 @@ async function runGlobalSearch(req) {
           .select("name code faculty")
       : Promise.resolve([]),
     Notification.find(req.tierWhere(notificationFilter)).sort({ createdAt: -1 }).limit(LIMIT).select("title body link type"),
+    searchPurchaseOrders(req, titleRx, tw),
+    searchConversations(req, titleRx, tw),
+    searchAuditEvents(req, titleRx, tw),
   ]);
 
   let visiblePublications = publications;
@@ -319,10 +429,7 @@ async function runGlobalSearch(req) {
   }
 
   let visibleThesis = thesisGroups;
-  if (role === ROLES.FACULTY_COORDINATOR && department) {
-    const dept = String(department).trim();
-    visibleThesis = thesisGroups.filter((g) => coordinatorMatchesResearcherDept(dept, g.department));
-  }
+  // Coordinators: same visibility as Thesis page (all groups in portal tier)
 
   const results = {
     proposals: proposals.map((p) => ({
@@ -374,7 +481,10 @@ async function runGlobalSearch(req) {
     thesisGroups: visibleThesis.map((g) => ({
       id: idStr(g),
       title: thesisTitle(g),
-      status: g.status,
+      subtitle: thesisSubtitle(g),
+      status: g.titleProposal?.status && g.titleProposal.status !== "none"
+        ? `${g.status} · title ${g.titleProposal.status}`
+        : g.status,
       type: "thesis",
       link: `/thesis?groupId=${idStr(g)}`,
     })),
@@ -383,7 +493,7 @@ async function runGlobalSearch(req) {
       title: g.name,
       status: g.kind || "group",
       type: "research_group",
-      link: "/groups",
+      link: `/groups#group-${idStr(g)}`,
     })),
     repository,
     budgets,
@@ -416,7 +526,35 @@ async function runGlobalSearch(req) {
       type: "notification",
       link: n.link && n.link.startsWith("/") ? n.link : "/notifications",
     })),
+    purchaseOrders,
+    conversations,
+    auditEvents,
   };
+
+  const sectionOrder = [
+    "proposals",
+    "projects",
+    "thesisGroups",
+    "ethics",
+    "publications",
+    "grants",
+    "fundingCalls",
+    "researchGroups",
+    "repository",
+    "budgets",
+    "payments",
+    "purchaseOrders",
+    "policies",
+    "conversations",
+    "notifications",
+    "users",
+    "departments",
+    "auditEvents",
+  ];
+
+  results.all = sectionOrder.flatMap((key) =>
+    (results[key] || []).map((item) => ({ ...item, section: key }))
+  );
 
   const total = Object.values(results).reduce((n, arr) => n + arr.length, 0);
   return { query: q, total, results };

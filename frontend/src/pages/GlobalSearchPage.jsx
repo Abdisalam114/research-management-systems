@@ -5,42 +5,51 @@ import { useProgramTier } from "../hooks/useProgramTier";
 import * as searchApi from "../services/searchApi";
 import { PageHeader } from "../components/PageHeader";
 
-const SECTIONS = [
-  { key: "proposals", label: "Proposals" },
-  { key: "projects", label: "Projects" },
-  { key: "grants", label: "Grants" },
-  { key: "publications", label: "Publications & outputs" },
-  { key: "fundingCalls", label: "Funding calls" },
-  { key: "ethics", label: "Ethics (JUREC)" },
-  { key: "thesisGroups", label: "Thesis groups" },
-  { key: "researchGroups", label: "Research groups" },
-  { key: "repository", label: "Repository" },
-  { key: "budgets", label: "Budgets" },
-  { key: "payments", label: "Payments" },
-  { key: "policies", label: "Policies" },
-  { key: "users", label: "Users" },
-  { key: "departments", label: "Departments" },
-  { key: "notifications", label: "Notifications" },
-];
+const SECTION_META = {
+  proposals: { label: "Proposals", accent: "#38bdf8" },
+  projects: { label: "Projects", accent: "#34d399" },
+  thesisGroups: { label: "Thesis", accent: "#a78bfa" },
+  ethics: { label: "Ethics (JUREC)", accent: "#2dd4bf" },
+  publications: { label: "Publications & outputs", accent: "#fbbf24" },
+  grants: { label: "Grants", accent: "#eab308" },
+  fundingCalls: { label: "Funding calls", accent: "#fb923c" },
+  researchGroups: { label: "Research groups", accent: "#94a3b8" },
+  repository: { label: "Repository", accent: "#64748b" },
+  budgets: { label: "Budgets", accent: "#22c55e" },
+  payments: { label: "Payments", accent: "#16a34a" },
+  purchaseOrders: { label: "Purchase orders", accent: "#0ea5e9" },
+  policies: { label: "Policies", accent: "#cbd5e1" },
+  conversations: { label: "Messages", accent: "#818cf8" },
+  notifications: { label: "Notifications", accent: "#f472b6" },
+  users: { label: "Users", accent: "#e2e8f0" },
+  departments: { label: "Departments", accent: "#94a3b8" },
+  auditEvents: { label: "Audit trail", accent: "#78716c" },
+};
+
+const SECTION_ORDER = Object.keys(SECTION_META);
 
 function sectionsForRole(role) {
   if (role === "leadership") {
-    return SECTIONS.filter((s) =>
-      ["proposals", "grants", "fundingCalls", "policies", "notifications"].includes(s.key)
+    return SECTION_ORDER.filter((k) =>
+      ["proposals", "grants", "fundingCalls", "policies", "notifications", "conversations"].includes(k)
     );
   }
   if (role === "researcher") {
-    return SECTIONS.filter((s) => !["users", "departments"].includes(s.key));
+    return SECTION_ORDER.filter((k) => !["users", "departments", "auditEvents"].includes(k));
   }
   if (role === "faculty_coordinator") {
-    return SECTIONS.filter((s) => !["users", "departments", "budgets", "payments"].includes(s.key));
+    return SECTION_ORDER.filter((k) => !["users", "departments", "budgets", "payments", "purchaseOrders"].includes(k));
   }
   if (role === "finance_officer") {
-    return SECTIONS.filter((s) =>
-      ["grants", "fundingCalls", "budgets", "payments", "policies", "notifications"].includes(s.key)
+    return SECTION_ORDER.filter((k) =>
+      ["grants", "fundingCalls", "budgets", "payments", "purchaseOrders", "policies", "notifications", "conversations"].includes(k)
     );
   }
-  return SECTIONS;
+  return SECTION_ORDER;
+}
+
+function typeBadge(sectionKey) {
+  return SECTION_META[sectionKey]?.label || sectionKey;
 }
 
 export function GlobalSearchPage() {
@@ -56,6 +65,15 @@ export function GlobalSearchPage() {
   const [searched, setSearched] = useState(false);
 
   const visibleSections = useMemo(() => sectionsForRole(user?.role), [user?.role]);
+
+  const allResults = useMemo(() => {
+    if (!results?.all?.length) {
+      return visibleSections.flatMap((key) =>
+        (results?.[key] || []).map((item) => ({ ...item, section: key }))
+      );
+    }
+    return (results.all || []).filter((item) => visibleSections.includes(item.section));
+  }, [results, visibleSections]);
 
   useEffect(() => {
     setResults(null);
@@ -98,15 +116,11 @@ export function GlobalSearchPage() {
     }
   }
 
-  const hasAnyResults =
-    results &&
-    visibleSections.some(({ key }) => Array.isArray(results[key]) && results[key].length > 0);
-
   return (
     <div className="pageStack">
       <PageHeader
         title="Global search"
-        subtitle={`Search across the whole ${programTierLabel} portal — proposals, projects, ethics, thesis, finance, policies, and more`}
+        subtitle={`One search across the whole ${programTierLabel} portal — proposals, projects, thesis titles, ethics, finance, messages, and more`}
       />
       <form
         className="card"
@@ -120,7 +134,7 @@ export function GlobalSearchPage() {
           style={{ flex: "1 1 240px" }}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search titles, names, departments, DOI, ethics, thesis…"
+          placeholder="Search thesis title, student name, proposal, project, DOI, ethics…"
           aria-label="Search query"
         />
         <button type="submit" className="btn primary" disabled={busy}>
@@ -128,35 +142,65 @@ export function GlobalSearchPage() {
         </button>
       </form>
       {error ? <div className="bannerErr">{error}</div> : null}
-      {searched && !busy && !error && !hasAnyResults ? (
-        <div className="card muted">No results found for &ldquo;{q.trim()}&rdquo;.</div>
+      {searched && !busy && !error && allResults.length === 0 ? (
+        <div className="card muted">
+          No results found for &ldquo;{q.trim()}&rdquo;.
+          <div style={{ marginTop: 8, fontSize: 13 }}>
+            Hubi inaad portal sax dooratay: <strong>{programTierLabel}</strong> — thesis UG iyo PG waa kala duwan yihiin.
+            Tusaale: &ldquo;green energy&rdquo; waa UG, &ldquo;research management system&rdquo; waa PG.
+          </div>
+        </div>
       ) : null}
-      {hasAnyResults ? (
+      {allResults.length > 0 ? (
         <p className="muted" style={{ fontSize: 13 }}>
           {total} result{total === 1 ? "" : "s"} for &ldquo;{q.trim()}&rdquo;
         </p>
       ) : null}
-      {results ? (
-        <div style={{ display: "grid", gap: 12 }}>
-          {visibleSections.map(({ key, label }) => {
-            const items = results[key] || [];
-            if (!items.length) return null;
-            return (
-              <div key={key} className="card">
-                <div style={{ fontWeight: 800, marginBottom: 8 }}>{label}</div>
-                <ul style={{ margin: 0, paddingLeft: 18 }}>
-                  {items.map((item) => (
-                    <li key={`${key}-${item.id}`} style={{ marginBottom: 6 }}>
-                      <Link to={item.link}>{item.title}</Link>
-                      <span className="muted" style={{ fontSize: 12, marginLeft: 8 }}>
-                        {item.status || item.type}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
+      {allResults.length > 0 ? (
+        <div className="card">
+          <div style={{ fontWeight: 800, marginBottom: 10 }}>All results</div>
+          <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 8 }}>
+            {allResults.map((item) => (
+              <li
+                key={`${item.section}-${item.id}`}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: "1px solid rgba(148,163,184,0.18)",
+                  background: "rgba(15,23,42,0.35)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <Link to={item.link} style={{ fontWeight: 700 }}>
+                      {item.title}
+                    </Link>
+                    {item.subtitle ? (
+                      <div className="muted" style={{ fontSize: 12, marginTop: 2 }}>
+                        {item.subtitle}
+                      </div>
+                    ) : null}
+                  </div>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: 6,
+                      alignSelf: "flex-start",
+                      background: `${SECTION_META[item.section]?.accent || "#64748b"}22`,
+                      color: SECTION_META[item.section]?.accent || "#94a3b8",
+                    }}
+                  >
+                    {typeBadge(item.section)}
+                  </span>
+                </div>
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                  {item.status || item.type}
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       ) : null}
     </div>

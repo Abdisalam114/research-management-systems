@@ -105,7 +105,7 @@ export default function App() {
             <Route path="/kpi-dashboard" element={<KpiDashboardPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={["research_director", "faculty_coordinator", "researcher", "leadership"]} />}>
+          <Route element={<ProtectedRoute roles={["research_director", "faculty_coordinator", "researcher", "leadership", "finance_officer"]} />}>
             <Route path="/search" element={<GlobalSearchPage />} />
           </Route>
 
