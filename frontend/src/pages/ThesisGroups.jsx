@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { useModuleLoad } from "../hooks/useModuleLoad";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as thesisApi from "../services/thesisGroupApi";
 import * as userApi from "../services/userApi";
 import * as departmentApi from "../services/departmentApi";
@@ -210,6 +211,8 @@ export function ThesisGroupsPage() {
   const [statusFilter, setStatusFilter] = useState("all");
 
   const [message, setMessage] = useState("");
+
+  useScrollToTop([showForm, editingId, expandedId]);
 
   const canManage = MANAGE_ROLES.includes(user?.role);
 

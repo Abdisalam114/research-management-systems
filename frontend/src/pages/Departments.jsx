@@ -5,6 +5,7 @@ import * as departmentApi from "../services/departmentApi";
 import { PageHeader } from "../components/PageHeader";
 import { statFilterLabel } from "../utils/pageHeaderFilters";
 import { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } from "../constants/faculties";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 
 export function DepartmentsPage() {
   const { accessToken } = useAuth();
@@ -16,6 +17,8 @@ export function DepartmentsPage() {
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+
+  useScrollToTop([showForm, editingId]);
 
   async function load() {
     try {

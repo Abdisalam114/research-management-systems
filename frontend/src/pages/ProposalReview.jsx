@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as proposalApi from "../services/proposalApi";
 import * as ethicsApi from "../services/ethicsApi";
 import { ProposalEthicsReviewPanel } from "../components/ProposalEthicsReviewPanel";
@@ -20,6 +21,8 @@ export function ProposalReviewPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [ethicsDecisionModal, setEthicsDecisionModal] = useState(null);
+
+  useScrollToTop([id, proposal?.id]);
 
   const isCoordinator = user?.role === "faculty_coordinator";
   const isDirector = user?.role === "research_director";

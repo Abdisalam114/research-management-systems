@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as paymentApi from "../services/paymentApi";
 import { PageHeader } from "../components/PageHeader";
 
@@ -61,6 +62,8 @@ export function PaymentDetailsPage() {
   }, [accessToken, id]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load, [id]);
+
+  useScrollToTop([id, payment?.id, loading]);
 
   async function handleDirectorDecision(decision) {
     if (!payment) return;

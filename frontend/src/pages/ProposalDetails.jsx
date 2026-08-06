@@ -7,6 +7,7 @@ import { ProposalEthicsWorkflow } from "../components/ProposalEthicsWorkflow";
 import { SubmitValidationAlert, SubmitSuccessAlert } from "../components/SubmitValidationAlert";
 import { collectSubmitValidationIssues, SUBMIT_SUCCESS_MESSAGE } from "../utils/proposalSubmitValidation";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import { apiOrigin } from "../config/apiBase";
 import { StatusBadge } from "../components/StatusBadge";
 
@@ -29,6 +30,8 @@ export function ProposalDetailsPage() {
     return "";
   });
   const [busy, setBusy] = useState(false);
+
+  useScrollToTop([id, proposal?.id]);
 
   const isOwner = proposal && String(proposal.researcherId) === String(user?.id);
   const showSubmitBtn =

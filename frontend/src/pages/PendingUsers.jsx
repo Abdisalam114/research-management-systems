@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as userApi from "../services/userApi";
 import { formatRole } from "../utils/roleLabels";
 import { SYSTEM_ROLES } from "../constants/systemRoles";
@@ -38,6 +39,8 @@ export function PendingUsersPage() {
   const [success, setSuccess] = useState("");
   const [busyId, setBusyId] = useState("");
   const [creating, setCreating] = useState(false);
+
+  useScrollToTop([edit?.id, creating]);
   const [savingEdit, setSavingEdit] = useState(false);
 
   async function handleDeleteUser(u) {

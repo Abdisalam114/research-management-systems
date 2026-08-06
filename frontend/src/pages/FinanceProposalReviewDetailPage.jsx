@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as proposalApi from "../services/proposalApi";
 import { ProposalMultiStageReview } from "../components/ProposalMultiStageReview";
 
@@ -12,6 +13,8 @@ export function FinanceProposalReviewDetailPage() {
   const { programTier } = useProgramTier();
   const [proposal, setProposal] = useState(null);
   const [error, setError] = useState("");
+
+  useScrollToTop([id, proposal?.id]);
 
   async function load() {
     setError("");

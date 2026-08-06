@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as ethicsApi from "../services/ethicsApi";
 import * as proposalApi from "../services/proposalApi";
 import * as departmentApi from "../services/departmentApi";
@@ -51,6 +52,8 @@ export function EthicsPage() {
   const editorRef = useRef(null);
   const autoOpenedRef = useRef(false);
   const applicationIdFromUrl = searchParams.get("applicationId");
+
+  useScrollToTop([editing?.id, applicationIdFromUrl]);
   const load = useCallback(async () => {
     const [res, deptRes] = await Promise.all([
       ethicsApi.listEthicsApplications(accessToken),
@@ -154,6 +157,7 @@ export function EthicsPage() {
         setEditing((s) => (s?.id === a.id ? { ...s, proposalKind: kind } : s));
       }).catch(() => {});
     }
+    setPendingEditorScroll(true);
   }
 
   function scrollToEditor() {

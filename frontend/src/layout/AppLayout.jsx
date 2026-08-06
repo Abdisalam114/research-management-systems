@@ -1,17 +1,11 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { getPageTitle } from "../utils/navigation";
-import { logScrollProbe, scrollAppContainerToTop } from "../utils/scrollContainer";
+import { logScrollProbe } from "../utils/scrollContainer";
+import { scrollToTopNow, useScrollToTop } from "../hooks/useScrollToTop";
 import "./layout.css";
-
-function scrollAfterPaint() {
-  scrollAppContainerToTop();
-  requestAnimationFrame(() => {
-    scrollAppContainerToTop();
-  });
-}
 
 export function AppLayout() {
   const location = useLocation();
@@ -24,16 +18,17 @@ export function AppLayout() {
     return () => document.body.classList.remove("appShellActive");
   }, []);
 
-  useLayoutEffect(() => {
-    scrollAfterPaint();
+  useScrollToTop([location.pathname, location.search, location.hash, location.key]);
+
+  useEffect(() => {
     requestAnimationFrame(() => {
       logScrollProbe(`${location.pathname}${location.search}`, "B");
     });
-  }, [location.pathname, location.search]);
+  }, [location.pathname, location.search, location.key]);
 
   return (
     <div className="appShell">
-      <Sidebar onNavigate={scrollAfterPaint} />
+      <Sidebar onNavigate={scrollToTopNow} />
       <div className="appContent" ref={contentRef}>
         <TopBar title={title} />
         <main className="appMain">

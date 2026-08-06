@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as publicationApi from "../services/publicationApi";
 import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
@@ -64,6 +65,8 @@ export function PublicationsPage() {
   const [decisionModal, setDecisionModal] = useState(null); // { publication, decision, comment, project, loading }
   const [decisionBusy, setDecisionBusy] = useState(false);
   const [viewPub, setViewPub] = useState(null);
+
+  useScrollToTop([showForm, viewPub?.id, decisionModal?.publication?.id, projectIdFromUrl]);
 
   function publicationExternalUrl(p) {
     if (p?.url && /^https?:\/\//i.test(String(p.url))) return p.url;

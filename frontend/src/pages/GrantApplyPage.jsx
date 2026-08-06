@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as fundingCallApi from "../services/fundingCallApi";
 import * as proposalApi from "../services/proposalApi";
 import * as grantApi from "../services/grantApi";
@@ -58,6 +59,8 @@ export function GrantApplyPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const budgetInitRef = useRef(false);
+
+  useScrollToTop([callId, step, call?.id]);
 
   const syncProposalsForCall = useCallback(
     async (c) => {

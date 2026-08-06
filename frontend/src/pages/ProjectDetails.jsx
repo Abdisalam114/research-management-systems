@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as projectApi from "../services/projectApi";
 import * as analyticsApi from "../services/analyticsApi";
 import { ProjectWorkflowPanel } from "../components/ProjectWorkflowPanel";
@@ -39,6 +40,8 @@ export function ProjectDetailsPage() {
   });
 
   const [saving, setSaving] = useState(false);
+
+  useScrollToTop([id, project?.id]);
 
   async function saveExecution(body) {
     await projectApi.updateProject(accessToken, id, body);

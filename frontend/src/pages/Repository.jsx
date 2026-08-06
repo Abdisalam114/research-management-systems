@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as repositoryApi from "../services/repositoryApi";
 import * as projectApi from "../services/projectApi";
 import { apiOrigin } from "../config/apiBase";
@@ -22,6 +23,8 @@ export function RepositoryPage() {
   const [form, setForm] = useState({ title: "", description: "", access: "private", groupId: "", projectId: projectIdFromUrl });
   const [file, setFile] = useState(null);
   const [exporting, setExporting] = useState("");
+
+  useScrollToTop([showForm, projectIdFromUrl]);
 
   const canUpload = user?.role === "researcher";
 

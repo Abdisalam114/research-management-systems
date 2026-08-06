@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as grantApi from "../services/grantApi";
 import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
@@ -62,6 +63,8 @@ export function GrantDetailsPage() {
   }, [accessToken, id, user?.role]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load, [id]);
+
+  useScrollToTop([id, grant?.id, loading]);
 
   async function handleAwardConfirm(amountAwarded) {
     if (!grant) return;

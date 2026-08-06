@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
 
@@ -135,6 +136,8 @@ function FinanceClosureDetail({ id }) {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("Finance cleared");
+
+  useScrollToTop([id, project?.id]);
 
   const load = useCallback(async () => {
     const res = await projectApi.getProject(accessToken, id);

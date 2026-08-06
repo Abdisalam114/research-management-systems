@@ -7,6 +7,8 @@ export function getAppScrollContainer() {
 export function scrollAppContainerToTop() {
   const container = getAppScrollContainer();
   if (container) container.scrollTop = 0;
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
   window.scrollTo(0, 0);
 }
 

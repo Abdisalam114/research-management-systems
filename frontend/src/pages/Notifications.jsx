@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { useModuleLoad } from "../hooks/useModuleLoad";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import { isCrossTierRole } from "../constants/programTier";
 import { SYSTEM_REFRESH_MS } from "../constants/systemRefresh";
 import * as notificationApi from "../services/notificationApi";
@@ -35,6 +36,8 @@ export function NotificationsPage() {
   const [downloadBusy, setDownloadBusy] = useState("");
   const [detailNote, setDetailNote] = useState(null);
   const [actionBusy, setActionBusy] = useState("");
+
+  useScrollToTop([detailNote?.id]);
 
   const load = useCallback(async () => {
     const res = await notificationApi.listMyNotifications(accessToken);

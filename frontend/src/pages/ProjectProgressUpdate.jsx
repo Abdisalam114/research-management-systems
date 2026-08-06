@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as projectApi from "../services/projectApi";
 
 export function ProjectProgressUpdatePage() {
@@ -12,6 +13,8 @@ export function ProjectProgressUpdatePage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+
+  useScrollToTop([id, loading]);
 
   useEffect(() => {
     let cancelled = false;

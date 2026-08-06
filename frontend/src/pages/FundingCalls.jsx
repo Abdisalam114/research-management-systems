@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { useModuleLoad } from "../hooks/useModuleLoad";
+import { useScrollToTop } from "../hooks/useScrollToTop";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import * as fundingCallApi from "../services/fundingCallApi";
 import * as grantApi from "../services/grantApi";
@@ -143,6 +144,8 @@ export function FundingCallsPage() {
   const [message, setMessage] = useState("");
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all", FUNDING_CALL_STATUS_FILTERS);
   const [highlightedCallId, setHighlightedCallId] = useState("");
+
+  useScrollToTop([showForm, editingId]);
 
   const load = useCallback(async () => {
     const res = await fundingCallApi.listFundingCalls(accessToken);
