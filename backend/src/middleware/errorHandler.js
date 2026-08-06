@@ -9,6 +9,18 @@ function errorHandler(err, req, res, next) {
     });
   }
 
+  if (err?.name === "MulterError") {
+    const message =
+      err.code === "LIMIT_FILE_SIZE"
+        ? "File is too large (max 10 MB)"
+        : err.message || "Upload failed";
+    return res.status(400).json({ message });
+  }
+
+  if (err?.message && /files are allowed|file type|Only PDF/i.test(err.message)) {
+    return res.status(400).json({ message: err.message });
+  }
+
   const statusCode = err instanceof AppError ? err.statusCode : 500;
 
   const payload = {

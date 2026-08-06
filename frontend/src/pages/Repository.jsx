@@ -5,7 +5,6 @@ import { useModuleLoad } from "../hooks/useModuleLoad";
 import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as repositoryApi from "../services/repositoryApi";
 import * as projectApi from "../services/projectApi";
-import { apiOrigin } from "../config/apiBase";
 import { PageHeader } from "../components/PageHeader";
 
 import { filterByStatKey, statFilterLabel, totalStatTile, typeStatTile } from "../utils/pageHeaderFilters";
@@ -23,6 +22,7 @@ export function RepositoryPage() {
   const [form, setForm] = useState({ title: "", description: "", access: "private", groupId: "", projectId: projectIdFromUrl });
   const [file, setFile] = useState(null);
   const [exporting, setExporting] = useState("");
+  const [openingFileId, setOpeningFileId] = useState("");
 
   useScrollToTop([showForm, projectIdFromUrl]);
 
@@ -69,7 +69,7 @@ export function RepositoryPage() {
           if (!projectTitle || looksLikeFunding) return f;
           return { ...f, title: projectTitle };
         });
-} catch {
+      } catch {
         if (!cancelled) setLinkedProject(null);
       }
     })();
@@ -90,7 +90,7 @@ export function RepositoryPage() {
     const by = (s) => items.filter((i) => i.type === s).length;
     return [
       totalStatTile("Total items", items.length),
-      typeStatTile("PDF", by("document"), "document", "#0ea5e9"),
+      typeStatTile("Documents", by("document"), "document", "#0ea5e9"),
       typeStatTile("CSV / Excel", by("dataset"), "dataset", "#38bdf8"),
     ];
   }, [items]);
@@ -117,7 +117,7 @@ export function RepositoryPage() {
       map.get(key).items.push(item);
     }
 
-    if (canUpload && !projectIdFromUrl) {
+    if (canUpload && !projectIdFromUrl && statusFilter === "all") {
       for (const proj of projects) {
         const key = String(proj.id);
         if (!map.has(key)) {
@@ -127,7 +127,7 @@ export function RepositoryPage() {
     }
 
     return [...map.values()].sort((a, b) => String(a.title).localeCompare(String(b.title)));
-  }, [filteredItems, projects, canUpload, projectIdFromUrl]);
+  }, [filteredItems, projects, canUpload, projectIdFromUrl, statusFilter]);
 
   function canDeleteItem(item) {
     if (user?.role === "research_director") return true;
@@ -159,13 +159,26 @@ export function RepositoryPage() {
     try {
       setExporting(kind);
       setError("");
-      if (kind === "pdf") await repositoryApi.downloadRepositoryPdf(accessToken);
-      else if (kind === "excel") await repositoryApi.downloadRepositoryExcel(accessToken);
-      else await repositoryApi.downloadRepositoryCsv(accessToken);
+      const params = projectIdFromUrl ? { projectId: projectIdFromUrl } : {};
+      if (kind === "pdf") await repositoryApi.downloadRepositoryPdf(accessToken, params);
+      else if (kind === "excel") await repositoryApi.downloadRepositoryExcel(accessToken, params);
+      else await repositoryApi.downloadRepositoryCsv(accessToken, params);
     } catch (e) {
       setError(e?.response?.data?.message || e.message || "Export failed");
     } finally {
       setExporting("");
+    }
+  }
+
+  async function handleOpenFile(item) {
+    try {
+      setOpeningFileId(item.id);
+      setError("");
+      await repositoryApi.openRepositoryFile(accessToken, item.id, item.fileName || item.title || "repository-file");
+    } catch (e) {
+      setError(e?.response?.data?.message || e.message || "Could not open file");
+    } finally {
+      setOpeningFileId("");
     }
   }
 
@@ -175,7 +188,7 @@ export function RepositoryPage() {
         title="Research Repository"
         subtitle={
           canUpload
-            ? "Files from My Projects only (projectId) — PDF, CSV, Excel upload & export."
+            ? "Upload project files (PDF, Word, CSV, Excel, TXT, ZIP) from My Projects."
             : "Project-linked repository files — grouped by research project."
         }
         stats={stats}
@@ -226,7 +239,7 @@ export function RepositoryPage() {
         <div className="card" style={{ marginTop: 12 }}>
           <div style={{ fontWeight: 800 }}>Upload file</div>
           <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-            PDF, CSV, or Excel (.xlsx / .xls) only — other formats are not allowed.
+            Allowed: PDF, Word, CSV, Excel, TXT, or ZIP (max 10 MB).
           </p>
           <div style={{ display: "grid", gap: 10, marginTop: 10 }}>
             <div className="field">
@@ -267,8 +280,19 @@ export function RepositoryPage() {
               </div>
             ) : null}
             <div className="field">
-              <label>Title</label>
-              <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+              <label>Title (required)</label>
+              <input
+                value={form.title}
+                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                required
+                placeholder={linkedProject?.title ? "Enter a file title for this project" : "File title"}
+              />
+              {linkedProject?.title &&
+              /\b(fund|grant|award|fellowship|scholarship|challenge|call|seed)\b/i.test(linkedProject.title) ? (
+                <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                  Enter a descriptive file title — project title was not auto-filled because it looks like a funding call name.
+                </div>
+              ) : null}
             </div>
             <div className="field">
               <label>Description</label>
@@ -295,9 +319,10 @@ export function RepositoryPage() {
                       throw new Error("Only PDF, Word, CSV, Excel, TXT, or ZIP files are allowed");
                     }
                     if (!form.projectId) throw new Error("Select the research project this file belongs to");
+                    if (!form.title.trim()) throw new Error("Enter a title for this file");
                     const fd = new FormData();
                     fd.append("file", file);
-                    fd.append("title", form.title);
+                    fd.append("title", form.title.trim());
                     fd.append("description", form.description);
                     fd.append("access", form.access);
                     fd.append("projectId", form.projectId);
@@ -363,10 +388,15 @@ export function RepositoryPage() {
                             {i.type} • {i.access}
                           </div>
                           <div className="muted" style={{ marginTop: 6 }}>
-                            File:{" "}
-                            <a href={`${apiOrigin()}${i.filePath}`} target="_blank" rel="noreferrer">
-                              {i.filePath}
-                            </a>
+                            <button
+                              type="button"
+                              className="btn"
+                              style={{ padding: "4px 10px", fontSize: 13 }}
+                              disabled={openingFileId === i.id}
+                              onClick={() => handleOpenFile(i)}
+                            >
+                              {openingFileId === i.id ? "Opening…" : `Download ${i.fileName || "file"}`}
+                            </button>
                           </div>
                         </div>
                         {canDeleteItem(i) ? (
@@ -388,7 +418,13 @@ export function RepositoryPage() {
           ))}
           {groupedByProject.length === 0 ? (
             <div className="muted">
-              No project-linked files. Open <Link to="/projects">Projects</Link> first, then upload from a project.
+              {canUpload ? (
+                <>
+                  No project-linked files yet. Open <Link to="/projects">Projects</Link>, then upload from a project.
+                </>
+              ) : (
+                <>No repository files in this portal yet.</>
+              )}
             </div>
           ) : null}
         </div>

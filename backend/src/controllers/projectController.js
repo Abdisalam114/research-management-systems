@@ -605,6 +605,7 @@ async function finalizeClosedProject(req, project) {
       bodyLines: lines,
     });
 
+    const webPath = `/uploads/repository/${String(project._id)}/closure-${path.basename(archiveFile)}`;
     const existingRepo = await RepositoryItem.findOne({
       projectId: project._id,
       title: { $regex: /^Project closure archive:/i },
@@ -615,7 +616,7 @@ async function finalizeClosedProject(req, project) {
           type: REPOSITORY_ITEM_TYPES.DOCUMENT,
           title: `Project closure archive: ${project.title}`,
           description: project.closure?.finalReport || "Archived on project closure",
-          filePath: archiveFile.replace(/\\/g, "/"),
+          filePath: webPath,
           fileSize: 0,
           access: REPOSITORY_ACCESS.INSTITUTION,
           projectId: project._id,

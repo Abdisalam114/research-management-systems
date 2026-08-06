@@ -1,6 +1,7 @@
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const path = require("path");
+const mongoose = require("mongoose");
 const { RepositoryItem, REPOSITORY_ACCESS } = require("../models/RepositoryItem");
 const { ResearchGroup } = require("../models/ResearchGroup");
 const { AppError } = require("../utils/AppError");
@@ -44,14 +45,45 @@ function xmlEscape(value) {
     .replace(/'/g, "&apos;");
 }
 
+function normalizeStoredFilePath(filePath) {
+  if (!filePath) return "";
+  const normalized = String(filePath).replace(/\\/g, "/");
+  if (normalized.startsWith("/uploads/")) return normalized;
+  const marker = "/uploads/";
+  const idx = normalized.toLowerCase().indexOf(marker);
+  if (idx >= 0) return normalized.slice(idx);
+  return normalized;
+}
+
+function fileBasename(filePath) {
+  const rel = normalizeStoredFilePath(filePath);
+  const parts = rel.split("/");
+  return parts[parts.length - 1] || rel || "file";
+}
+
+async function assertCanAccessItem(req, item) {
+  const isStaff = ["research_director", "faculty_coordinator"].includes(req.user.role);
+  if (isStaff) return;
+  if (String(item.uploadedBy) === String(req.user.id)) return;
+  if (item.access === REPOSITORY_ACCESS.INSTITUTION) return;
+  if (item.access === REPOSITORY_ACCESS.GROUP && item.groupId) {
+    const group = await ResearchGroup.findOne(req.tierWhere({ _id: item.groupId }));
+    const isMember = group && (group.members || []).some((m) => String(m.userId) === String(req.user.id));
+    if (isMember) return;
+  }
+  throw new AppError("Forbidden", 403);
+}
+
 function sanitizeItem(i) {
+  const filePath = normalizeStoredFilePath(i.filePath);
   return {
     id: i._id,
     type: i.type,
     title: i.title,
     description: i.description,
     tags: i.tags,
-    filePath: i.filePath,
+    filePath,
+    fileName: fileBasename(i.filePath),
     fileSize: i.fileSize,
     access: i.access,
     groupId: i.groupId,
@@ -88,7 +120,8 @@ async function listItems(req, res) {
 
 async function uploadItem(req, res) {
   const { title, description, tags, access, groupId, projectId } = req.body || {};
-  if (!title) throw new AppError("title is required", 400);
+  const trimmedTitle = String(title || "").trim();
+  if (!trimmedTitle) throw new AppError("title is required", 400);
   if (!req.file) throw new AppError("file is required", 400);
 
   const type = inferTypeFromFilename(req.file.originalname);
@@ -98,6 +131,9 @@ async function uploadItem(req, res) {
 
   if (normalizedAccess === REPOSITORY_ACCESS.GROUP) {
     if (!normalizedGroupId) throw new AppError("groupId is required for group access", 400);
+    if (!mongoose.Types.ObjectId.isValid(normalizedGroupId)) {
+      throw new AppError("Invalid group ID", 400);
+    }
     const group = await ResearchGroup.findOne(req.tierWhere({ _id: normalizedGroupId }));
     if (!group) throw new AppError("Research group not found", 404);
     const isMember = (group.members || []).some((m) => String(m.userId) === String(req.user.id));
@@ -116,7 +152,7 @@ async function uploadItem(req, res) {
   }
 const item = await RepositoryItem.create(req.tierAssign({
     type,
-    title: String(title).trim(),
+    title: trimmedTitle,
     description: description ? String(description) : "",
     tags: Array.isArray(tags) ? tags.map((t) => String(t).trim()).filter(Boolean) : [],
     filePath: `/uploads/${req.file.filename}`,
@@ -143,20 +179,22 @@ async function getItem(req, res) {
   const item = await RepositoryItem.findOne(req.tierWhere({ _id: id }));
   if (!item) throw new AppError("Repository item not found", 404);
 
-  const isStaff = ["research_director", "faculty_coordinator"].includes(req.user.role);
-  if (isStaff) return res.json({ item: sanitizeItem(item) });
+  await assertCanAccessItem(req, item);
+  return res.json({ item: sanitizeItem(item) });
+}
 
-  if (String(item.uploadedBy) === String(req.user.id)) return res.json({ item: sanitizeItem(item) });
+async function downloadItemFile(req, res) {
+  const { id } = req.params;
+  const item = await RepositoryItem.findOne(req.tierWhere({ _id: id }));
+  if (!item) throw new AppError("Repository item not found", 404);
 
-  if (item.access === REPOSITORY_ACCESS.INSTITUTION) return res.json({ item: sanitizeItem(item) });
+  await assertCanAccessItem(req, item);
 
-  if (item.access === REPOSITORY_ACCESS.GROUP && item.groupId) {
-    const group = await ResearchGroup.findOne(req.tierWhere({ _id: item.groupId }));
-    const isMember = group && (group.members || []).some((m) => String(m.userId) === String(req.user.id));
-    if (isMember) return res.json({ item: sanitizeItem(item) });
-  }
+  const rel = normalizeStoredFilePath(item.filePath);
+  const abs = path.join(process.cwd(), rel.replace(/^\//, ""));
+  if (!fs.existsSync(abs)) throw new AppError("File not found on server", 404);
 
-  throw new AppError("Forbidden", 403);
+  return res.download(abs, fileBasename(item.filePath));
 }
 
 async function deleteItem(req, res) {
@@ -174,7 +212,8 @@ async function deleteItem(req, res) {
 
   if (filePath) {
     try {
-      const abs = path.join(process.cwd(), filePath.replace(/^\//, ""));
+      const rel = normalizeStoredFilePath(filePath);
+      const abs = path.join(process.cwd(), rel.replace(/^\//, ""));
       if (fs.existsSync(abs)) fs.unlinkSync(abs);
     } catch {
       /* optional file cleanup */
@@ -393,6 +432,7 @@ module.exports = {
   listItems,
   uploadItem,
   getItem,
+  downloadItemFile,
   deleteItem,
   exportRepositoryCsv,
   exportRepositoryExcel,

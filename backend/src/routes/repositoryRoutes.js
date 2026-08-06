@@ -21,6 +21,7 @@ router.get("/", authenticateUser, requireActiveUser, asyncHandler(repositoryCont
 router.get("/export/csv", authenticateUser, requireActiveUser, asyncHandler(repositoryController.exportRepositoryCsv));
 router.get("/export/pdf", authenticateUser, requireActiveUser, asyncHandler(repositoryController.exportRepositoryPdf));
 router.get("/export/excel", authenticateUser, requireActiveUser, asyncHandler(repositoryController.exportRepositoryExcel));
+router.get("/:id/file", authenticateUser, requireActiveUser, blockReservedRepoIds, asyncHandler(repositoryController.downloadItemFile));
 router.get("/:id", authenticateUser, requireActiveUser, blockReservedRepoIds, asyncHandler(repositoryController.getItem));
 
 router.post(

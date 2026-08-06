@@ -3,7 +3,8 @@ const { Project } = require("../models/Project");
 const { Grant } = require("../models/Grant");
 const { Publication } = require("../models/Publication");
 const { FundingCall } = require("../models/FundingCall");
-const { RepositoryItem } = require("../models/RepositoryItem");
+const { RepositoryItem, REPOSITORY_ACCESS } = require("../models/RepositoryItem");
+const { ResearchGroup } = require("../models/ResearchGroup");
 const { AppError } = require("../utils/AppError");
 
 const LIMIT = 8;
@@ -34,6 +35,16 @@ async function globalSearch(req, res) {
     grantFilter.researcherId = userId;
     pubFilter.researcherId = userId;
     callFilter.status = "open";
+
+    const myProjects = await Project.find({ ...tier, researcherId: userId }).select("_id");
+    repoFilter.projectId = { $in: myProjects.map((p) => p._id) };
+    const groups = await ResearchGroup.find(tier).where("members.userId").equals(userId).select("_id");
+    const groupIds = groups.map((g) => g._id);
+    repoFilter.$or = [
+      { uploadedBy: userId },
+      { access: REPOSITORY_ACCESS.INSTITUTION },
+      { access: REPOSITORY_ACCESS.GROUP, groupId: { $in: groupIds } },
+    ];
   }
 
   const [proposals, projects, grants, publications, calls, repository] = await Promise.all([

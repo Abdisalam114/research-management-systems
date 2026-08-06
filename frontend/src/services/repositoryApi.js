@@ -22,9 +22,10 @@ export async function deleteRepositoryItem(accessToken, id) {
   return res.data;
 }
 
-async function downloadExport(accessToken, path, filename) {
+async function downloadExport(accessToken, path, filename, params = {}) {
   const res = await api.get(path, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    params,
     responseType: "blob",
   });
   const blob = new Blob([res.data], { type: res.headers["content-type"] || "application/octet-stream" });
@@ -36,14 +37,30 @@ async function downloadExport(accessToken, path, filename) {
   URL.revokeObjectURL(url);
 }
 
-export async function downloadRepositoryCsv(accessToken) {
-  return downloadExport(accessToken, "/api/repository/export/csv", "JUST-RMS-Repository.csv");
+export async function downloadRepositoryCsv(accessToken, params = {}) {
+  return downloadExport(accessToken, "/api/repository/export/csv", "JUST-RMS-Repository.csv", params);
 }
 
-export async function downloadRepositoryExcel(accessToken) {
-  return downloadExport(accessToken, "/api/repository/export/excel", "JUST-RMS-Repository.xls");
+export async function downloadRepositoryExcel(accessToken, params = {}) {
+  return downloadExport(accessToken, "/api/repository/export/excel", "JUST-RMS-Repository.xls", params);
 }
 
-export async function downloadRepositoryPdf(accessToken) {
-  return downloadExport(accessToken, "/api/repository/export/pdf", "JUST-RMS-Repository.pdf");
+export async function downloadRepositoryPdf(accessToken, params = {}) {
+  return downloadExport(accessToken, "/api/repository/export/pdf", "JUST-RMS-Repository.pdf", params);
+}
+
+export async function openRepositoryFile(accessToken, id, filename = "repository-file") {
+  const res = await api.get(`/api/repository/${id}/file`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    responseType: "blob",
+  });
+  const blob = new Blob([res.data], { type: res.headers["content-type"] || "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
