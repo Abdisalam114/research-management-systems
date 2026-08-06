@@ -28,3 +28,7 @@ docs/~$*
 
 # Debug / temp scripts output
 scripts/*.log
+
+# MongoDB local exports (copy folder manually to other servers; do not commit data)
+backend/data/mongo-export/**
+!backend/data/mongo-export/.gitkeep

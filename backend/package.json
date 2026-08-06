@@ -26,6 +26,9 @@
     "docs:pdf": "node src/scripts/generateDatabaseDocsPdf.js && node src/scripts/generateSystemDocsPdf.js",
     "verify:roles": "node ../scripts/verify-all-roles.cjs",
     "verify:stakeholders": "node src/scripts/verifyAllStakeholders.js",
+    "mongo:export": "node scripts/exportMongoDb.js",
+    "mongo:import": "node scripts/importMongoDb.js --yes",
+    "users:sync": "node scripts/syncInstitutionalUsers.js",
     "test": "echo \"No tests yet\" && exit 0"
   },
   "keywords": [],
