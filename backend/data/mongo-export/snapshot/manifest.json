@@ -1,0 +1,24 @@
+{
+  "exportedAt": "2026-08-06T08:16:25.082Z",
+  "dbName": "rms",
+  "collections": {
+    "auditevents": 208,
+    "budgets": 4,
+    "conversations": 0,
+    "departments": 24,
+    "ethicsapplications": 10,
+    "fundingcalls": 4,
+    "grants": 3,
+    "institutionalpolicies": 44,
+    "notifications": 140,
+    "payments": 3,
+    "projects": 4,
+    "proposals": 10,
+    "publications": 4,
+    "purchaseorders": 0,
+    "repositoryitems": 3,
+    "researchgroups": 2,
+    "thesisgroups": 2,
+    "users": 6
+  }
+}

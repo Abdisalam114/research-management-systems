@@ -29,6 +29,7 @@ docs/~$*
 # Debug / temp scripts output
 scripts/*.log
 
-# MongoDB local exports (copy folder manually to other servers; do not commit data)
-backend/data/mongo-export/**
+# MongoDB ad-hoc exports (snapshot/ is committed for demo database sync)
+backend/data/mongo-export/*
+!backend/data/mongo-export/snapshot/
 !backend/data/mongo-export/.gitkeep
