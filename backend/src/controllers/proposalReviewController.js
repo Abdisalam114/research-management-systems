@@ -463,9 +463,6 @@ async function financeProposalReview(req, res) {
   res.json({ message: "Finance review saved", proposal: sanitizeProposalBrief(proposal) });
 }
 
-  });
-}
-
 async function listMyFinanceAssignments(req, res) {
   const userId = req.user.id;
   const isDirector = req.user.role === "research_director";
