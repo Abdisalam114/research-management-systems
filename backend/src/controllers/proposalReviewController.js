@@ -2,6 +2,7 @@ const { Proposal, PROPOSAL_STATUSES } = require("../models/Proposal");
 const { User, ROLES } = require("../models/User");
 const { AppError } = require("../utils/AppError");
 const { notifyUser } = require("../utils/notify");
+const { notifyProposalResearcher } = require("../utils/notifyProposalResearcher");
 const { recordAudit } = require("../utils/audit");
 const {
   STAGE_STATUS,
@@ -221,6 +222,13 @@ await recordAudit({
     /* best-effort */
   }
 
+  if (peerComplete) {
+    await notifyProposalResearcher(proposal, {
+      title: "Peer review passed",
+      body: `Your proposal "${proposal.title}" was accepted at peer review. It is moving forward to the committee stage — please stand by.`,
+    });
+  }
+
   res.json({
     message: peerComplete
       ? "Peer review saved — stage complete; Director notified"
@@ -275,6 +283,11 @@ async function completePeerReview(req, res) {
   } catch {
     /* best-effort */
   }
+
+  await notifyProposalResearcher(proposal, {
+    title: "Peer review passed",
+    body: `Your proposal "${proposal.title}" was accepted at peer review. It is moving forward to the committee stage — please stand by.`,
+  });
 
   res.json({ message: "Peer review stage completed", proposal: sanitizeProposalBrief(proposal) });
 }
@@ -378,6 +391,28 @@ async function committeeReview(req, res) {
   } catch {
     /* best-effort */
   }
+
+  if (committeeStatus === STAGE_STATUS.PASSED) {
+    const next = isVoluntaryProposal(proposal)
+      ? "Final director approval is next — please stand by."
+      : "Finance review is next — please stand by.";
+    await notifyProposalResearcher(proposal, {
+      title: "Committee review passed",
+      body: `Your proposal "${proposal.title}" was accepted by the committee. ${next}`,
+    });
+  } else if (decision === "recommend_revision") {
+    await notifyProposalResearcher(proposal, {
+      title: "Revision requested",
+      body: `The committee requested revisions on "${proposal.title}". Please update your proposal and resubmit.`,
+      link: `/proposals/${proposal._id}`,
+    });
+  } else if (committeeStatus === STAGE_STATUS.FAILED) {
+    await notifyProposalResearcher(proposal, {
+      title: "Proposal not accepted",
+      body: `Your proposal "${proposal.title}" was not accepted at committee review.`,
+    });
+  }
+
   await recordAudit({
     entityType: "proposal",
     entityId: proposal._id,
@@ -447,6 +482,18 @@ async function financeProposalReview(req, res) {
     );
   } catch {
     /* best-effort */
+  }
+
+  if (decision === "approve") {
+    await notifyProposalResearcher(proposal, {
+      title: "Finance review passed",
+      body: `Your proposal "${proposal.title}" was accepted at finance review. Final director approval is next — please stand by.`,
+    });
+  } else {
+    await notifyProposalResearcher(proposal, {
+      title: "Finance review declined",
+      body: `Finance review did not approve the budget for "${proposal.title}". Please contact the Research Office if you have questions.`,
+    });
   }
 
   await recordAudit({

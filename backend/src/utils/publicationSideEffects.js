@@ -1,5 +1,5 @@
 const { Project } = require("../models/Project");
-const { Publication, PUBLICATION_STATUSES, PUBLICATION_TYPE_LABELS } = require("../models/Publication");
+const { Publication, PUBLICATION_STATUSES, PUBLICATION_TYPE_LABELS, WORKFLOW_STAGES } = require("../models/Publication");
 const { notifyUser, notifyUsersByRole } = require("./notify");
 const { recordAudit } = require("./audit");
 const { workflowStageLabel, resolveWorkflowStage } = require("./publicationWorkflow");
@@ -231,11 +231,58 @@ async function afterPublicationSubmitted(req, pub) {
   return effects;
 }
 
-/** After Accept / Revise / Reject decision. */
-async function afterPublicationDecision(req, pub, { decisionLabel, comment }) {
+/** Short English notice to the publication owner (researcher). */
+function buildResearcherPublicationNotice(pub, kind, comment = "") {
+  const title = pub.title || "Research output";
+  const note = String(comment || "").trim();
+  const noteSuffix = note ? ` Note: ${note.length > 220 ? `${note.slice(0, 217)}…` : note}` : "";
+
+  switch (kind) {
+    case "published":
+      return {
+        title: "Publication published",
+        body: `Congratulations! Your research output "${title}" has been published and is now recorded in the institutional system. Please proceed with any follow-up reporting on your project.`,
+      };
+    case "accepted":
+      return {
+        title: "Publication accepted",
+        body: `Your research output "${title}" was accepted by the Research Office. It is moving forward in the publication workflow — you will be notified when it is published.`,
+      };
+    case "rejected":
+      return {
+        title: "Publication not accepted",
+        body: `Your research output "${title}" was not accepted.${noteSuffix || " Please review the feedback in your project outputs."}`,
+      };
+    case "revision":
+      return {
+        title: "Revision requested",
+        body: `Revisions were requested on "${title}". Please update your submission and resubmit.${noteSuffix}`,
+      };
+    default:
+      return {
+        title: "Publication update",
+        body: note ? `${title}: ${note.slice(0, 300)}` : title,
+      };
+  }
+}
+
+/** After Accept / Revise / Reject / Publish decision. */
+async function afterPublicationDecision(req, pub, { kind, comment, decisionLabel }) {
+  const resolvedKind =
+    kind ||
+    (decisionLabel?.includes("published")
+      ? "published"
+      : decisionLabel?.includes("accepted")
+        ? "accepted"
+        : decisionLabel?.includes("rejected")
+          ? "rejected"
+          : decisionLabel?.includes("revision")
+            ? "revision"
+            : "update");
+  const notice = buildResearcherPublicationNotice(pub, resolvedKind, comment);
   return notifyPublicationEvent(req, pub, {
-    title: `Publication ${decisionLabel}`,
-    body: `${pub.title}: ${String(comment || "").trim().slice(0, 300)}`,
+    title: notice.title,
+    body: notice.body,
     alsoNotifyRoles: [],
     notifyOwner: true,
   });
@@ -263,5 +310,6 @@ module.exports = {
   notifyPublicationEvent,
   isSubmittedOrBetter,
   buildPublicationSubmitNotificationBody,
+  buildResearcherPublicationNotice,
   loadPublicationForNotification,
 };

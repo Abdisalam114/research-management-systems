@@ -32,6 +32,7 @@ const {
   afterPublicationComment,
   notifyPublicationEvent,
   buildPublicationSubmitNotificationBody,
+  buildResearcherPublicationNotice,
   loadPublicationForNotification,
 } = require("../utils/publicationSideEffects");
 const { coordinatorMatchesResearcherDept } = require("../utils/facultyMatcher");
@@ -506,7 +507,11 @@ async function validatePublication(req, res) {
   const decisionLabel =
     normalized === "accept" ? "accepted" : normalized === "reject" ? "rejected" : "sent back for revision";
 
-  await afterPublicationDecision(req, pub, { decisionLabel, comment });
+  await afterPublicationDecision(req, pub, {
+    kind: normalized === "accept" ? "accepted" : normalized === "reject" ? "rejected" : "revision",
+    comment,
+    decisionLabel,
+  });
 
   res.json({
     message: `Decision saved: ${decisionLabel}`,
@@ -609,7 +614,18 @@ async function setJournalDecision(req, res) {
         : normalized === JOURNAL_DECISIONS.REJECT
           ? "rejected (journal)"
           : "sent back for revision (journal)";
-    await afterPublicationDecision(req, pub, { decisionLabel, comment: noteText });
+    await afterPublicationDecision(req, pub, {
+      kind:
+        normalized === JOURNAL_DECISIONS.ACCEPT
+          ? pub.workflowStage === WORKFLOW_STAGES.PUBLISHED
+            ? "published"
+            : "accepted"
+          : normalized === JOURNAL_DECISIONS.REJECT
+            ? "rejected"
+            : "revision",
+      comment: noteText,
+      decisionLabel,
+    });
   }
 
   res.json({
@@ -720,8 +736,14 @@ async function updateWorkflowStage(req, res) {
   }
 
   await notifyPublicationEvent(req, pub, {
-    title: `Research output: ${workflowStageLabel(stage)}`,
-    body: buildPublicationSubmitNotificationBody(await loadPublicationForNotification(pub), req),
+    title:
+      stage === WORKFLOW_STAGES.PUBLISHED
+        ? buildResearcherPublicationNotice(pub, "published").title
+        : `Research output: ${workflowStageLabel(stage)}`,
+    body:
+      stage === WORKFLOW_STAGES.PUBLISHED
+        ? buildResearcherPublicationNotice(pub, "published").body
+        : buildPublicationSubmitNotificationBody(await loadPublicationForNotification(pub), req),
     notifyOwner: true,
     alsoNotifyRoles: stage === WORKFLOW_STAGES.PUBLISHED ? ["faculty_coordinator", "research_director"] : [],
   });

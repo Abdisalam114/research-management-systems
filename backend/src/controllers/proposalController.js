@@ -6,6 +6,7 @@ const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
 const { AppError } = require("../utils/AppError");
 const { assertEligibleForCall } = require("../utils/fundingCallEligibility");
 const { notifyUsersByRole, notifyUser } = require("../utils/notify");
+const { notifyProposalResearcher } = require("../utils/notifyProposalResearcher");
 const {
   getEthicsForProposal,
   assertEthicsReadyForProposalSubmit,
@@ -716,6 +717,18 @@ async function directorDecision(req, res) {
   }
   await proposal.save();
 
+  if (decision === PROPOSAL_STATUSES.REVISION_REQUESTED) {
+    await notifyProposalResearcher(proposal, {
+      title: "Revision requested",
+      body: `The Research Director requested revisions on "${proposal.title}". Please update your proposal and resubmit.`,
+    });
+  } else if (decision === PROPOSAL_STATUSES.REJECTED) {
+    await notifyProposalResearcher(proposal, {
+      title: "Proposal not approved",
+      body: `Your proposal "${proposal.title}" was not approved. Please review the director's comments.`,
+    });
+  }
+
   await recordAudit({
     entityType: "proposal",
     entityId: proposal._id,
@@ -747,8 +760,8 @@ async function directorDecision(req, res) {
       try {
         await notifyUser(proposal.researcherId, {
           type: "proposal",
-          title: "Proposal approved — project created",
-          body: proposal.title,
+          title: "Congratulations — proposal accepted",
+          body: `Your proposal "${proposal.title}" has been fully accepted. A research project has been created — please proceed with your research.`,
           link: `/projects/${project._id}`,
           programTier: proposal.programTier,
         });
@@ -879,12 +892,9 @@ if (!Array.isArray(reviewerIds) || reviewerIds.length === 0) {
     }
   }
   try {
-    await notifyUser(proposal.researcherId, {
-      type: "proposal",
-      title: "Proposal sent to reviewer",
-      body: `"${proposal.title}" was sent to Leadership peer reviewer(s).`,
-      link: `/proposals/${proposal._id}`,
-      programTier: req.programTier,
+    await notifyProposalResearcher(proposal, {
+      title: "Peer review started",
+      body: `Your proposal "${proposal.title}" was sent to peer review. You will be notified when this stage is complete.`,
     });
   } catch (_) {
     /* best-effort */
@@ -1010,6 +1020,11 @@ async function assignCommittee(req, res) {
     }
   }
 
+  await notifyProposalResearcher(proposal, {
+    title: "Committee review started",
+    body: `Your proposal "${proposal.title}" was sent to committee review. You will be notified when this stage is complete.`,
+  });
+
   const populated = await Proposal.findById(proposal._id)
     .populate("assignedCommittee.userId", "fullName email role")
     .populate("assignedReviewers.userId", "fullName email role")
@@ -1083,6 +1098,11 @@ async function assignFinance(req, res) {
       /* best-effort */
     }
   }
+
+  await notifyProposalResearcher(proposal, {
+    title: "Finance review started",
+    body: `Your proposal "${proposal.title}" was sent to finance review. You will be notified when this stage is complete.`,
+  });
 
   const populated = await Proposal.findById(proposal._id)
     .populate("assignedFinance.userId", "fullName email role")
