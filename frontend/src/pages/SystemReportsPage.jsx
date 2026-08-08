@@ -212,7 +212,7 @@ export function SystemReportsPage() {
                 Funding calls: <strong>{report.fundingCalls?.total ?? 0}</strong>
               </p>
               <p style={{ margin: "0 0 6px", fontSize: 14 }}>
-                Thesis titles pending: <strong>{report.thesis?.titlesPending ?? 0}</strong>
+                Thesis groups: <strong>{report.thesis?.total ?? 0}</strong>
               </p>
               <p style={{ margin: 0, fontSize: 14 }}>
                 Repository items: <strong>{report.repository?.total ?? 0}</strong>

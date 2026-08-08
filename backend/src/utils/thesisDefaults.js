@@ -246,6 +246,63 @@ async function assertThesisTitleNotUsedElsewhere(ThesisGroup, title, { excludeGr
   }
 }
 
+function chapterIsFinished(status) {
+  return status === CHAPTER_STATUSES.COMPLETED || status === CHAPTER_STATUSES.REVIEWED;
+}
+
+const CHAPTER_STATUS_RANK = Object.freeze({
+  [CHAPTER_STATUSES.PENDING]: 0,
+  [CHAPTER_STATUSES.IN_PROGRESS]: 1,
+  [CHAPTER_STATUSES.COMPLETED]: 2,
+  [CHAPTER_STATUSES.REVIEWED]: 3,
+});
+
+/** Block Chapter 2+ until the previous chapter is completed/reviewed. */
+function assertChapterSequentialOrder(chapters, chapterKey, newStatus) {
+  const list = chapters || [];
+  const idx = list.findIndex((c) => c.key === chapterKey);
+  if (idx < 0) return;
+
+  const chapter = list[idx];
+  if (newStatus !== CHAPTER_STATUSES.PENDING && idx > 0) {
+    const prev = list[idx - 1];
+    if (!chapterIsFinished(prev.status)) {
+      const err = new Error(
+        `Finish "${prev.title || prev.key}" before updating "${chapter.title || chapter.key}"`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+
+  const oldRank = CHAPTER_STATUS_RANK[chapter.status] ?? 0;
+  const newRank = CHAPTER_STATUS_RANK[newStatus] ?? 0;
+  if (newRank < oldRank) {
+    const later = list.slice(idx + 1).find((c) => (CHAPTER_STATUS_RANK[c.status] ?? 0) > 0);
+    if (later) {
+      const err = new Error(
+        `Reset "${later.title || later.key}" before downgrading this chapter`
+      );
+      err.statusCode = 400;
+      throw err;
+    }
+  }
+}
+
+function allChaptersFinished(chapters) {
+  return (chapters?.length ?? 0) > 0 && (chapters || []).every((c) => chapterIsFinished(c.status));
+}
+
+/** When every chapter is completed/reviewed, promote group to Completed (pre-defense). */
+function applyThesisGroupStatusFromChapterProgress(group, THESIS_STATUSES) {
+  if (!allChaptersFinished(group.chapters)) return null;
+  if ([THESIS_STATUSES.PROPOSED, THESIS_STATUSES.IN_PROGRESS].includes(group.status)) {
+    group.status = THESIS_STATUSES.COMPLETED;
+    return THESIS_STATUSES.COMPLETED;
+  }
+  return null;
+}
+
 module.exports = {
   MIN_THESIS_GROUP_STUDENTS,
   CHAPTER_STATUSES,
@@ -260,4 +317,8 @@ module.exports = {
   assertThesisStudentsNotUsedElsewhere,
   assertThesisTitleNotUsedElsewhere,
   normalizedTitleKey,
+  chapterIsFinished,
+  assertChapterSequentialOrder,
+  allChaptersFinished,
+  applyThesisGroupStatusFromChapterProgress,
 };

@@ -105,6 +105,19 @@ function chapterStatusLabel(s) {
   return CHAPTER_STATUSES.find((x) => x.value === s)?.label || s;
 }
 
+function chapterIsFinished(status) {
+  return status === "completed" || status === "reviewed";
+}
+
+function isChapterUnlocked(chapters, index) {
+  if (index <= 0) return true;
+  return chapterIsFinished(chapters[index - 1]?.status);
+}
+
+function allChaptersFinished(chapters) {
+  return (chapters?.length ?? 0) > 0 && (chapters || []).every((c) => chapterIsFinished(c.status));
+}
+
 function displayTitle(g) {
   const status = g.titleProposal?.status;
   if (status === "pending" || status === "rejected") {
@@ -308,12 +321,12 @@ export function ThesisGroupsPage() {
   const stats = useMemo(() => {
     const validGroups = groups.filter(isValidThesisGroup);
     const titleAccepted = validGroups.filter(isTitleAccepted).length;
-    const titlePending = validGroups.filter((g) => titleProposalStatus(g) === "pending").length;
+    const withTitle = validGroups.filter((g) => Boolean(displayTitle(g))).length;
     const totalStudents = validGroups.reduce((acc, g) => acc + (g.students?.length || 0), 0);
     return [
       { label: "Thesis groups", value: validGroups.length, filterKey: "validGroups", accent: "#0ea5e9" },
-      { label: "Titles pending", value: titlePending, filterKey: "titlePending", accent: "#f59e0b" },
-      { label: "Title accepted", value: titleAccepted, filterKey: "titleAccepted", accent: "#22c55e" },
+      { label: "With title", value: withTitle, filterKey: "hasTitle", accent: "#f59e0b" },
+      { label: "Title recorded", value: titleAccepted, filterKey: "titleAccepted", accent: "#22c55e" },
       {
         label: "With supervisor",
         value: validGroups.filter((g) => g.supervisorId).length,
@@ -333,7 +346,6 @@ export function ThesisGroupsPage() {
           hasSupervisor: (g) => Boolean(g.supervisorId) && isValidThesisGroup(g),
           hasStudents: (g) => isValidThesisGroup(g) && (g.students?.length || 0) > 0,
           titleAccepted: (g) => isTitleAccepted(g) && isValidThesisGroup(g),
-          titlePending: (g) => titleProposalStatus(g) === "pending" && isValidThesisGroup(g),
         },
       }),
     [groups, statusFilter]
@@ -487,7 +499,7 @@ export function ThesisGroupsPage() {
       if (res?.group) {
         setGroups((prev) => prev.map((g) => (String(g.id) === String(groupId) ? res.group : g)));
       }
-      setMessage("Title submitted for coordinator/director approval.");
+      setMessage("Title saved — Faculty Coordinator is notified (no approval required).");
       setExpandedId(groupId);
       await reload();
     } catch (e2) {
@@ -527,10 +539,30 @@ export function ThesisGroupsPage() {
       if (res?.group) {
         setGroups((prev) => prev.map((g) => (String(g.id) === String(groupId) ? res.group : g)));
       }
+      if (res?.statusPromoted === "completed") {
+        setMessage("All chapters complete — thesis status is now Completed.");
+      }
       setExpandedId(groupId);
       await reload();
     } catch (e2) {
       setError(e2?.response?.data?.message || "Failed to update chapter");
+    }
+  }
+
+  async function recordDefense(groupId) {
+    if (!window.confirm("Record that this thesis has been defended? Status will change to Defended.")) return;
+    try {
+      setError("");
+      setMessage("");
+      const res = await thesisApi.markThesisDefended(accessToken, groupId);
+      if (res?.group) {
+        setGroups((prev) => prev.map((g) => (String(g.id) === String(groupId) ? res.group : g)));
+      }
+      setMessage("Thesis marked as Defended.");
+      setExpandedId(groupId);
+      await reload();
+    } catch (e2) {
+      setError(e2?.response?.data?.message || "Failed to record defense");
     }
   }
 
@@ -626,7 +658,7 @@ export function ThesisGroupsPage() {
 
       <PageHeader
         title="Thesis"
-        subtitle="Students choose the title; the supervisor enters it; the Faculty Coordinator accepts or rejects it."
+        subtitle="Supervisor enters title and chapter progress. Faculty Coordinator receives notifications only — no accept/reject step."
         stats={stats}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
@@ -837,12 +869,10 @@ export function ThesisGroupsPage() {
           const isAssignedSupervisor =
             user?.role === "researcher" && supervisorIdValue && String(supervisorIdValue) === String(user?.id);
           const canLogMeeting =
-            (canManage || isAssignedSupervisor) &&
-            !["submitted", "defended", "completed"].includes(g.status);
+            (canManage || isAssignedSupervisor) && g.status !== "defended";
           const canUpdateChapters = canManage || isAssignedSupervisor;
           const canUploadFinalDoc = canManage || isAssignedSupervisor;
-          const canEnterTitle = isAssignedSupervisor && titleStatus !== "accepted";
-          const canReviewTitle = canManage && titleStatus === "pending";
+          const canEnterTitle = isAssignedSupervisor;
           const shownTitle = displayTitle(g);
           const finalDoc = g.finalDocument;
 
@@ -893,29 +923,6 @@ export function ThesisGroupsPage() {
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-                  {canReviewTitle ? (
-                    <>
-                      <button
-                        type="button"
-                        className="btn primary"
-                        onClick={() => reviewTitle(g.id, "accept")}
-                        title="Accept thesis title"
-                      >
-                        Accept title
-                      </button>
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => {
-                          setExpandedId(g.id);
-                          setTitleForm({ title: "", reviewNote: "" });
-                        }}
-                        title="Open reject form"
-                      >
-                        Reject title
-                      </button>
-                    </>
-                  ) : null}
                   <button type="button" className="btn" onClick={() => toggleView(g)}>
                     {open ? "Hide" : "View"}
                   </button>
@@ -934,9 +941,11 @@ export function ThesisGroupsPage() {
                 <div style={{ marginTop: 10, display: "grid", gap: 10 }}>
                   {canEnterTitle ? (
                     <div className="card" style={{ background: "rgba(251,191,36,0.08)", borderColor: "rgba(251,191,36,0.35)" }}>
-                      <div style={{ fontWeight: 800, marginBottom: 8 }}>Enter student thesis title</div>
+                      <div style={{ fontWeight: 800, marginBottom: 8 }}>
+                        {titleStatus === "accepted" ? "Update student thesis title" : "Enter student thesis title"}
+                      </div>
                       <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
-                        After students choose their title, enter it here. The coordinator will review and accept it.
+                        After students choose their title, enter it here. The Faculty Coordinator is notified automatically — no approval needed.
                       </p>
                       <div className="field" style={{ marginBottom: 8 }}>
                         <label>Thesis title</label>
@@ -947,45 +956,18 @@ export function ThesisGroupsPage() {
                         />
                       </div>
                       <button type="button" className="btn primary" onClick={() => submitTitleProposal(g.id)}>
-                        Submit title for approval
+                        Save title
                       </button>
                     </div>
                   ) : null}
 
-                  {canReviewTitle ? (
-                    <div className="card" style={{ background: "rgba(14,165,233,0.06)" }}>
-                      <div style={{ fontWeight: 800, marginBottom: 8 }}>
-                        Faculty Coordinator — Accept or Reject title
-                      </div>
-                      <p className="muted" style={{ fontSize: 13, marginBottom: 8 }}>
-                        Supervisor submitted: <strong>{g.titleProposal?.title}</strong>
-                      </p>
-                      <div className="field" style={{ marginBottom: 8 }}>
-                        <label>Review note (optional — useful when rejecting)</label>
-                        <input
-                          value={titleForm.reviewNote}
-                          onChange={(e) => setTitleForm({ ...titleForm, reviewNote: e.target.value })}
-                          placeholder="Comments if rejecting"
-                        />
-                      </div>
-                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                        <button type="button" className="btn primary" onClick={() => reviewTitle(g.id, "accept")}>
-                          Accept title
-                        </button>
-                        <button type="button" className="btn" onClick={() => reviewTitle(g.id, "reject")}>
-                          Reject title
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {titleStatus === "accepted" ? (
+                  {titleStatus === "accepted" && !canEnterTitle ? (
                     <div className="card" style={{ background: "rgba(34,197,94,0.06)" }}>
-                      <div className="muted" style={{ fontSize: 12 }}>Accepted thesis title</div>
+                      <div className="muted" style={{ fontSize: 12 }}>Thesis title</div>
                       <div style={{ fontWeight: 700 }}>{g.title}</div>
-                      {g.titleProposal?.reviewedAt ? (
+                      {g.titleProposal?.proposedAt ? (
                         <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                          Accepted: {formatTimelineDate(g.titleProposal.reviewedAt)}
+                          Recorded: {formatTimelineDate(g.titleProposal.proposedAt)}
                         </div>
                       ) : null}
                       {canManage ? (
@@ -1035,6 +1017,9 @@ export function ThesisGroupsPage() {
 
                   <div className="card">
                     <div style={{ fontWeight: 700, marginBottom: 6 }}>Chapter progress</div>
+                    <p className="muted" style={{ fontSize: 13, marginTop: 0, marginBottom: 8 }}>
+                      Complete chapters in order (1 → 2 → …). When all are done, status becomes <strong>Completed</strong>. After oral defense, Coordinator records <strong>Defended</strong>.
+                    </p>
                     {g.chapters?.length ? (
                       <table className="dashTable">
                         <thead>
@@ -1045,28 +1030,84 @@ export function ThesisGroupsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {g.chapters.map((ch) => (
+                          {g.chapters.map((ch, chIdx) => {
+                            const unlocked = isChapterUnlocked(g.chapters, chIdx);
+                            return (
                             <tr key={ch.key}>
                               <td>{ch.title}</td>
                               <td>{chapterStatusLabel(ch.status)}</td>
                               {canUpdateChapters ? (
                                 <td>
-                                  <select
-                                    value={ch.status}
-                                    onChange={(e) => updateChapter(g.id, ch.key, e.target.value)}
-                                    style={{ fontSize: 13 }}
-                                  >
-                                    {CHAPTER_STATUSES.map((s) => (
-                                      <option key={s.value} value={s.value}>{s.label}</option>
-                                    ))}
-                                  </select>
+                                  {!unlocked && ch.status === "pending" ? (
+                                    <span className="muted" style={{ fontSize: 13 }}>
+                                      Finish {g.chapters[chIdx - 1]?.title || "previous chapter"} first
+                                    </span>
+                                  ) : (
+                                    <select
+                                      value={ch.status}
+                                      onChange={(e) => updateChapter(g.id, ch.key, e.target.value)}
+                                      style={{ fontSize: 13 }}
+                                    >
+                                      {CHAPTER_STATUSES.map((s) => {
+                                        const advanceBlocked =
+                                          !unlocked &&
+                                          s.value !== "pending" &&
+                                          s.value !== ch.status;
+                                        return (
+                                          <option key={s.value} value={s.value} disabled={advanceBlocked}>
+                                            {s.label}
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
+                                  )}
                                 </td>
                               ) : null}
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     ) : <span className="muted">No chapters configured.</span>}
+                    {allChaptersFinished(g.chapters) && g.status === "completed" ? (
+                      <div
+                        style={{
+                          marginTop: 10,
+                          padding: "10px 12px",
+                          borderRadius: 8,
+                          background: "rgba(34,197,94,0.1)",
+                          border: "1px solid rgba(34,197,94,0.35)",
+                          fontSize: 13,
+                        }}
+                      >
+                        ✓ All chapters complete — thesis status: <strong>Completed</strong>
+                        {canManage ? (
+                          <div style={{ marginTop: 8 }}>
+                            <button type="button" className="btn primary" onClick={() => recordDefense(g.id)}>
+                              Record defense (Defended)
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="muted" style={{ marginTop: 6 }}>
+                            Faculty Coordinator will record defense when the oral exam is done.
+                          </div>
+                        )}
+                      </div>
+                    ) : null}
+                    {g.status === "defended" ? (
+                      <div
+                        style={{
+                          marginTop: 10,
+                          padding: "10px 12px",
+                          borderRadius: 8,
+                          background: "rgba(14,165,233,0.08)",
+                          fontSize: 13,
+                          fontWeight: 600,
+                        }}
+                      >
+                        ✓ Thesis defense recorded — status: <strong>Defended</strong>
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="card">

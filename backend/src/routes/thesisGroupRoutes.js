@@ -49,6 +49,14 @@ router.patch(
 );
 
 router.post(
+  "/:id/mark-defended",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("faculty_coordinator", "research_director"),
+  asyncHandler(thesisGroupController.markDefended)
+);
+
+router.post(
   "/:id/meetings",
   authenticateUser,
   requireActiveUser,

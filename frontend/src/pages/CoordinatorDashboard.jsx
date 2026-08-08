@@ -150,6 +150,21 @@ export function CoordinatorDashboardPage() {
         </div>
       </section>
 
+      <section className="dashboardSection">
+        <div className="dashCard">
+          <div className="dashCardTitle">Thesis supervision (information only)</div>
+          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+            When supervisors update thesis titles, chapters, or meetings, you receive a notification — no accept/reject step.
+          </p>
+          <Link className="btn" to="/thesis" style={{ marginTop: 8, display: "inline-block" }}>
+            Open Thesis groups
+          </Link>
+          <Link className="btn" to="/notifications" style={{ marginTop: 8, marginLeft: 8, display: "inline-block" }}>
+            Notifications
+          </Link>
+        </div>
+      </section>
+
       {facultyReport ? (
         <section className="dashboardSection">
           <ActiveProjectsPanel

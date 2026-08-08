@@ -18,7 +18,6 @@ const {
   buildResearchJourneyForResearcher,
   listResearchersForJourney,
 } = require("../utils/researchJourney");
-const { TITLE_PROPOSAL_STATUSES } = require("../utils/thesisDefaults");
 const { Notification } = require("../models/Notification");
 const { FACULTIES, matchFacultyByName } = require("../utils/facultyMatcher");
 const {
@@ -937,7 +936,7 @@ async function getWorkflowOverview(req, res) {
         .limit(300)
         .lean(),
       ThesisGroup.find(thesisFilter)
-        .select("groupName status titleProposal supervisorId updatedAt")
+        .select("title status titleProposal chapters supervisorId updatedAt")
         .sort({ updatedAt: -1 })
         .limit(200)
         .lean(),
@@ -1052,18 +1051,16 @@ async function getWorkflowOverview(req, res) {
     },
     {
       key: "thesis_titles",
-      label: "Thesis — titles pending accept/reject",
+      label: "Thesis — recent title updates",
       link: "/thesis",
-      count: thesisGroups.filter(
-        (t) => t.titleProposal?.status === TITLE_PROPOSAL_STATUSES.PENDING
-      ).length,
+      count: thesisGroups.filter((t) => Boolean(t.title?.trim() || t.titleProposal?.title?.trim())).length,
       items: sample(
-        thesisGroups.filter((t) => t.titleProposal?.status === TITLE_PROPOSAL_STATUSES.PENDING),
+        thesisGroups.filter((t) => Boolean(t.title?.trim() || t.titleProposal?.title?.trim())),
         (t) => ({
           id: String(t._id),
           title: t.titleProposal?.title || t.title || "Thesis group",
-          link: "/thesis",
-          status: t.titleProposal?.status,
+          link: `/thesis?groupId=${t._id}`,
+          status: t.status,
         })
       ),
     },
@@ -1124,7 +1121,7 @@ async function getSystemReport(req, res) {
     Payment.find(tf({})).select("amount status").lean(),
     PurchaseOrder.find(tf({})).select("totalAmount status").lean(),
     Publication.find(tf({})).select("status workflowStage type").lean(),
-    ThesisGroup.find(tf({})).select("status titleProposal").lean(),
+    ThesisGroup.find(tf({})).select("status titleProposal chapters").lean(),
     FundingCall.find(tf({})).select("status").lean(),
     isDirector
       ? User.find({ role: { $ne: ROLES.RESEARCH_DIRECTOR } }).select("role status programTier").lean()
@@ -1211,9 +1208,8 @@ async function getSystemReport(req, res) {
     thesis: {
       total: thesisGroups.length,
       byStatus: countByField(thesisGroups, "status"),
-      titlesPending: thesisGroups.filter(
-        (t) => t.titleProposal?.status === TITLE_PROPOSAL_STATUSES.PENDING
-      ).length,
+      titlesPending: 0,
+      chaptersPending: 0,
     },
     repository: {
       total: visibleRepository.length,

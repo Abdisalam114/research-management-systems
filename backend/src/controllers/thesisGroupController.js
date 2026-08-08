@@ -25,6 +25,9 @@ const {
   assertThesisStudentsNotUsedElsewhere,
   assertThesisTitleNotUsedElsewhere,
   MIN_THESIS_GROUP_STUDENTS,
+  assertChapterSequentialOrder,
+  allChaptersFinished,
+  applyThesisGroupStatusFromChapterProgress,
 } = require("../utils/thesisDefaults");
 
 function resolveTitleProposal(plain) {
@@ -196,17 +199,23 @@ function applyStudentTitleProposal(group, title, userId) {
   const trimmed = String(title || "").trim();
   if (!trimmed) {
     group.titleProposal = emptyTitleProposal();
+    group.title = "";
     return;
   }
+  const now = new Date();
   group.titleProposal = {
     title: trimmed,
-    status: TITLE_PROPOSAL_STATUSES.PENDING,
-    proposedAt: new Date(),
+    status: TITLE_PROPOSAL_STATUSES.ACCEPTED,
+    proposedAt: now,
     proposedBy: userId,
-    reviewedAt: null,
+    reviewedAt: now,
     reviewedBy: null,
     reviewNote: "",
   };
+  group.title = trimmed;
+  if (group.status === THESIS_STATUSES.PROPOSED) {
+    group.status = THESIS_STATUSES.IN_PROGRESS;
+  }
 }
 
 async function loadSanitizedGroup(id) {
@@ -242,21 +251,16 @@ async function findSupervisorResearcher(supervisorId, req) {
   return User.findOne(scoped);
 }
 
-/** Notify Research Director + Faculty Coordinator when the supervisor updates a thesis group. */
-async function notifyStaffOfSupervisorUpdate(group, programTier, { title, body, downloadLink }) {
-  const link = `/thesis?groupId=${group._id}`;
+/** Notify Faculty Coordinator (information only — no approval required). */
+async function notifyCoordinatorThesisUpdate(group, programTier, { title, body, downloadLink, link }) {
+  const resolvedLink = link || `/thesis?groupId=${group._id}`;
   const payload = {
     type: "system",
     title: title || "Thesis supervisor update",
     body: body || "The thesis supervisor made an update.",
-    link,
+    link: resolvedLink,
     downloadLink: downloadLink || "",
   };
-  try {
-    await notifyUsersByRole(ROLES.RESEARCH_DIRECTOR, payload, programTier);
-  } catch {
-    /* best-effort */
-  }
   try {
     await notifyUsersByRole(ROLES.FACULTY_COORDINATOR, payload, programTier);
   } catch {
@@ -539,10 +543,6 @@ async function proposeTitle(req, res) {
     throw new AppError("Only the assigned supervisor can enter the student-chosen thesis title", 403);
   }
 
-  if (titleIsLocked(group)) {
-    throw new AppError("Title is already accepted; contact coordinator to change it", 400);
-  }
-
   try {
     await assertThesisTitleNotUsedElsewhere(ThesisGroup, trimmed, {
       excludeGroupId: group._id,
@@ -555,9 +555,10 @@ async function proposeTitle(req, res) {
   applyStudentTitleProposal(group, trimmed, userId);
   await group.save();
 
-  await notifyStaffOfSupervisorUpdate(group, group.programTier || req.programTier, {
-    title: "Thesis title submitted for acceptance",
-    body: `Supervisor submitted title "${trimmed}" for ${thesisGroupLabel(group)}. Coordinator: Accept or Reject on Thesis.`,
+  await notifyCoordinatorThesisUpdate(group, group.programTier || req.programTier, {
+    title: "Thesis title recorded",
+    body: `Supervisor set thesis title "${trimmed}" for ${thesisGroupLabel(group)}. No approval needed — for your information.`,
+    link: `/thesis?groupId=${group._id}`,
   });
 
   res.json({ group: await loadSanitizedGroup(group._id) });
@@ -663,23 +664,92 @@ async function updateChapter(req, res) {
 
   if (status !== undefined) {
     if (!Object.values(CHAPTER_STATUSES).includes(status)) throw new AppError("Invalid chapter status", 400);
+    if (status !== chapter.status) {
+      try {
+        assertChapterSequentialOrder(group.chapters, chapterKey, status);
+      } catch (e) {
+        throw new AppError(e.message, e.statusCode || 400);
+      }
+    }
     chapter.status = status;
   }
   if (notes !== undefined) chapter.notes = String(notes);
   chapter.updatedAt = new Date();
   chapter.updatedBy = userId;
-
+  group.markModified("chapters");
+  const promotedStatus = applyThesisGroupStatusFromChapterProgress(group, THESIS_STATUSES);
   await group.save();
 
   if (isSupervisor) {
     const chapterLabel = chapter.title || chapter.key || chapterKey;
-    await notifyStaffOfSupervisorUpdate(group, group.programTier || req.programTier, {
-      title: "Thesis chapter updated by supervisor",
-      body: `Supervisor updated "${chapterLabel}" → ${chapter.status} on ${thesisGroupLabel(group)}.`,
+    await notifyCoordinatorThesisUpdate(group, group.programTier || req.programTier, {
+      title: "Thesis chapter updated",
+      body: `Supervisor updated "${chapterLabel}" → ${chapter.status.replace(/_/g, " ")} on ${thesisGroupLabel(group)}.`,
+      link: `/thesis?groupId=${group._id}`,
+    });
+    if (promotedStatus === THESIS_STATUSES.COMPLETED) {
+      await notifyCoordinatorThesisUpdate(group, group.programTier || req.programTier, {
+        title: "All thesis chapters complete",
+        body: `${thesisGroupLabel(group)} — all chapters are finished. Thesis status is now Completed. Record defense when the oral exam is done.`,
+        link: `/thesis?groupId=${group._id}`,
+      });
+      if (group.supervisorId) {
+        await notifyUser(group.supervisorId, {
+          type: "system",
+          title: "All thesis chapters complete",
+          body: `All chapters are finished for ${thesisGroupLabel(group)}. Thesis status: Completed.`,
+          link: `/thesis?groupId=${group._id}`,
+          programTier: group.programTier || req.programTier,
+        });
+      }
+    }
+  }
+
+  res.json({
+    group: await loadSanitizedGroup(group._id),
+    statusPromoted: promotedStatus || undefined,
+  });
+}
+
+async function markDefended(req, res) {
+  const { role } = req.user;
+  if (![ROLES.RESEARCH_DIRECTOR, ROLES.FACULTY_COORDINATOR].includes(role)) {
+    throw new AppError("Only the coordinator or director can record thesis defense", 403);
+  }
+
+  const { id } = req.params;
+  const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }));
+  if (!group) throw new AppError("Thesis group not found", 404);
+
+  ensureChapters(group);
+
+  if (!allChaptersFinished(group.chapters)) {
+    throw new AppError("All chapters must be completed before recording defense", 400);
+  }
+  if (group.status !== THESIS_STATUSES.COMPLETED) {
+    throw new AppError("Thesis must be Completed (all chapters finished) before recording defense", 400);
+  }
+
+  group.status = THESIS_STATUSES.DEFENDED;
+  await group.save();
+
+  await notifyCoordinatorThesisUpdate(group, group.programTier || req.programTier, {
+    title: "Thesis defense recorded",
+    body: `${thesisGroupLabel(group)} has been marked Defended.`,
+    link: `/thesis?groupId=${group._id}`,
+  });
+
+  if (group.supervisorId) {
+    await notifyUser(group.supervisorId, {
+      type: "system",
+      title: "Thesis defense recorded",
+      body: `${thesisGroupLabel(group)} has been marked Defended in the system.`,
+      link: `/thesis?groupId=${group._id}`,
+      programTier: group.programTier || req.programTier,
     });
   }
 
-  res.json({ group: await loadSanitizedGroup(group._id) });
+  res.json({ group: await loadSanitizedGroup(group._id), message: "Thesis marked as defended" });
 }
 
 async function addMeeting(req, res) {
@@ -697,8 +767,8 @@ async function addMeeting(req, res) {
   const { date, location, agenda, notes, chaptersDiscussed } = req.body || {};
   if (!date) throw new AppError("date is required", 400);
 
-  if ([THESIS_STATUSES.COMPLETED, THESIS_STATUSES.DEFENDED, THESIS_STATUSES.SUBMITTED].includes(group.status)) {
-    throw new AppError("Cannot log supervision meetings after the thesis is submitted, defended, or completed", 400);
+  if (group.status === THESIS_STATUSES.DEFENDED) {
+    throw new AppError("Cannot log supervision meetings after thesis defense is recorded", 400);
   }
 
   const validKeys = new Set((group.chapters || []).map((c) => c.key));
@@ -730,7 +800,7 @@ async function addMeeting(req, res) {
   await group.save();
 
   if (isSupervisor) {
-    await notifyStaffOfSupervisorUpdate(group, group.programTier || req.programTier, {
+    await notifyCoordinatorThesisUpdate(group, group.programTier || req.programTier, {
       title: "Thesis meeting logged by supervisor",
       body: `Supervisor logged a meeting (${dateStr}) for ${thesisGroupLabel(group)}${agenda ? `: ${String(agenda).slice(0, 80)}` : ""}.`,
     });
@@ -763,8 +833,8 @@ async function uploadFinalDocument(req, res) {
     throw new AppError("Only the supervisor (or coordinator/director) can upload the final thesis", 403);
   }
 
-  if (!titleIsLocked(group) && !String(group.title || "").trim()) {
-    throw new AppError("Accept the thesis title before uploading the final document", 400);
+  if (!String(group.title || group.titleProposal?.title || "").trim()) {
+    throw new AppError("Enter the thesis title before uploading the final document", 400);
   }
 
   if (!req.file) throw new AppError("PDF or Word file is required", 400);
@@ -780,16 +850,19 @@ async function uploadFinalDocument(req, res) {
     uploadedBy: userId,
   };
 
-  if (markComplete) {
+  if (markComplete && group.status !== THESIS_STATUSES.DEFENDED) {
     group.status = THESIS_STATUSES.COMPLETED;
-  } else if (group.status === THESIS_STATUSES.IN_PROGRESS || group.status === THESIS_STATUSES.PROPOSED) {
+  } else if (
+    group.status === THESIS_STATUSES.IN_PROGRESS ||
+    group.status === THESIS_STATUSES.PROPOSED
+  ) {
     group.status = THESIS_STATUSES.SUBMITTED;
   }
 
   await group.save();
 
   const fileLabel = group.finalDocument.originalName || "thesis document";
-  await notifyStaffOfSupervisorUpdate(group, group.programTier || req.programTier, {
+  await notifyCoordinatorThesisUpdate(group, group.programTier || req.programTier, {
     title: "Final thesis document uploaded",
     body: `Supervisor uploaded "${fileLabel}" for ${thesisGroupLabel(group)}${
       group.status === THESIS_STATUSES.COMPLETED ? " (marked completed)." : "."
@@ -825,6 +898,7 @@ module.exports = {
   proposeTitle,
   reviewTitleProposal,
   updateChapter,
+  markDefended,
   addMeeting,
   uploadFinalDocument,
   deleteGroup,

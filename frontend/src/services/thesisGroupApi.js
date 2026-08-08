@@ -44,6 +44,11 @@ export async function updateThesisChapter(accessToken, id, chapterKey, body) {
   return data;
 }
 
+export async function markThesisDefended(accessToken, id) {
+  const { data } = await api.post(`/api/thesis-groups/${id}/mark-defended`, {}, authHeaders(accessToken));
+  return data;
+}
+
 export async function deleteThesisGroup(accessToken, id) {
   const { data } = await api.delete(`/api/thesis-groups/${id}`, authHeaders(accessToken));
   return data;
