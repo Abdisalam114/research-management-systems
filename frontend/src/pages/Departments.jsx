@@ -3,7 +3,6 @@ import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import * as departmentApi from "../services/departmentApi";
 import { PageHeader } from "../components/PageHeader";
-import { statFilterLabel } from "../utils/pageHeaderFilters";
 import { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } from "../constants/faculties";
 import { useScrollToTop } from "../hooks/useScrollToTop";
 
@@ -16,7 +15,6 @@ export function DepartmentsPage() {
   const [form, setForm] = useState({ name: "", code: "", faculty: FACULTIES[0].value, programTier: portalTier });
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("all");
 
   useScrollToTop([showForm, editingId]);
 
@@ -122,21 +120,13 @@ export function DepartmentsPage() {
     return map;
   }, [departments]);
 
-  const stats = useMemo(() => {
-    const facultiesWithDepts = FACULTIES.filter((f) => (departmentsByFaculty[f.value] || []).length > 0).length;
-    return [
-      { label: "Faculties", value: FACULTIES.length, filterKey: "all", accent: "#0ea5e9" },
-      { label: "With departments", value: facultiesWithDepts, filterKey: "hasDepartments", accent: "#38bdf8" },
-      { label: "Departments", value: departments.length, filterKey: "all", accent: "#0ea5e9" },
-    ];
-  }, [departments, departmentsByFaculty]);
-
-  const visibleFaculties = useMemo(() => {
-    if (statusFilter === "hasDepartments") {
-      return FACULTIES.filter((f) => (departmentsByFaculty[f.value] || []).length > 0);
-    }
-    return FACULTIES;
-  }, [statusFilter, departmentsByFaculty]);
+  const stats = useMemo(
+    () => [
+      { label: "Faculties", value: FACULTIES.length, accent: "#0ea5e9" },
+      { label: "Departments", value: departments.length, accent: "#38bdf8" },
+    ],
+    [departments.length]
+  );
 
   return (
     <div>
@@ -144,8 +134,6 @@ export function DepartmentsPage() {
         title="Faculties & Departments"
         subtitle="6 faculties of Jamhuriya University; each faculty contains its departments."
         stats={stats}
-        activeFilter={statusFilter}
-        onFilterChange={setStatusFilter}
         actions={
           <button
             type="button"
@@ -162,11 +150,6 @@ export function DepartmentsPage() {
           </button>
         }
       />
-      {statusFilter !== "all" ? (
-        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          Showing: <strong>{statFilterLabel(stats, statusFilter)}</strong>
-        </p>
-      ) : null}
       {error ? (
         <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)", marginBottom: 12 }}>{error}</div>
       ) : null}
@@ -213,7 +196,7 @@ export function DepartmentsPage() {
       ) : null}
 
       <div style={{ display: "grid", gap: 12 }}>
-        {visibleFaculties.map((f) => (
+        {FACULTIES.map((f) => (
           <FacultyCard
             key={f.value}
             faculty={f}
