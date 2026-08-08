@@ -41,24 +41,18 @@ export function ReviewAssignmentsPage() {
   const stats = useMemo(
     () => [
       {
-        label: isDirector ? "Sent to reviewers" : "Assigned",
+        label: isDirector ? "Awaiting Leadership" : "Assigned",
         value: assignments.length,
         filterKey: "all",
       },
       {
-        label: isDirector ? "Awaiting Leadership" : "Pending review",
+        label: isDirector ? "Still pending" : "Pending review",
         value: awaiting.length,
         filterKey: "pending",
         accent: "#fbbf24",
       },
-      {
-        label: isDirector ? "Reviews received" : "Submitted",
-        value: received.length,
-        filterKey: "done",
-        accent: "#22c55e",
-      },
     ],
-    [assignments.length, awaiting.length, received.length, isDirector]
+    [assignments.length, awaiting.length, isDirector]
   );
 
   const filtered = useMemo(() => {
@@ -73,7 +67,7 @@ export function ReviewAssignmentsPage() {
         title="Peer Reviews"
         subtitle={
           isDirector
-            ? "Active proposals you sent to Leadership — tile count matches this list."
+            ? "Proposals awaiting Leadership peer review — completed ones move to committee on the Review page."
             : "Proposals the Research Director sent to you — submit score (1–5) and comments."
         }
         stats={stats}
@@ -116,7 +110,7 @@ export function ReviewAssignmentsPage() {
             </div>
             <p className="muted" style={{ marginTop: 8, fontSize: 14 }}>
               {isDirector
-                ? "Open a proposal → Review → Assign & send to reviewer. Active ones appear here and on the dashboard Peer Reviews tile."
+                ? "When Leadership finishes peer review, the proposal leaves this list. Open Proposals → Review to assign committee."
                 : "When the Research Director sends a proposal to you, it appears here. Use the same portal (Undergraduate / Postgraduate)."}
             </p>
             {isDirector ? (
@@ -201,9 +195,7 @@ export function ReviewAssignmentsPage() {
                         }}
                       >
                         {isDirector
-                          ? isAwaiting
-                            ? "⏳ Awaiting Leadership peer review"
-                            : "✓ Leadership reviews received — continue pipeline"
+                          ? "⏳ Awaiting Leadership peer review"
                           : isAwaiting
                             ? "⏳ Peer review pending — action required"
                             : "✓ Peer review submitted"}

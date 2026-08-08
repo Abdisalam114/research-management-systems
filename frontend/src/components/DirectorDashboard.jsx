@@ -195,19 +195,23 @@ export function DirectorDashboard() {
       </section>
 
       <section className="dashboardSection">
-        <div className="dashboardSectionTitle">Peer Reviews — sent to Leadership</div>
+        <div className="dashboardSectionTitle">Peer Reviews — awaiting Leadership</div>
         <div className="card" style={{ marginTop: 8 }}>
           <p style={{ marginTop: 0, fontSize: 14 }}>
-            <strong>{peerSummary.total}</strong> sent to Leadership ·{" "}
-            <strong style={{ color: "#fbbf24" }}>{peerSummary.awaiting}</strong> awaiting review ·{" "}
-            <strong style={{ color: "#22c55e" }}>{peerSummary.received}</strong> reviews received
+            <strong>{peerSummary.total}</strong> awaiting Leadership review
+            {peerSummary.awaiting !== peerSummary.total ? (
+              <>
+                {" "}
+                · <strong style={{ color: "#fbbf24" }}>{peerSummary.awaiting}</strong> still pending
+              </>
+            ) : null}
             {data.overview?.modules?.reviews != null ? (
               <span className="muted"> · Tile: {data.overview.modules.reviews}</span>
             ) : null}
           </p>
           {peerQueue.length === 0 ? (
             <p className="muted" style={{ marginBottom: 0, fontSize: 14 }}>
-              No active proposals sent to reviewers. Assign Leadership from a proposal Review page.
+              No proposals awaiting Leadership. After peer review completes, continue on the proposal Review page (committee).
             </p>
           ) : (
             <div style={{ display: "grid", gap: 10 }}>
@@ -234,9 +238,7 @@ export function DirectorDashboard() {
                       <div style={{ fontWeight: 700 }}>{a.title}</div>
                       <div className="muted" style={{ fontSize: 12 }}>
                         Sent to reviewer{names ? `: ${names}` : ""} ·{" "}
-                        <span style={{ color: awaiting ? "#fbbf24" : "#22c55e", fontWeight: 600 }}>
-                          {awaiting ? "Awaiting Leadership" : "Reviews received"}
-                        </span>
+                        <span style={{ color: "#fbbf24", fontWeight: 600 }}>Awaiting Leadership</span>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

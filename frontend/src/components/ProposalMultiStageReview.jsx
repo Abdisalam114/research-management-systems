@@ -67,34 +67,57 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
     (r) => reviewerRefId(r.userId) === String(user?.id)
   );
   const peerStageOpen = pipe.peerReview?.status !== "passed";
+  const peerReviewPassed = pipe.peerReview?.status === "passed";
   const hasPeerReviews = (proposal.peerReviews || []).length > 0;
+  const hasAssignedReviewers = (proposal.assignedReviewers || []).length > 0;
   const hasCommitteeAssignees = (proposal.assignedCommittee || []).length > 0;
   const canSubmitPeerReview =
     assigned && !peerDone && peerStageOpen && (isLeadershipReviewer || isDirector);
   const canDirectorSubmitPeer =
     isDirector && !peerDone && peerStageOpen && !hasPeerReviews && !isLeadershipReviewer;
   const showPeerSubmitForm = canSubmitPeerReview || canDirectorSubmitPeer;
-  const canAssignReviewers = isDirector;
+  const canAssignReviewers =
+    isDirector && !peerReviewPassed && !hasAssignedReviewers && !hasPeerReviews;
+  const showPeerAwaitingDirector =
+    isDirector && !peerReviewPassed && (hasAssignedReviewers || hasPeerReviews);
   const canAssignCommittee =
     isDirector &&
     pipe.peerReview?.status === "passed" &&
-    stageOpen(pipe.committeeReview?.status);
+    stageOpen(pipe.committeeReview?.status) &&
+    !hasCommitteeAssignees;
+  const committeeStageOpen = stageOpen(pipe.committeeReview?.status);
+  const committeePassed = pipe.committeeReview?.status === "passed";
+  const committeeFailed = pipe.committeeReview?.status === "failed";
+  const committeeCompletedByMe =
+    String(pipe.committeeReview?.completedBy || "") === String(user?.id);
+  const showCommitteeAwaitingDirector =
+    isDirector && committeeStageOpen && hasCommitteeAssignees;
+  const hasFinanceAssignees = (proposal.assignedFinance || []).length > 0;
+  const financeStageOpen = stageOpen(pipe.financeReview?.status);
+  const financePassed = pipe.financeReview?.status === "passed";
+  const financeFailed = pipe.financeReview?.status === "failed";
+  const financeCompletedByMe =
+    String(pipe.financeReview?.completedBy || "") === String(user?.id);
+  const directorReady = proposal.currentReviewStage === "ready_for_director";
   const canAssignFinance =
     isDirector &&
     !isVoluntary &&
     pipe.committeeReview?.status === "passed" &&
-    stageOpen(pipe.financeReview?.status);
+    financeStageOpen &&
+    !hasFinanceAssignees;
+  const showFinanceAwaitingDirector =
+    isDirector && !isVoluntary && financeStageOpen && hasFinanceAssignees;
   const canDecideCommittee =
-    hasCommitteeAssignees &&
-    (isDirector || (isCoordinator && assignedToCommittee)) &&
+    isCoordinator &&
+    assignedToCommittee &&
     pipe.peerReview?.status === "passed" &&
-    stageOpen(pipe.committeeReview?.status);
+    committeeStageOpen;
   const canDecideFinance =
     isFinance &&
     assignedToFinance &&
     !isVoluntary &&
     pipe.committeeReview?.status === "passed" &&
-    stageOpen(pipe.financeReview?.status);
+    financeStageOpen;
 
   useEffect(() => {
     if (!canAssignReviewers || !accessToken) return;
@@ -350,26 +373,63 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
           >
             Assign &amp; send to reviewer
           </button>
+        </div>
+      ) : null}
+
+      {showPeerAwaitingDirector ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 14,
+            padding: 12,
+            borderColor: "rgba(251,191,36,0.45)",
+            background: "rgba(251,191,36,0.08)",
+            fontSize: 13,
+          }}
+        >
+          <strong>Sent to Leadership — awaiting peer review.</strong>
           {(proposal.assignedReviewers || []).length > 0 ? (
-            <div
-              className="card"
-              style={{
-                marginTop: 10,
-                padding: 10,
-                borderColor: "rgba(34,197,94,0.45)",
-                background: "rgba(34,197,94,0.08)",
-                fontSize: 13,
-              }}
-            >
-              <strong>Sent to reviewer:</strong>{" "}
+            <span>
+              {" "}
+              Reviewer(s):{" "}
               {(proposal.assignedReviewers || [])
                 .map((r) => r.fullName || r.email || "Leadership")
                 .join(", ")}
-              {pipe.peerReview?.status === "in_progress" ? (
-                <span className="muted"> · Peer review in progress</span>
-              ) : null}
-            </div>
+            </span>
           ) : null}
+          {hasPeerReviews ? (
+            <span className="muted">
+              {" "}
+              · {(proposal.peerReviews || []).length} review(s) received — waiting for remaining
+              reviewer(s) or stage completion.
+            </span>
+          ) : (
+            <span className="muted"> · This proposal leaves Peer Reviews once Leadership submits.</span>
+          )}
+        </div>
+      ) : null}
+
+      {isDirector && peerReviewPassed ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 14,
+            padding: 12,
+            borderColor: "rgba(34,197,94,0.45)",
+            background: "rgba(34,197,94,0.08)",
+            fontSize: 13,
+          }}
+        >
+          <strong>✓ Leadership peer review complete.</strong>
+          {(proposal.peerReviews || []).length > 0 ? (
+            <span>
+              {" "}
+              {(proposal.peerReviews || [])
+                .map((r) => `${r.reviewerName || r.reviewerEmail || "Reviewer"} (${r.score}/5)`)
+                .join(" · ")}
+            </span>
+          ) : null}
+          <span className="muted"> Continue with committee assignment below.</span>
         </div>
       ) : null}
 
@@ -379,7 +439,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         </div>
       ) : null}
 
-      {(isDirector || isCoordinator) && (proposal.peerReviews || []).length > 0 ? (
+      {(isCoordinator || (isDirector && !peerReviewPassed)) && (proposal.peerReviews || []).length > 0 ? (
         <div
           style={{
             marginBottom: 14,
@@ -416,7 +476,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
               </div>
             ))}
           </div>
-          {isDirector && pipe.peerReview?.status !== "passed" ? (
+          {isDirector && pipe.peerReview?.status !== "passed" && hasPeerReviews ? (
             <button
               type="button"
               className="btn primary"
@@ -426,11 +486,6 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
             >
               Complete peer review stage
             </button>
-          ) : null}
-          {pipe.peerReview?.status === "passed" ? (
-            <div className="muted" style={{ marginTop: 8, fontSize: 12, color: "#22c55e" }}>
-              ✓ Peer review stage completed — assign committee below.
-            </div>
           ) : null}
         </div>
       ) : null}
@@ -501,11 +556,12 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
       ) : null}
 
       {isDirector &&
-      pipe.peerReview?.status !== "passed" &&
+      !peerReviewPassed &&
+      !hasAssignedReviewers &&
       (proposal.peerReviews || []).length === 0 ? (
         <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
-          Assign Leadership reviewers above. After they submit scores &amp; comments, complete the
-          peer review stage here.
+          Assign Leadership reviewers above. Once they submit, this proposal leaves Peer Reviews and
+          you can assign committee here.
         </p>
       ) : null}
 
@@ -555,25 +611,97 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
           >
             Assign &amp; send to committee
           </button>
+        </div>
+      ) : null}
+
+      {showCommitteeAwaitingDirector ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 14,
+            padding: 12,
+            borderColor: "rgba(251,191,36,0.45)",
+            background: "rgba(251,191,36,0.08)",
+            fontSize: 13,
+          }}
+        >
+          <strong>Sent to committee — awaiting Faculty Coordinator review.</strong>
           {(proposal.assignedCommittee || []).length > 0 ? (
-            <div
-              className="card"
-              style={{
-                marginTop: 10,
-                padding: 10,
-                borderColor: "rgba(34,197,94,0.45)",
-                background: "rgba(34,197,94,0.08)",
-                fontSize: 13,
-              }}
-            >
-              <strong>Sent to committee:</strong>{" "}
+            <span>
+              {" "}
+              Coordinator(s):{" "}
               {(proposal.assignedCommittee || [])
                 .map((r) => r.fullName || r.email || "Coordinator")
                 .join(", ")}
-              {pipe.committeeReview?.status === "in_progress" ? (
-                <span className="muted"> · Committee review in progress</span>
-              ) : null}
-            </div>
+            </span>
+          ) : null}
+          <span className="muted">
+            {" "}
+            · This proposal leaves Committee Reviews once the coordinator submits.
+          </span>
+        </div>
+      ) : null}
+
+      {isDirector && committeePassed ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 14,
+            padding: 12,
+            borderColor: "rgba(34,197,94,0.45)",
+            background: "rgba(34,197,94,0.08)",
+            fontSize: 13,
+          }}
+        >
+          <strong>✓ Committee review complete.</strong>
+          {pipe.committeeReview?.score != null ? (
+            <span> Score: {pipe.committeeReview.score}/5.</span>
+          ) : null}
+          {pipe.committeeReview?.decision ? (
+            <span> Decision: {String(pipe.committeeReview.decision).replace(/_/g, " ")}.</span>
+          ) : null}
+          <span className="muted">
+            {isVoluntary
+              ? " Voluntary proposal — no finance stage. Issue ethics certificate (above), then approve below to create the project."
+              : " Continue with finance assignment below."}
+          </span>
+        </div>
+      ) : null}
+
+      {isDirector && isVoluntary && committeePassed && directorReady ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 14,
+            padding: 12,
+            borderColor: "rgba(56,189,248,0.45)",
+            background: "rgba(56,189,248,0.08)",
+            fontSize: 13,
+          }}
+        >
+          <strong>Ready for director approval.</strong>
+          <span className="muted">
+            {" "}
+            Voluntary research — finance is not used. Approve ethics certificate if required, then use{" "}
+            <strong>Proposal decision</strong> below to approve and create the project.
+          </span>
+        </div>
+      ) : null}
+
+      {isDirector && committeeFailed ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 14,
+            padding: 12,
+            borderColor: "rgba(239,68,68,0.45)",
+            background: "rgba(239,68,68,0.08)",
+            fontSize: 13,
+          }}
+        >
+          <strong>Committee rejected this proposal.</strong>
+          {pipe.committeeReview?.comment ? (
+            <span className="muted"> {pipe.committeeReview.comment}</span>
           ) : null}
         </div>
       ) : null}
@@ -584,15 +712,13 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
             marginBottom: 14,
             padding: 12,
             borderRadius: 8,
-            border: isCoordinator ? "1px solid rgba(251,191,36,0.45)" : "1px solid rgba(148,197,255,0.25)",
-            background: isCoordinator ? "rgba(251,191,36,0.08)" : undefined,
+            border: "1px solid rgba(251,191,36,0.45)",
+            background: "rgba(251,191,36,0.08)",
           }}
         >
-          {isCoordinator ? (
-            <div style={{ fontWeight: 800, marginBottom: 8, color: "#fbbf24" }}>
-              Your committee review — action required
-            </div>
-          ) : null}
+          <div style={{ fontWeight: 800, marginBottom: 8, color: "#fbbf24" }}>
+            Your committee review — action required
+          </div>
           <div style={{ marginBottom: 12 }}>
           <label>
             Committee score (1–5)
@@ -671,6 +797,20 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         </div>
       ) : null}
 
+      {isCoordinator && committeeCompletedByMe && !committeeStageOpen ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 12,
+            borderColor: "rgba(34,197,94,0.4)",
+            background: "rgba(34,197,94,0.08)",
+            fontSize: 13,
+          }}
+        >
+          ✓ Your committee review was submitted. The Research Director can continue the pipeline.
+        </div>
+      ) : null}
+
       {isCoordinator &&
       !assignedToCommittee &&
       pipe.peerReview?.status === "passed" &&
@@ -726,31 +866,91 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
           >
             Assign &amp; send to finance
           </button>
+        </div>
+      ) : null}
+
+      {showFinanceAwaitingDirector ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 14,
+            padding: 12,
+            borderColor: "rgba(251,191,36,0.45)",
+            background: "rgba(251,191,36,0.08)",
+            fontSize: 13,
+          }}
+        >
+          <strong>Sent to finance — awaiting Finance Officer review.</strong>
           {(proposal.assignedFinance || []).length > 0 ? (
-            <div
-              className="card"
-              style={{
-                marginTop: 10,
-                padding: 10,
-                borderColor: "rgba(34,197,94,0.45)",
-                background: "rgba(34,197,94,0.08)",
-                fontSize: 13,
-              }}
-            >
-              <strong>Sent to finance:</strong>{" "}
+            <span>
+              {" "}
+              Officer(s):{" "}
               {(proposal.assignedFinance || [])
                 .map((r) => r.fullName || r.email || "Finance")
                 .join(", ")}
-              {pipe.financeReview?.status === "in_progress" ? (
-                <span className="muted"> · Finance review in progress</span>
-              ) : null}
-            </div>
+            </span>
+          ) : null}
+          <span className="muted">
+            {" "}
+            · Leaves the finance queue once the officer submits. Then approve the proposal to create the project.
+          </span>
+        </div>
+      ) : null}
+
+      {isDirector && financePassed ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 14,
+            padding: 12,
+            borderColor: "rgba(34,197,94,0.45)",
+            background: "rgba(34,197,94,0.08)",
+            fontSize: 13,
+          }}
+        >
+          <strong>✓ Finance review complete.</strong>
+          {pipe.financeReview?.decision ? (
+            <span> Decision: {pipe.financeReview.decision}.</span>
+          ) : null}
+          <span className="muted">
+            {" "}
+            Issue ethics certificate if required, then use <strong>Proposal decision</strong> below to approve and
+            create the project.
+          </span>
+        </div>
+      ) : null}
+
+      {isDirector && financeFailed ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 14,
+            padding: 12,
+            borderColor: "rgba(239,68,68,0.45)",
+            background: "rgba(239,68,68,0.08)",
+            fontSize: 13,
+          }}
+        >
+          <strong>Finance rejected this proposal budget.</strong>
+          {pipe.financeReview?.comment ? (
+            <span className="muted"> {pipe.financeReview.comment}</span>
           ) : null}
         </div>
       ) : null}
 
       {canDecideFinance ? (
-        <div>
+        <div
+          style={{
+            marginBottom: 14,
+            padding: 12,
+            borderRadius: 8,
+            border: "1px solid rgba(251,191,36,0.45)",
+            background: "rgba(251,191,36,0.08)",
+          }}
+        >
+          <div style={{ fontWeight: 800, marginBottom: 8, color: "#fbbf24" }}>
+            Your finance review — action required
+          </div>
           <input
             placeholder="Finance review comment"
             value={comment}
@@ -792,6 +992,20 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
               Finance reject
             </button>
           </div>
+        </div>
+      ) : null}
+
+      {isFinance && financeCompletedByMe && !financeStageOpen ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: 12,
+            borderColor: "rgba(34,197,94,0.4)",
+            background: "rgba(34,197,94,0.08)",
+            fontSize: 13,
+          }}
+        >
+          ✓ Your finance review was submitted. The Research Director can approve the proposal and create the project.
         </div>
       ) : null}
 

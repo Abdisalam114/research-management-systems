@@ -24,48 +24,31 @@ export function CommitteeAssignmentsPage() {
   const { loading, error, reload } = useModuleLoad(accessToken, load, [location.pathname]);
 
   const pending = useMemo(
-    () =>
-      assignments.filter((a) =>
-        isDirector ? a.committeeStage !== "passed" : a.actionRequired
-      ),
-    [assignments, isDirector]
-  );
-  const done = useMemo(
-    () =>
-      assignments.filter((a) =>
-        isDirector ? a.committeeStage === "passed" : !a.actionRequired
-      ),
+    () => assignments.filter((a) => (isDirector ? true : a.actionRequired)),
     [assignments, isDirector]
   );
 
   const stats = useMemo(
     () => [
       {
-        label: isDirector ? "Sent to committee" : "Assigned to you",
+        label: isDirector ? "Awaiting committee" : "Assigned to you",
         value: assignments.length,
         filterKey: "all",
       },
       {
-        label: isDirector ? "Awaiting committee" : "Action required",
+        label: isDirector ? "Still pending" : "Action required",
         value: pending.length,
         filterKey: "pending",
         accent: "#fbbf24",
       },
-      {
-        label: "Completed",
-        value: done.length,
-        filterKey: "done",
-        accent: "#22c55e",
-      },
     ],
-    [assignments.length, pending.length, done.length, isDirector]
+    [assignments.length, pending.length, isDirector]
   );
 
   const filtered = useMemo(() => {
     if (statusFilter === "pending") return pending;
-    if (statusFilter === "done") return done;
     return filterByStatKey(assignments, statusFilter === "all" ? "all" : statusFilter);
-  }, [assignments, statusFilter, pending, done]);
+  }, [assignments, statusFilter, pending]);
 
   return (
     <div>
@@ -73,8 +56,8 @@ export function CommitteeAssignmentsPage() {
         title="Committee Reviews"
         subtitle={
           isCoordinator
-            ? "Proposals the Research Director assigned to you — submit score (1–5) and committee decision."
-            : "Active proposals sent to Faculty Coordinators for committee review."
+            ? "Proposals assigned to you — submit committee review here. Completed ones leave this list."
+            : "Proposals awaiting Faculty Coordinator review — completed ones move to finance on the Review page."
         }
         stats={stats}
         activeFilter={statusFilter}
@@ -116,8 +99,8 @@ export function CommitteeAssignmentsPage() {
             </div>
             <p className="muted" style={{ marginTop: 8, fontSize: 14 }}>
               {isCoordinator
-                ? "When the Research Director assigns you to a proposal committee, it appears here with a notification. Open and submit your committee review."
-                : "Assign Faculty Coordinators from a proposal Review page after peer review is complete."}
+                ? "When the Research Director assigns you, the proposal appears here until you submit your committee review."
+                : "When the coordinator finishes committee review, the proposal leaves this list. Open Proposals → Review to assign finance."}
             </p>
           </div>
         ) : (
@@ -127,7 +110,7 @@ export function CommitteeAssignmentsPage() {
                 .map((m) => m.fullName || m.email)
                 .filter(Boolean)
                 .join(", ");
-              const needsAction = isCoordinator ? a.actionRequired : a.committeeStage !== "passed";
+              const needsAction = isCoordinator ? a.actionRequired : true;
               return (
                 <div key={a.id} className="card">
                   <div
@@ -174,12 +157,8 @@ export function CommitteeAssignmentsPage() {
                         }}
                       >
                         {isCoordinator
-                          ? needsAction
-                            ? "⏳ Committee review required — submit score & comment"
-                            : "✓ Committee stage complete or not assigned to you"
-                          : needsAction
-                            ? "⏳ Awaiting committee review"
-                            : "✓ Committee review complete"}
+                          ? "⏳ Committee review required — submit score & comment"
+                          : "⏳ Awaiting Faculty Coordinator review"}
                       </p>
                     </div>
                     <div

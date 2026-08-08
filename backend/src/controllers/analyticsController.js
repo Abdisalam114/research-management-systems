@@ -188,12 +188,13 @@ async function getDashboardMetrics(req, res) {
       const assigned = await Proposal.find(
         tw(peerReviewLeadershipQueueFilter(userId))
       ).select("peerReviews assignedReviewers reviewPipeline");
-      reviewAssignments = assigned.length;
-      reviewAssignmentsPending = assigned.filter(
+      const open = assigned.filter(
         (p) => !(p.peerReviews || []).some((r) => reviewerRefId(r.userId) === String(userId))
-      ).length;
+      );
+      reviewAssignments = open.length;
+      reviewAssignmentsPending = open.length;
     } else {
-      // Director Peer Reviews tile = active queue (same filter as Peer Reviews page)
+      // Director Peer Reviews tile = awaiting Leadership only (same filter as Peer Reviews page)
       const sentActive = await Proposal.find(
         tw(peerReviewDirectorQueueFilter())
       ).select("assignedReviewers peerReviews reviewPipeline");
@@ -209,14 +210,9 @@ async function getDashboardMetrics(req, res) {
         );
         const peerStage = p.reviewPipeline?.peerReview?.status || "pending";
         if (reviewers.length === 0) {
-          const count = (p.peerReviews || []).length;
-          return (
-            count === 0 ||
-            peerStage === STAGE_STATUS.PENDING ||
-            peerStage === STAGE_STATUS.IN_PROGRESS
-          );
+          return peerStage === STAGE_STATUS.PENDING || peerStage === STAGE_STATUS.IN_PROGRESS;
         }
-        return pending || peerStage === STAGE_STATUS.PENDING || peerStage === STAGE_STATUS.IN_PROGRESS;
+        return pending;
       }).length;
     }
   }

@@ -205,7 +205,7 @@ throw e;
           (peer → committee
           {proposal.proposalKind === "grant_fund_call" || proposal.fundingCallId
             ? " → finance"
-            : ""}
+            : " — voluntary: no finance"}
           ). Use Assign &amp; send above to move the proposal forward.
         </div>
       ) : null}

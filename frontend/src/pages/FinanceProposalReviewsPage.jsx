@@ -1,106 +1,142 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useCallback, useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { useProgramTier } from "../hooks/useProgramTier";
+import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
+import { StatusBadge } from "../components/StatusBadge";
 
-/** Finance-only queue: grant proposals waiting on finance review (not general proposals). */
+/** Finance queue: grant proposals assigned for finance review (voluntary excluded). */
 export function FinanceProposalReviewsPage() {
-  const { accessToken } = useAuth();
-  const { programTier } = useProgramTier();
-  const [proposals, setProposals] = useState([]);
-  const [error, setError] = useState("");
+  const { accessToken, user } = useAuth();
+  const location = useLocation();
+  const [assignments, setAssignments] = useState([]);
+  const isDirector = user?.role === "research_director";
 
-  useEffect(() => {
-    proposalApi
-      .listProposals(accessToken)
-      .then((res) => setProposals(res.proposals || []))
-      .catch((e) => setError(e?.response?.data?.message || "Failed to load finance review queue"));
-  }, [accessToken, programTier]);
+  const load = useCallback(async () => {
+    const res = await proposalApi.listMyFinanceAssignments(accessToken);
+    setAssignments(res.assignments || []);
+  }, [accessToken]);
 
-  const queue = useMemo(() => {
-    return (proposals || []).filter((p) => {
-      const kind = p.proposalKind || (p.fundingCallId ? "grant_fund_call" : "voluntary");
-      if (kind === "voluntary" || (!p.fundingCallId && p.proposalKind !== "grant_fund_call")) {
-        return false;
-      }
-      const pipe = p.reviewPipeline || {};
-      if (pipe.committeeReview?.status !== "passed") return false;
-      const fr = pipe.financeReview?.status;
-      if (fr === "passed" || fr === "failed" || fr === "skipped") return false;
-      // Prefer assigned queue; if none assigned yet, still show after committee so Director can assign
-      return fr === "pending" || fr === "in_progress" || p.currentReviewStage === "finance_review";
-    });
-  }, [proposals]);
+  const { loading, error, reload } = useModuleLoad(accessToken, load, [location.pathname]);
 
-  const done = useMemo(() => {
-    return (proposals || []).filter((p) => {
-      const kind = p.proposalKind || (p.fundingCallId ? "grant_fund_call" : "voluntary");
-      if (kind === "voluntary") return false;
-      return p.reviewPipeline?.financeReview?.status === "passed" || p.reviewPipeline?.financeReview?.status === "failed";
-    });
-  }, [proposals]);
+  const stats = useMemo(
+    () => [
+      {
+        label: isDirector ? "Awaiting finance" : "Assigned to you",
+        value: assignments.length,
+        filterKey: "all",
+      },
+    ],
+    [assignments.length, isDirector]
+  );
 
   return (
     <div>
       <PageHeader
         title="Finance review (Proposals)"
-        subtitle="Kaliya proposals grant_fund_call ee sugaya finance review — ma aha liiska proposals guud."
-        stats={[
-          { label: "Awaiting finance", value: queue.length, accent: "#38bdf8" },
-          { label: "Reviewed", value: done.length },
-        ]}
+        subtitle={
+          isDirector
+            ? "Grant proposals awaiting Finance Officer review — voluntary proposals never appear here."
+            : "Grant proposals assigned to you — submit finance review, then the Director approves and creates the project."
+        }
+        stats={stats}
         actions={
-          <Link className="btn" to="/finance/closures">
-            Project closure queue
-          </Link>
+          <>
+            {!isDirector ? (
+              <Link className="btn" to="/finance/closures">
+                Project closures
+              </Link>
+            ) : null}
+            <button type="button" className="btn" onClick={() => reload()} disabled={loading}>
+              Refresh
+            </button>
+          </>
         }
       />
 
-      {error ? <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)", marginTop: 12 }}>{error}</div> : null}
+      {error ? (
+        <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)", marginTop: 12 }}>
+          {error}
+        </div>
+      ) : null}
+      {loading ? <p className="muted" style={{ marginTop: 12 }}>Loading finance assignments…</p> : null}
 
       <div className="card" style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>Awaiting your finance review</div>
-        {queue.length === 0 ? (
-          <div className="muted">No proposals waiting for finance review.</div>
+        {!loading && assignments.length === 0 ? (
+          <div style={{ padding: 8, textAlign: "center" }}>
+            <div style={{ fontWeight: 800 }}>No proposals awaiting finance review</div>
+            <p className="muted" style={{ marginTop: 8, fontSize: 14 }}>
+              {isDirector
+                ? "Voluntary proposals skip finance. After finance completes, approve the proposal on the Review page to create the project."
+                : "When the Research Director assigns you a grant proposal, it appears here until you submit your finance review."}
+            </p>
+          </div>
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
-            {queue.map((p) => (
-              <div key={p.id} className="card" style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-                <div>
-                  <div style={{ fontWeight: 800 }}>{p.title}</div>
-                  <div className="muted" style={{ fontSize: 13 }}>
-                    Grant fund call • {p.department || "—"}
-                    {p.researcherName ? ` • PI: ${p.researcherName}` : ""}
-                    {p.budgetTotal || p.requestedAmount || p.fundingCall?.amountCap
-                      ? ` • Requested: ${p.budgetCurrency || p.fundingCall?.currency || "USD"} ${Number(
-                          p.requestedAmount || p.budgetTotal || p.fundingCall?.amountCap || 0
-                        ).toLocaleString()}`
-                      : ""}
+            {assignments.map((a) => {
+              const officerNames = (a.assignedFinance || [])
+                .map((r) => r.fullName || r.email)
+                .filter(Boolean)
+                .join(", ");
+              return (
+                <div key={a.id} className="card">
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      alignItems: "flex-start",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 800 }}>{a.title}</div>
+                      <div className="muted" style={{ marginTop: 4, fontSize: 13 }}>
+                        Grant fund call • {a.department || "—"}
+                        {a.researcherName ? ` · PI: ${a.researcherName}` : ""}
+                        {a.requestedAmount
+                          ? ` · ${a.budgetCurrency || "USD"} ${Number(a.requestedAmount).toLocaleString()}`
+                          : ""}
+                      </div>
+                      {isDirector && officerNames ? (
+                        <div style={{ marginTop: 8, fontSize: 13 }}>
+                          Sent to finance: {officerNames}
+                        </div>
+                      ) : null}
+                      <p
+                        style={{
+                          fontWeight: 600,
+                          marginTop: 8,
+                          marginBottom: 0,
+                          color: "#fbbf24",
+                        }}
+                      >
+                        {isDirector
+                          ? "⏳ Awaiting Finance Officer review"
+                          : "⏳ Finance review required — submit comment & decision"}
+                      </p>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-end",
+                        gap: 8,
+                      }}
+                    >
+                      <StatusBadge status={a.status} />
+                      <Link className="btn primary" to={`/finance/reviews/${a.id}`}>
+                        {isDirector ? "Open review" : "Submit finance review"}
+                      </Link>
+                    </div>
                   </div>
                 </div>
-                <Link className="btn primary" to={`/finance/reviews/${p.id}`}>
-                  Open finance review
-                </Link>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
-
-      {done.length ? (
-        <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Recently reviewed</div>
-          <div style={{ display: "grid", gap: 8 }}>
-            {done.slice(0, 10).map((p) => (
-              <div key={p.id} className="muted" style={{ fontSize: 13 }}>
-                {p.title} — finance: {p.reviewPipeline?.financeReview?.status}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

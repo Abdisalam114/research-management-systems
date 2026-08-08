@@ -15,6 +15,8 @@ const {
   peerReviewLeadershipQueueFilter,
   committeeAssignedToUserFilter,
   committeeSentToMembersFilter,
+  financeAssignedToUserFilter,
+  financeSentToOfficersFilter,
 } = require("../utils/proposalReviewPipeline");
 
 function sanitizeProposalBrief(p) {
@@ -180,6 +182,8 @@ async function submitPeerReview(req, res) {
       score: r.score,
       at: r.at,
     }));
+    proposal.assignedReviewers = [];
+    proposal.markModified("assignedReviewers");
   }
 
   proposal.markModified("reviewPipeline");
@@ -204,9 +208,11 @@ await recordAudit({
       {
         type: "proposal",
         title: peerComplete
-          ? "Peer review complete — continue proposal review"
+          ? "Peer review complete — assign committee"
           : "Peer review submitted — awaiting remaining reviewers",
-        body: `${proposal.title} (score ${score}/5)`,
+        body: peerComplete
+          ? `${proposal.title} — Leadership review done; assign committee on the Review page.`
+          : `${proposal.title} (score ${score}/5)`,
         link: `/proposals/${proposal._id}/review`,
       },
       req.programTier
@@ -329,6 +335,10 @@ async function committeeReview(req, res) {
   } else if (decision === "reject") {
     proposal.status = PROPOSAL_STATUSES.REJECTED;
   }
+  if (committeeStatus === STAGE_STATUS.PASSED || committeeStatus === STAGE_STATUS.FAILED) {
+    proposal.assignedCommittee = [];
+    proposal.markModified("assignedCommittee");
+  }
   proposal.reviewerComments.push({ role: req.user.role, comment: `[Committee: ${decision}] ${comment}` });
   proposal.markModified("reviewPipeline");
   await proposal.save();
@@ -340,6 +350,33 @@ async function committeeReview(req, res) {
     } catch {
       /* best-effort */
     }
+  }
+
+  try {
+    const { notifyUsersByRole } = require("../utils/notify");
+    const nextStep = isVoluntaryProposal(proposal)
+      ? "ready for your final decision on the Review page"
+      : "assign finance on the Review page";
+    await notifyUsersByRole(
+      "research_director",
+      {
+        type: "proposal",
+        title:
+          committeeStatus === STAGE_STATUS.PASSED
+            ? "Committee review complete"
+            : committeeStatus === STAGE_STATUS.FAILED
+              ? "Committee rejected proposal"
+              : "Committee requested revision",
+        body:
+          committeeStatus === STAGE_STATUS.PASSED
+            ? `${proposal.title} — committee passed; ${nextStep}.`
+            : `${proposal.title} — committee ${decision.replace(/_/g, " ")}.`,
+        link: `/proposals/${proposal._id}/review`,
+      },
+      req.programTier
+    );
+  } catch {
+    /* best-effort */
   }
   await recordAudit({
     entityType: "proposal",
@@ -384,9 +421,33 @@ async function financeProposalReview(req, res) {
     decision,
     comment: String(comment),
   };
+  proposal.assignedFinance = [];
+  proposal.markModified("assignedFinance");
   proposal.reviewerComments.push({ role: "finance_officer", comment: `[Finance: ${decision}] ${comment}` });
   proposal.markModified("reviewPipeline");
   await proposal.save();
+
+  try {
+    const { notifyUsersByRole } = require("../utils/notify");
+    await notifyUsersByRole(
+      "research_director",
+      {
+        type: "proposal",
+        title:
+          decision === "approve"
+            ? "Finance review complete — approve proposal"
+            : "Finance rejected proposal budget",
+        body:
+          decision === "approve"
+            ? `${proposal.title} — finance cleared; issue certificate if needed, then approve to create the project.`
+            : `${proposal.title} — finance ${decision}.`,
+        link: `/proposals/${proposal._id}/review`,
+      },
+      req.programTier
+    );
+  } catch {
+    /* best-effort */
+  }
 
   await recordAudit({
     entityType: "proposal",
@@ -400,6 +461,92 @@ async function financeProposalReview(req, res) {
   });
 
   res.json({ message: "Finance review saved", proposal: sanitizeProposalBrief(proposal) });
+}
+
+  });
+}
+
+async function listMyFinanceAssignments(req, res) {
+  const userId = req.user.id;
+  const isDirector = req.user.role === "research_director";
+
+  const filter = isDirector
+    ? req.tierWhere(financeSentToOfficersFilter())
+    : req.tierWhere(financeAssignedToUserFilter(userId));
+
+  const proposals = await Proposal.find(filter)
+    .sort({ submittedAt: -1, updatedAt: -1 })
+    .populate("assignedFinance.userId", "fullName email role department")
+    .populate("researcherId", "fullName email department")
+    .populate("fundingCallId", "title currency amountCap")
+    .select(
+      "title status department submittedAt assignedFinance reviewPipeline researcherId updatedAt proposalKind fundingCallId budgetTotal budgetCurrency requestedAmount"
+    );
+
+  let items = proposals
+    .filter((p) => !isVoluntaryProposal(p))
+    .map((p) => {
+      const officers = (p.assignedFinance || []).map((r) => ({
+        id: reviewerUserId(r.userId),
+        fullName: r.userId?.fullName || null,
+        email: r.userId?.email || null,
+        assignedAt: r.assignedAt || null,
+      }));
+      const assignedToMe = officers.some((m) => m.id === String(userId));
+      const financeStage = p.reviewPipeline?.financeReview?.status || "pending";
+      const actionRequired =
+        !isDirector &&
+        assignedToMe &&
+        (financeStage === STAGE_STATUS.PENDING || financeStage === STAGE_STATUS.IN_PROGRESS);
+      const amount =
+        Number(p.requestedAmount) > 0
+          ? Number(p.requestedAmount)
+          : Number(p.budgetTotal) > 0
+            ? Number(p.budgetTotal)
+            : Number(p.fundingCallId?.amountCap) > 0
+              ? Number(p.fundingCallId.amountCap)
+              : 0;
+      return {
+        id: p._id,
+        title: p.title,
+        status: p.status,
+        department: p.department,
+        submittedAt: p.submittedAt,
+        updatedAt: p.updatedAt,
+        researcherName: p.researcherId?.fullName || null,
+        currentReviewStage: getCurrentReviewStage(p),
+        financeStage,
+        assignedFinance: officers,
+        assignedToMe,
+        actionRequired,
+        proposalKind: p.proposalKind || (p.fundingCallId ? "grant_fund_call" : "voluntary"),
+        budgetTotal: p.budgetTotal,
+        budgetCurrency: p.budgetCurrency || p.fundingCallId?.currency || "USD",
+        requestedAmount: amount,
+        fundingCallTitle: p.fundingCallId?.title || null,
+        scope: isDirector ? "sent_to_finance" : "my_finance",
+      };
+    });
+
+  if (isDirector) {
+    items = items.filter(
+      (i) => i.financeStage === STAGE_STATUS.PENDING || i.financeStage === STAGE_STATUS.IN_PROGRESS
+    );
+  } else {
+    items = items.filter((i) => i.actionRequired);
+  }
+
+  const pendingCount = items.length;
+
+  res.json({
+    assignments: items,
+    mode: isDirector ? "director_sent" : "finance_officer",
+    summary: {
+      total: items.length,
+      pending: pendingCount,
+      done: 0,
+    },
+  });
 }
 
 async function listMyReviewAssignments(req, res) {
@@ -436,7 +583,7 @@ async function listMyReviewAssignments(req, res) {
       "title status department submittedAt assignedReviewers peerReviews reviewPipeline researcherId updatedAt"
     );
 
-  const items = proposals.map((p) => {
+  let items = proposals.map((p) => {
     const reviewed = (p.peerReviews || []).some(
       (r) => reviewerUserId(r.userId) === String(userId)
     );
@@ -487,10 +634,16 @@ async function listMyReviewAssignments(req, res) {
     };
   });
 
+  if (isDirector) {
+    items = items.filter((i) => i.peerStage !== STAGE_STATUS.PASSED);
+  } else {
+    items = items.filter((i) => !i.peerReviewSubmitted);
+  }
+
   const awaitingCount = items.filter((i) =>
     isDirector ? i.awaitingLeadership : !i.peerReviewSubmitted
   ).length;
-res.json({
+  res.json({
     assignments: items,
     mode: isDirector ? "director_sent" : "reviewer",
     summary: {
@@ -517,7 +670,7 @@ async function listMyCommitteeAssignments(req, res) {
       "title status department submittedAt assignedCommittee reviewPipeline researcherId updatedAt"
     );
 
-  const items = proposals.map((p) => {
+  let items = proposals.map((p) => {
     const members = (p.assignedCommittee || []).map((r) => ({
       id: reviewerUserId(r.userId),
       fullName: r.userId?.fullName || null,
@@ -526,7 +679,10 @@ async function listMyCommitteeAssignments(req, res) {
     }));
     const assignedToMe = members.some((m) => m.id === String(userId));
     const committeeStage = p.reviewPipeline?.committeeReview?.status || "pending";
-    const actionRequired = !isDirector && assignedToMe && committeeStage !== STAGE_STATUS.PASSED;
+    const actionRequired =
+      !isDirector &&
+      assignedToMe &&
+      (committeeStage === STAGE_STATUS.PENDING || committeeStage === STAGE_STATUS.IN_PROGRESS);
     return {
       id: p._id,
       title: p.title,
@@ -544,7 +700,20 @@ async function listMyCommitteeAssignments(req, res) {
     };
   });
 
-  const pendingCount = items.filter((i) => (isDirector ? i.committeeStage !== STAGE_STATUS.PASSED : i.actionRequired)).length;
+  if (isDirector) {
+    items = items.filter(
+      (i) =>
+        i.committeeStage === STAGE_STATUS.PENDING || i.committeeStage === STAGE_STATUS.IN_PROGRESS
+    );
+  } else {
+    items = items.filter((i) => i.actionRequired);
+  }
+
+  const pendingCount = items.filter((i) =>
+    isDirector
+      ? i.committeeStage === STAGE_STATUS.PENDING || i.committeeStage === STAGE_STATUS.IN_PROGRESS
+      : i.actionRequired
+  ).length;
 
   res.json({
     assignments: items,
@@ -565,5 +734,6 @@ module.exports = {
   financeProposalReview,
   listMyReviewAssignments,
   listMyCommitteeAssignments,
+  listMyFinanceAssignments,
   sanitizeProposalBrief,
 };

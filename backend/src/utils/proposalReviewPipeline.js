@@ -135,10 +135,11 @@ function peerReviewAssignedToUserFilter(userId, extra = {}) {
   };
 }
 
-/** Director queue: sent to reviewers OR already has submitted peer reviews (assignees may be cleared after completion). */
+/** Director queue: awaiting Leadership peer review (exits once peer review stage passes). */
 function peerReviewDirectorQueueFilter(extra = {}) {
   return {
     status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+    "reviewPipeline.peerReview.status": { $in: [STAGE_STATUS.PENDING, STAGE_STATUS.IN_PROGRESS] },
     $or: [
       { "assignedReviewers.0": { $exists: true } },
       { "peerReviews.0": { $exists: true } },
@@ -147,14 +148,12 @@ function peerReviewDirectorQueueFilter(extra = {}) {
   };
 }
 
-/** Leadership queue: currently assigned OR previously submitted a review on an active proposal. */
+/** Leadership queue: assigned and peer review stage still open (exits after they submit). */
 function peerReviewLeadershipQueueFilter(userId, extra = {}) {
   return {
     status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
-    $or: [
-      { "assignedReviewers.userId": userId },
-      { "peerReviews.userId": userId },
-    ],
+    "assignedReviewers.userId": userId,
+    "reviewPipeline.peerReview.status": { $in: [STAGE_STATUS.PENDING, STAGE_STATUS.IN_PROGRESS] },
     ...extra,
   };
 }
@@ -175,13 +174,35 @@ function committeeAssignedToUserFilter(userId, extra = {}) {
   };
 }
 
-/** Director view: proposals sent to committee (active pipeline). */
+/** Director view: proposals awaiting committee (exits once committee stage completes). */
 function committeeSentToMembersFilter(extra = {}) {
   return {
     "assignedCommittee.0": { $exists: true },
     status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
     "reviewPipeline.peerReview.status": STAGE_STATUS.PASSED,
     "reviewPipeline.committeeReview.status": { $in: [...ACTIVE_COMMITTEE_REVIEW_STATUSES] },
+    ...extra,
+  };
+}
+
+/** Finance officer queue: assigned while committee passed and finance stage open. */
+function financeAssignedToUserFilter(userId, extra = {}) {
+  return {
+    "assignedFinance.userId": userId,
+    status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+    "reviewPipeline.committeeReview.status": STAGE_STATUS.PASSED,
+    "reviewPipeline.financeReview.status": { $in: [...ACTIVE_COMMITTEE_REVIEW_STATUSES] },
+    ...extra,
+  };
+}
+
+/** Director view: proposals awaiting finance review (grant fund call only). */
+function financeSentToOfficersFilter(extra = {}) {
+  return {
+    "assignedFinance.0": { $exists: true },
+    status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+    "reviewPipeline.committeeReview.status": STAGE_STATUS.PASSED,
+    "reviewPipeline.financeReview.status": { $in: [...ACTIVE_COMMITTEE_REVIEW_STATUSES] },
     ...extra,
   };
 }
@@ -199,6 +220,8 @@ module.exports = {
   ACTIVE_COMMITTEE_REVIEW_STATUSES,
   committeeAssignedToUserFilter,
   committeeSentToMembersFilter,
+  financeAssignedToUserFilter,
+  financeSentToOfficersFilter,
   defaultReviewPipeline,
   ensureReviewPipeline,
   stagePassed,

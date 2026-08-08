@@ -25,6 +25,13 @@ router.get(
   asyncHandler(proposalReviewController.listMyCommitteeAssignments)
 );
 router.get(
+  "/my-finance-assignments",
+  authenticateUser,
+  requireActiveUser,
+  authorizeRoles("finance_officer", "research_director"),
+  asyncHandler(proposalReviewController.listMyFinanceAssignments)
+);
+router.get(
   "/:id/ethics-application",
   authenticateUser,
   requireActiveUser,
