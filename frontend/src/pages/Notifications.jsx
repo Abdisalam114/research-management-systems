@@ -28,6 +28,10 @@ function hasDetailBody(n) {
   return Boolean(n?.body?.trim());
 }
 
+function hasRichDetailBody(n) {
+  return hasDetailBody(n) && ["publication", "grant", "proposal", "project"].includes(n?.type);
+}
+
 export function NotificationsPage() {
   const { accessToken, user } = useAuth();
   const navigate = useNavigate();
@@ -259,10 +263,10 @@ export function NotificationsPage() {
                   whiteSpace: "pre-wrap",
                   fontSize: 13,
                   lineHeight: 1.55,
-                  padding: n.type === "publication" ? "10px 12px" : undefined,
-                  borderRadius: n.type === "publication" ? 8 : undefined,
-                  background: n.type === "publication" ? "rgba(15,23,42,0.04)" : undefined,
-                  fontFamily: n.type === "publication" ? "inherit" : undefined,
+                  padding: ["publication", "project"].includes(n.type) ? "10px 12px" : undefined,
+                  borderRadius: ["publication", "project"].includes(n.type) ? 8 : undefined,
+                  background: ["publication", "project"].includes(n.type) ? "rgba(15,23,42,0.04)" : undefined,
+                  fontFamily: ["publication", "project"].includes(n.type) ? "inherit" : undefined,
                 }}
               >
                 {n.body}
@@ -273,7 +277,7 @@ export function NotificationsPage() {
                     {n.type === "message" ? "Open chat" : "Open"}
                   </button>
                 ) : null}
-                {(n.type === "publication" || n.type === "grant" || n.type === "proposal") && hasDetailBody(n) ? (
+                {hasRichDetailBody(n) ? (
                   <button type="button" className="btn" onClick={() => viewNotificationDetails(n)}>
                     View details
                   </button>

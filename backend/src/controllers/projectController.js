@@ -10,6 +10,7 @@ const { resolvePrincipalInvestigatorId, resolvePrincipalInvestigatorName } = req
 const { buildWorkflowForProject, canViewProjectAwards, sanitizeLinkedGrantsForViewer } = require("../utils/researchJourney");
 const { recordAudit } = require("../utils/audit");
 const { notifyUsersByRole, notifyUser } = require("../utils/notify");
+const { buildProjectNotificationBody, loadProjectForNotification } = require("../utils/projectNotificationBody");
 const { writeSimplePdf } = require("../utils/pdf");
 
 function normalizeTeamMembers(team) {
@@ -435,10 +436,11 @@ async function submitClosure(req, res) {
 
 
   try {
+    const populated = await loadProjectForNotification(project);
     await notifyUsersByRole("research_director", {
       type: "project",
       title: "Project closure submitted",
-      body: project.title,
+      body: buildProjectNotificationBody(populated, { context: "closure_submitted" }),
       link: `/projects/${project._id}#closure`,
       programTier: req.notifyProgramTier?.(project) || req.programTier,
     }, req.programTier);
@@ -498,12 +500,16 @@ async function directorClosureApproval(req, res) {
 
   if (!isVoluntary) {
     try {
+      const populated = await loadProjectForNotification(project);
       await notifyUsersByRole(
         "finance_officer",
         {
           type: "project",
           title: "Project closure pending finance",
-          body: project.title,
+          body: buildProjectNotificationBody(populated, {
+            context: "closure_pending_finance",
+            comment: comment ? String(comment).trim() : "",
+          }),
           link: `/finance/closures/${project._id}`,
           programTier: req.notifyProgramTier?.(project) || project.programTier || req.programTier,
         },
@@ -628,10 +634,11 @@ async function finalizeClosedProject(req, project) {
   } catch { /* best-effort archive PDF */ }
 
   try {
+    const populated = await loadProjectForNotification(project);
     await notifyUser(project.researcherId, {
       type: "project",
       title: "Project closed",
-      body: project.title,
+      body: buildProjectNotificationBody(populated, { context: "project_closed" }),
       link: `/projects/${project._id}`,
       programTier: project.programTier || req.programTier,
     });
