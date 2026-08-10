@@ -11,6 +11,7 @@ const { recordAudit } = require("../utils/audit");
 
 const { normalizeBudgetBreakdown } = require("../utils/budgetBreakdown");
 const { assertEligibleForCall, findOpenEligibleCall } = require("../utils/fundingCallEligibility");
+const { resolveProjectStartDate } = require("../utils/projectStartDate");
 const {
   buildRequirementChecklist,
   assertRequirementsMet,
@@ -264,7 +265,7 @@ function sanitizeProjectSummary(project) {
     id: project._id,
     title: project.title,
     status: project.status,
-    startDate: project.startDate,
+    startDate: resolveProjectStartDate(project),
     endDate: project.endDate,
   };
 }

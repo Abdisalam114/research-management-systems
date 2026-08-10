@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { programTierField } = require("../constants/programTierField");
+const { resolveProjectStartDate } = require("../utils/projectStartDate");
 
 const PROJECT_STATUSES = Object.freeze({
   ACTIVE: "active",
@@ -86,7 +87,7 @@ const projectSchema = new mongoose.Schema(
     leadResearcher: { type: mongoose.Schema.Types.ObjectId, ref: "User", index: true },
     teamMembers: [teamMemberSchema],
     milestones: [milestoneSchema],
-    startDate: { type: Date, default: Date.now },
+    startDate: { type: Date, default: null },
     endDate: { type: Date, default: null },
     status: { type: String, enum: Object.values(PROJECT_STATUSES), default: PROJECT_STATUSES.ACTIVE, index: true },
     progressReports: [progressReportSchema],
@@ -118,6 +119,15 @@ const projectSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+projectSchema.pre("save", function setProjectStartOnCreate(next) {
+  if (this.isNew && !this.startDate) {
+    this.startDate = new Date();
+  }
+  const start = resolveProjectStartDate(this);
+  if (start) this.startDate = start;
+  next();
+});
 
 const Project = mongoose.model("Project", projectSchema);
 

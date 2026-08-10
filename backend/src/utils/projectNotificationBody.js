@@ -1,5 +1,6 @@
 const { Project } = require("../models/Project");
 const { userDisplayName } = require("./userDisplay");
+const { resolveProjectStartDate } = require("./projectStartDate");
 
 function line(label, value) {
   const v = String(value ?? "").trim();
@@ -76,7 +77,7 @@ function buildProjectNotificationBody(project, opts = {}) {
     line("Status", project.status),
     line("Principal investigator", researcherDisplay(project).replace(/\n/g, " · ")),
     line("Program tier", programTierLabel(project.programTier)),
-    line("Start date", formatDate(project.startDate)),
+    line("Start date", formatDate(resolveProjectStartDate(project))),
     line("End date", formatDate(project.endDate))
   );
 

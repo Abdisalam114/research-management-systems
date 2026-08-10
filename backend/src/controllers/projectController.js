@@ -12,6 +12,7 @@ const { recordAudit } = require("../utils/audit");
 const { notifyUsersByRole, notifyUser } = require("../utils/notify");
 const { buildProjectNotificationBody, loadProjectForNotification } = require("../utils/projectNotificationBody");
 const { writeSimplePdf } = require("../utils/pdf");
+const { resolveProjectStartDate, assertDateOnOrAfterProjectStart } = require("../utils/projectStartDate");
 
 function normalizeTeamMembers(team) {
   if (!Array.isArray(team)) return [];
@@ -114,7 +115,7 @@ function sanitizeProject(p) {
       loggedBy: entry.loggedBy?._id || entry.loggedBy,
       authorName: entry.loggedBy?.fullName || null,
     })),
-    startDate: p.startDate,
+    startDate: resolveProjectStartDate(p),
     endDate: p.endDate,
     status: p.status,
     progressReports: p.progressReports,
@@ -338,40 +339,57 @@ async function updateProject(req, res) {
   const isDirector = req.user.role === "research_director";
   if (!isOwner && !isDirector) throw new AppError("Forbidden", 403);
 
-  const { milestones, teamMembers, workPlan, activities, startDate, endDate, status } = req.body;
+  const { milestones, teamMembers, workPlan, activities, endDate, status } = req.body;
   if (milestones !== undefined) {
     if (!Array.isArray(milestones)) throw new AppError("milestones must be an array", 400);
-    project.milestones = milestones.map((m) => ({ title: m.title, dueDate: m.dueDate ? new Date(m.dueDate) : null, completed: Boolean(m.completed) }));
+    project.milestones = milestones.map((m) => {
+      const dueDate = m.dueDate ? new Date(m.dueDate) : null;
+      if (dueDate) assertDateOnOrAfterProjectStart(project, dueDate, { fieldLabel: "Milestone due date" });
+      return { title: m.title, dueDate, completed: Boolean(m.completed) };
+    });
   }
   if (workPlan !== undefined) {
     if (!Array.isArray(workPlan)) throw new AppError("workPlan must be an array", 400);
-    project.workPlan = workPlan.map((w) => ({
-      phase: String(w.phase || "").trim(),
-      description: String(w.description || "").trim(),
-      startDate: w.startDate ? new Date(w.startDate) : null,
-      endDate: w.endDate ? new Date(w.endDate) : null,
-      owner: String(w.owner || "").trim(),
-      status: ["planned", "in_progress", "completed"].includes(w.status) ? w.status : "planned",
-    })).filter((w) => w.phase);
+    project.workPlan = workPlan.map((w) => {
+      const rowStart = w.startDate ? new Date(w.startDate) : null;
+      const rowEnd = w.endDate ? new Date(w.endDate) : null;
+      if (rowStart) assertDateOnOrAfterProjectStart(project, rowStart, { fieldLabel: "Work plan start date" });
+      if (rowEnd) assertDateOnOrAfterProjectStart(project, rowEnd, { fieldLabel: "Work plan end date" });
+      return {
+        phase: String(w.phase || "").trim(),
+        description: String(w.description || "").trim(),
+        startDate: rowStart,
+        endDate: rowEnd,
+        owner: String(w.owner || "").trim(),
+        status: ["planned", "in_progress", "completed"].includes(w.status) ? w.status : "planned",
+      };
+    }).filter((w) => w.phase);
   }
   if (activities !== undefined) {
     if (!Array.isArray(activities)) throw new AppError("activities must be an array", 400);
-    project.activities = activities.map((a) => ({
-      title: String(a.title || "").trim(),
-      description: String(a.description || "").trim(),
-      dueDate: a.dueDate ? new Date(a.dueDate) : null,
-      status: ["todo", "in_progress", "done", "blocked"].includes(a.status) ? a.status : "todo",
-      assignedTo: String(a.assignedTo || "").trim(),
-      completedAt: a.status === "done" ? (a.completedAt ? new Date(a.completedAt) : new Date()) : null,
-      createdBy: a.createdBy || req.user.id,
-    })).filter((a) => a.title);
+    project.activities = activities.map((a) => {
+      const dueDate = a.dueDate ? new Date(a.dueDate) : null;
+      if (dueDate) assertDateOnOrAfterProjectStart(project, dueDate, { fieldLabel: "Activity due date" });
+      return {
+        title: String(a.title || "").trim(),
+        description: String(a.description || "").trim(),
+        dueDate,
+        status: ["todo", "in_progress", "done", "blocked"].includes(a.status) ? a.status : "todo",
+        assignedTo: String(a.assignedTo || "").trim(),
+        completedAt: a.status === "done" ? (a.completedAt ? new Date(a.completedAt) : new Date()) : null,
+        createdBy: a.createdBy || req.user.id,
+      };
+    }).filter((a) => a.title);
   }
   if (teamMembers !== undefined) {
     if (!Array.isArray(teamMembers)) throw new AppError("teamMembers must be an array", 400);
     project.teamMembers = normalizeTeamMembers(teamMembers);
   }
-  if (startDate !== undefined) project.startDate = startDate ? new Date(startDate) : project.startDate;
-  if (endDate !== undefined) project.endDate = endDate ? new Date(endDate) : null;
+  if (endDate !== undefined) {
+    const nextEnd = endDate ? new Date(endDate) : null;
+    if (nextEnd) assertDateOnOrAfterProjectStart(project, nextEnd, { fieldLabel: "End date" });
+    project.endDate = nextEnd;
+  }
   if (status !== undefined) {
     if (!Object.values(PROJECT_STATUSES).includes(status)) throw new AppError("Invalid status", 400);
     if (!isDirector && status !== project.status) throw new AppError("Only director can change project status", 403);
@@ -686,7 +704,7 @@ async function exportTechnicalReportPdf(req, res) {
     `Project: ${project.title}`,
     `PI: ${userDisplayName(project.researcherId)}`,
     `Status: ${project.status}`,
-    `Period: ${project.startDate ? new Date(project.startDate).toLocaleDateString() : "—"} – ${project.endDate ? new Date(project.endDate).toLocaleDateString() : "—"}`,
+    `Period: ${resolveProjectStartDate(project) ? new Date(resolveProjectStartDate(project)).toLocaleDateString() : "—"} – ${project.endDate ? new Date(project.endDate).toLocaleDateString() : "—"}`,
     "",
     "Progress (automatic from workflow):",
     autoProgress != null ? `${autoProgress}% complete` : "—",

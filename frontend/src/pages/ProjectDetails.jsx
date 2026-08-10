@@ -22,7 +22,6 @@ export function ProjectDetailsPage() {
   const [project, setProject] = useState(null);
   const [milestones, setMilestones] = useState([emptyMilestone]);
   const [teamMembers, setTeamMembers] = useState([emptyMember]);
-  const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -62,7 +61,6 @@ export function ProjectDetailsPage() {
     setProject(p);
     setMilestones(p.milestones?.length ? p.milestones : [emptyMilestone]);
     setTeamMembers(p.teamMembers?.length ? p.teamMembers : [emptyMember]);
-    setStartDate(p.startDate ? p.startDate.slice(0, 10) : "");
     setEndDate(p.endDate ? p.endDate.slice(0, 10) : "");
   }
 
@@ -102,6 +100,12 @@ export function ProjectDetailsPage() {
       : project.proposalKind !== "grant_fund_call" && !project.fundingCallId;
   // Finance clears money on Project closure (Finance) — PI never self-certifies financialCleared
   const closureItems = CLOSURE_CHECKLIST_ITEMS.filter((item) => item.key !== "financialCleared");
+
+  const projectStartDate = project.startDate
+    ? String(project.startDate).slice(0, 10)
+    : project.createdAt
+      ? String(project.createdAt).slice(0, 10)
+      : "";
 
   return (
     <div>
@@ -239,22 +243,38 @@ export function ProjectDetailsPage() {
           </div>
         )}
 
-        {canEdit ? (
-          <div className="row" style={{ marginTop: 14 }}>
-            <div className="field">
-              <label>Start date</label>
-              <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+        <div className="row" style={{ marginTop: 14 }}>
+          <div className="field">
+            <label>Start date</label>
+            <div style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid var(--rms-border)", background: "rgba(255,255,255,0.02)" }}>
+              {projectStartDate ? new Date(projectStartDate).toLocaleDateString() : "—"}
             </div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+              Set automatically when the project was created (proposal approval).
+            </div>
+          </div>
+          {canEdit ? (
             <div className="field">
               <label>End date</label>
-              <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              <input
+                type="date"
+                min={projectStartDate || undefined}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
             </div>
-          </div>
-        ) : (
+          ) : (
+            <div className="field">
+              <label>End date</label>
+              <div style={{ padding: "10px 12px" }}>{endDate || "—"}</div>
+            </div>
+          )}
+        </div>
+        {!canEdit ? (
           <div className="muted" style={{ marginTop: 10 }}>
-            Timeline: {startDate || "—"} → {endDate || "—"}
+            Timeline: {projectStartDate || "—"} → {endDate || "—"}
           </div>
-        )}
+        ) : null}
 
         {project.workflow?.progressPercent != null ? (
           <div className="muted" style={{ marginTop: 10 }}>
@@ -334,6 +354,7 @@ export function ProjectDetailsPage() {
               <input
                 type="date"
                 disabled={!canEdit}
+                min={projectStartDate || undefined}
                 value={m.dueDate ? String(m.dueDate).slice(0, 10) : ""}
                 onChange={(e) => {
                   const next = [...milestones];
@@ -415,7 +436,6 @@ export function ProjectDetailsPage() {
               await projectApi.updateProject(accessToken, id, {
                 milestones: milestones.filter((m) => m.title.trim()),
                 teamMembers: teamMembers.filter((m) => m.name.trim()),
-                startDate: startDate || undefined,
                 endDate: endDate || null,
               });
               setMessage("Project updated.");

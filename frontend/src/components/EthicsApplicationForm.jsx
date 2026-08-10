@@ -281,17 +281,8 @@ export function EthicsApplicationForm({
       <Section title="Part II — Project details">
         <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
           Required title, level, aims, and design are entered in the section above. Complete the remaining REC fields below.
+          Project start/end dates are set automatically when your proposal is approved and the research project is created.
         </p>
-        <div className="row">
-          <div className="field">
-            <label>Start date</label>
-            <input type="date" disabled={readOnly} value={form.startDate || ""} onChange={(e) => set("startDate", e.target.value)} />
-          </div>
-          <div className="field">
-            <label>End date</label>
-            <input type="date" disabled={readOnly} value={form.endDate || ""} onChange={(e) => set("endDate", e.target.value)} />
-          </div>
-        </div>
         <Textarea
           label="4. Background & literature review"
           value={form.backgroundLiterature}
