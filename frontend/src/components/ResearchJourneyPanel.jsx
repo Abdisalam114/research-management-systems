@@ -223,7 +223,9 @@ function PipelineCard({ item, kind = "project", highlighted = false, stepFilter 
   const progress = item.progressPercent;
   const projectHref = isProject && item.projectId ? `/projects/${item.projectId}#workflow` : null;
   const proposalHref = !isProject && item.proposalId ? `/proposals/${item.proposalId}` : null;
-  const visibleSteps = (item.steps || []).filter((s) => !stepFilter || s.status === stepFilter);
+  const visibleSteps = (item.steps || []).filter(
+    (s) => s.key !== "project_progress" && (!stepFilter || s.status === stepFilter)
+  );
 
   return (
     <div
@@ -268,17 +270,29 @@ function PipelineCard({ item, kind = "project", highlighted = false, stepFilter 
             >
               <span style={{ fontWeight: 700, color: "#0369a1" }}>Hadda waa joogtaa:</span>{" "}
               <strong style={{ color: "#0c4a6e" }}>{item.currentStepLabel}</strong>
-              {progress != null ? <span className="muted"> · {progress}%</span> : null}
             </div>
           ) : null}
         </div>
         <div className="workflowItemActions">
           {isProject && progress != null ? (
-            <div style={{ minWidth: 120, textAlign: "right" }}>
-              <div style={{ fontSize: 12, fontWeight: 700 }}>{progress}% progress</div>
+            <div
+              style={{
+                marginTop: 8,
+                padding: "8px 10px",
+                borderRadius: 8,
+                background: "rgba(14,165,233,0.08)",
+                border: "1px solid rgba(14,165,233,0.28)",
+                fontSize: 13,
+                minWidth: 160,
+              }}
+            >
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", letterSpacing: 0.4 }}>
+                Research progress (automatic)
+              </div>
+              <div style={{ fontWeight: 800, color: "#0c4a6e", marginTop: 4 }}>{progress}%</div>
               <div
                 style={{
-                  marginTop: 4,
+                  marginTop: 6,
                   height: 6,
                   borderRadius: 999,
                   background: "rgba(148,163,184,0.25)",

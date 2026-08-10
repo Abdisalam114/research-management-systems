@@ -105,9 +105,6 @@ function ProjectCard({ p, isDirector, onApproveClosure, busyId }) {
             <Link className="btn primary" to={`/projects/${p.id}#${needsDirectorClosure ? "closure" : "workflow"}`}>
               {needsDirectorClosure ? "Open closure" : "Open workflow"}
             </Link>
-            <Link className="btn" to={`/research-workflow?projectId=${p.id}`}>
-              Publish pipeline
-            </Link>
           </div>
         </div>
       </div>

@@ -219,13 +219,16 @@ export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = 
       link: withProjectContext(step.link, { projectId, proposalId }),
     }));
 
-  const coreSteps = visibleSteps.filter((s) => s.section !== "publish");
-  const publishSteps = visibleSteps.filter((s) => s.section === "publish");
+  const listSteps = visibleSteps.filter((s) => s.key !== "project_progress");
 
-  const currentSteps = visibleSteps.filter((s) => s.status === "current");
+  const currentSteps = visibleSteps.filter((s) => s.status === "current" && s.key !== "project_progress");
   const currentLabels = currentSteps.map((s) => s.label).filter(Boolean);
-  const displayCurrentLabel =
-    currentLabels.length > 1 ? currentLabels.join(" · ") : currentLabel || currentLabels[0];
+  const displayCurrentLabel = (() => {
+    if (currentLabels.length > 1) return currentLabels.join(" · ");
+    if (currentLabels[0]) return currentLabels[0];
+    if (currentLabel && currentLabel !== "Research progress (automatic)") return currentLabel;
+    return null;
+  })();
 
   return (
     <div
@@ -246,13 +249,55 @@ export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = 
       ) : null}
       <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
         {workflow?.isVoluntary
-          ? "Proposal → ethics → review → project → publish pipeline → repository → project completed."
+          ? "Proposal → ethics → review → project → output → repository → completed."
           : workflow?.projectStatus !== "completed" && workflow?.projectStatus !== "closed"
-            ? "Proposal → ethics → review → project → grants/budget → publish pipeline → repository → project completed."
+            ? "Proposal → ethics → review → project → grants/budget → output → repository → completed."
             : workflow?.awardsVisible === false
-              ? "Proposal → ethics → review → project → publish pipeline → repository → project completed."
-              : "Proposal → ethics → review → project → funding → budget → publish pipeline → repository → project completed."}
+              ? "Proposal → ethics → review → project → output → repository → completed."
+              : "Proposal → ethics → review → project → funding → budget → output → repository → completed."}
       </div>
+
+      {progress != null ? (
+        <div
+          style={{
+            marginTop: 12,
+            padding: "12px 14px",
+            borderRadius: 10,
+            background: "rgba(14,165,233,0.08)",
+            border: "1px solid rgba(14,165,233,0.35)",
+          }}
+        >
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", letterSpacing: 0.4 }}>
+            Research progress (automatic)
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginTop: 8, flexWrap: "wrap" }}>
+            <div className="muted" style={{ fontSize: 13 }}>
+              Progress % is calculated from your workflow steps — not entered manually.
+            </div>
+            <div style={{ minWidth: 140 }}>
+              <div style={{ fontSize: 14, fontWeight: 800, textAlign: "right", color: "#0c4a6e" }}>{progress}%</div>
+              <div
+                style={{
+                  marginTop: 4,
+                  height: 8,
+                  borderRadius: 999,
+                  background: "rgba(148,163,184,0.25)",
+                  overflow: "hidden",
+                }}
+              >
+                <div
+                  style={{
+                    width: `${Math.min(100, Math.max(0, progress))}%`,
+                    height: "100%",
+                    background: "#0ea5e9",
+                    borderRadius: 999,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {displayCurrentLabel ? (
         <div
@@ -269,9 +314,6 @@ export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = 
             {currentLabels.length > 1 ? " (tallaabooyin badan — mid mid u hormar)" : ""}
           </div>
           <div style={{ fontWeight: 900, fontSize: 18, marginTop: 4, color: "#0c4a6e" }}>{displayCurrentLabel}</div>
-          {progress != null ? (
-            <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>{progress}% project progress</div>
-          ) : null}
         </div>
       ) : null}
 
@@ -296,33 +338,10 @@ export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = 
             </>
           ) : null}
         </div>
-        {progress != null ? (
-          <div style={{ minWidth: 140 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, textAlign: "right" }}>{progress}% progress</div>
-            <div
-              style={{
-                marginTop: 4,
-                height: 6,
-                borderRadius: 999,
-                background: "rgba(148,163,184,0.25)",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  width: `${Math.min(100, Math.max(0, progress))}%`,
-                  height: "100%",
-                  background: "#0ea5e9",
-                  borderRadius: 999,
-                }}
-              />
-            </div>
-          </div>
-        ) : null}
       </div>
 
       <div style={{ marginTop: 14 }}>
-        {coreSteps.map((step, idx) => (
+        {listSteps.map((step, idx) => (
           <StepRow
             key={step.key}
             step={step}
@@ -330,29 +349,6 @@ export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = 
             highlighted={focusWorkflow && step.status === "current"}
           />
         ))}
-        {publishSteps.length ? (
-          <>
-            <div
-              style={{
-                marginTop: coreSteps.length ? 16 : 0,
-                marginBottom: 8,
-                fontWeight: 800,
-                fontSize: 14,
-                color: "#0c4a6e",
-              }}
-            >
-              Publish pipeline
-            </div>
-            {publishSteps.map((step, idx) => (
-              <StepRow
-                key={step.key}
-                step={step}
-                index={idx}
-                highlighted={focusWorkflow && step.status === "current"}
-              />
-            ))}
-          </>
-        ) : null}
       </div>
     </div>
   );
