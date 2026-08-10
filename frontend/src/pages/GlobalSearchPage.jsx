@@ -134,7 +134,7 @@ export function GlobalSearchPage() {
           style={{ flex: "1 1 240px" }}
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search thesis title, student name, proposal, project, DOI, ethics…"
+          placeholder="Search thesis title, student name, proposal, project, ethics…"
           aria-label="Search query"
         />
         <button type="submit" className="btn primary" disabled={busy}>

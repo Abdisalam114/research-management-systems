@@ -294,7 +294,7 @@ async function runGlobalSearch(req) {
   let proposalFilter = tw({ ...textMatch(["title", "abstract", "department", "researchArea"], titleRx) });
   let projectFilter = tw({ ...textMatch(["title"], titleRx) });
   let grantFilter = tw({ ...textMatch(["title", "fundingSource"], titleRx) });
-  let pubFilter = tw({ ...textMatch(["title", "venue", "doi", "communityImpact", "authors"], titleRx) });
+  let pubFilter = tw({ ...textMatch(["title", "venue", "communityImpact", "authors"], titleRx) });
   let callFilter = tw({ ...textMatch(["title", "description", "fundingSource", "donorRef"], titleRx) });
   let ethicsFilter = tw({ ...textMatch(["projectTitle", "principal.firstName", "principal.lastName", "principal.department", "principal.email", "aimsObjectives", "design", "backgroundLiterature"], titleRx) });
   let thesisFilter = tw({ ...textMatch(THESIS_TEXT_FIELDS, titleRx) });

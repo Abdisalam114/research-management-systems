@@ -38,7 +38,7 @@ async function loadAllOaiRecords() {
       description: p.communityImpact || p.venue || "",
       tags: p.authors || [],
       filePath: "",
-      url: p.url || (p.doi ? `https://doi.org/${p.doi}` : ""),
+      url: p.url || "",
       setSpec: SET_PUBLICATIONS,
       source: "publication",
       sourceId: String(p._id),

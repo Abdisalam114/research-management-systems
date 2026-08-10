@@ -53,7 +53,7 @@ const METRIC_DEFINITIONS = Object.freeze({
     source: "won / decided; decided = approved|rejected|active|closed",
     listPath: "/grants",
   },
-  "researchOutput.citations": { source: "Sum Publication.citationCount", listPath: "/publications" },
+  "researchOutput.publications": { source: "Publication.countDocuments({ status: validated })", listPath: "/publications" },
 });
 
 module.exports = {

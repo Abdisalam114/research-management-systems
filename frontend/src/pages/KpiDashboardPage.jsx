@@ -18,7 +18,6 @@ const KPI_ROUTES = [
   { key: "activeProjects", label: "Active projects", format: (v) => v ?? 0, to: "/projects" },
   { key: "projectsArchived", label: "Archived projects", format: (v) => v ?? 0, to: "/projects" },
   { key: "publicationsValidated", label: "Validated publications", format: (v) => v ?? 0, to: "/publications" },
-  { key: "totalCitations", label: "Citations", format: (v) => v ?? 0, to: "/publications" },
   {
     key: "openFundingCalls",
     label: "Open funding calls",

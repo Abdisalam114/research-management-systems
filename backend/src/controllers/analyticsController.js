@@ -101,7 +101,7 @@ async function getDashboardMetrics(req, res) {
     projects: { total: 0 },
     grants: { total: 0, awardedTotal: 0 },
     budgets: { total: 0, itemsPending: 0, itemsApproved: 0, itemsPaid: 0 },
-    publications: { total: 0, validated: 0, submitted: 0, citationTotal: 0 },
+    publications: { total: 0, validated: 0, submitted: 0 },
     repository: { total: 0 },
     groups: { total: 0 },
   };
@@ -124,7 +124,7 @@ async function getDashboardMetrics(req, res) {
       Project.countDocuments(projectFilter),
       Grant.find(grantFilter).select("amountAwarded status"),
       Budget.find(budgetFilter).select("items"),
-      Publication.find(pubFilter).select("status citationCount"),
+      Publication.find(pubFilter).select("status"),
       RepositoryItem.countDocuments(repoFilter),
       ResearchGroup.countDocuments(
         tw(
@@ -182,7 +182,6 @@ async function getDashboardMetrics(req, res) {
   base.publications.total = pubs.length;
   base.publications.validated = pubs.filter((p) => p.status === PUBLICATION_STATUSES.VALIDATED).length;
   base.publications.submitted = pubs.filter((p) => p.status === PUBLICATION_STATUSES.SUBMITTED).length;
-  base.publications.citationTotal = sum(pubs.map((p) => p.citationCount || 0));
 
   base.repository.total = repoCount;
   base.groups.total = collabGroupCount;
@@ -332,7 +331,7 @@ async function buildInstitutionalAnalytics(programTier) {
     Project.find(tf({})).select("researcherId").populate("researcherId", "fullName department"),
     Grant.find(tf({})).select("amountAwarded status createdAt decidedAt"),
     Budget.find(tf({})).select("items totalAllocated"),
-    Publication.find(tf({})).select("title type year status citationCount doi createdAt updatedAt researcherId"),
+    Publication.find(tf({})).select("title type year status createdAt updatedAt researcherId"),
     Proposal.find(
       tf({
         status: {
@@ -377,8 +376,6 @@ async function buildInstitutionalAnalytics(programTier) {
     letter_to_editor: publications.filter((p) => p.type === PUBLICATION_TYPES.LETTER_TO_EDITOR).length,
     community_research_impact: publications.filter((p) => p.type === PUBLICATION_TYPES.COMMUNITY_IMPACT).length,
   };
-  const citationTotal = publications.reduce((a, p) => a + (p.citationCount || 0), 0);
-
   const recentActivity = [
     ...proposals.map((p) => ({
       type: "proposal",
@@ -429,7 +426,7 @@ async function buildInstitutionalAnalytics(programTier) {
   // Pre-seed all 6 faculties so every faculty row appears (even with zero counts).
   const facultyMap = {};
   FACULTIES.forEach((f) => {
-    facultyMap[f] = { department: f, researchers: 0, publications: 0, citations: 0, proposals: 0, projects: 0 };
+    facultyMap[f] = { department: f, researchers: 0, publications: 0, proposals: 0, projects: 0 };
   });
 
   activeUsers.forEach((u) => {
@@ -441,7 +438,6 @@ async function buildInstitutionalAnalytics(programTier) {
     const u = activeUsers.find((x) => String(x._id) === String(pub.researcherId));
     const faculty = resolveFaculty(u?.department);
     facultyMap[faculty].publications += 1;
-    facultyMap[faculty].citations += pub.citationCount || 0;
   });
 
   const allProposals = await Proposal.find(tf({})).select("department status assignedReviewers");
@@ -544,7 +540,6 @@ async function buildInstitutionalAnalytics(programTier) {
     },
     researchOutput: {
       publications: publicationCount,
-      citations: citationTotal,
       papers: pubsByType.paper,
       caseStudies: pubsByType.case_study,
       byType: pubsByType,
@@ -563,8 +558,6 @@ async function buildInstitutionalAnalytics(programTier) {
       type: p.type,
       year: p.year,
       status: p.status,
-      doi: p.doi,
-      citations: p.citationCount,
     })),
     repository: repositoryItems,
     groups: groups.map((g) => ({
@@ -639,7 +632,6 @@ async function getFacultyReport(req, res) {
       projects: facultyProjects.length,
       activeProjects: facultyProjects.filter((p) => p.status === PROJECT_STATUSES.ACTIVE).length,
       publications: facultyPublications.length,
-      citations: facultyPublications.reduce((acc, p) => acc + (p.citationCount || 0), 0),
     },
     proposals: proposals.slice(0, 50).map((p) => ({
       id: p._id,
@@ -668,7 +660,6 @@ async function getFacultyReport(req, res) {
       type: p.type,
       year: p.year,
       author: p.researcherId?.fullName || "—",
-      citations: p.citationCount || 0,
       status: p.status,
     })),
   });
@@ -714,9 +705,6 @@ async function exportFacultyReportPdf(req, res) {
   doc.text(`Proposals: ${proposals.length}`);
   doc.text(`Projects: ${facultyProjects.length}`);
   doc.text(`Publications: ${facultyPublications.length}`);
-  doc.text(
-    `Citations: ${facultyPublications.reduce((acc, p) => acc + (p.citationCount || 0), 0)}`
-  );
   doc.moveDown(0.8);
 
   doc.fontSize(14).text("Recent proposals", { underline: true });
@@ -739,7 +727,7 @@ async function exportFacultyReportPdf(req, res) {
   doc.moveDown(0.4);
   doc.fontSize(11);
   facultyPublications.slice(0, 15).forEach((p) => {
-    doc.text(`• ${p.title} — ${p.type} ${p.year || ""} — ${p.citationCount || 0} citations`);
+    doc.text(`• ${p.title} — ${p.type} ${p.year || ""}`);
   });
 
   doc.end();
@@ -775,16 +763,13 @@ async function exportAnnualReportPdf(req, res) {
 
   doc.fontSize(14).text("Research output", { underline: true });
   doc.moveDown(0.4);
-  doc.text(`Total citations: ${data.researchOutput.citations}`);
   doc.text(`Active projects: ${data.projectStatus.active} / ${data.projectStatus.total}`);
   doc.moveDown(0.8);
 
   doc.fontSize(14).text("Publications per faculty (top 5)", { underline: true });
   doc.moveDown(0.4);
   (ar.topFacultyByPublications || []).forEach((f) => {
-    doc.text(
-      `${f.department}: ${f.publications} publications, ${f.citations} citations, ${f.researchers} researchers`
-    );
+    doc.text(`${f.department}: ${f.publications} publications, ${f.researchers} researchers`);
   });
   doc.moveDown(0.8);
 
@@ -1334,7 +1319,7 @@ async function getKpiDashboard(req, res) {
     Proposal.find(tf({})).select("status createdAt submittedAt"),
     Grant.find(tf({})).select("status amountAwarded amountRequested createdAt"),
     Project.find(tf({})).select("status closure"),
-    Publication.find(tf({})).select("status citationCount type"),
+    Publication.find(tf({})).select("status type"),
     FundingCall.find(tf({})).select("status callType amountCap"),
     Project.countDocuments(tf({ "closure.status": "archived" })),
   ]);
@@ -1349,7 +1334,6 @@ async function getKpiDashboard(req, res) {
   const totalAwarded = sumAwardedAmount(grants);
   const totalRequested = grants.reduce((s, g) => s + Number(g.amountRequested || 0), 0);
   const activeProjects = projects.filter((p) => p.status === PROJECT_STATUSES.ACTIVE).length;
-  const citations = publications.reduce((s, p) => s + (p.citationCount || 0), 0);
   const validatedPubs = publications.filter((p) => p.status === PUBLICATION_STATUSES.VALIDATED).length;
   const openCalls = calls.filter((c) => c.status === CALL_STATUSES.OPEN).length;
   const internalCalls = calls.filter((c) => (c.callType || "internal") === "internal").length;
@@ -1366,7 +1350,6 @@ async function getKpiDashboard(req, res) {
       activeProjects,
       projectsArchived: closedProjects,
       publicationsValidated: validatedPubs,
-      totalCitations: citations,
       openFundingCalls: openCalls,
       internalFundingCalls: internalCalls,
       externalFundingCalls: externalCalls,

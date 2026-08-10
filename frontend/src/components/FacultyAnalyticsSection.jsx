@@ -26,7 +26,6 @@ export function FacultyAnalyticsSection({ data, onDownloadReport, downloading })
               <th>Proposals</th>
               <th>Projects</th>
               <th>Publications</th>
-              <th>Citations</th>
             </tr>
           </thead>
           <tbody>
@@ -37,7 +36,6 @@ export function FacultyAnalyticsSection({ data, onDownloadReport, downloading })
                 <td>{f.proposals}</td>
                 <td>{f.projects}</td>
                 <td>{f.publications}</td>
-                <td>{f.citations}</td>
               </tr>
             ))}
           </tbody>

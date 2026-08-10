@@ -165,7 +165,7 @@ export function DirectorDashboard() {
     onHold: 0,
     activePercent: 0,
   };
-  const researchOutput = data.researchOutput || { publications: 0, citations: 0, papers: 0, byType: {} };
+  const researchOutput = data.researchOutput || { publications: 0, papers: 0, byType: {} };
   const grantFunding = data.grantFunding || { activeFunds: 0, trends: [] };
   const keyMetrics = data.keyMetrics || {
     activeGrantsValue: 0,
@@ -173,7 +173,6 @@ export function DirectorDashboard() {
     researchers: 0,
   };
   const recentActivity = Array.isArray(data.recentActivity) ? data.recentActivity : [];
-  const citationsLabel = Number(researchOutput.citations || 0).toLocaleString();
 
   return (
     <div className="dashboardPage">
@@ -268,10 +267,6 @@ export function DirectorDashboard() {
         <div className="dashboardKpiItem">
           <div className="dashboardKpiLabel">💰 Funding awarded</div>
           <div className="dashboardKpiValue">{formatMoney(keyMetrics.activeGrantsValue)}</div>
-        </div>
-        <div className="dashboardKpiItem">
-          <div className="dashboardKpiLabel">📚 Total citations</div>
-          <div className="dashboardKpiValue">{citationsLabel}</div>
         </div>
         <div className="dashboardKpiItem">
           <div className="dashboardKpiLabel">🥇 Top faculty (pubs)</div>
@@ -388,9 +383,6 @@ export function DirectorDashboard() {
                 Pubs <strong>{researchOutput.publications}</strong>
               </span>
               <span>
-                Citations <strong>{citationsLabel}</strong>
-              </span>
-              <span>
                 Papers <strong>{researchOutput.papers ?? 0}</strong>
               </span>
             </div>
@@ -435,10 +427,6 @@ export function DirectorDashboard() {
               <div className="metricRow">
                 <span>🏆 Grant success rate</span>
                 <strong>{data.grantSuccessRate ?? 0}%</strong>
-              </div>
-              <div className="metricRow">
-                <span>📚 Citations</span>
-                <strong>{citationsLabel}</strong>
               </div>
               <div className="metricRow">
                 <span>🏛️ Faculties tracked</span>

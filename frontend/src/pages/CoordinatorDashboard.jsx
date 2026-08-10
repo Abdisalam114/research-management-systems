@@ -191,8 +191,7 @@ export function CoordinatorDashboardPage() {
             Researchers: <strong>{facultyReport.counts.researchers}</strong> • Proposals:{" "}
             <strong>{facultyReport.counts.proposals}</strong> • Projects:{" "}
             <strong>{facultyReport.counts.projects}</strong> • Publications:{" "}
-            <strong>{facultyReport.counts.publications}</strong> • Citations:{" "}
-            <strong>{facultyReport.counts.citations}</strong>
+            <strong>{facultyReport.counts.publications}</strong>
           </div>
           </div>
         </section>
