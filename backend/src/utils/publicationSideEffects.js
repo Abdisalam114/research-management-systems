@@ -3,6 +3,7 @@ const { Publication, PUBLICATION_STATUSES, PUBLICATION_TYPE_LABELS, WORKFLOW_STA
 const { notifyUser, notifyUsersByRole } = require("./notify");
 const { recordAudit } = require("./audit");
 const { workflowStageLabel, resolveWorkflowStage } = require("./publicationWorkflow");
+const { publishPlatformLabel } = require("../constants/publicationPlatforms");
 
 function isSubmittedOrBetter(status) {
   return (
@@ -65,6 +66,8 @@ function buildPublicationSubmitNotificationBody(pub, req) {
     line("Type", typeLabel),
     line("Year", pub.year),
     line("Venue", pub.venue),
+    line("Published on", pub.publishPlatform ? publishPlatformLabel(pub.publishPlatform) : null),
+    line("Publication URL", pub.url),
     line("Authors", authors),
     line("DOI", pub.doi),
     line("ORCID", pub.orcid),

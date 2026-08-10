@@ -36,6 +36,15 @@ const {
   loadPublicationForNotification,
 } = require("../utils/publicationSideEffects");
 const { coordinatorMatchesResearcherDept } = require("../utils/facultyMatcher");
+const {
+  normalizePublishPlatform,
+  publishPlatformLabel,
+} = require("../constants/publicationPlatforms");
+const {
+  normalizeDoi,
+  refreshPublicationCitations,
+  refreshStalePublicationCitations,
+} = require("../utils/crossrefCitations");
 
 const EDITABLE_STATUSES = [
   PUBLICATION_STATUSES.DRAFT,
@@ -113,11 +122,15 @@ function sanitizePublication(p) {
     type: p.type,
     year: p.year,
     venue: p.venue,
+    publishPlatform: p.publishPlatform || "",
+    publishPlatformLabel: publishPlatformLabel(p.publishPlatform),
     doi: p.doi,
     orcid: p.orcid,
     url: p.url,
     authors: p.authors,
     citationCount: p.citationCount,
+    citationsRefreshedAt: p.citationsRefreshedAt || null,
+    citationsSource: p.citationsSource || null,
     communityImpact: p.communityImpact || "",
     status: p.status,
     statusLabel: PUBLICATION_STATUS_LABELS[p.status] || p.status,
@@ -185,7 +198,14 @@ async function listPublications(req, res) {
     const uid = String(req.user.id);
     pubs = pubs.filter((p) => String(p.researcherId?._id || p.researcherId) === uid);
   }
-res.json({ publications: pubs.map(sanitizePublication) });
+
+  try {
+    await refreshStalePublicationCitations(pubs, { limit: 5 });
+  } catch {
+    /* best-effort auto-update from DOI */
+  }
+
+  res.json({ publications: pubs.map(sanitizePublication) });
 }
 
 async function getFacultyWorkflow(req, res) {
@@ -284,7 +304,8 @@ function normalizeType(value) {
 }
 
 async function createPublication(req, res) {
-  const { title, type, year, venue, doi, orcid, url, authors, communityImpact, projectId, submit } = req.body || {};
+  const { title, type, year, venue, publishPlatform, doi, orcid, url, authors, communityImpact, projectId, submit } =
+    req.body || {};
   if (!title && !projectId) throw new AppError("title is required", 400);
 
   const normalizedType = normalizeType(type);
@@ -307,6 +328,7 @@ const pub = await Publication.create(req.tierAssign({
     type: normalizedType,
     year: year || new Date().getFullYear(),
     venue: venue ? String(venue).trim() : "",
+    publishPlatform: normalizePublishPlatform(publishPlatform),
     doi: doi ? String(doi).trim() : "",
     orcid: orcid ? String(orcid).trim() : "",
     url: url ? String(url).trim() : "",
@@ -326,6 +348,14 @@ const pub = await Publication.create(req.tierAssign({
     sideEffects = await afterPublicationSubmitted(req, pub);
   }
 
+  if (normalizeDoi(pub.doi)) {
+    try {
+      await refreshPublicationCitations(pub, { force: true });
+    } catch {
+      /* best-effort */
+    }
+  }
+
   res.status(201).json({
     message: wantSubmit ? "Publication created and submitted" : "Publication created",
     publication: sanitizePublication(pub),
@@ -343,11 +373,14 @@ async function updatePublication(req, res) {
     throw new AppError("Only draft, rejected, or revise&resubmit publications can be edited", 400);
   }
 
-  const { title, type, year, venue, doi, orcid, url, authors, citationCount, communityImpact, projectId } = req.body || {};
+  const prevDoi = pub.doi;
+  const { title, type, year, venue, publishPlatform, doi, orcid, url, authors, citationCount, communityImpact, projectId } =
+    req.body || {};
   if (title !== undefined) pub.title = String(title).trim();
   if (type !== undefined) pub.type = normalizeType(type);
   if (year !== undefined) pub.year = year;
   if (venue !== undefined) pub.venue = String(venue).trim();
+  if (publishPlatform !== undefined) pub.publishPlatform = normalizePublishPlatform(publishPlatform);
   if (doi !== undefined) pub.doi = String(doi).trim();
   if (orcid !== undefined) pub.orcid = String(orcid).trim();
   if (url !== undefined) pub.url = String(url).trim();
@@ -381,6 +414,16 @@ async function updatePublication(req, res) {
   }
 
   await pub.save();
+
+  const doiChanged = normalizeDoi(pub.doi) !== normalizeDoi(prevDoi);
+  if (normalizeDoi(pub.doi) && (doiChanged || !pub.citationsRefreshedAt)) {
+    try {
+      await refreshPublicationCitations(pub, { force: true });
+    } catch {
+      /* best-effort */
+    }
+  }
+
   res.json({ publication: sanitizePublication(pub) });
 }
 
@@ -647,32 +690,15 @@ async function refreshCitations(req, res) {
     throw new AppError("Publication has no DOI to look up", 400);
   }
 
-  let citationCount = pub.citationCount || 0;
-  let source = "manual";
-  try {
-    const apiUrl = `https://api.crossref.org/works/${encodeURIComponent(pub.doi)}`;
-    const r = await fetch(apiUrl, {
-      headers: { "User-Agent": "JustRMS/1.0 (mailto:research@just.edu.so)" },
-    });
-    if (r.ok) {
-      const data = await r.json();
-      const count = data?.message?.["is-referenced-by-count"];
-      if (typeof count === "number") {
-        citationCount = count;
-        source = "crossref";
-      }
-    }
-  } catch {
-    /* keep manual count on network errors */
-  }
-
-  pub.citationCount = citationCount;
-  await pub.save();
+  const result = await refreshPublicationCitations(pub, { force: true });
 
   res.json({
-    message: source === "crossref" ? "Citation count refreshed from CrossRef" : "DOI lookup unavailable; count unchanged",
-    citationCount,
-    source,
+    message:
+      result.source === "crossref"
+        ? "Citation count refreshed from CrossRef"
+        : "DOI lookup unavailable; count unchanged",
+    citationCount: result.citationCount,
+    source: result.source === "crossref" ? "crossref" : "manual",
     publication: sanitizePublication(pub),
   });
 }

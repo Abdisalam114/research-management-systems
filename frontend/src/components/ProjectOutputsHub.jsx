@@ -4,6 +4,7 @@ import * as publicationApi from "../services/publicationApi";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { FacultyResearchWorkflowModule } from "./FacultyResearchWorkflowModule";
 import { publicationTypeLabel } from "../constants/publicationTypes";
+import { publishPlatformLabel } from "../constants/publicationPlatforms";
 
 /**
  * Project hub: outputs + comments + review decisions for ONE recognized project.
@@ -136,6 +137,7 @@ export function ProjectOutputsHub({
                     {publicationTypeLabel(p.type)} • {p.year} •{" "}
                     <strong>{p.statusLabel || p.status}</strong>
                     {p.venue ? ` • ${p.venue}` : ""}
+                    {p.publishPlatform ? ` • ${p.publishPlatformLabel || publishPlatformLabel(p.publishPlatform)}` : ""}
                     {p.workflowStageLabel ? ` • ${p.workflowStageLabel}` : ""}
                   </div>
                   {p.journalDecision && p.journalDecision !== "pending" ? (

@@ -17,6 +17,12 @@ import {
   matchesTrackingFilter,
   publicationTypeLabel,
 } from "../constants/publicationTypes";
+import {
+  PUBLISH_PLATFORM_OPTIONS,
+  publishPlatformLabel,
+  publishPlatformUrlPlaceholder,
+  suggestPublishPlatform,
+} from "../constants/publicationPlatforms";
 import { workflowStageMeta } from "../constants/facultyWorkflow";
 
 const EMPTY_FORM = {
@@ -24,6 +30,8 @@ const EMPTY_FORM = {
   type: "paper",
   year: new Date().getFullYear(),
   venue: "",
+  publishPlatform: "",
+  url: "",
   doi: "",
   orcid: "",
   authors: "",
@@ -84,6 +92,7 @@ export function PublicationsPage() {
       `Type: ${publicationTypeLabel(p.type)}`,
       `Year: ${p.year ?? "—"}`,
       `Venue: ${p.venue || "—"}`,
+      `Published on: ${p.publishPlatformLabel || publishPlatformLabel(p.publishPlatform) || "—"}`,
       `Status: ${p.statusLabel || p.status || "—"}`,
       `Workflow: ${p.workflowStageLabel || p.workflowStage || "—"}`,
       `Authors: ${Array.isArray(p.authors) ? p.authors.join(", ") : "—"}`,
@@ -439,6 +448,10 @@ setPublications(list);
         setError("Select the research project this output belongs to.");
         return;
       }
+      if (submitNow && form.publishPlatform && !form.url.trim() && !form.doi.trim()) {
+        setError("Add the published webpage URL or DOI for the platform you selected.");
+        return;
+      }
       const authors = form.authors
         .split(",")
         .map((a) => a.trim())
@@ -613,7 +626,17 @@ setPublications(list);
             <div className="row">
               <div className="field">
                 <label>Output type</label>
-                <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
+                <select
+                  value={form.type}
+                  onChange={(e) => {
+                    const nextType = e.target.value;
+                    setForm((f) => ({
+                      ...f,
+                      type: nextType,
+                      publishPlatform: f.publishPlatform || suggestPublishPlatform(nextType),
+                    }));
+                  }}
+                >
                   {FORM_TYPE_GROUPS.map((g) => (
                     <optgroup key={g.key} label={g.label}>
                       {PUBLICATION_TYPE_OPTIONS.filter((o) => o.group === g.key).map((o) => (
@@ -635,17 +658,47 @@ setPublications(list);
               </div>
             </div>
             <div className="field">
-              <label>Journal / conference / publisher / patent office</label>
+              <label>Journal / conference / publisher / patent office (name)</label>
               <input
                 value={form.venue}
                 onChange={(e) => setForm((f) => ({ ...f, venue: e.target.value }))}
-                placeholder="e.g. BMC Public Health, IEEE ICRERA, Springer"
+                placeholder="e.g. BMC Public Health, IEEE ICRERA, Springer, USPTO"
               />
+            </div>
+            <div className="row">
+              <div className="field">
+                <label>Published on (platform / website)</label>
+                <select
+                  value={form.publishPlatform}
+                  onChange={(e) => setForm((f) => ({ ...f, publishPlatform: e.target.value }))}
+                >
+                  {PUBLISH_PLATFORM_OPTIONS.map((o) => (
+                    <option key={o.value || "none"} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
+                  Dooro meesha paper-ka / output-ka lagu daabacay (IEEE, Springer, arXiv, repository, iwm.).
+                </p>
+              </div>
+              <div className="field">
+                <label>Published webpage URL</label>
+                <input
+                  type="url"
+                  value={form.url}
+                  onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
+                  placeholder={publishPlatformUrlPlaceholder(form.publishPlatform)}
+                />
+              </div>
             </div>
             <div className="row">
               <div className="field">
                 <label>DOI</label>
                 <input value={form.doi} onChange={(e) => setForm((f) => ({ ...f, doi: e.target.value }))} />
+                <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
+                  Citations auto-update from CrossRef when you save a valid DOI (refreshed weekly on open).
+                </p>
               </div>
               <div className="field">
                 <label>ORCID</label>
@@ -685,6 +738,8 @@ setPublications(list);
         </div>
         <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
           Menu: Publications & Outputs · Data source: Projects only (no separate silo).
+          {" "}
+          DOI-linked outputs refresh citation counts automatically via CrossRef.
         </div>
         <div style={{ display: "grid", gap: 14, marginTop: 12 }}>
           {groupedByProject.map((group) => (
@@ -731,6 +786,7 @@ setPublications(list);
                     {publicationTypeLabel(p.type)} • {p.year} •{" "}
                     <strong>{p.statusLabel || p.status}</strong>
                     {p.venue ? ` • ${p.venue}` : ""}
+                    {p.publishPlatform ? ` • ${p.publishPlatformLabel || publishPlatformLabel(p.publishPlatform)}` : ""}
                   </div>
                   {p.journalDecision && p.journalDecision !== "pending" ? (
                     <div style={{ fontSize: 12, marginTop: 4, color: "#fbbf24" }}>
@@ -793,6 +849,14 @@ setPublications(list);
                   {typeof p.citationCount === "number" ? (
                     <div className="muted">
                       Citations: <strong>{p.citationCount}</strong>
+                      {p.citationsRefreshedAt ? (
+                        <span style={{ fontSize: 11 }}>
+                          {" "}
+                          · auto-updated {new Date(p.citationsRefreshedAt).toLocaleDateString()}
+                        </span>
+                      ) : p.doi ? (
+                        <span style={{ fontSize: 11 }}> · updates on save / weekly</span>
+                      ) : null}
                     </div>
                   ) : null}
                   {p.communityImpact ? (
@@ -826,7 +890,7 @@ setPublications(list);
                     <button
                       type="button"
                       className="btn"
-                      title="Look up citations via CrossRef"
+                      title="Force refresh citations from CrossRef now"
                       onClick={async () => {
                         try {
                           setError("");
@@ -840,7 +904,7 @@ setPublications(list);
                         }
                       }}
                     >
-                      Refresh citations
+                      Refresh now
                     </button>
                   ) : null}
                   {canResubmit(p) ? (
@@ -1109,6 +1173,15 @@ setPublications(list);
               <div><strong>Type:</strong> {publicationTypeLabel(viewPub.type)}</div>
               <div><strong>Year:</strong> {viewPub.year ?? "—"}</div>
               <div><strong>Venue:</strong> {viewPub.venue || "—"}</div>
+              <div><strong>Published on:</strong> {viewPub.publishPlatformLabel || publishPlatformLabel(viewPub.publishPlatform) || "—"}</div>
+              {viewPub.url ? (
+                <div>
+                  <strong>Webpage:</strong>{" "}
+                  <a href={viewPub.url} target="_blank" rel="noopener noreferrer">
+                    {viewPub.url}
+                  </a>
+                </div>
+              ) : null}
               <div><strong>Status:</strong> {viewPub.statusLabel || viewPub.status}</div>
               {viewPub.workflowStage ? (
                 <div><strong>Workflow:</strong> {viewPub.workflowStageLabel || viewPub.workflowStage}</div>
