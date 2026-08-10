@@ -90,8 +90,15 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
   const committeeFailed = pipe.committeeReview?.status === "failed";
   const committeeCompletedByMe =
     String(pipe.committeeReview?.completedBy || "") === String(user?.id);
+  const canDecideCommittee =
+    pipe.peerReview?.status === "passed" &&
+    committeeStageOpen &&
+    ((isCoordinator && assignedToCommittee) || isDirector);
   const showCommitteeAwaitingDirector =
-    isDirector && committeeStageOpen && hasCommitteeAssignees;
+    isDirector && committeeStageOpen && hasCommitteeAssignees && !canDecideCommittee;
+  /** Director: committee stage UI (status/awaiting/outcome) only after sent to committee — like peer review. */
+  const showCommitteeStageForDirector =
+    hasCommitteeAssignees || committeePassed || committeeFailed;
   const hasFinanceAssignees = (proposal.assignedFinance || []).length > 0;
   const financeStageOpen = stageOpen(pipe.financeReview?.status);
   const financePassed = pipe.financeReview?.status === "passed";
@@ -107,11 +114,9 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
     !hasFinanceAssignees;
   const showFinanceAwaitingDirector =
     isDirector && !isVoluntary && financeStageOpen && hasFinanceAssignees;
-  const canDecideCommittee =
-    isCoordinator &&
-    assignedToCommittee &&
-    pipe.peerReview?.status === "passed" &&
-    committeeStageOpen;
+  /** Director: finance stage UI only after sent to finance — same pattern as committee. */
+  const showFinanceStageForDirector =
+    hasFinanceAssignees || financePassed || financeFailed;
   const canDecideFinance =
     isFinance &&
     assignedToFinance &&
@@ -308,10 +313,12 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
             1. Peer review <StageBadge status={pipe.peerReview?.status} /> (
             {(proposal.peerReviews || []).length} reviews)
           </div>
-          <div>
-            2. Committee <StageBadge status={pipe.committeeReview?.status} />
-          </div>
-          {!isVoluntary ? (
+          {(!isDirector || showCommitteeStageForDirector) && (
+            <div>
+              2. Committee <StageBadge status={pipe.committeeReview?.status} />
+            </div>
+          )}
+          {!isVoluntary && (!isDirector || showFinanceStageForDirector) ? (
             <div>
               3. Finance <StageBadge status={pipe.financeReview?.status} />
             </div>
@@ -642,7 +649,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         </div>
       ) : null}
 
-      {isDirector && committeePassed ? (
+      {isDirector && showCommitteeStageForDirector && committeePassed ? (
         <div
           className="card"
           style={{
@@ -668,7 +675,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         </div>
       ) : null}
 
-      {isDirector && isVoluntary && committeePassed && directorReady ? (
+      {isDirector && showCommitteeStageForDirector && isVoluntary && committeePassed && directorReady ? (
         <div
           className="card"
           style={{
@@ -688,7 +695,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         </div>
       ) : null}
 
-      {isDirector && committeeFailed ? (
+      {isDirector && showCommitteeStageForDirector && committeeFailed ? (
         <div
           className="card"
           style={{
@@ -717,8 +724,14 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
           }}
         >
           <div style={{ fontWeight: 800, marginBottom: 8, color: "#fbbf24" }}>
-            Your committee review — action required
+            {isDirector ? "Committee review — score & decision (Director)" : "Your committee review — action required"}
           </div>
+          {isDirector ? (
+            <p className="muted" style={{ fontSize: 12, marginTop: 0, marginBottom: 10 }}>
+              Submit the committee review yourself (same as Faculty Coordinator), or assign a coordinator above
+              and wait for their submission.
+            </p>
+          ) : null}
           <div style={{ marginBottom: 12 }}>
           <label>
             Committee score (1–5)
@@ -797,7 +810,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         </div>
       ) : null}
 
-      {isCoordinator && committeeCompletedByMe && !committeeStageOpen ? (
+      {(isCoordinator || isDirector) && committeeCompletedByMe && !committeeStageOpen ? (
         <div
           className="card"
           style={{
@@ -807,7 +820,9 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
             fontSize: 13,
           }}
         >
-          ✓ Your committee review was submitted. The Research Director can continue the pipeline.
+          {isDirector
+            ? "✓ Committee review submitted. Continue with finance assignment or final proposal approval below."
+            : "✓ Your committee review was submitted. The Research Director can continue the pipeline."}
         </div>
       ) : null}
 
@@ -897,7 +912,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         </div>
       ) : null}
 
-      {isDirector && financePassed ? (
+      {isDirector && showFinanceStageForDirector && financePassed ? (
         <div
           className="card"
           style={{
@@ -920,7 +935,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         </div>
       ) : null}
 
-      {isDirector && financeFailed ? (
+      {isDirector && showFinanceStageForDirector && financeFailed ? (
         <div
           className="card"
           style={{

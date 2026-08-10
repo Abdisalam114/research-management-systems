@@ -36,7 +36,7 @@ router.post(
   "/:id/progress",
   authenticateUser,
   requireActiveUser,
-  authorizeRoles("researcher"),
+  authorizeRoles("research_director"),
   asyncHandler(projectController.addProgressReport)
 );
 

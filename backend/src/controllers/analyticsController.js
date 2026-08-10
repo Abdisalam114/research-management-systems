@@ -17,6 +17,7 @@ const { AuditEvent } = require("../models/AuditEvent");
 const {
   buildResearchJourneyForResearcher,
   listResearchersForJourney,
+  buildWorkflowForProject,
 } = require("../utils/researchJourney");
 const { Notification } = require("../models/Notification");
 const { FACULTIES, matchFacultyByName } = require("../utils/facultyMatcher");
@@ -76,9 +77,18 @@ function mapProjectDashboardRow(p, piName) {
   };
 }
 
-async function mapProjectDashboardRows(projects) {
+async function mapProjectDashboardRows(projects, { tierFilter = {}, viewerRole = null } = {}) {
   const enriched = await enrichProjectsResearcher(projects);
-  return enriched.map(({ doc, piName }) => mapProjectDashboardRow(doc, piName));
+  return Promise.all(
+    enriched.map(async ({ doc, piName }) => {
+      const row = mapProjectDashboardRow(doc, piName);
+      try {
+        const wf = await buildWorkflowForProject(doc._id, tierFilter, viewerRole);
+        if (wf?.progressPercent != null) row.progressPercent = wf.progressPercent;
+      } catch { /* keep fallback */ }
+      return row;
+    })
+  );
 }
 
 async function getDashboardMetrics(req, res) {
@@ -155,7 +165,10 @@ async function getDashboardMetrics(req, res) {
   base.proposals.total = proposalCount;
   base.projects.total = projectCount;
   base.projects.active = activeProjectCount;
-  base.activeProjects = await mapProjectDashboardRows(activeProjectDocs);
+  base.activeProjects = await mapProjectDashboardRows(activeProjectDocs, {
+    tierFilter: projectFilter,
+    viewerRole: role,
+  });
   base.grants.total = grants.length;
   base.grants.awardedTotal = sumAwardedAmount(grants);
   base.grants.awardedCount = grants.filter(isAwardedGrant).length;
@@ -383,7 +396,10 @@ async function buildInstitutionalAnalytics(programTier) {
     .sort((a, b) => new Date(b.at) - new Date(a.at))
     .slice(0, 5);
 
-  const activeProjectsTable = await mapProjectDashboardRows(dashboardActiveProjects);
+  const activeProjectsTable = await mapProjectDashboardRows(dashboardActiveProjects, {
+    tierFilter: tf({}),
+    viewerRole: "research_director",
+  });
 
   const grantSuccessRate = computeGrantSuccessRate(grants);
 
@@ -636,7 +652,8 @@ async function getFacultyReport(req, res) {
       facultyProjects
         .filter((p) => p.status === PROJECT_STATUSES.ACTIVE)
         .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-        .slice(0, DASHBOARD_ACTIVE_PROJECTS_LIMIT)
+        .slice(0, DASHBOARD_ACTIVE_PROJECTS_LIMIT),
+      { tierFilter: req.tierWhere({}), viewerRole: req.user.role }
     )).map((row) => ({
       id: row.id,
       projectId: row.projectId,

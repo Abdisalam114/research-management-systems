@@ -749,11 +749,7 @@ async function directorDecision(req, res) {
         researcherId: proposal.researcherId,
         programTier: proposal.programTier,
         teamMembers: [],
-        milestones: [
-          { title: "Ethics clearance", dueDate: null, completed: proposal.ethicsStatus === ETHICS_STATUSES.APPROVED },
-          { title: "Mid-term review", dueDate: null, completed: false },
-          { title: "Final report", dueDate: null, completed: false },
-        ],
+        milestones: [],
         status: "active",
         progressReports: [],
       }));

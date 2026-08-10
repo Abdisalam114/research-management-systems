@@ -17,12 +17,6 @@ import {
   matchesTrackingFilter,
   publicationTypeLabel,
 } from "../constants/publicationTypes";
-import {
-  PUBLISH_PLATFORM_OPTIONS,
-  publishPlatformLabel,
-  publishPlatformUrlPlaceholder,
-  suggestPublishPlatform,
-} from "../constants/publicationPlatforms";
 import { workflowStageMeta } from "../constants/facultyWorkflow";
 
 const EMPTY_FORM = {
@@ -30,10 +24,6 @@ const EMPTY_FORM = {
   type: "paper",
   year: new Date().getFullYear(),
   venue: "",
-  publishPlatform: "",
-  url: "",
-  doi: "",
-  orcid: "",
   authors: "",
   communityImpact: "",
   projectId: "",
@@ -76,29 +66,15 @@ export function PublicationsPage() {
 
   useScrollToTop([showForm, viewPub?.id, decisionModal?.publication?.id, projectIdFromUrl]);
 
-  function publicationExternalUrl(p) {
-    if (p?.url && /^https?:\/\//i.test(String(p.url))) return p.url;
-    if (p?.doi) {
-      const doi = String(p.doi).replace(/^https?:\/\/doi.org\//i, "").trim();
-      return doi ? `https://doi.org/${doi}` : null;
-    }
-    return null;
-  }
-
   function downloadPublicationSummary(p) {
-    const external = publicationExternalUrl(p);
     const lines = [
       `Title: ${p.title || "—"}`,
       `Type: ${publicationTypeLabel(p.type)}`,
       `Year: ${p.year ?? "—"}`,
       `Venue: ${p.venue || "—"}`,
-      `Published on: ${p.publishPlatformLabel || publishPlatformLabel(p.publishPlatform) || "—"}`,
       `Status: ${p.statusLabel || p.status || "—"}`,
       `Workflow: ${p.workflowStageLabel || p.workflowStage || "—"}`,
       `Authors: ${Array.isArray(p.authors) ? p.authors.join(", ") : "—"}`,
-      `DOI: ${p.doi || "—"}`,
-      `ORCID: ${p.orcid || "—"}`,
-      `URL: ${external || "—"}`,
       p.communityImpact ? `Community impact: ${p.communityImpact}` : "",
       p.validationComment ? `Latest review: ${p.validationComment}` : "",
     ].filter(Boolean);
@@ -400,7 +376,6 @@ setPublications(list);
   const stats = useMemo(() => {
     const by = (s) => publications.filter((p) => p.status === s).length;
     const publishedCount = publications.filter((p) => p.workflowStage === "published").length;
-    const totalCitations = publications.reduce((acc, p) => acc + Number(p.citationCount || 0), 0);
     return [
       { label: "Total outputs", value: publications.length, filterKey: "all" },
       { label: "Draft", value: by("draft"), filterKey: "draft" },
@@ -419,7 +394,6 @@ setPublications(list);
         filterKey: "published",
         accent: "#22c55e",
       },
-      { label: "Citations", value: totalCitations.toLocaleString(), accent: "#7dd3fc" },
     ];
   }, [publications]);
 
@@ -446,10 +420,6 @@ setPublications(list);
       }
       if (!form.projectId) {
         setError("Select the research project this output belongs to.");
-        return;
-      }
-      if (submitNow && form.publishPlatform && !form.url.trim() && !form.doi.trim()) {
-        setError("Add the published webpage URL or DOI for the platform you selected.");
         return;
       }
       const authors = form.authors
@@ -628,14 +598,7 @@ setPublications(list);
                 <label>Output type</label>
                 <select
                   value={form.type}
-                  onChange={(e) => {
-                    const nextType = e.target.value;
-                    setForm((f) => ({
-                      ...f,
-                      type: nextType,
-                      publishPlatform: f.publishPlatform || suggestPublishPlatform(nextType),
-                    }));
-                  }}
+                  onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
                 >
                   {FORM_TYPE_GROUPS.map((g) => (
                     <optgroup key={g.key} label={g.label}>
@@ -664,46 +627,6 @@ setPublications(list);
                 onChange={(e) => setForm((f) => ({ ...f, venue: e.target.value }))}
                 placeholder="e.g. BMC Public Health, IEEE ICRERA, Springer, USPTO"
               />
-            </div>
-            <div className="row">
-              <div className="field">
-                <label>Published on (platform / website)</label>
-                <select
-                  value={form.publishPlatform}
-                  onChange={(e) => setForm((f) => ({ ...f, publishPlatform: e.target.value }))}
-                >
-                  {PUBLISH_PLATFORM_OPTIONS.map((o) => (
-                    <option key={o.value || "none"} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-                <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
-                  Dooro meesha paper-ka / output-ka lagu daabacay (IEEE, Springer, arXiv, repository, iwm.).
-                </p>
-              </div>
-              <div className="field">
-                <label>Published webpage URL</label>
-                <input
-                  type="url"
-                  value={form.url}
-                  onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-                  placeholder={publishPlatformUrlPlaceholder(form.publishPlatform)}
-                />
-              </div>
-            </div>
-            <div className="row">
-              <div className="field">
-                <label>DOI</label>
-                <input value={form.doi} onChange={(e) => setForm((f) => ({ ...f, doi: e.target.value }))} />
-                <p className="muted" style={{ fontSize: 12, marginTop: 6, marginBottom: 0 }}>
-                  Citations auto-update from CrossRef when you save a valid DOI (refreshed weekly on open).
-                </p>
-              </div>
-              <div className="field">
-                <label>ORCID</label>
-                <input value={form.orcid} onChange={(e) => setForm((f) => ({ ...f, orcid: e.target.value }))} />
-              </div>
             </div>
             <div className="field">
               <label>
@@ -738,8 +661,6 @@ setPublications(list);
         </div>
         <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
           Menu: Publications & Outputs · Data source: Projects only (no separate silo).
-          {" "}
-          DOI-linked outputs refresh citation counts automatically via CrossRef.
         </div>
         <div style={{ display: "grid", gap: 14, marginTop: 12 }}>
           {groupedByProject.map((group) => (
@@ -786,7 +707,6 @@ setPublications(list);
                     {publicationTypeLabel(p.type)} • {p.year} •{" "}
                     <strong>{p.statusLabel || p.status}</strong>
                     {p.venue ? ` • ${p.venue}` : ""}
-                    {p.publishPlatform ? ` • ${p.publishPlatformLabel || publishPlatformLabel(p.publishPlatform)}` : ""}
                   </div>
                   {p.journalDecision && p.journalDecision !== "pending" ? (
                     <div style={{ fontSize: 12, marginTop: 4, color: "#fbbf24" }}>
@@ -836,29 +756,6 @@ setPublications(list);
                       Faculty workflow: <strong>{p.workflowStageLabel || p.workflowStage}</strong>
                     </div>
                   ) : null}
-                  {p.doi ? <div className="muted">DOI: {p.doi}</div> : null}
-                  {publicationExternalUrl(p) ? (
-                    <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-                      Link:{" "}
-                      <a href={publicationExternalUrl(p)} target="_blank" rel="noopener noreferrer">
-                        {publicationExternalUrl(p)}
-                      </a>
-                    </div>
-                  ) : null}
-                  {p.orcid ? <div className="muted">ORCID: {p.orcid}</div> : null}
-                  {typeof p.citationCount === "number" ? (
-                    <div className="muted">
-                      Citations: <strong>{p.citationCount}</strong>
-                      {p.citationsRefreshedAt ? (
-                        <span style={{ fontSize: 11 }}>
-                          {" "}
-                          · auto-updated {new Date(p.citationsRefreshedAt).toLocaleDateString()}
-                        </span>
-                      ) : p.doi ? (
-                        <span style={{ fontSize: 11 }}> · updates on save / weekly</span>
-                      ) : null}
-                    </div>
-                  ) : null}
                   {p.communityImpact ? (
                     <div className="muted" style={{ marginTop: 4 }}>
                       Community impact: {p.communityImpact}
@@ -874,38 +771,7 @@ setPublications(list);
                       <button type="button" className="btn" onClick={() => downloadPublicationSummary(p)}>
                         Download summary
                       </button>
-                      {publicationExternalUrl(p) ? (
-                        <a
-                          className="btn"
-                          href={publicationExternalUrl(p)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Open published link
-                        </a>
-                      ) : null}
                     </>
-                  ) : null}
-                  {p.doi ? (
-                    <button
-                      type="button"
-                      className="btn"
-                      title="Force refresh citations from CrossRef now"
-                      onClick={async () => {
-                        try {
-                          setError("");
-                          const res = await publicationApi.refreshCitations(accessToken, p.id);
-                          if (res.source !== "crossref") {
-                            setError(res.message);
-                          }
-                          await reload();
-                        } catch (e) {
-                          setError(e?.response?.data?.message || "Failed to refresh citations");
-                        }
-                      }}
-                    >
-                      Refresh now
-                    </button>
                   ) : null}
                   {canResubmit(p) ? (
                     <button
@@ -1173,31 +1039,12 @@ setPublications(list);
               <div><strong>Type:</strong> {publicationTypeLabel(viewPub.type)}</div>
               <div><strong>Year:</strong> {viewPub.year ?? "—"}</div>
               <div><strong>Venue:</strong> {viewPub.venue || "—"}</div>
-              <div><strong>Published on:</strong> {viewPub.publishPlatformLabel || publishPlatformLabel(viewPub.publishPlatform) || "—"}</div>
-              {viewPub.url ? (
-                <div>
-                  <strong>Webpage:</strong>{" "}
-                  <a href={viewPub.url} target="_blank" rel="noopener noreferrer">
-                    {viewPub.url}
-                  </a>
-                </div>
-              ) : null}
               <div><strong>Status:</strong> {viewPub.statusLabel || viewPub.status}</div>
               {viewPub.workflowStage ? (
                 <div><strong>Workflow:</strong> {viewPub.workflowStageLabel || viewPub.workflowStage}</div>
               ) : null}
               {Array.isArray(viewPub.authors) && viewPub.authors.length ? (
                 <div><strong>Authors:</strong> {viewPub.authors.join(", ")}</div>
-              ) : null}
-              {viewPub.doi ? <div><strong>DOI:</strong> {viewPub.doi}</div> : null}
-              {viewPub.orcid ? <div><strong>ORCID:</strong> {viewPub.orcid}</div> : null}
-              {publicationExternalUrl(viewPub) ? (
-                <div>
-                  <strong>Published link:</strong>{" "}
-                  <a href={publicationExternalUrl(viewPub)} target="_blank" rel="noopener noreferrer">
-                    {publicationExternalUrl(viewPub)}
-                  </a>
-                </div>
               ) : null}
               {viewPub.communityImpact ? (
                 <div><strong>Community impact:</strong> {viewPub.communityImpact}</div>
@@ -1210,11 +1057,6 @@ setPublications(list);
               <button type="button" className="btn primary" onClick={() => downloadPublicationSummary(viewPub)}>
                 Download summary
               </button>
-              {publicationExternalUrl(viewPub) ? (
-                <a className="btn" href={publicationExternalUrl(viewPub)} target="_blank" rel="noopener noreferrer">
-                  Open published link
-                </a>
-              ) : null}
               {viewPub.projectId ? (
                 <Link className="btn" to={`/projects/${viewPub.projectId}#project-outputs`}>
                   Open project

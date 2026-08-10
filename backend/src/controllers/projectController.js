@@ -204,7 +204,10 @@ async function listProjects(req, res) {
       base.isVoluntary = kindMeta.isVoluntary;
       base.fundingCallId = kindMeta.fundingCallId;
       const wf = await buildWorkflowForProject(p._id, tierFilter, role);
-      if (wf) base.workflow = { currentStepLabel: wf.currentStepLabel, currentStepKey: wf.currentStepKey, progressPercent: wf.progressPercent };
+      if (wf) {
+        base.workflow = { currentStepLabel: wf.currentStepLabel, currentStepKey: wf.currentStepKey, progressPercent: wf.progressPercent };
+        if (wf.progressPercent != null) base.progressPercent = wf.progressPercent;
+      }
       return base;
     })
   );
@@ -323,6 +326,7 @@ async function getProject(req, res) {
 
 
   out.workflow = await buildWorkflowForProject(id, tierFilter, req.user.role);
+  if (out.workflow?.progressPercent != null) out.progressPercent = out.workflow.progressPercent;
   res.json({ project: out });
 }
 
@@ -380,17 +384,10 @@ async function updateProject(req, res) {
 }
 
 async function addProgressReport(req, res) {
-  const { note, progressPercent } = req.body;
-  if (!note) throw new AppError("note is required", 400);
-
-  const project = await Project.findOne(req.tierWhere({ _id: req.params.id }));
-  if (!project) throw new AppError("Project not found", 404);
-  if (String(project.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
-
-  project.progressReports.unshift({ note, progressPercent: typeof progressPercent === "number" ? progressPercent : 0, createdBy: req.user.id });
-  await project.save();
-  const updated = await Project.findById(project._id).populate(PROJECT_POPULATE);
-  res.json({ message: "Progress report added", project: sanitizeProject(updated) });
+  throw new AppError(
+    "Manual progress updates are disabled. Project progress is calculated automatically from the research workflow.",
+    403
+  );
 }
 
 async function submitClosure(req, res) {
@@ -683,20 +680,20 @@ async function exportTechnicalReportPdf(req, res) {
   const isStaff = ["research_director", "faculty_coordinator", "finance_officer", "leadership"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
-  const reports = project.progressReports || [];
+  const wf = await buildWorkflowForProject(project._id, req.tierWhere({}), req.user.role);
+  const autoProgress = wf?.progressPercent ?? (project.status === PROJECT_STATUSES.COMPLETED ? 100 : null);
   const lines = [
     `Project: ${project.title}`,
     `PI: ${userDisplayName(project.researcherId)}`,
     `Status: ${project.status}`,
     `Period: ${project.startDate ? new Date(project.startDate).toLocaleDateString() : "—"} – ${project.endDate ? new Date(project.endDate).toLocaleDateString() : "—"}`,
     "",
-    "Progress reports:",
-    ...(reports.length
-      ? reports.map((r, i) => `${i + 1}. ${r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"} — ${r.note || "—"} (${r.progressPercent ?? "—"}%)`)
-      : ["No progress reports submitted yet."]),
+    "Progress (automatic from workflow):",
+    autoProgress != null ? `${autoProgress}% complete` : "—",
+    wf?.currentStepLabel ? `Current step: ${wf.currentStepLabel}` : "",
     "",
     `Generated: ${new Date().toISOString()}`,
-  ];
+  ].filter(Boolean);
 
   const outDir = path.join(process.cwd(), "uploads", "reports");
   const outFile = path.join(outDir, `technical-${project._id}-${Date.now()}.pdf`);

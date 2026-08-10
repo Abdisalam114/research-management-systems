@@ -3,7 +3,6 @@ const { Publication, PUBLICATION_STATUSES, PUBLICATION_TYPE_LABELS, WORKFLOW_STA
 const { notifyUser, notifyUsersByRole } = require("./notify");
 const { recordAudit } = require("./audit");
 const { workflowStageLabel, resolveWorkflowStage } = require("./publicationWorkflow");
-const { publishPlatformLabel } = require("../constants/publicationPlatforms");
 
 function isSubmittedOrBetter(status) {
   return (
@@ -66,12 +65,7 @@ function buildPublicationSubmitNotificationBody(pub, req) {
     line("Type", typeLabel),
     line("Year", pub.year),
     line("Venue", pub.venue),
-    line("Published on", pub.publishPlatform ? publishPlatformLabel(pub.publishPlatform) : null),
-    line("Publication URL", pub.url),
     line("Authors", authors),
-    line("DOI", pub.doi),
-    line("ORCID", pub.orcid),
-    line("URL", pub.url),
     line("Researcher", researcherDisplay(pub, req).replace(/\n/g, " · ")),
     line("Project", projectDisplay(pub)),
     line("Status", pub.status || PUBLICATION_STATUSES.SUBMITTED),
@@ -128,10 +122,7 @@ async function notifyPublicationEvent(req, pub, { title, body, alsoNotifyRoles =
   const projectId = pubProjectId(pub);
   const link = projectLink(projectId);
   const programTier = req.programTier || pub.programTier || null;
-  const resolvedDownload =
-    downloadLink ||
-    (pub.url && String(pub.url).startsWith("http") ? pub.url : "") ||
-    (pub.doi ? `https://doi.org/${String(pub.doi).replace(/^https?:\/\/doi.org\//i, "")}` : "");
+  const resolvedDownload = downloadLink || "";
   const effects = { notifiedOwner: false, notifiedRoles: [], projectLogUpdated: false, link, downloadLink: resolvedDownload };
 
   if (notifyOwner && pub.researcherId) {

@@ -45,15 +45,6 @@ export async function setJournalDecision(accessToken, id, payload) {
   return res.data;
 }
 
-export async function refreshCitations(accessToken, id) {
-  const res = await api.post(
-    `/api/publications/${id}/citations/refresh`,
-    null,
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  return res.data;
-}
-
 export async function getFacultyWorkflow(accessToken, params = {}) {
   const res = await api.get("/api/publications/faculty-workflow", {
     headers: { Authorization: `Bearer ${accessToken}` },

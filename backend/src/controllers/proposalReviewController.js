@@ -310,7 +310,7 @@ async function committeeReview(req, res) {
 
   const isDirector = req.user.role === "research_director";
   const assignedList = proposal.assignedCommittee || [];
-  if (assignedList.length === 0) {
+  if (assignedList.length === 0 && !isDirector) {
     throw new AppError("Assign committee members before committee review", 400);
   }
   const assigned = assignedList.some(
@@ -370,24 +370,26 @@ async function committeeReview(req, res) {
     const nextStep = isVoluntaryProposal(proposal)
       ? "ready for your final decision on the Review page"
       : "assign finance on the Review page";
-    await notifyUsersByRole(
-      "research_director",
-      {
-        type: "proposal",
-        title:
-          committeeStatus === STAGE_STATUS.PASSED
-            ? "Committee review complete"
-            : committeeStatus === STAGE_STATUS.FAILED
-              ? "Committee rejected proposal"
-              : "Committee requested revision",
-        body:
-          committeeStatus === STAGE_STATUS.PASSED
-            ? `${proposal.title} — committee passed; ${nextStep}.`
-            : `${proposal.title} — committee ${decision.replace(/_/g, " ")}.`,
-        link: `/proposals/${proposal._id}/review`,
-      },
-      req.programTier
-    );
+    if (!isDirector) {
+      await notifyUsersByRole(
+        "research_director",
+        {
+          type: "proposal",
+          title:
+            committeeStatus === STAGE_STATUS.PASSED
+              ? "Committee review complete"
+              : committeeStatus === STAGE_STATUS.FAILED
+                ? "Committee rejected proposal"
+                : "Committee requested revision",
+          body:
+            committeeStatus === STAGE_STATUS.PASSED
+              ? `${proposal.title} — committee passed; ${nextStep}.`
+              : `${proposal.title} — committee ${decision.replace(/_/g, " ")}.`,
+          link: `/proposals/${proposal._id}/review`,
+        },
+        req.programTier
+      );
+    }
   } catch {
     /* best-effort */
   }

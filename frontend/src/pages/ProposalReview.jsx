@@ -29,12 +29,6 @@ export function ProposalReviewPage() {
   const isLeadershipReviewer = user?.role === "leadership";
 
   const actions = useMemo(() => {
-    if (isCoordinator) {
-      return [
-        { id: "recommend_revision", label: "Recommend Revision" },
-        { id: "recommend_approval", label: "Recommend Approval" },
-      ];
-    }
     if (isDirector) {
       return [
         { id: "approved", label: "Approve proposal (creates project)" },
@@ -43,7 +37,7 @@ export function ProposalReviewPage() {
       ];
     }
     return [];
-  }, [isCoordinator, isDirector]);
+  }, [isDirector]);
 
   const [selected, setSelected] = useState(actions[0]?.id || "");
 
@@ -93,15 +87,10 @@ throw e;
 
   // Final Approve / Reject waits until Multi-stage review (Phase 3) is complete (UG + PG).
   const multiStageReady = proposal.currentReviewStage === "ready_for_director";
-  const pipe = proposal.reviewPipeline || {};
-  const adminScreeningOpen =
-    pipe.adminScreening?.status === "pending" || pipe.adminScreening?.status === "in_progress";
   const reviewableStatuses = ["submitted", "under_review", "revision_requested"];
-  const showCoordinatorReview =
-    isCoordinator && reviewableStatuses.includes(proposal.status) && (adminScreeningOpen || multiStageReady);
   const showDirectorDecision =
     isDirector && multiStageReady && reviewableStatuses.includes(proposal.status);
-  const showFinalDecision = showCoordinatorReview || showDirectorDecision;
+  const showFinalDecision = showDirectorDecision;
 
   return (
     <div>
@@ -212,9 +201,7 @@ throw e;
 
       {showFinalDecision ? (
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>
-            {isDirector ? "Proposal decision" : "Coordinator recommendation"}
-          </div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>Proposal decision</div>
           {isDirector && proposal.requiresEthics && !ethicsApproved ? (
             <div className="muted" style={{ marginBottom: 10, fontSize: 13 }}>
               Approve ethics (certificate) above first. Then you can approve the proposal to create the project.
@@ -260,9 +247,7 @@ throw e;
               setBusy(true);
               setError("");
               try {
-                if (isCoordinator) {
-                  await proposalApi.coordinatorReview(accessToken, id, selected, comment.trim());
-                } else if (isDirector) {
+                if (isDirector) {
                   await proposalApi.directorDecision(accessToken, id, selected, comment.trim());
                 }
                 setComment("");

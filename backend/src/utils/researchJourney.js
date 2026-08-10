@@ -109,9 +109,20 @@ function ts(value) {
   return value ? new Date(value).toISOString() : null;
 }
 
+/** Automatic % from workflow steps — researchers do not enter progress manually. */
+function computeProgressPercentFromSteps(steps, project) {
+  if (isProjectCompleted(project)) return 100;
+  if (!steps?.length) return 0;
+  const countable = steps.filter((s) => s.status !== "skipped");
+  if (!countable.length) return 0;
+  const completed = countable.filter((s) => s.status === "completed").length;
+  const current = countable.some((s) => s.status === "current") ? 1 : 0;
+  const score = completed + current * 0.5;
+  return Math.min(100, Math.round((score / countable.length) * 100));
+}
+
 function buildProjectSteps(project, approved) {
   const link = project ? `/projects/${project._id}` : "/projects";
-  const progressLink = project ? `/projects/${project._id}/progress` : "/projects";
 
   if (!project) {
     const createdStatus = approved ? "current" : "pending";
@@ -121,14 +132,12 @@ function buildProjectSteps(project, approved) {
         detail: approved ? "Awaiting project record" : undefined,
       }),
       step("project_team", "Team & milestones setup", "pending", { link: "/projects" }),
-      step("project_progress", "Progress updates", "pending", { link: "/projects" }),
+      step("project_progress", "Research progress (automatic)", "pending", { link: "/projects" }),
     ];
   }
 
   const hasTeamOrMilestones =
     (project.teamMembers?.length || 0) > 0 || (project.milestones?.length || 0) > 0;
-  const hasProgress = (project.progressReports?.length || 0) > 0;
-  const latestProgress = project.progressReports?.[0];
   const isCompleted = project.status === PROJECT_STATUSES.COMPLETED;
   const isOnHold = project.status === PROJECT_STATUSES.ON_HOLD;
 
@@ -142,7 +151,7 @@ function buildProjectSteps(project, approved) {
 
   let teamStatus = "pending";
   if (hasTeamOrMilestones) teamStatus = "completed";
-  else if (!hasProgress && !isCompleted) teamStatus = "current";
+  else if (!isCompleted) teamStatus = "current";
 
   steps.push(
     step("project_team", "Team & milestones setup", teamStatus, {
@@ -153,17 +162,15 @@ function buildProjectSteps(project, approved) {
     })
   );
 
-  let progressStatus = "pending";
-  if (hasProgress) progressStatus = "completed";
-  else if (hasTeamOrMilestones) progressStatus = "current";
+  let progressStatus = "current";
+  if (isCompleted) progressStatus = "completed";
+  else if (isOnHold) progressStatus = "blocked";
 
   steps.push(
-    step("project_progress", "Progress updates", progressStatus, {
-      at: latestProgress ? ts(latestProgress.createdAt) : null,
-      link: progressLink,
-      detail: hasProgress
-        ? `${latestProgress.progressPercent || 0}% — ${String(latestProgress.note || "").slice(0, 55)}`
-        : "Submit progress on your project",
+    step("project_progress", "Research progress (automatic)", progressStatus, {
+      at: ts(project.updatedAt || project.createdAt),
+      link,
+      detail: "Progress % updates automatically from your workflow steps",
     })
   );
 
@@ -176,8 +183,6 @@ function buildProjectCompletedStep(project) {
   }
 
   const link = `/projects/${project._id}#closure`;
-  const hasProgress = (project.progressReports?.length || 0) > 0;
-  const latestProgress = project.progressReports?.[0];
   const isCompleted =
     project.status === PROJECT_STATUSES.COMPLETED ||
     project.status === PROJECT_STATUSES.CLOSED;
@@ -186,12 +191,14 @@ function buildProjectCompletedStep(project) {
   const closurePending = ["submitted", "director_approved", "finance_approved"].includes(
     project.closure?.status
   );
+  const milestones = project.milestones || [];
+  const allMilestonesDone = milestones.length > 0 && milestones.every((m) => m.completed);
 
   let completeStatus = "pending";
   if (isCompleted) completeStatus = "completed";
   else if (isOnHold) completeStatus = "blocked";
   else if (isClosing || closurePending) completeStatus = "current";
-  else if (hasProgress && (latestProgress?.progressPercent || 0) >= 90) completeStatus = "current";
+  else if (allMilestonesDone) completeStatus = "current";
 
   return step("project_completed", "Project completed", completeStatus, {
     link,
@@ -510,13 +517,7 @@ async function buildResearchJourneyForResearcher(researcherId, tierFilter, viewe
       steps.find((s) => s.status === "current") ||
       steps.find((s) => s.status === "blocked") ||
       steps.filter((s) => s.status === "completed").pop();
-    const latestProgress = project?.progressReports?.[0];
-    let progressPercent = null;
-    if (project) {
-      progressPercent =
-        latestProgress?.progressPercent ??
-        (isProjectCompleted(project) ? 100 : 0);
-    }
+    const progressPercent = project ? computeProgressPercentFromSteps(steps, project) : null;
     return {
       currentStepKey: current?.key || track.currentStepKey,
       currentStepLabel: current?.label || track.currentStepLabel,
@@ -660,13 +661,6 @@ function buildTrackResult(proposal, project, trackGrants, budget, publications, 
     publication,
     repositoryItem,
   });
-  const latestProgress = project?.progressReports?.[0];
-  let progressPercent = null;
-  if (project) {
-    progressPercent =
-      latestProgress?.progressPercent ??
-      (project.status === PROJECT_STATUSES.COMPLETED ? 100 : 0);
-  }
   const canViewAwards = canViewProjectAwards({
     role: viewerRole,
     hasProjectPublication: publicationUnlocksAwards(publication),
@@ -678,6 +672,7 @@ function buildTrackResult(proposal, project, trackGrants, budget, publications, 
     steps.find((s) => s.status === "current") ||
     steps.find((s) => s.status === "blocked") ||
     steps.filter((s) => s.status === "completed").pop();
+  const progressPercent = project ? computeProgressPercentFromSteps(steps, project) : null;
   return {
     currentStepKey: current?.key || null,
     currentStepLabel: current?.label || null,
@@ -742,6 +737,7 @@ module.exports = {
   buildResearchJourneyForResearcher,
   listResearchersForJourney,
   buildWorkflowForProject,
+  computeProgressPercentFromSteps,
   pickPrimaryGrant,
   canViewProjectAwards,
   sanitizeLinkedGrantsForViewer,

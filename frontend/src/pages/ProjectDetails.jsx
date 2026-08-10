@@ -256,10 +256,14 @@ export function ProjectDetailsPage() {
           </div>
         )}
 
-        {isOwner ? (
-          <button type="button" className="btn primary" style={{ marginTop: 12 }} onClick={() => navigate(`/projects/${id}/progress`)}>
-            Add progress report
-          </button>
+        {project.workflow?.progressPercent != null ? (
+          <div className="muted" style={{ marginTop: 10 }}>
+            Progress: {project.workflow.progressPercent}% (automatic from workflow)
+          </div>
+        ) : project.progressPercent != null ? (
+          <div className="muted" style={{ marginTop: 10 }}>
+            Progress: {project.progressPercent}% (automatic from workflow)
+          </div>
         ) : null}
       </div>
 
@@ -429,7 +433,7 @@ export function ProjectDetailsPage() {
 
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-          <div style={{ fontWeight: 800 }}>Progress reports</div>
+          <div style={{ fontWeight: 800 }}>Project progress</div>
           <button
             type="button"
             className="btn"
@@ -450,20 +454,15 @@ export function ProjectDetailsPage() {
             Download technical report (PDF)
           </button>
         </div>
-        {(project.progressReports || []).length === 0 ? (
-          <div className="muted">No progress reports yet.</div>
-        ) : (
-          <div style={{ display: "grid", gap: 8 }}>
-            {project.progressReports.map((r, idx) => (
-              <div className="card" key={idx}>
-                <div className="muted">
-                  {new Date(r.createdAt).toLocaleString()} • {r.progressPercent ?? 0}%
-                </div>
-                <div style={{ marginTop: 6 }}>{r.note}</div>
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="muted" style={{ marginTop: 8 }}>
+          Progress % is calculated automatically. Team, milestones, repository, publications, and closure are updated manually by you.
+          {project.workflow?.currentStepLabel ? (
+            <span> Current step: {project.workflow.currentStepLabel}.</span>
+          ) : null}
+          {project.workflow?.progressPercent != null || project.progressPercent != null ? (
+            <span> • {project.workflow?.progressPercent ?? project.progressPercent}% complete</span>
+          ) : null}
+        </div>
       </div>
 
       <ProjectExecutionPanel

@@ -62,14 +62,6 @@ router.post(
   asyncHandler(publicationController.setJournalDecision)
 );
 
-router.post(
-  "/:id/citations/refresh",
-  authenticateUser,
-  requireActiveUser,
-  authorizeRoles("researcher", "faculty_coordinator", "research_director"),
-  asyncHandler(publicationController.refreshCitations)
-);
-
 router.patch(
   "/:id/workflow-stage",
   authenticateUser,
