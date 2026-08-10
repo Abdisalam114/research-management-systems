@@ -83,7 +83,12 @@ function itemHasGrantStep(item) {
 
 function itemHasPublicationStep(item) {
   return (item.steps || []).some(
-    (s) => ["publication", "repository"].includes(s.key) && s.status !== "skipped"
+    (s) =>
+      (s.key === "repository" ||
+        s.key === "project_completed" ||
+        s.key?.startsWith("pub_") ||
+        s.section === "publish") &&
+      s.status !== "skipped"
   );
 }
 

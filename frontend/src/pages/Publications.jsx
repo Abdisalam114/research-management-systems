@@ -17,6 +17,12 @@ import {
   matchesTrackingFilter,
   publicationTypeLabel,
 } from "../constants/publicationTypes";
+import {
+  isPresetVenue,
+  venueLabelForType,
+  venueOptionsForType,
+  venueSelectValue,
+} from "../constants/publicationVenues";
 import { workflowStageMeta } from "../constants/facultyWorkflow";
 
 const EMPTY_FORM = {
@@ -398,6 +404,10 @@ setPublications(list);
   }, [publications]);
 
   const isCommunityType = form.type === "community_research_impact";
+  const venueOptions = useMemo(() => venueOptionsForType(form.type), [form.type]);
+  const venueFieldLabel = venueLabelForType(form.type);
+  const venueSelect = venueSelectValue(form.type, form.venue);
+  const showCustomVenue = venueSelect === "__other__";
 
   function resetForm() {
     const fallback =
@@ -598,7 +608,7 @@ setPublications(list);
                 <label>Output type</label>
                 <select
                   value={form.type}
-                  onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+                  onChange={(e) => setForm((f) => ({ ...f, type: e.target.value, venue: "" }))}
                 >
                   {FORM_TYPE_GROUPS.map((g) => (
                     <optgroup key={g.key} label={g.label}>
@@ -621,12 +631,32 @@ setPublications(list);
               </div>
             </div>
             <div className="field">
-              <label>Journal / conference / publisher / patent office (name)</label>
-              <input
-                value={form.venue}
-                onChange={(e) => setForm((f) => ({ ...f, venue: e.target.value }))}
-                placeholder="e.g. BMC Public Health, IEEE ICRERA, Springer, USPTO"
-              />
+              <label>{venueFieldLabel}</label>
+              <select
+                value={venueSelect}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setForm((f) => ({
+                    ...f,
+                    venue: next === "__other__" ? (isPresetVenue(f.type, f.venue) ? "" : f.venue) : next,
+                  }));
+                }}
+              >
+                <option value="">Select {venueFieldLabel.toLowerCase()}…</option>
+                {venueOptions.map((o) => (
+                  <option key={o.value || o.label} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              {showCustomVenue ? (
+                <input
+                  style={{ marginTop: 8 }}
+                  value={form.venue}
+                  onChange={(e) => setForm((f) => ({ ...f, venue: e.target.value }))}
+                  placeholder={`Enter ${venueFieldLabel.toLowerCase()}`}
+                />
+              ) : null}
             </div>
             <div className="field">
               <label>

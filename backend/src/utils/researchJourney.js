@@ -6,6 +6,12 @@ const { Publication, PUBLICATION_STATUSES } = require("../models/Publication");
 const { RepositoryItem } = require("../models/RepositoryItem");
 const { User } = require("../models/User");
 const {
+  resolveWorkflowStage,
+  workflowStageLabel,
+  STAGE_ORDER,
+  WORKFLOW_STAGES,
+} = require("./publicationWorkflow");
+const {
   indexByProjectId,
   pickPublicationForProject,
   pickRepositoryForProject,
@@ -177,9 +183,9 @@ function buildProjectSteps(project, approved) {
   return steps;
 }
 
-function buildProjectCompletedStep(project) {
+function buildProjectCompletedStep(project, publication = null, repositoryItem = null, { isVoluntary = true } = {}) {
   if (!project) {
-    return step("project_completed", "Project completed", "pending", { link: "/projects" });
+    return step("project_completed", "Project completed", "pending", { link: "/projects", section: "publish" });
   }
 
   const link = `/projects/${project._id}#closure`;
@@ -188,27 +194,107 @@ function buildProjectCompletedStep(project) {
     project.status === PROJECT_STATUSES.CLOSED;
   const isClosing = project.status === PROJECT_STATUSES.CLOSING;
   const isOnHold = project.status === PROJECT_STATUSES.ON_HOLD;
-  const closurePending = ["submitted", "director_approved", "finance_approved"].includes(
-    project.closure?.status
-  );
-  const milestones = project.milestones || [];
-  const allMilestonesDone = milestones.length > 0 && milestones.every((m) => m.completed);
+  const closureStatus = project.closure?.status;
+  const closurePending = ["submitted", "director_approved", "finance_approved"].includes(closureStatus);
+  const pubStage = publication ? resolveWorkflowStage(publication) : null;
+  const pubPublished = pubStage === WORKFLOW_STAGES.PUBLISHED;
+  const hasRepository = Boolean(repositoryItem);
 
   let completeStatus = "pending";
   if (isCompleted) completeStatus = "completed";
   else if (isOnHold) completeStatus = "blocked";
   else if (isClosing || closurePending) completeStatus = "current";
-  else if (allMilestonesDone) completeStatus = "current";
+  else if (pubPublished && hasRepository) completeStatus = "current";
+
+  let detail = isVoluntary
+    ? "Final step — Research Director must approve closure"
+    : "Final step — Director and Finance must approve closure";
+  if (isOnHold) detail = "On hold";
+  else if (isCompleted) detail = "Completed / closed";
+  else if (closureStatus === "submitted") {
+    detail = isVoluntary
+      ? "Awaiting Research Director closure approval"
+      : "Awaiting Research Director closure approval (then Finance)";
+  } else if (closureStatus === "director_approved") {
+    detail = "Director approved — awaiting Finance closure clearance";
+  } else if (closureStatus === "finance_approved") {
+    detail = "Awaiting final archive";
+  } else if (pubPublished && hasRepository) {
+    detail = isVoluntary
+      ? "Publish pipeline done — submit closure for director approval"
+      : "Publish pipeline done — submit closure (director + finance)";
+  } else if (pubPublished) {
+    detail = "Output published — archive in repository, then submit closure";
+  }
 
   return step("project_completed", "Project completed", completeStatus, {
     link,
-    detail: isOnHold
-      ? "On hold"
-      : isCompleted
-        ? "Completed / closed"
-        : isClosing || closurePending
-          ? `Closure: ${project.closure?.status || project.status}`
-          : project.status,
+    section: "publish",
+    detail,
+  });
+}
+
+/** Faculty publish pipeline: submitted → in process → pipeline → published */
+function buildPublicationPipelineSteps(project, publication) {
+  const pubLink = project ? `/publications?projectId=${project._id}` : "/publications";
+  const pub = publication || null;
+  const stageDefs = [
+    { key: "pub_submitted", stage: WORKFLOW_STAGES.SUBMITTED },
+    { key: "pub_in_process", stage: WORKFLOW_STAGES.IN_PROCESS },
+    { key: "pub_pipeline", stage: WORKFLOW_STAGES.PIPELINE },
+    { key: "pub_published", stage: WORKFLOW_STAGES.PUBLISHED },
+  ];
+
+  if (!pub && !project) {
+    return [
+      step("pub_submitted", "Publish — Submitted", "pending", {
+        link: pubLink,
+        section: "publish",
+        detail: "Register a research output",
+      }),
+    ];
+  }
+
+  if (!pub) {
+    return stageDefs.map((def, index) =>
+      step(`pub_${def.stage}`, `Publish — ${workflowStageLabel(def.stage)}`, index === 0 ? "current" : "pending", {
+        link: pubLink,
+        section: "publish",
+        detail: index === 0 ? "Register and submit output for this project" : undefined,
+      })
+    );
+  }
+
+  const pubDraft = pub.status === PUBLICATION_STATUSES.DRAFT;
+  const pubRevision = pub.status === PUBLICATION_STATUSES.REVISION_REQUESTED;
+  const pubRejected = pub.status === PUBLICATION_STATUSES.REJECTED;
+  const resolvedStage = resolveWorkflowStage(pub);
+  const stageIndex = STAGE_ORDER.indexOf(resolvedStage);
+
+  return stageDefs.map((def, index) => {
+    let status = "pending";
+    if (pubDraft || pubRevision) {
+      status = index === 0 ? "current" : "pending";
+    } else if (pubRejected) {
+      status = index === 0 ? "blocked" : "pending";
+    } else if (stageIndex >= 0) {
+      if (index < stageIndex) status = "completed";
+      else if (index === stageIndex) {
+        status = stageIndex === STAGE_ORDER.length - 1 ? "completed" : "current";
+      }
+    }
+
+    return step(`pub_${def.stage}`, `Publish — ${workflowStageLabel(def.stage)}`, status, {
+      at: index === stageIndex || (stageIndex === STAGE_ORDER.length - 1 && index === stageIndex) ? ts(pub.updatedAt) : null,
+      link: pubLink,
+      section: "publish",
+      detail:
+        index === 0 && (pubDraft || pubRevision || pubRejected)
+          ? `${String(pub.title || "").slice(0, 55)} • ${pub.status}`
+          : index === stageIndex
+            ? String(pub.title || "").slice(0, 55)
+            : undefined,
+    });
   });
 }
 
@@ -283,7 +369,6 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
   );
 
   steps.push(...buildProjectSteps(project, approved));
-  steps.push(buildProjectCompletedStep(project));
 
   const grant = pickPrimaryGrant(grants);
   const grantAwarded = grant && AWARDED_GRANT.includes(grant.status) && Number(grant.amountAwarded || 0) > 0;
@@ -360,31 +445,11 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
   const pub = publication || null;
   const pubSubmittedOrBetter =
     pub &&
-    [PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.VALIDATED].includes(pub.status);
-  const pubDraft = pub && pub.status === PUBLICATION_STATUSES.DRAFT;
-  const pubRejected = pub && pub.status === PUBLICATION_STATUSES.REJECTED;
-
-  let pubStatus = "pending";
-  if (pubSubmittedOrBetter) pubStatus = "completed";
-  else if (pubDraft || pubRejected) pubStatus = "current";
-  else if (project && isProjectCompleted(project)) pubStatus = "current";
-  else if (project) pubStatus = "pending";
-
-  if (pub || project) {
-    steps.push(
-      step("publication", "Research publication", pubStatus, {
-        at: pub ? ts(pub.updatedAt) : null,
-        link: pubLink,
-        detail: pub
-          ? `${String(pub.title || "").slice(0, 55)}${pub.title ? " • " : ""}${pub.status}${
-              pub.workflowStage ? ` • ${pub.workflowStage}` : ""
-            }`
-          : "Register and submit a research output for this project",
-      })
+    [PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.VALIDATED, PUBLICATION_STATUSES.REVISION_REQUESTED].includes(
+      pub.status
     );
-  } else {
-    steps.push(step("publication", "Research publication", "pending", { link: pubLink }));
-  }
+
+  steps.push(...buildPublicationPipelineSteps(project, pub));
 
   const repo = repositoryItem || null;
   let repoStatus = "pending";
@@ -395,9 +460,12 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
     step("repository", "Archive in repository", repoStatus, {
       at: repo ? ts(repo.createdAt) : null,
       link: repoLink,
-      detail: repo ? repo.title : pubSubmittedOrBetter ? "Archive output files for this project" : "Not archived yet",
+      section: "publish",
+      detail: repo ? repo.title : pubSubmittedOrBetter ? "Archive output files for this project" : "After publish pipeline",
     })
   );
+
+  steps.push(buildProjectCompletedStep(project, pub, repo, { isVoluntary }));
 
   const gatedSteps = enforceSequentialWorkflow(steps);
   const current =

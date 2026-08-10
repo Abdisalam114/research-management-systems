@@ -219,6 +219,9 @@ export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = 
       link: withProjectContext(step.link, { projectId, proposalId }),
     }));
 
+  const coreSteps = visibleSteps.filter((s) => s.section !== "publish");
+  const publishSteps = visibleSteps.filter((s) => s.section === "publish");
+
   const currentSteps = visibleSteps.filter((s) => s.status === "current");
   const currentLabels = currentSteps.map((s) => s.label).filter(Boolean);
   const displayCurrentLabel =
@@ -243,12 +246,12 @@ export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = 
       ) : null}
       <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
         {workflow?.isVoluntary
-          ? "Proposal → ethics → review → project → publication → repository (no grants/budget). Steps can progress independently."
+          ? "Proposal → ethics → review → project → publish pipeline → repository → project completed."
           : workflow?.projectStatus !== "completed" && workflow?.projectStatus !== "closed"
-            ? "Proposal → ethics → review → project → publication → repository · Funding-call grants after Completed/Closed. Steps can progress independently."
+            ? "Proposal → ethics → review → project → grants/budget → publish pipeline → repository → project completed."
             : workflow?.awardsVisible === false
-              ? "Proposal → ethics → review → project → publication → repository · Grant amounts after publication."
-              : "Proposal → ethics → review → project → funding-call grant → budget → publication → repository."}
+              ? "Proposal → ethics → review → project → publish pipeline → repository → project completed."
+              : "Proposal → ethics → review → project → funding → budget → publish pipeline → repository → project completed."}
       </div>
 
       {displayCurrentLabel ? (
@@ -319,7 +322,7 @@ export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = 
       </div>
 
       <div style={{ marginTop: 14 }}>
-        {visibleSteps.map((step, idx) => (
+        {coreSteps.map((step, idx) => (
           <StepRow
             key={step.key}
             step={step}
@@ -327,6 +330,29 @@ export function ProjectWorkflowPanel({ workflow, projectId = null, proposalId = 
             highlighted={focusWorkflow && step.status === "current"}
           />
         ))}
+        {publishSteps.length ? (
+          <>
+            <div
+              style={{
+                marginTop: coreSteps.length ? 16 : 0,
+                marginBottom: 8,
+                fontWeight: 800,
+                fontSize: 14,
+                color: "#0c4a6e",
+              }}
+            >
+              Publish pipeline
+            </div>
+            {publishSteps.map((step, idx) => (
+              <StepRow
+                key={step.key}
+                step={step}
+                index={idx}
+                highlighted={focusWorkflow && step.status === "current"}
+              />
+            ))}
+          </>
+        ) : null}
       </div>
     </div>
   );
