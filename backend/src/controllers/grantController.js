@@ -11,7 +11,11 @@ const { recordAudit } = require("../utils/audit");
 
 const { normalizeBudgetBreakdown } = require("../utils/budgetBreakdown");
 const { assertEligibleForCall, findOpenEligibleCall } = require("../utils/fundingCallEligibility");
-const { buildRequirementChecklist, assertRequirementsMet } = require("../utils/fundingCallRequirements");
+const {
+  buildRequirementChecklist,
+  assertRequirementsMet,
+  parseCallRequirementLabels,
+} = require("../utils/fundingCallRequirements");
 const { closeExpiredOpenCalls, closeCallAfterGrantAccepted } = require("../utils/fundingCallAutoClose");
 const { ROLES } = require("../models/User");
 const { canViewProjectAwards } = require("../utils/researchJourney");
@@ -147,27 +151,50 @@ async function resolveGrantProposalId(req, proposalId, researcherId, call) {
 }
 
 function parseRequirementChecklist(body, call, existing = []) {
-  if (body?.requirementChecklist !== undefined) {
-    let raw = body.requirementChecklist;
-    if (typeof raw === "string") {
-      try {
-        raw = JSON.parse(raw);
-      } catch {
-        throw new AppError("Invalid requirementChecklist JSON", 400);
-      }
-    }
-    if (!Array.isArray(raw)) throw new AppError("requirementChecklist must be an array", 400);
-    const labels = buildRequirementChecklist(call?.requiredDocuments || "", []).map((item) => item.label);
-    const labelSet = new Set(labels);
-    return raw
-      .filter((item) => item?.label && labelSet.has(String(item.label).trim()))
-      .map((item) => ({
-        label: String(item.label).trim(),
-        met: Boolean(item.met),
-        note: item.note ? String(item.note).trim() : "",
-      }));
+  const expected = buildRequirementChecklist(call?.requiredDocuments || "", existing);
+  if (body?.requirementChecklist === undefined) {
+    return expected;
   }
-  return buildRequirementChecklist(call?.requiredDocuments || "", existing);
+
+  let raw = body.requirementChecklist;
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      throw new AppError("Invalid requirementChecklist JSON", 400);
+    }
+  }
+  if (!Array.isArray(raw)) throw new AppError("requirementChecklist must be an array", 400);
+
+  const byLabel = new Map();
+  for (const item of raw) {
+    if (!item?.label) continue;
+    byLabel.set(String(item.label).trim(), {
+      label: String(item.label).trim(),
+      met: Boolean(item.met),
+      note: item.note ? String(item.note).trim() : "",
+    });
+  }
+
+  const merged = expected.map((item) => byLabel.get(item.label) || item);
+  return merged;
+}
+
+function assertCallRequirementsComplete(call, checklist) {
+  const requiredLabels = parseCallRequirementLabels(call?.requiredDocuments || "");
+  if (!requiredLabels.length) return;
+  const merged = buildRequirementChecklist(call.requiredDocuments, checklist);
+  if (merged.length < requiredLabels.length) {
+    throw new AppError(
+      `Complete all funding call requirements (${requiredLabels.length} required).`,
+      400
+    );
+  }
+  try {
+    assertRequirementsMet(merged);
+  } catch (e) {
+    throw new AppError(e.message, e.statusCode || 400);
+  }
 }
 
 async function assertGrantReadyForSubmit(grant, req) {
@@ -347,7 +374,9 @@ async function createGrant(req, res) {
 
   const explicitProjectId = projectId ? await resolveGrantProjectId(req, projectId, req.user.id) : null;
   const linkedProjectId = explicitProjectId || linkedProjectFromProposal;
-const grant = await Grant.create(req.tierAssign({
+  const checklist = parseRequirementChecklist(req.body, call);
+  assertCallRequirementsComplete(call, checklist);
+  const grant = await Grant.create(req.tierAssign({
     title: resolvedTitle,
     fundingSource: String(call.fundingSource).trim(),
     amountRequested: requested,
@@ -359,7 +388,7 @@ const grant = await Grant.create(req.tierAssign({
     callId: call._id,
     researcherId: req.user.id,
     status: GRANT_STATUSES.DRAFT,
-    requirementChecklist: parseRequirementChecklist(req.body, call),
+    requirementChecklist: checklist,
     ...(budgetFields || { budgetBreakdown: [], budgetTotal: 0 }),
   }));
 
@@ -436,6 +465,9 @@ async function updateGrant(req, res) {
 
   if (req.body?.requirementChecklist !== undefined) {
     grant.requirementChecklist = parseRequirementChecklist(req.body, callForChecklist, grant.requirementChecklist);
+    if (callForChecklist) {
+      assertCallRequirementsComplete(callForChecklist, grant.requirementChecklist);
+    }
   } else if (!grant.requirementChecklist?.length && callForChecklist) {
     grant.requirementChecklist = buildRequirementChecklist(callForChecklist.requiredDocuments, []);
   }

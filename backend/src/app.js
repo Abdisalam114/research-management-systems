@@ -50,6 +50,16 @@ function createApp() {
     res.json({ ok: true, service: "just-rms-backend" });
   });
 
+  app.get("/", (req, res) => {
+    const clientOrigin = process.env.CLIENT_ORIGIN?.split(",")[0]?.trim() || "http://localhost:5173";
+    res.status(200).json({
+      service: "JUST RMS API",
+      message: "This is the backend API only. Open the web app in your browser.",
+      appUrl: clientOrigin,
+      health: "/api/health",
+    });
+  });
+
   const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
   // Public OAI-PMH — register before /api/repository router so ":id" never captures "oai"
   app.get("/api/repository/oai", asyncHandler(repositoryController.oaiPmhh));
