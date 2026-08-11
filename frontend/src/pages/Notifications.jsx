@@ -28,8 +28,16 @@ function hasDetailBody(n) {
   return Boolean(n?.body?.trim());
 }
 
-function hasRichDetailBody(n) {
-  return hasDetailBody(n) && ["publication", "grant", "proposal", "project"].includes(n?.type);
+function typeLabel(type) {
+  if (!type) return "";
+  return String(type).replace(/_/g, " ");
+}
+
+function tierLabel(tier) {
+  if (!tier) return "";
+  if (tier === "undergraduate") return "UG";
+  if (tier === "postgraduate") return "PG";
+  return String(tier);
 }
 
 export function NotificationsPage() {
@@ -38,10 +46,9 @@ export function NotificationsPage() {
   const { programTier, selectProgramTier } = useProgramTier();
   const [notifications, setNotifications] = useState([]);
   const [downloadBusy, setDownloadBusy] = useState("");
-  const [detailNote, setDetailNote] = useState(null);
   const [actionBusy, setActionBusy] = useState("");
 
-  useScrollToTop([detailNote?.id]);
+  useScrollToTop([]);
 
   const load = useCallback(async () => {
     const res = await notificationApi.listMyNotifications(accessToken);
@@ -57,22 +64,17 @@ export function NotificationsPage() {
     return () => clearInterval(timer);
   }, [reload]);
 
-  function viewNotificationDetails(n) {
-    if (n.body?.trim()) {
-      setDetailNote(n);
-      return;
-    }
-    if (n.link) {
-      if (n.link.startsWith("http")) {
-        window.open(n.link, "_blank", "noopener,noreferrer");
-      } else {
-        navigate(n.link);
-      }
-    }
-  }
-
   function downloadNotificationSummary(n) {
-    const text = `${n.title || "Notification"}\n\n${n.body || ""}`.trim();
+    const meta = [
+      n.type ? `Type: ${typeLabel(n.type)}` : "",
+      n.programTier ? `Portal: ${tierLabel(n.programTier)}` : "",
+      n.link ? `Link: ${n.link}` : "",
+      n.downloadLink ? `Download: ${n.downloadLink}` : "",
+      n.createdAt ? `When: ${formatWhen(n.createdAt)}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const text = `${n.title || "Notification"}\n\n${n.body || ""}${meta ? `\n\n---\n${meta}` : ""}`.trim();
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
@@ -89,8 +91,6 @@ export function NotificationsPage() {
     } catch {
       /* still navigate */
     }
-
-    setDetailNote(null);
 
     const needsPortalSwitch =
       n.programTier &&
@@ -195,7 +195,6 @@ export function NotificationsPage() {
     setError("");
     try {
       await notificationApi.clearAllNotifications(accessToken);
-      setDetailNote(null);
       notificationApi.notifyNotificationsUpdated();
       await reload();
     } catch (e) {
@@ -261,30 +260,63 @@ export function NotificationsPage() {
                   {formatWhen(n.createdAt)}
                 </span>
               </div>
+
+              <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                {n.type ? (
+                  <span className="fundingCallMetaChip" style={{ textTransform: "capitalize" }}>
+                    {typeLabel(n.type)}
+                  </span>
+                ) : null}
+                {n.programTier ? (
+                  <span className="fundingCallMetaChip">{tierLabel(n.programTier)}</span>
+                ) : null}
+                {!n.readAt ? (
+                  <span className="fundingCallMetaChip" style={{ borderColor: "rgba(14,165,233,0.55)" }}>
+                    Unread
+                  </span>
+                ) : null}
+                {n.downloadLink ? (
+                  <span className="fundingCallMetaChip">Has download</span>
+                ) : null}
+              </div>
+
               <div
-                className="muted"
                 style={{
-                  marginTop: 8,
+                  marginTop: 10,
                   whiteSpace: "pre-wrap",
                   fontSize: 13,
                   lineHeight: 1.55,
-                  padding: ["publication", "project"].includes(n.type) ? "10px 12px" : undefined,
-                  borderRadius: ["publication", "project"].includes(n.type) ? 8 : undefined,
-                  background: ["publication", "project"].includes(n.type) ? "rgba(15,23,42,0.04)" : undefined,
-                  fontFamily: ["publication", "project"].includes(n.type) ? "inherit" : undefined,
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  background: "rgba(15,23,42,0.04)",
+                  color: "inherit",
                 }}
               >
-                {n.body}
+                {n.body?.trim() ? n.body : <span className="muted">No additional details.</span>}
               </div>
+
+              {(n.link || n.downloadLink) ? (
+                <div className="muted" style={{ marginTop: 8, fontSize: 12, display: "grid", gap: 2 }}>
+                  {n.link ? (
+                    <div>
+                      <strong>Link:</strong> {n.link}
+                    </div>
+                  ) : null}
+                  {n.downloadLink ? (
+                    <div>
+                      <strong>Download:</strong>{" "}
+                      {ethicsIdFromDownloadLink(n.downloadLink)
+                        ? "JUREC certificate PDF"
+                        : n.downloadLink}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 {n.link ? (
                   <button type="button" className="btn primary" onClick={() => openNotification(n)}>
                     {n.type === "message" ? "Open chat" : "Open"}
-                  </button>
-                ) : null}
-                {hasRichDetailBody(n) ? (
-                  <button type="button" className="btn" onClick={() => viewNotificationDetails(n)}>
-                    View details
                   </button>
                 ) : null}
                 {canDownload(n) ? (
@@ -296,9 +328,9 @@ export function NotificationsPage() {
                   >
                     {downloadBusy === n.id
                       ? "Downloading…"
-                      : hasDetailBody(n)
-                        ? "Download summary"
-                        : "Download document"}
+                      : ethicsIdFromDownloadLink(n.downloadLink) || n.downloadLink
+                        ? "Download document"
+                        : "Download summary"}
                   </button>
                 ) : null}
                 {!n.readAt ? (
@@ -324,79 +356,6 @@ export function NotificationsPage() {
           ) : null}
         </div>
       </div>
-
-      {detailNote ? (
-        <>
-          <div
-            role="presentation"
-            onClick={() => setDetailNote(null)}
-            style={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 999,
-              background: "rgba(0,0,0,0.45)",
-            }}
-          />
-          <div
-            className="card"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="pub-detail-title"
-            style={{
-              position: "fixed",
-              top: "50%",
-              left: "50%",
-              transform: "translate(-50%, -50%)",
-              zIndex: 1000,
-              width: "min(640px, calc(100vw - 32px))",
-              maxHeight: "min(85vh, 720px)",
-              overflow: "auto",
-              boxShadow: "0 24px 48px rgba(0,0,0,0.35)",
-            }}
-          >
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-            <div id="pub-detail-title" style={{ fontWeight: 800, fontSize: 18 }}>
-              {detailNote.title}
-            </div>
-            <button type="button" className="btn" onClick={() => setDetailNote(null)}>
-              Close
-            </button>
-          </div>
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              fontFamily: "inherit",
-              fontSize: 13,
-              lineHeight: 1.55,
-              marginTop: 12,
-              marginBottom: 0,
-              padding: 12,
-              borderRadius: 8,
-              background: "rgba(15,23,42,0.04)",
-            }}
-          >
-            {detailNote.body}
-          </pre>
-          <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {detailNote.link ? (
-              <button
-                type="button"
-                className="btn primary"
-                onClick={() => {
-                  setDetailNote(null);
-                  openNotification(detailNote);
-                }}
-              >
-                Open in project
-              </button>
-            ) : null}
-            <button type="button" className="btn" onClick={() => downloadNotificationSummary(detailNote)}>
-              Download summary
-            </button>
-          </div>
-        </div>
-        </>
-      ) : null}
     </div>
   );
 }

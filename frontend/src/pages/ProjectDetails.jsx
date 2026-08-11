@@ -366,7 +366,11 @@ export function ProjectDetailsPage() {
       ) : null}
 
       <div className="card" style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>Milestones</div>
+        <div style={{ fontWeight: 800, marginBottom: 4 }}>Milestones</div>
+        <p className="muted" style={{ fontSize: 13, marginTop: 0, marginBottom: 10 }}>
+          Planned research checkpoints / deadlines for the project team.{" "}
+          <span style={{ opacity: 0.9 }}>SO: Qodobada qorshaysan ee mashruuca (waqtiyada muhiimka ah).</span>
+        </p>
         {milestones.map((m, idx) => (
           <div key={idx} className="row" style={{ alignItems: "end", marginBottom: 8 }}>
             <div className="field" style={{ flex: 2 }}>

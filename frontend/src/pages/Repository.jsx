@@ -26,7 +26,7 @@ export function RepositoryPage() {
 
   useScrollToTop([showForm, projectIdFromUrl]);
 
-  const canUpload = user?.role === "researcher";
+  const canUpload = ["researcher", "faculty_coordinator", "research_director"].includes(user?.role);
 
   useEffect(() => {
     if (projectIdFromUrl) {
@@ -188,8 +188,8 @@ export function RepositoryPage() {
         title="Research Repository"
         subtitle={
           canUpload
-            ? "Upload project files (PDF, Word, CSV, Excel, TXT, ZIP) from My Projects."
-            : "Project-linked repository files — grouped by research project."
+            ? "Upload project files (PDF, Word, CSV, Excel, TXT, ZIP)."
+            : "Project-linked repository files."
         }
         stats={stats}
         activeFilter={statusFilter}

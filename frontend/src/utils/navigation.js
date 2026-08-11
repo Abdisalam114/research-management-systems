@@ -54,16 +54,16 @@ export function shouldShowBack(pathname, search = "") {
 
 export function getPageTitle(pathname) {
   const exact = {
-    "/dashboard": "Dashboard & Analytics",
-    "/pending-users": "Director — Users",
-    "/departments": "Faculties & Departments",
-    "/ethics": "Research Ethical Clearance",
+    "/dashboard": "Dashboard",
+    "/pending-users": "Users",
+    "/departments": "Departments",
+    "/ethics": "Ethics",
     "/proposals": "Proposals",
     "/projects": "Projects",
-    "/grants": "Grants & Funding",
-    "/budgets": "Finance & Budget",
+    "/grants": "Grants",
+    "/budgets": "Budgets",
     "/publications": "Publications",
-    "/research-workflow": "Research Workflow Status",
+    "/research-workflow": "Workflow",
     "/repository": "Repository",
     "/groups": "Groups",
     "/thesis": "Thesis",
@@ -71,7 +71,7 @@ export function getPageTitle(pathname) {
     "/notifications": "Notifications",
     "/profile": "Profile",
     "/faculty-dashboard": "Faculty Dashboard",
-    "/committee-assignments": "Committee Reviews",
+    "/committee-assignments": "Committee",
     "/review-assignments": "Peer Reviews",
   };
   if (exact[pathname]) return exact[pathname];

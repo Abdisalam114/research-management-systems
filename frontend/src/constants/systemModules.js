@@ -2,24 +2,24 @@
 import { SYSTEM_ROLES } from "./systemRoles";
 
 export const SYSTEM_MODULES = [
-  { key: "ethics", to: "/ethics?filter=submitted", label: "Ethics (REC)", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { key: "ethics", to: "/ethics?filter=submitted", label: "Ethics", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "proposals_staff", to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher", "leadership"] },
   { key: "reviews", to: "/review-assignments", label: "Peer Reviews", icon: "✍️", roles: ["research_director", "leadership"] },
-  { key: "committee_reviews", to: "/committee-assignments", label: "Committee Reviews", icon: "⚖️", roles: ["research_director", "faculty_coordinator"] },
-  { key: "finance_grant_approvals", to: "/finance/grant-approvals", label: "Grant funding approval", icon: "💵", roles: ["finance_officer"] },
-  { key: "finance_closures", to: "/finance/closures", label: "Project closure", icon: "📁", roles: ["finance_officer"] },
+  { key: "committee_reviews", to: "/committee-assignments", label: "Committee", icon: "⚖️", roles: ["research_director", "faculty_coordinator"] },
+  { key: "finance_grant_approvals", to: "/finance/grant-approvals", label: "Grant approval", icon: "💵", roles: ["finance_officer"] },
+  { key: "finance_closures", to: "/finance/closures", label: "Closures", icon: "📁", roles: ["finance_officer"] },
   { key: "projects_staff", to: "/projects", label: "Projects", icon: "📁", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "funding_calls", to: "/funding-calls", label: "Funding Calls", icon: "📢", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher", "leadership"] },
   { key: "policies", to: "/policies", label: "Policies", icon: "📜", roles: [...SYSTEM_ROLES] },
   { key: "grants", to: "/grants", label: "Grants", icon: "💰", roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher", "leadership"] },
-  { key: "budgets", to: "/budgets", label: "Finance & Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher"] },
+  { key: "budgets", to: "/budgets", label: "Budgets", icon: "🧾", roles: ["research_director", "finance_officer", "researcher"] },
   { key: "finance_reports", to: "/finance-reports", label: "Finance Reports", icon: "📊", roles: ["research_director", "finance_officer"] },
-  { key: "publications", to: "/publications", label: "Publications & Outputs", icon: "📚", roles: ["research_director", "faculty_coordinator", "researcher"] },
-  { key: "workflow", to: "/research-workflow", label: "Research Workflow", icon: "🔄", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { key: "publications", to: "/publications", label: "Publications", icon: "📚", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { key: "workflow", to: "/research-workflow", label: "Workflow", icon: "🔄", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "groups", to: "/groups", label: "Groups", icon: "🧑‍🤝‍🧑", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "thesis", to: "/thesis", label: "Thesis", icon: "🎓", roles: ["research_director", "faculty_coordinator", "researcher"] },
-  { key: "system_reports", to: "/system-reports", label: "System Reports", icon: "📑", roles: ["research_director", "faculty_coordinator", "finance_officer", "leadership"] },
-  { key: "kpi", to: "/kpi-dashboard", label: "KPI Dashboard", icon: "📈", roles: ["research_director", "faculty_coordinator", "leadership"] },
+  { key: "system_reports", to: "/system-reports", label: "Reports", icon: "📑", roles: ["research_director", "faculty_coordinator", "finance_officer", "leadership"] },
+  { key: "kpi", to: "/kpi-dashboard", label: "KPI", icon: "📈", roles: ["research_director", "faculty_coordinator", "leadership"] },
   { key: "donor", to: "/donor-reports", label: "Donor Reports", icon: "🌍", roles: ["research_director", "finance_officer"] },
 ];
 

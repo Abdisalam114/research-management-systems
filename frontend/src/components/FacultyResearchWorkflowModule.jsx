@@ -5,7 +5,7 @@ import { PageHeader } from "./PageHeader";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { statFilterLabel } from "../utils/pageHeaderFilters";
-import { FACULTY_WORKFLOW_STAGES, nextWorkflowStage, workflowStageMeta } from "../constants/facultyWorkflow";
+import { FACULTY_WORKFLOW_STAGES, nextWorkflowStage, workflowStageMeta, isPipelineReadyForPublish } from "../constants/facultyWorkflow";
 import { publicationTypeLabel } from "../constants/publicationTypes";
 
 export function FacultyResearchWorkflowModule({
@@ -55,6 +55,28 @@ export function FacultyResearchWorkflowModule({
       await load();
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to update workflow");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function journalPublish(pub) {
+    const note = window.prompt(
+      "Journal accept → Publish.\nGeli note / faallo (qasab):",
+      pub.journalDecisionNote || "Accepted by journal / venue"
+    );
+    if (!note?.trim()) return;
+    setBusyId(pub.id);
+    setError("");
+    try {
+      await publicationApi.setJournalDecision(accessToken, pub.id, {
+        decision: "accept",
+        note: note.trim(),
+      });
+      setStageFilter("published");
+      await load();
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to record journal decision");
     } finally {
       setBusyId(null);
     }
@@ -161,7 +183,14 @@ export function FacultyResearchWorkflowModule({
           </div>
           <div style={{ display: "grid", gap: 8 }}>
             {(filteredStage.items || []).map((p) => (
-              <WorkflowRow key={p.id} pub={p} canManage={canManage} busyId={busyId} onAdvance={advance} />
+              <WorkflowRow
+                key={p.id}
+                pub={p}
+                canManage={canManage}
+                busyId={busyId}
+                onAdvance={advance}
+                onJournalPublish={journalPublish}
+              />
             ))}
             {(filteredStage.items || []).length === 0 ? <div className="muted">No items in this stage.</div> : null}
           </div>
@@ -174,7 +203,14 @@ export function FacultyResearchWorkflowModule({
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>{stage.label}</div>
                 <div style={{ display: "grid", gap: 6 }}>
                   {stage.items.slice(0, listLimit).map((p) => (
-                    <WorkflowRow key={p.id} pub={p} canManage={canManage} busyId={busyId} onAdvance={advance} />
+                    <WorkflowRow
+                      key={p.id}
+                      pub={p}
+                      canManage={canManage}
+                      busyId={busyId}
+                      onAdvance={advance}
+                      onJournalPublish={journalPublish}
+                    />
                   ))}
                   {!showStageTiles && stage.items.length > listLimit ? (
                     <button type="button" className="btn" onClick={() => setStageFilter(stage.id)}>
@@ -241,7 +277,7 @@ export function FacultyResearchWorkflowModule({
       <div className="card" style={{ marginTop: 16, borderColor: "rgba(56,189,248,0.35)" }}>
         <div style={{ fontWeight: 800, fontSize: 18 }}>Faculty publication workflow</div>
         <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-          {departmentLabel || data?.department} — submitted → in process → pipeline → published.
+          {departmentLabel || data?.department} — In process → Pipeline → Journal decision → Publish.
         </div>
         {body}
       </div>
@@ -259,10 +295,11 @@ export function FacultyResearchWorkflowModule({
   );
 }
 
-function WorkflowRow({ pub, canManage, busyId, onAdvance }) {
+function WorkflowRow({ pub, canManage, busyId, onAdvance, onJournalPublish }) {
   const current = pub.workflowStage && pub.workflowStage !== "null" ? pub.workflowStage : "submitted";
   const next = nextWorkflowStage(current);
   const meta = workflowStageMeta(current);
+  const canJournalPublish = canManage && isPipelineReadyForPublish(current);
 
   return (
     <div
@@ -281,34 +318,37 @@ function WorkflowRow({ pub, canManage, busyId, onAdvance }) {
         </div>
         <div style={{ fontSize: 12, marginTop: 4, color: meta.accent }}>
           {meta.icon} {pub.workflowStageLabel || meta.label}
+          {pub.journalDecision && pub.journalDecision !== "pending" ? (
+            <> • Journal: {pub.journalDecisionLabel || pub.journalDecision}</>
+          ) : null}
         </div>
       </div>
-      {canManage && next ? (
-        <div className="workflowItemActions">
-          <Link className="btn sm" to={`/publications?projectId=${pub.projectId || ""}`}>
-            View output
+      <div className="workflowItemActions">
+        <Link className="btn sm" to={`/publications?projectId=${pub.projectId || ""}`}>
+          View output
+        </Link>
+        {pub.projectId ? (
+          <Link className="btn sm" to={`/projects/${pub.projectId}`}>
+            Open project
           </Link>
-          {pub.projectId ? (
-            <Link className="btn sm" to={`/projects/${pub.projectId}`}>
-              Open project
-            </Link>
-          ) : null}
+        ) : null}
+        {canManage && next ? (
           <button type="button" className="btn sm primary" disabled={busyId === pub.id} onClick={() => onAdvance(pub)}>
             {busyId === pub.id ? "…" : `→ ${workflowStageMeta(next).label}`}
           </button>
-        </div>
-      ) : (
-        <div className="workflowItemActions">
-          <Link className="btn sm" to={`/publications?projectId=${pub.projectId || ""}`}>
-            View output
-          </Link>
-          {pub.projectId ? (
-            <Link className="btn sm" to={`/projects/${pub.projectId}`}>
-              Open project
-            </Link>
-          ) : null}
-        </div>
-      )}
+        ) : null}
+        {canJournalPublish ? (
+          <button
+            type="button"
+            className="btn sm primary"
+            disabled={busyId === pub.id}
+            onClick={() => onJournalPublish(pub)}
+            title="Journal accept → Published"
+          >
+            {busyId === pub.id ? "…" : "Journal accept → Publish"}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }

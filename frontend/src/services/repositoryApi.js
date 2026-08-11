@@ -11,6 +11,16 @@ export async function listRepositoryItems(accessToken, params = {}) {
 export async function uploadRepositoryItem(accessToken, formData) {
   const res = await api.post("/api/repository/upload", formData, {
     headers: { Authorization: `Bearer ${accessToken}` },
+    // Axios must set multipart boundary itself — never force Content-Type here
+    transformRequest: [
+      (data, headers) => {
+        if (typeof FormData !== "undefined" && data instanceof FormData) {
+          if (headers && typeof headers.delete === "function") headers.delete("Content-Type");
+          else if (headers) delete headers["Content-Type"];
+        }
+        return data;
+      },
+    ],
   });
   return res.data;
 }

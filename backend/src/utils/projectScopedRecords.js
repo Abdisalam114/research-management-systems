@@ -47,7 +47,17 @@ function pickRepositoryForProject(repositoryItems, project) {
 
 async function resolveOwnedProjectId(req, projectId, researcherId, { forRepository = false } = {}) {
   if (!projectId) return null;
-  const project = await Project.findOne({ _id: projectId, researcherId });
+  let project = await Project.findOne({ _id: projectId, researcherId });
+  if (!project && forRepository) {
+    // Allow repository upload when researcher is listed on the project team
+    project = await Project.findOne({
+      _id: projectId,
+      $or: [
+        { researcherId },
+        { "teamMembers.userId": researcherId },
+      ],
+    });
+  }
   if (!project) throw new AppError("Research project not found or does not belong to you", 404);
   await repairOwnerProgramTier(project, req);
 
@@ -59,7 +69,7 @@ async function resolveOwnedProjectId(req, projectId, researcherId, { forReposito
       const isShell =
         proposal.researchArea === "Research Outputs" ||
         /linked from publication|Seeded voluntary proposal for publication/i.test(proposal.abstract || "");
-      if (isShell) {
+      if (isShell && !forRepository) {
         throw new AppError("Select a recognized research project from Projects (not a temporary output shell)", 400);
       }
       // Repository archives can be added to any owned active project; publications still need approval

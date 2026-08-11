@@ -194,19 +194,29 @@ setSuccessMsg(res.message || `Decision: ${decisionModal.decision}`);
 
   async function recordJournalDecision(p) {
     const decision = prompt(
-      "Journal / venue decision (international):\nType: accept | reject | revise | pending",
+      "Journal / venue decision:\nType: accept | reject | revise | pending\n(Accept → Publish only when workflow is Pipeline)",
       p.journalDecision || "pending"
     );
     if (!decision) return;
+    const normalized = decision.trim().toLowerCase();
+    if (
+      (normalized === "accept" || normalized === "validated") &&
+      p.workflowStage !== "pipeline"
+    ) {
+      setError(
+        `Journal accept → Publish requires Pipeline first (current: ${p.workflowStageLabel || p.workflowStage || "—"}).`
+      );
+      return;
+    }
     const note =
-      decision.trim().toLowerCase() === "pending"
+      normalized === "pending"
         ? ""
         : prompt("Note / reviewer feedback for this journal decision (required):");
-    if (decision.trim().toLowerCase() !== "pending" && !note) return;
+    if (normalized !== "pending" && !note) return;
     try {
       setError("");
       const res = await publicationApi.setJournalDecision(accessToken, p.id, {
-        decision: decision.trim().toLowerCase(),
+        decision: normalized,
         note: note || "",
       });
       setSuccessMsg(res.message || "Journal decision saved");

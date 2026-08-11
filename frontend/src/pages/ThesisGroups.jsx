@@ -499,7 +499,7 @@ export function ThesisGroupsPage() {
       if (res?.group) {
         setGroups((prev) => prev.map((g) => (String(g.id) === String(groupId) ? res.group : g)));
       }
-      setMessage("Title saved — Faculty Coordinator is notified (no approval required).");
+      setMessage("Title sent for review — Director or Faculty Coordinator can accept (one decision is enough).");
       setExpandedId(groupId);
       await reload();
     } catch (e2) {
@@ -658,7 +658,7 @@ export function ThesisGroupsPage() {
 
       <PageHeader
         title="Thesis"
-        subtitle="Supervisor enters title and chapter progress. Faculty Coordinator receives notifications only — no accept/reject step."
+        subtitle="Supervisor proposes title → Director or Coordinator accepts (one is enough) → chapters & meetings unlock."
         stats={stats}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
@@ -868,11 +868,13 @@ export function ThesisGroupsPage() {
           const titleStatus = titleProposalStatus(g);
           const isAssignedSupervisor =
             user?.role === "researcher" && supervisorIdValue && String(supervisorIdValue) === String(user?.id);
+          const canEnterTitle = isAssignedSupervisor && titleStatus !== "accepted";
+          const canReviewTitle = canManage && titleStatus === "pending";
+          const titleAccepted = titleStatus === "accepted" || isTitleAccepted(g);
           const canLogMeeting =
-            (canManage || isAssignedSupervisor) && g.status !== "defended";
-          const canUpdateChapters = canManage || isAssignedSupervisor;
-          const canUploadFinalDoc = canManage || isAssignedSupervisor;
-          const canEnterTitle = isAssignedSupervisor;
+            (canManage || isAssignedSupervisor) && g.status !== "defended" && titleAccepted;
+          const canUpdateChapters = (canManage || isAssignedSupervisor) && titleAccepted;
+          const canUploadFinalDoc = (canManage || isAssignedSupervisor) && titleAccepted;
           const shownTitle = displayTitle(g);
           const finalDoc = g.finalDocument;
 
@@ -942,10 +944,10 @@ export function ThesisGroupsPage() {
                   {canEnterTitle ? (
                     <div className="card" style={{ background: "rgba(251,191,36,0.08)", borderColor: "rgba(251,191,36,0.35)" }}>
                       <div style={{ fontWeight: 800, marginBottom: 8 }}>
-                        {titleStatus === "accepted" ? "Update student thesis title" : "Enter student thesis title"}
+                        {titleStatus === "rejected" ? "Re-submit student thesis title" : "Enter student thesis title"}
                       </div>
                       <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>
-                        After students choose their title, enter it here. The Faculty Coordinator is notified automatically — no approval needed.
+                        After students choose their title, enter it here. Director or Faculty Coordinator must accept (one is enough) before chapters/meetings unlock.
                       </p>
                       <div className="field" style={{ marginBottom: 8 }}>
                         <label>Thesis title</label>
@@ -956,15 +958,41 @@ export function ThesisGroupsPage() {
                         />
                       </div>
                       <button type="button" className="btn primary" onClick={() => submitTitleProposal(g.id)}>
-                        Save title
+                        Submit title for review
                       </button>
                     </div>
                   ) : null}
 
-                  {titleStatus === "accepted" && !canEnterTitle ? (
+                  {canReviewTitle ? (
+                    <div className="card" style={{ background: "rgba(14,165,233,0.08)", borderColor: "rgba(14,165,233,0.4)" }}>
+                      <div style={{ fontWeight: 800, marginBottom: 6 }}>Title pending acceptance</div>
+                      <div style={{ fontWeight: 700, marginBottom: 8 }}>{g.titleProposal?.title}</div>
+                      <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+                        Director ama Coordinator — midkiiba waa ku filan (labadaba looma baahna).
+                      </p>
+                      <div className="field" style={{ marginBottom: 8 }}>
+                        <label>Review note (optional)</label>
+                        <input
+                          value={titleForm.reviewNote}
+                          onChange={(e) => setTitleForm({ ...titleForm, reviewNote: e.target.value })}
+                          placeholder="Note for supervisor"
+                        />
+                      </div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button type="button" className="btn primary" onClick={() => reviewTitle(g.id, "accept")}>
+                          Accept title
+                        </button>
+                        <button type="button" className="btn" onClick={() => reviewTitle(g.id, "reject")}>
+                          Reject title
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {titleStatus === "accepted" ? (
                     <div className="card" style={{ background: "rgba(34,197,94,0.06)" }}>
-                      <div className="muted" style={{ fontSize: 12 }}>Thesis title</div>
-                      <div style={{ fontWeight: 700 }}>{g.title}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>Thesis title (accepted)</div>
+                      <div style={{ fontWeight: 700 }}>{g.title || g.titleProposal?.title}</div>
                       {g.titleProposal?.proposedAt ? (
                         <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
                           Recorded: {formatTimelineDate(g.titleProposal.proposedAt)}
@@ -998,6 +1026,9 @@ export function ThesisGroupsPage() {
                       {g.titleProposal?.reviewNote ? (
                         <div className="muted" style={{ marginTop: 4 }}>{g.titleProposal.reviewNote}</div>
                       ) : null}
+                      <p className="muted" style={{ fontSize: 13, marginBottom: 0 }}>
+                        Chapters and meetings stay locked until a new title is accepted.
+                      </p>
                     </div>
                   ) : null}
 
@@ -1017,10 +1048,16 @@ export function ThesisGroupsPage() {
 
                   <div className="card">
                     <div style={{ fontWeight: 700, marginBottom: 6 }}>Chapter progress</div>
-                    <p className="muted" style={{ fontSize: 13, marginTop: 0, marginBottom: 8 }}>
-                      Complete chapters in order (1 → 2 → …). When all are done, status becomes <strong>Completed</strong>. After oral defense, Coordinator records <strong>Defended</strong>.
-                    </p>
-                    {g.chapters?.length ? (
+                    {!titleAccepted ? (
+                      <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+                        Locked until the thesis title is accepted.
+                      </p>
+                    ) : (
+                      <p className="muted" style={{ fontSize: 13, marginTop: 0, marginBottom: 8 }}>
+                        Complete chapters in order (1 → 2 → …). When all are done, status becomes <strong>Completed</strong>. After oral defense, Coordinator records <strong>Defended</strong>.
+                      </p>
+                    )}
+                    {titleAccepted && g.chapters?.length ? (
                       <table className="dashTable">
                         <thead>
                           <tr>
@@ -1068,7 +1105,9 @@ export function ThesisGroupsPage() {
                           })}
                         </tbody>
                       </table>
-                    ) : <span className="muted">No chapters configured.</span>}
+                    ) : titleAccepted ? (
+                      <span className="muted">No chapters configured.</span>
+                    ) : null}
                     {allChaptersFinished(g.chapters) && g.status === "completed" ? (
                       <div
                         style={{
@@ -1134,8 +1173,21 @@ export function ThesisGroupsPage() {
                     ) : <span className="muted">No students.</span>}
                   </div>
 
-                  <div className="card">
-                    <div style={{ fontWeight: 700, marginBottom: 6 }}>Meetings ({g.meetings?.length || 0})</div>
+                  <details className="card" open={titleAccepted && (g.meetings?.length > 0 || canLogMeeting)}>
+                    <summary style={{ fontWeight: 700, cursor: "pointer", listStyle: "none" }}>
+                      Meetings ({g.meetings?.length || 0})
+                      <span className="muted" style={{ fontWeight: 500, marginLeft: 8, fontSize: 12 }}>
+                        {titleAccepted
+                          ? "— supervision log (fold/expand)"
+                          : "— locked until title is accepted"}
+                      </span>
+                    </summary>
+                    {!titleAccepted ? (
+                      <p className="muted" style={{ fontSize: 13, marginTop: 10, marginBottom: 0 }}>
+                        Accept the thesis title first, then log supervision meetings here.
+                      </p>
+                    ) : (
+                      <div style={{ marginTop: 10 }}>
                     {g.meetings?.length ? (
                       <table className="dashTable">
                         <thead>
@@ -1227,7 +1279,9 @@ export function ThesisGroupsPage() {
                         </div>
                       </form>
                     ) : null}
-                  </div>
+                      </div>
+                    )}
+                  </details>
 
                   <div className="card">
                     <div style={{ fontWeight: 700, marginBottom: 6 }}>Final thesis document</div>

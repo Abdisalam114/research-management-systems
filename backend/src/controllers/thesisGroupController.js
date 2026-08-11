@@ -89,6 +89,14 @@ function resolveTitleProposal(plain) {
   return emptyTitleProposal();
 }
 
+function isTitleAcceptedForProgress(group) {
+  const tp = group.titleProposal || {};
+  const status = tp.status || TITLE_PROPOSAL_STATUSES.NONE;
+  if (status === TITLE_PROPOSAL_STATUSES.ACCEPTED) return true;
+  if (status === TITLE_PROPOSAL_STATUSES.NONE && group.title?.trim()) return true;
+  return false;
+}
+
 function titleIsLocked(group) {
   const tp = group.titleProposal || {};
   const status = tp.status || TITLE_PROPOSAL_STATUSES.NONE;
@@ -215,19 +223,18 @@ function applyStudentTitleProposal(group, title, userId) {
     return;
   }
   const now = new Date();
+  // Pending until Director OR Faculty Coordinator accepts (one acceptance is enough)
   group.titleProposal = {
     title: trimmed,
-    status: TITLE_PROPOSAL_STATUSES.ACCEPTED,
+    status: TITLE_PROPOSAL_STATUSES.PENDING,
     proposedAt: now,
     proposedBy: userId,
-    reviewedAt: now,
+    reviewedAt: null,
     reviewedBy: null,
     reviewNote: "",
   };
-  group.title = trimmed;
-  if (group.status === THESIS_STATUSES.PROPOSED) {
-    group.status = THESIS_STATUSES.IN_PROGRESS;
-  }
+  // Do not unlock group.title / chapters until accepted
+  group.title = "";
 }
 
 async function loadSanitizedGroup(id) {
@@ -263,7 +270,7 @@ async function findSupervisorResearcher(supervisorId, req) {
   return User.findOne(scoped);
 }
 
-/** Notify Faculty Coordinator (information only — no approval required). */
+/** Notify Faculty Coordinator + Research Director about thesis title / updates. */
 async function notifyCoordinatorThesisUpdate(group, programTier, { title, body, downloadLink, link }) {
   const resolvedLink = link || `/thesis?groupId=${group._id}`;
   const payload = {
@@ -278,12 +285,40 @@ async function notifyCoordinatorThesisUpdate(group, programTier, { title, body, 
   } catch {
     /* best-effort */
   }
+  try {
+    await notifyUsersByRole(ROLES.RESEARCH_DIRECTOR, payload, programTier);
+  } catch {
+    /* best-effort */
+  }
   if (group.coordinatorId) {
     try {
       await notifyUser(group.coordinatorId, { ...payload, programTier });
     } catch {
       /* best-effort */
     }
+  }
+}
+
+/** After one staff accepts/rejects title, clear sibling pending title-review notifications. */
+async function clearTitleReviewNotifications(group) {
+  const link = `/thesis?groupId=${group._id}`;
+  try {
+    const { Notification } = require("../models/Notification");
+    await Notification.updateMany(
+      {
+        link,
+        readAt: null,
+        title: { $in: ["Thesis title pending review", "Thesis title recorded"] },
+      },
+      {
+        $set: {
+          readAt: new Date(),
+          body: "Title already decided by another reviewer — no further action needed.",
+        },
+      }
+    );
+  } catch {
+    /* best-effort */
   }
 }
 
@@ -559,6 +594,10 @@ async function proposeTitle(req, res) {
     throw new AppError("Only the assigned supervisor can enter the student-chosen thesis title", 403);
   }
 
+  if (group.titleProposal?.status === TITLE_PROPOSAL_STATUSES.ACCEPTED) {
+    throw new AppError("Title is already accepted. Ask Coordinator/Director to unlock before changing it.", 400);
+  }
+
   try {
     await assertThesisTitleNotUsedElsewhere(ThesisGroup, trimmed, {
       excludeGroupId: group._id,
@@ -572,8 +611,8 @@ async function proposeTitle(req, res) {
   await group.save();
 
   await notifyCoordinatorThesisUpdate(group, group.programTier || req.programTier, {
-    title: "Thesis title recorded",
-    body: `Supervisor set thesis title "${trimmed}" for ${thesisGroupLabel(group)}. No approval needed — for your information.`,
+    title: "Thesis title pending review",
+    body: `Supervisor proposed thesis title "${trimmed}" for ${thesisGroupLabel(group)}. Director or Faculty Coordinator — accept or reject (one decision is enough).`,
     link: `/thesis?groupId=${group._id}`,
   });
 
@@ -644,6 +683,8 @@ async function reviewTitleProposal(req, res) {
 
   await group.save();
 
+  await clearTitleReviewNotifications(group);
+
   if (group.supervisorId) {
     await notifyUser(group.supervisorId, {
       type: "system",
@@ -654,6 +695,30 @@ async function reviewTitleProposal(req, res) {
       link: `/thesis?groupId=${group._id}`,
       programTier: group.programTier || req.programTier,
     });
+  }
+
+  // Inform the other staff role so they know the title was already decided
+  const otherRoles =
+    role === ROLES.RESEARCH_DIRECTOR
+      ? [ROLES.FACULTY_COORDINATOR]
+      : [ROLES.RESEARCH_DIRECTOR];
+  for (const r of otherRoles) {
+    try {
+      await notifyUsersByRole(
+        r,
+        {
+          type: "system",
+          title: accepting ? "Thesis title already accepted" : "Thesis title already rejected",
+          body: accepting
+            ? `Title "${group.titleProposal.title}" was accepted — no further accept needed.`
+            : `Title proposal was rejected — no further action needed.`,
+          link: `/thesis?groupId=${group._id}`,
+        },
+        group.programTier || req.programTier
+      );
+    } catch {
+      /* best-effort */
+    }
   }
 
   res.json({ group: await loadSanitizedGroup(group._id) });
@@ -668,6 +733,10 @@ async function updateChapter(req, res) {
   if (!group) throw new AppError("Thesis group not found", 404);
 
   ensureChapters(group);
+
+  if (!isTitleAcceptedForProgress(group)) {
+    throw new AppError("Accept the thesis title before updating chapter progress", 400);
+  }
 
   const isSupervisor = group.supervisorId && String(group.supervisorId) === String(userId);
   const isStaff = [ROLES.RESEARCH_DIRECTOR, ROLES.FACULTY_COORDINATOR].includes(role);
@@ -776,6 +845,10 @@ async function addMeeting(req, res) {
 
   ensureChapters(group);
 
+  if (!isTitleAcceptedForProgress(group)) {
+    throw new AppError("Accept the thesis title before logging supervision meetings", 400);
+  }
+
   const isSupervisor = group.supervisorId && String(group.supervisorId) === String(userId);
   const isStaff = [ROLES.RESEARCH_DIRECTOR, ROLES.FACULTY_COORDINATOR].includes(role);
   if (!isSupervisor && !isStaff) throw new AppError("Only supervisor, coordinator, or director can log meetings", 403);
@@ -849,8 +922,8 @@ async function uploadFinalDocument(req, res) {
     throw new AppError("Only the supervisor (or coordinator/director) can upload the final thesis", 403);
   }
 
-  if (!String(group.title || group.titleProposal?.title || "").trim()) {
-    throw new AppError("Enter the thesis title before uploading the final document", 400);
+  if (!String(group.title || "").trim() || !isTitleAcceptedForProgress(group)) {
+    throw new AppError("Accepted thesis title is required before uploading the final document", 400);
   }
 
   if (!req.file) throw new AppError("PDF or Word file is required", 400);

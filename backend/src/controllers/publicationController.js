@@ -23,6 +23,8 @@ const {
   workflowStageLabel,
   countByWorkflowStage,
   STAGE_ORDER,
+  nextAdvanceStage,
+  canAdvanceWorkflow,
 } = require("../utils/publicationWorkflow");
 const { resolvePrincipalInvestigatorName } = require("../utils/projectPrincipalInvestigator");
 const { userDisplayName } = require("../utils/userDisplay");
@@ -581,8 +583,17 @@ async function setJournalDecision(req, res) {
 
   if (noteText) pushReviewerComment(pub, req, noteText, normalized);
 
+  const beforeStage = resolveWorkflowStage(pub);
+
   // Keep institutional status aligned when staff/researcher logs venue outcome
   if (normalized === JOURNAL_DECISIONS.ACCEPT) {
+    // Must be Pipeline first: In process → Pipeline → journal accept → Published
+    if (beforeStage !== WORKFLOW_STAGES.PIPELINE) {
+      throw new AppError(
+        `Journal accept → Publish is only allowed from Pipeline (current: ${workflowStageLabel(beforeStage)}). Advance the workflow to Pipeline first.`,
+        400
+      );
+    }
     pub.status = PUBLICATION_STATUSES.VALIDATED;
     pub.workflowStage = WORKFLOW_STAGES.PUBLISHED;
     pub.validationComment = noteText || pub.validationComment;
@@ -659,27 +670,37 @@ async function updateWorkflowStage(req, res) {
   }
 
   const current = resolveWorkflowStage(pub);
+  if (stage === WORKFLOW_STAGES.PUBLISHED) {
+    throw new AppError(
+      "Published comes from journal decision (accept). Advance only up to Pipeline, then record journal accept.",
+      400
+    );
+  }
   if (current !== stage) {
     const isDirector = req.user.role === "research_director";
     const ci = STAGE_ORDER.indexOf(current);
     const ni = STAGE_ORDER.indexOf(stage);
-    const ok = ni > ci && (isDirector ? true : ni === ci + 1);
+    const publishedIdx = STAGE_ORDER.indexOf(WORKFLOW_STAGES.PUBLISHED);
+    const ok =
+      ni > ci &&
+      ni < publishedIdx &&
+      (isDirector || canAdvanceWorkflow(current, stage) || nextAdvanceStage(current) === stage);
     if (!ok) {
       throw new AppError(
-        `Cannot move from "${workflowStageLabel(current)}" to "${workflowStageLabel(stage)}". Advance one step at a time.`,
+        `Cannot move from "${workflowStageLabel(current)}" to "${workflowStageLabel(stage)}". Advance one step at a time (up to Pipeline).`,
         400
       );
     }
   }
 
   pub.workflowStage = stage;
-  if (stage === WORKFLOW_STAGES.PUBLISHED && pub.status === PUBLICATION_STATUSES.SUBMITTED) {
+  if (stage === WORKFLOW_STAGES.PIPELINE && pub.status === PUBLICATION_STATUSES.SUBMITTED) {
     pub.status = PUBLICATION_STATUSES.VALIDATED;
     pub.validatedAt = pub.validatedAt || new Date();
   }
   await pub.save();
   let projectCompletion = null;
-  if (pub.projectId && (stage === WORKFLOW_STAGES.PUBLISHED || pub.status === PUBLICATION_STATUSES.VALIDATED)) {
+  if (pub.projectId && pub.status === PUBLICATION_STATUSES.VALIDATED) {
     try {
       const { maybeCompleteFundedProject } = require("../utils/maybeCompleteFundedProject");
       projectCompletion = await maybeCompleteFundedProject(pub.projectId);
@@ -689,16 +710,10 @@ async function updateWorkflowStage(req, res) {
   }
 
   await notifyPublicationEvent(req, pub, {
-    title:
-      stage === WORKFLOW_STAGES.PUBLISHED
-        ? buildResearcherPublicationNotice(pub, "published").title
-        : `Research output: ${workflowStageLabel(stage)}`,
-    body:
-      stage === WORKFLOW_STAGES.PUBLISHED
-        ? buildResearcherPublicationNotice(pub, "published").body
-        : buildPublicationSubmitNotificationBody(await loadPublicationForNotification(pub), req),
+    title: `Research output: ${workflowStageLabel(stage)}`,
+    body: buildPublicationSubmitNotificationBody(await loadPublicationForNotification(pub), req),
     notifyOwner: true,
-    alsoNotifyRoles: stage === WORKFLOW_STAGES.PUBLISHED ? ["faculty_coordinator", "research_director"] : [],
+    alsoNotifyRoles: [],
   });
 
   res.json({ message: "Workflow stage updated", publication: sanitizePublication(pub), projectCompletion });

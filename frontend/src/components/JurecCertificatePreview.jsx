@@ -61,12 +61,27 @@ export function JurecCertificatePreview({ cert, includeSignature, includeStamp }
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 24, gap: 16 }}>
         <div style={{ flex: 1 }}>
-          {includeSignature ? (
-            <div style={{ marginBottom: 6, fontStyle: "italic", fontSize: 18, color: "#334155", lineHeight: 1 }}>
-              {cert.chairpersonLine || "—"}
+          {includeSignature !== false ? (
+            <div style={{ marginBottom: 4 }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: "#475569", marginBottom: 4 }}>
+                Signature / Saxiix:
+              </div>
+              <div
+                style={{
+                  fontStyle: "italic",
+                  fontFamily: "Georgia, 'Times New Roman', serif",
+                  fontSize: 22,
+                  color: "#0f172a",
+                  lineHeight: 1.2,
+                  marginBottom: 4,
+                }}
+              >
+                {cert.chairpersonLine || "—"}
+              </div>
+              <div style={{ borderBottom: "1.5px solid #334155", width: 180, marginBottom: 8 }} />
             </div>
           ) : null}
-          <div style={{ fontWeight: 600 }}>{cert.chairpersonLine || "—"}</div>
+          <div style={{ fontWeight: 700 }}>{cert.chairpersonLine || "—"}</div>
           <div>{cert.signatoryTitle || "Chairperson"}</div>
           <div>Jamhuriya University Research Ethics Committee</div>
           <div>Mogadishu – Somalia</div>

@@ -105,15 +105,30 @@ function renderOfficialStamp(doc, x, y, size) {
 }
 
 function renderSignatureBlock(doc, x, y, name, includeSignature) {
+  const label = String(name || "—").trim() || "—";
   if (includeSignature) {
     doc.save();
+    doc.font("Helvetica-Bold").fontSize(9).fillColor("#475569").text("Signature / Saxiix:", x, y);
+    const sigTop = doc.y + 4;
+    // Visible ink-style signature + underline so it never looks blank on the PDF
+    doc.font("Helvetica-Oblique").fontSize(18).fillColor("#0f172a").text(label, x, sigTop, {
+      width: 240,
+      align: "left",
+    });
+    const lineY = Math.max(doc.y, sigTop + 24);
     doc.lineWidth(1).strokeColor("#334155");
-    doc.moveTo(x, y).bezierCurveTo(x + 35, y - 18, x + 70, y + 10, x + 130, y - 4).stroke();
-    doc.font("Helvetica-Oblique").fontSize(11).fillColor("#0f172a").text(name, x, y + 8);
+    doc.moveTo(x, lineY).lineTo(x + 180, lineY).stroke();
+    // Decorative flourish above the line (kept below page edge)
+    doc.lineWidth(1.4).strokeColor("#1e293b");
+    doc
+      .moveTo(x + 8, lineY - 12)
+      .bezierCurveTo(x + 45, lineY - 28, x + 90, lineY + 4, x + 160, lineY - 10)
+      .stroke();
     doc.restore();
-  } else {
-    doc.font("Helvetica").fontSize(10).fillColor("#0f172a").text(name, x, y);
+    return lineY + 8;
   }
+  doc.font("Helvetica").fontSize(10).fillColor("#0f172a").text(label, x, y);
+  return y + 14;
 }
 
 async function previewJurecCertificate(application, { EthicsApplication, tierFilter, issueDate = new Date() }) {
@@ -337,18 +352,28 @@ function renderJurecCertificatePdf(doc, application, { margin, pageWidth, logoPa
   y = renderApprovalDetailsBoxes(doc, margin, y, contentWidth, approval) + 20;
 
   const signatory = resolveSignatory(approval.signatoryKey, approval.chairpersonLine || approval.signedByName);
-  const includeSignature = approval.includeSignature !== false;
-  const includeStamp = approval.includeStamp !== false;
+  // Coerce string/boolean from API so signature is never accidentally dropped
+  const includeSignature = approval.includeSignature !== false && approval.includeSignature !== "false";
+  const includeStamp = approval.includeStamp !== false && approval.includeStamp !== "false";
   const sigX = margin;
+  const pageBottom = doc.page.height - doc.page.margins.bottom;
+  const needed = includeSignature ? 130 : 70;
+  if (y + needed > pageBottom) {
+    doc.addPage();
+    y = doc.page.margins.top;
+  }
   const sigY = y + 8;
+  const sigName = signatory.line || signatory.name || approval.chairpersonLine || approval.signedByName || "—";
 
-  renderSignatureBlock(doc, sigX, sigY, signatory.line || signatory.name, includeSignature);
-  let blockBottom = sigY + (includeSignature ? 36 : 18);
-  doc.font("Helvetica").fontSize(10).fillColor("#0f172a");
+  let blockBottom = renderSignatureBlock(doc, sigX, sigY, sigName, includeSignature);
+  doc.font("Helvetica-Bold").fontSize(10).fillColor("#0f172a");
+  doc.text(sigName, sigX, blockBottom);
+  blockBottom = doc.y + 4;
+  doc.font("Helvetica").fontSize(10);
   doc.text(signatory.title || approval.signatoryTitle || "Chairperson", sigX, blockBottom);
-  blockBottom += 14;
+  blockBottom = doc.y + 4;
   doc.text("Jamhuriya University Research Ethics Committee", sigX, blockBottom);
-  blockBottom += 14;
+  blockBottom = doc.y + 4;
   doc.text("Mogadishu – Somalia", sigX, blockBottom);
 
   if (includeStamp) {
