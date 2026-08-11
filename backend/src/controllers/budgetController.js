@@ -240,7 +240,7 @@ async function financeUpdateItemStatus(req, res) {
         title: `Budget item ${status}`,
         body: freshItem.description,
         link: budget.projectId ? `/budgets?projectId=${budget.projectId}` : "/budgets",
-        programTier: req.programTier,
+        programTier: fresh.programTier || budget.programTier || req.programTier,
       });
     } catch {
       /* notifications are best-effort */
@@ -261,7 +261,7 @@ async function financeUpdateItemStatus(req, res) {
       title: `Budget item ${status}`,
       body: item.description,
       link: budget.projectId ? `/budgets?projectId=${budget.projectId}` : "/budgets",
-      programTier: req.programTier,
+      programTier: budget.programTier || req.programTier,
     });
   } catch {
     /* notifications are best-effort */

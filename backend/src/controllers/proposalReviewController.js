@@ -66,7 +66,7 @@ async function adminScreening(req, res) {
     detail: proposal.title,
     actorId: req.user.id,
     actorRole: req.user.role,
-    programTier: req.programTier,
+    programTier: proposal.programTier || req.programTier,
   });
 
   if (decision === "pass" && (proposal.assignedReviewers || []).length) {
@@ -77,7 +77,7 @@ async function adminScreening(req, res) {
           title: "Proposal ready for peer review",
           body: `Admin screening passed: ${proposal.title}`,
           link: `/proposals/${proposal._id}/review`,
-          programTier: req.programTier,
+          programTier: proposal.programTier || req.programTier,
         });
       } catch (_) {
         /* best-effort */
@@ -198,7 +198,7 @@ await recordAudit({
     detail: `Score ${score}`,
     actorId: req.user.id,
     actorRole: req.user.role,
-    programTier: req.programTier,
+    programTier: proposal.programTier || req.programTier,
   });
 
   // Always notify Director so Open works (Director inbox is cross-portal)
@@ -216,7 +216,7 @@ await recordAudit({
           : `${proposal.title} (score ${score}/5)`,
         link: `/proposals/${proposal._id}/review`,
       },
-      req.programTier
+      proposal.programTier || req.programTier
     );
   } catch {
     /* best-effort */
@@ -278,7 +278,7 @@ async function completePeerReview(req, res) {
         body: proposal.title,
         link: `/proposals/${proposal._id}/review`,
       },
-      req.programTier
+      proposal.programTier || req.programTier
     );
   } catch {
     /* best-effort */
@@ -387,7 +387,7 @@ async function committeeReview(req, res) {
               : `${proposal.title} — committee ${decision.replace(/_/g, " ")}.`,
           link: `/proposals/${proposal._id}/review`,
         },
-        req.programTier
+        proposal.programTier || req.programTier
       );
     }
   } catch {
@@ -423,7 +423,7 @@ async function committeeReview(req, res) {
     detail: proposal.title,
     actorId: req.user.id,
     actorRole: req.user.role,
-    programTier: req.programTier,
+    programTier: proposal.programTier || req.programTier,
   });
 
   res.json({ message: "Committee review saved", proposal: sanitizeProposalBrief(proposal) });
@@ -480,7 +480,7 @@ async function financeProposalReview(req, res) {
             : `${proposal.title} — finance ${decision}.`,
         link: `/proposals/${proposal._id}/review`,
       },
-      req.programTier
+      proposal.programTier || req.programTier
     );
   } catch {
     /* best-effort */
@@ -506,7 +506,7 @@ async function financeProposalReview(req, res) {
     detail: proposal.title,
     actorId: req.user.id,
     actorRole: req.user.role,
-    programTier: req.programTier,
+    programTier: proposal.programTier || req.programTier,
   });
 
   res.json({ message: "Finance review saved", proposal: sanitizeProposalBrief(proposal) });

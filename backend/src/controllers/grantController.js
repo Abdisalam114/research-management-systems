@@ -514,7 +514,7 @@ async function submitGrant(req, res) {
       title: "Grant submitted for review",
       body: grant.title,
       link: `/grants/${grant._id}`,
-    }, req.programTier);
+    }, grant.programTier || req.programTier);
   } catch { /* best-effort */ }
 
   await recordAudit({
@@ -570,7 +570,7 @@ async function directorDecision(req, res) {
     await closeCallAfterGrantAccepted(grant.callId, {
       actorId: req.user.id,
       actorRole: req.user.role,
-      programTier: req.programTier,
+      programTier: grant.programTier || req.programTier,
       grantTitle: grant.title,
     });
   }
@@ -587,7 +587,7 @@ async function directorDecision(req, res) {
       title: decision === GRANT_STATUSES.APPROVED ? "Grant approved — project ready (pending finance)" : "Grant rejected",
       body: grant.title,
       link: decision === GRANT_STATUSES.APPROVED ? projectLink : "/grants",
-      programTier: req.programTier,
+      programTier: grant.programTier || req.programTier,
     });
     if (decision === GRANT_STATUSES.APPROVED) {
       await notifyUsersByRole("finance_officer", {
@@ -595,7 +595,7 @@ async function directorDecision(req, res) {
         title: "Grant pending finance approval",
         body: grant.title,
         link: "/finance/grant-approvals",
-      }, req.programTier);
+      }, grant.programTier || req.programTier);
     }
   } catch { /* best-effort */ }
 
@@ -650,7 +650,7 @@ async function financeDecision(req, res) {
         await closeCallAfterGrantAccepted(grant.callId, {
           actorId: req.user.id,
           actorRole: req.user.role,
-          programTier: req.programTier,
+          programTier: grant.programTier || req.programTier,
           grantTitle: grant.title,
         });
       } catch { /* best-effort */ }
@@ -666,7 +666,7 @@ try {
         title: "Grant authorized — project funded",
         body: `${grant.title} — funds are allocated; open the project to continue work.`,
         link: projectId ? `/projects/${projectId}` : "/budgets",
-        programTier: req.programTier,
+        programTier: grant.programTier || req.programTier,
       });
     } catch { /* best-effort */ }
   } else {
@@ -678,7 +678,7 @@ try {
         title: "Grant rejected by finance",
         body: grant.title,
         link: `/grants/${grant._id}`,
-        programTier: req.programTier,
+        programTier: grant.programTier || req.programTier,
       });
     } catch { /* best-effort */ }
   }

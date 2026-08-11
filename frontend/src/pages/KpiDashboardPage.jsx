@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
@@ -6,26 +6,45 @@ import * as analyticsApi from "../services/analyticsApi";
 import { PageHeader } from "../components/PageHeader";
 import "../pages/dashboard.css";
 
-const KPI_ROUTES = [
-  { key: "grantSuccessRate", label: "Grant success rate", format: (v) => `${v ?? 0}%`, to: "/grants" },
-  { key: "proposalApprovalRate", label: "Proposal approval", format: (v) => `${v ?? 0}%`, to: "/proposals" },
-  {
-    key: "totalFundingAwarded",
-    label: "Funding awarded",
-    format: (v) => `$${Number(v || 0).toLocaleString()}`,
-    to: "/finance-reports",
-  },
-  { key: "activeProjects", label: "Active projects", format: (v) => v ?? 0, to: "/projects" },
-  { key: "projectsArchived", label: "Archived projects", format: (v) => v ?? 0, to: "/projects" },
-  { key: "publicationsValidated", label: "Validated publications", format: (v) => v ?? 0, to: "/publications" },
-  {
-    key: "openFundingCalls",
-    label: "Open funding calls",
-    format: (v) => v ?? 0,
-    sub: (kpis) => `Internal ${kpis.internalFundingCalls ?? 0} · External ${kpis.externalFundingCalls ?? 0}`,
-    to: "/funding-calls",
-  },
-];
+function kpiRoutesForRole(role) {
+  const canFinance = ["research_director", "finance_officer"].includes(role);
+  const canProjects = ["research_director", "faculty_coordinator", "researcher"].includes(role);
+  return [
+    { key: "grantSuccessRate", label: "Grant success rate", format: (v) => `${v ?? 0}%`, to: "/grants" },
+    { key: "proposalApprovalRate", label: "Proposal approval", format: (v) => `${v ?? 0}%`, to: "/proposals" },
+    {
+      key: "totalFundingAwarded",
+      label: "Funding awarded",
+      format: (v) => `$${Number(v || 0).toLocaleString()}`,
+      to: canFinance ? "/finance-reports" : "/grants",
+    },
+    {
+      key: "activeProjects",
+      label: "Active projects",
+      format: (v) => v ?? 0,
+      to: canProjects ? "/projects" : "/system-reports",
+    },
+    {
+      key: "projectsArchived",
+      label: "Archived projects",
+      format: (v) => v ?? 0,
+      to: canProjects ? "/projects" : "/system-reports",
+    },
+    {
+      key: "publicationsValidated",
+      label: "Validated publications",
+      format: (v) => v ?? 0,
+      to: canProjects ? "/publications" : "/system-reports",
+    },
+    {
+      key: "openFundingCalls",
+      label: "Open funding calls",
+      format: (v) => v ?? 0,
+      sub: (kpis) => `Internal ${kpis.internalFundingCalls ?? 0} · External ${kpis.externalFundingCalls ?? 0}`,
+      to: "/funding-calls",
+    },
+  ];
+}
 
 function KpiCard({ label, value, sub, to }) {
   const inner = (
@@ -67,8 +86,9 @@ function KpiCard({ label, value, sub, to }) {
 }
 
 export function KpiDashboardPage() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const [data, setData] = useState(null);
+  const kpiRoutes = useMemo(() => kpiRoutesForRole(user?.role), [user?.role]);
 
   const load = useCallback(async () => {
     const res = await analyticsApi.kpiDashboard(accessToken);
@@ -100,7 +120,7 @@ export function KpiDashboardPage() {
           </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
-            {KPI_ROUTES.map((k) => (
+            {kpiRoutes.map((k) => (
               <KpiCard
                 key={k.key}
                 label={k.label}

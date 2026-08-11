@@ -84,6 +84,7 @@ export function SystemReportsPage() {
   }
 
   const isDirector = user?.role === "research_director";
+  const canFinanceReports = ["research_director", "finance_officer"].includes(user?.role);
 
   return (
     <div>
@@ -99,9 +100,11 @@ export function SystemReportsPage() {
             <button type="button" className="btn primary" disabled={busy || !report} onClick={downloadCsv}>
               {busy ? "Downloading…" : "Download CSV"}
             </button>
-            <Link className="btn" to="/finance-reports">
-              Finance report
-            </Link>
+            {canFinanceReports ? (
+              <Link className="btn" to="/finance-reports">
+                Finance report
+              </Link>
+            ) : null}
             <Link className="btn" to="/policies">
               Policies
             </Link>

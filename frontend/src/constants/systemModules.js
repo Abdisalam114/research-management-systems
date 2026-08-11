@@ -2,7 +2,7 @@
 import { SYSTEM_ROLES } from "./systemRoles";
 
 export const SYSTEM_MODULES = [
-  { key: "ethics", to: "/ethics", label: "Ethics (REC)", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { key: "ethics", to: "/ethics?filter=submitted", label: "Ethics (REC)", icon: "📋", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { key: "proposals_staff", to: "/proposals", label: "Proposals", icon: "📄", roles: ["research_director", "faculty_coordinator", "researcher", "leadership"] },
   { key: "reviews", to: "/review-assignments", label: "Peer Reviews", icon: "✍️", roles: ["research_director", "leadership"] },
   { key: "committee_reviews", to: "/committee-assignments", label: "Committee Reviews", icon: "⚖️", roles: ["research_director", "faculty_coordinator"] },

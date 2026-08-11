@@ -509,7 +509,7 @@ async function submitProposal(req, res) {
         : "Proposal submitted for director review",
       body: proposal.title,
       link: `/proposals/${proposal._id}/review`,
-    }, req.programTier);
+    }, req.notifyProgramTier?.(proposal) || proposal.programTier || req.programTier);
     if (proposal.requiresEthics) {
       await notifyUsersByRole("research_director", {
         type: "ethics",
@@ -518,7 +518,7 @@ async function submitProposal(req, res) {
         link: proposal.ethicsApplicationId
           ? `/ethics?applicationId=${proposal.ethicsApplicationId}`
           : "/ethics",
-      }, req.programTier);
+      }, req.notifyProgramTier?.(proposal) || proposal.programTier || req.programTier);
     }
 } catch {
     /* notifications best-effort */
@@ -797,7 +797,7 @@ async function directorDecision(req, res) {
         await closeCallAfterGrantAccepted(proposal.fundingCallId, {
           actorId: req.user.id,
           actorRole: req.user.role,
-          programTier: req.programTier,
+          programTier: proposal.programTier || req.programTier,
           grantTitle: proposal.title,
         });
       } catch { /* best-effort */ }
@@ -902,7 +902,7 @@ if (!Array.isArray(reviewerIds) || reviewerIds.length === 0) {
         title: "Peer review assignment",
         body: `You were assigned to review: ${proposal.title}`,
         link: `/review-assignments`,
-        programTier: req.programTier,
+        programTier: proposal.programTier || req.programTier,
       });
       notified += 1;
     } catch (_) {
@@ -1031,7 +1031,7 @@ async function assignCommittee(req, res) {
         title: "Committee review assignment",
         body: `You were assigned to committee-review: ${proposal.title}`,
         link: `/committee-assignments`,
-        programTier: req.programTier,
+        programTier: proposal.programTier || req.programTier,
       });
     } catch {
       /* best-effort */
@@ -1110,7 +1110,7 @@ async function assignFinance(req, res) {
         title: "Finance review assignment",
         body: `You were assigned to finance-review: ${proposal.title}`,
         link: `/finance/reviews/${proposal._id}`,
-        programTier: req.programTier,
+        programTier: proposal.programTier || req.programTier,
       });
     } catch {
       /* best-effort */
