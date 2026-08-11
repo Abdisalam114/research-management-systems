@@ -4,6 +4,8 @@ const { sanitizeAuditEvent } = require("../utils/audit");
 
 async function getEntityAudit(req, res) {
   const { entityType, entityId } = req.params;
+  // Researchers: show full trail for the entity (pages already gate entity access).
+  // Staff: portal-scoped.
   const filter =
     req.user?.role === "researcher"
       ? { entityType, entityId }

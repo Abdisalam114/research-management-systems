@@ -13,7 +13,7 @@ const KPI_ROUTES = [
     key: "totalFundingAwarded",
     label: "Funding awarded",
     format: (v) => `$${Number(v || 0).toLocaleString()}`,
-    to: "/finance/reports",
+    to: "/finance-reports",
   },
   { key: "activeProjects", label: "Active projects", format: (v) => v ?? 0, to: "/projects" },
   { key: "projectsArchived", label: "Archived projects", format: (v) => v ?? 0, to: "/projects" },

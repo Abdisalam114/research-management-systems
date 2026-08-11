@@ -166,7 +166,7 @@ try {
       title: "New payment request awaiting director approval",
       body: `${payment.payee}: ${payment.purpose}`,
       link: payment.projectId ? `/budgets?projectId=${payment.projectId}` : "/budgets",
-    });
+    }, payment.programTier || budget.programTier || req.programTier);
   } catch {
     /* best-effort */
   }
@@ -202,6 +202,7 @@ try {
       title: `Payment ${decision === "approve" ? "approved by director" : "rejected by director"}`,
       body: `${payment.payee} — ${payment.purpose}`,
       link: payment.projectId ? `/budgets?projectId=${payment.projectId}` : "/budgets",
+      programTier: payment.programTier || req.programTier,
     });
     if (decision === "approve") {
       await notifyUsersByRole("finance_officer", {
@@ -209,7 +210,7 @@ try {
         title: "Director-approved payment awaiting disbursement",
         body: `${payment.payee} — ${payment.purpose}`,
         link: payment.projectId ? `/budgets?projectId=${payment.projectId}` : "/budgets",
-      });
+      }, payment.programTier || req.programTier);
     }
   } catch {
     /* best-effort */
@@ -265,6 +266,7 @@ try {
       title: "Payment disbursed by finance",
       body: `${payment.payee} — ${payment.purpose} via ${paymentMethod}`,
       link: payment.projectId ? `/budgets?projectId=${payment.projectId}` : "/budgets",
+      programTier: payment.programTier || req.programTier,
     });
   } catch {
     /* best-effort */

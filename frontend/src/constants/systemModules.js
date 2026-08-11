@@ -56,7 +56,7 @@ export function countForModule(key, metrics = {}, overview = {}) {
     case "projects_staff":
       return m.projects ?? o.projects ?? metrics.projects?.total ?? 0;
     case "finance_closures":
-      return m.closuresPending ?? o.closuresPending ?? metrics.closures?.pending ?? m.projects ?? 0;
+      return m.closuresPending ?? o.closuresPending ?? metrics.closures?.pending ?? 0;
     case "funding_calls":
       return m.fundingCalls ?? o.fundingCalls ?? metrics.fundingCalls?.total ?? 0;
     case "policies":

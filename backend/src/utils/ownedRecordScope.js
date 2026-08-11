@@ -52,7 +52,8 @@ async function findOwnedRecord(Model, req, id, { ownerField = "researcherId" } =
 
 /** Create payload with enforced programTier (avoids silent UG default). */
 function createWithTier(req, data, label = "program tier") {
-  const tier = req.requireWriteProgramTier(req.currentUser?.programTier, label);
+  // Prefer active portal (req.programTier) over staff account's stored tier (often UG).
+  const tier = req.requireWriteProgramTier(data?.programTier || req.programTier, label);
   return req.tierAssign({ ...data, programTier: tier });
 }
 

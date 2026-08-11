@@ -1,5 +1,5 @@
 const { Proposal, PROPOSAL_STATUSES } = require("../models/Proposal");
-const { Project, PROJECT_STATUSES } = require("../models/Project");
+const { Project, PROJECT_STATUSES, CLOSURE_STATUSES } = require("../models/Project");
 const { Grant, GRANT_STATUSES } = require("../models/Grant");
 const { Budget, BUDGET_ITEM_STATUSES } = require("../models/Budget");
 const { Payment, PAYMENT_STATUSES } = require("../models/Payment");
@@ -120,7 +120,7 @@ async function getDashboardMetrics(req, res) {
     role === "researcher" ? "ownerResearcherId" : "researcherId"
   );
 
-  const [proposalCount, projectCount, grants, budgets, pubs, repoCount, collabGroupCount, ethicsCount, thesisCount, notifUnread, activeProjectCount, activeProjectDocs, workflowPubCount, fundingCallCount, openFundingCallCount] =
+  const [proposalCount, projectCount, grants, budgets, pubs, repoCount, collabGroupCount, ethicsCount, thesisCount, notifUnread, activeProjectCount, activeProjectDocs, workflowPubCount, fundingCallCount, openFundingCallCount, closuresPendingCount] =
     await Promise.all([
       Proposal.countDocuments(proposalFilter),
       Project.countDocuments(projectFilter),
@@ -136,7 +136,11 @@ async function getDashboardMetrics(req, res) {
           null
         )
       ),
-      EthicsApplication.countDocuments(role === "researcher" ? { researcherId: userId } : tw({})),
+      EthicsApplication.countDocuments(
+        role === "researcher"
+          ? { researcherId: userId }
+          : tw({ status: "submitted" })
+      ),
       ThesisGroup.countDocuments(
         tw(
           role === "researcher"
@@ -176,6 +180,10 @@ async function getDashboardMetrics(req, res) {
             }
           : tw({ status: CALL_STATUSES.OPEN })
       ),
+      Project.countDocuments({
+        ...projectFilter,
+        "closure.status": CLOSURE_STATUSES.DIRECTOR_APPROVED,
+      }),
     ]);
 
   let usersCount = 0;
@@ -274,6 +282,7 @@ async function getDashboardMetrics(req, res) {
       role === "leadership" ? reviewAssignmentsPending || reviewAssignments : reviewAssignments,
     fundingCalls: openFundingCallCount || fundingCallCount,
     grantsPendingFinance: grants.filter((g) => g.status === GRANT_STATUSES.PENDING_FINANCE).length,
+    closuresPending: closuresPendingCount,
     messages: "—",
     notificationsUnread: notifUnread,
   };

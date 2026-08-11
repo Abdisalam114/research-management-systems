@@ -109,6 +109,14 @@ async function joinGroup(req, res) {
   const { id } = req.params;
   const group = await ResearchGroup.findById(id);
   if (!group) throw new AppError("Research group not found", 404);
+  if (
+    req.programTier &&
+    group.programTier &&
+    group.programTier !== req.programTier &&
+    req.user.role !== "research_director"
+  ) {
+    throw new AppError("Research group not found", 404);
+  }
 
   const exists = (group.members || []).some((m) => String(m.userId) === String(req.user.id));
   if (!exists) group.members.push({ userId: req.user.id, role: GROUP_MEMBER_ROLES.MEMBER });

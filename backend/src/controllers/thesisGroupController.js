@@ -297,7 +297,9 @@ async function listGroups(req, res) {
   let filter = {};
 
   if (role === ROLES.RESEARCHER) {
-    filter = { supervisorId: userId };
+    filter = {
+      $or: [{ supervisorId: userId }, { createdBy: userId }, { coordinatorId: userId }],
+    };
   }
 
   const groups = await ThesisGroup.find(

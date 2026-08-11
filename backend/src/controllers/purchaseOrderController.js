@@ -161,6 +161,7 @@ async function directorDecision(req, res) {
       title: `PO ${decision === "approve" ? "approved by director" : "rejected by director"}`,
       body: po.vendorName,
       link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
+      programTier: po.programTier || req.programTier,
     });
     if (decision === "approve") {
       await notifyUsersByRole("finance_officer", {
@@ -168,7 +169,7 @@ async function directorDecision(req, res) {
         title: "Director-approved PO awaiting payment",
         body: `${po.vendorName} — ${po.currency} ${po.totalAmount}`,
         link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
-      });
+      }, po.programTier || req.programTier);
     }
   } catch {
     /* best-effort */
@@ -223,6 +224,7 @@ try {
       title: "PO paid by finance",
       body: `${po.vendorName} via ${paymentMethod}`,
       link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
+      programTier: po.programTier || req.programTier,
     });
   } catch {
     /* best-effort */
