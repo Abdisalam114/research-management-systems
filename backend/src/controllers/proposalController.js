@@ -17,6 +17,7 @@ const {
 const { applyEthicsPayload, parseEthicsJson } = require("../utils/ethicsFormMerge");
 const { ensureReviewPipeline, getCurrentReviewStage, defaultReviewPipeline, STAGE_STATUS, isVoluntaryProposal, peerReviewAssignedToUserFilter, clearPeerAssigneesIfInactive, assertStagesBeforeDirector } = require("../utils/proposalReviewPipeline");
 const { recordAudit } = require("../utils/audit");
+const { isValidProgramTier } = require("../constants/programTier");
 
 function resolveProposalKind(doc) {
   if (doc.proposalKind && Object.values(PROPOSAL_KINDS).includes(doc.proposalKind)) {
@@ -195,6 +196,17 @@ async function createLinkedEthicsApplication(proposal, user) {
   return ethics;
 }
 
+/** Researcher's own proposal — always visible even if programTier was saved wrong. */
+async function findResearcherOwnedProposal(req, id) {
+  let proposal = await Proposal.findOne({ _id: id, researcherId: req.user.id });
+  if (!proposal) return null;
+  if (req.programTier && proposal.programTier !== req.programTier && isValidProgramTier(req.programTier)) {
+    proposal.programTier = req.programTier;
+    await proposal.save();
+  }
+  return proposal;
+}
+
 async function persistProposalEthics(proposal, user, reqBody) {
   if (!proposal.requiresEthics) return;
   let ethics = await getEthicsForProposal(proposal._id, proposal.programTier);
@@ -310,24 +322,27 @@ async function createProposal(req, res) {
     kind = PROPOSAL_KINDS.VOLUNTARY;
   }
 
-  const proposal = await Proposal.create(req.tierAssign({
-    title,
-    abstract,
-    department,
-    researchArea,
-    document,
-    budgetBreakdown: [],
-    budgetTotal: initialBudgetTotal,
-    budgetCurrency: initialBudgetCurrency,
-    researcherId: req.user.id,
-    status: PROPOSAL_STATUSES.DRAFT,
-    version: 1,
-    requiresEthics: needsEthics,
-    ethicsStatus: needsEthics ? ETHICS_STATUSES.PENDING : ETHICS_STATUSES.NOT_REQUIRED,
-    proposalKind: kind,
-    fundingCallId: linkedCallId,
-    reviewPipeline: defaultReviewPipeline({ skipFinance: kind === PROPOSAL_KINDS.VOLUNTARY }),
-  }));
+  const proposal = await Proposal.create(
+    req.tierAssign({
+      title,
+      abstract,
+      department,
+      researchArea,
+      document,
+      budgetBreakdown: [],
+      budgetTotal: initialBudgetTotal,
+      budgetCurrency: initialBudgetCurrency,
+      researcherId: req.user.id,
+      programTier: req.requireWriteProgramTier(req.currentUser?.programTier, "proposal program tier"),
+      status: PROPOSAL_STATUSES.DRAFT,
+      version: 1,
+      requiresEthics: needsEthics,
+      ethicsStatus: needsEthics ? ETHICS_STATUSES.PENDING : ETHICS_STATUSES.NOT_REQUIRED,
+      proposalKind: kind,
+      fundingCallId: linkedCallId,
+      reviewPipeline: defaultReviewPipeline({ skipFinance: kind === PROPOSAL_KINDS.VOLUNTARY }),
+    })
+  );
 
   applyProposalDocuments(proposal, req);
   if (proposal.complianceDocuments?.length || proposal.supportingDocuments?.length) {
@@ -335,8 +350,14 @@ async function createProposal(req, res) {
   }
 
   if (needsEthics) {
-    const user = await User.findById(req.user.id);
-    await persistProposalEthics(proposal, user || {}, req.body);
+    try {
+      const user = await User.findById(req.user.id);
+      await persistProposalEthics(proposal, user || {}, req.body);
+    } catch (err) {
+      // Proposal draft is saved — ethics can be completed on next save
+      // eslint-disable-next-line no-console
+      console.error("persistProposalEthics on create:", err?.message || err);
+    }
   }
 
   res.status(201).json({ proposal: await attachEthicsSummary(proposal) });
@@ -344,7 +365,7 @@ async function createProposal(req, res) {
 
 async function updateProposal(req, res) {
   const { id } = req.params;
-  const proposal = await Proposal.findOne(req.tierWhere({ _id: id }));
+  const proposal = await findResearcherOwnedProposal(req, id);
   if (!proposal) throw new AppError("Proposal not found", 404);
   if (String(proposal.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
 
@@ -391,7 +412,10 @@ async function updateProposal(req, res) {
 }
 
 async function getProposalEthicsApplication(req, res) {
-  const proposal = await Proposal.findOne(req.tierWhere({ _id: req.params.id }));
+  const proposal =
+    req.user.role === ROLES.RESEARCHER
+      ? await findResearcherOwnedProposal(req, req.params.id)
+      : await Proposal.findOne(req.tierWhere({ _id: req.params.id }));
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const isOwner = String(proposal.researcherId) === String(req.user.id);
@@ -453,9 +477,8 @@ async function getProposalEthicsApplication(req, res) {
 
 async function submitProposal(req, res) {
   const { id } = req.params;
-  const proposal = await Proposal.findOne(req.tierWhere({ _id: id }));
+  const proposal = await findResearcherOwnedProposal(req, id);
   if (!proposal) throw new AppError("Proposal not found", 404);
-  if (String(proposal.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
 
   if (![PROPOSAL_STATUSES.DRAFT, PROPOSAL_STATUSES.REVISION_REQUESTED].includes(proposal.status)) {
     throw new AppError("Proposal cannot be submitted in its current status", 400);
@@ -552,7 +575,7 @@ res.json({ proposals: proposals.map(sanitizeProposal) });
   }
 
   if (role === "researcher") {
-    const proposals = await Proposal.find(req.tierWhere({ researcherId: req.user.id }))
+    const proposals = await Proposal.find({ researcherId: req.user.id })
       .populate("researcherId", "fullName email department")
       .populate("fundingCallId", "title status deadline")
       .sort({ createdAt: -1 });
@@ -592,12 +615,19 @@ res.json({ proposals: proposals.map(sanitizeProposal) });
 
 async function getProposal(req, res) {
   const { id } = req.params;
-  const proposal = await Proposal.findOne(req.tierWhere({ _id: id }))
-    .populate("assignedReviewers.userId", "fullName email role department")
-    .populate("assignedCommittee.userId", "fullName email role department")
-    .populate("assignedFinance.userId", "fullName email role department")
-    .populate("peerReviews.userId", "fullName email role")
-    .populate("fundingCallId", "title status amountCap currency deadline");
+  const populate = [
+    { path: "assignedReviewers.userId", select: "fullName email role department" },
+    { path: "assignedCommittee.userId", select: "fullName email role department" },
+    { path: "assignedFinance.userId", select: "fullName email role department" },
+    { path: "peerReviews.userId", select: "fullName email role" },
+    { path: "fundingCallId", select: "title status amountCap currency deadline" },
+  ];
+  let proposal =
+    req.user.role === ROLES.RESEARCHER
+      ? await findResearcherOwnedProposal(req, id)
+      : await Proposal.findOne(req.tierWhere({ _id: id }));
+  if (!proposal) throw new AppError("Proposal not found", 404);
+  proposal = await Proposal.findById(proposal._id).populate(populate);
   if (!proposal) throw new AppError("Proposal not found", 404);
 
   const isOwner = String(proposal.researcherId) === String(req.user.id);

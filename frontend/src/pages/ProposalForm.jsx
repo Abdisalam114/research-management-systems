@@ -206,6 +206,16 @@ export function ProposalFormPage() {
     setBusy(true);
     setError("");
     setValidationIssues([]);
+    if (!String(proposal.department || "").trim()) {
+      setError("Department is required — select your faculty and department.");
+      setBusy(false);
+      return null;
+    }
+    if (!String(proposal.title || "").trim() || !String(proposal.abstract || "").trim() || !String(proposal.researchArea || "").trim()) {
+      setError("Title, abstract, and research area are required to save a draft.");
+      setBusy(false);
+      return null;
+    }
     try {
       const payload = buildPayload();
       let res;
