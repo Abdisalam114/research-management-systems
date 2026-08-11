@@ -173,7 +173,9 @@ async function searchBudgets(req, titleRx, tw) {
     ...(matchingGrants.length ? [{ grantId: { $in: matchingGrants.map((g) => g._id) } }] : []),
   ];
 
-  const budgets = await Budget.find(tw(filter))
+  const budgets = await Budget.find(
+    role === ROLES.RESEARCHER ? { ...filter, ownerResearcherId: req.user.id } : tw(filter)
+  )
     .sort({ updatedAt: -1 })
     .limit(LIMIT)
     .populate("projectId", "title")
@@ -407,8 +409,8 @@ async function runGlobalSearch(req) {
     includeResearchGroups
       ? ResearchGroup.find(groupFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("name description kind")
       : Promise.resolve([]),
-    includeRepository ? searchRepository(req, titleRx, tw) : Promise.resolve([]),
-    searchBudgets(req, titleRx, tw),
+    includeRepository ? searchRepository(req, titleRx, role === ROLES.RESEARCHER ? owned : tw) : Promise.resolve([]),
+    searchBudgets(req, titleRx, role === ROLES.RESEARCHER ? owned : tw),
     searchPayments(req, titleRx, tw),
     InstitutionalPolicy.find(policyFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title status moduleKey"),
     includeUsers

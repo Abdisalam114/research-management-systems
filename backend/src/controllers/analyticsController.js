@@ -107,16 +107,16 @@ async function getDashboardMetrics(req, res) {
   };
 
   const isStaffAll = ["research_director", "faculty_coordinator"].includes(role);
-  const tw = (base = {}) =>
-    role === "researcher" ? req.researcherDashboardFilter(base) : req.tierWhere(base);
+  const tw = (base = {}, ownerField = "researcherId") =>
+    role === "researcher" ? req.researcherDashboardFilter(base, ownerField) : req.tierWhere(base);
 
-  const proposalFilter = tw(role === "researcher" ? {} : {});
-  const projectFilter = tw(role === "researcher" ? {} : {});
-  const grantFilter = tw(role === "researcher" ? {} : {});
-  const pubFilter = tw(role === "researcher" ? {} : {});
-  const repoFilter = tw(role === "researcher" ? { uploadedBy: userId } : {}, "uploadedBy");
+  const proposalFilter = tw({});
+  const projectFilter = tw({});
+  const grantFilter = tw({});
+  const pubFilter = tw({});
+  const repoFilter = tw({ uploadedBy: userId }, "uploadedBy");
   const budgetFilter = tw(
-    role === "researcher" ? { ownerResearcherId: userId } : role === "finance_officer" ? {} : isStaffAll ? {} : {},
+    role === "researcher" ? {} : role === "finance_officer" ? {} : isStaffAll ? {} : {},
     role === "researcher" ? "ownerResearcherId" : "researcherId"
   );
 
@@ -132,7 +132,8 @@ async function getDashboardMetrics(req, res) {
         tw(
           role === "researcher"
             ? { "members.userId": userId, ...COLLAB_GROUP_FILTER }
-            : COLLAB_GROUP_FILTER
+            : COLLAB_GROUP_FILTER,
+          null
         )
       ),
       EthicsApplication.countDocuments(role === "researcher" ? { researcherId: userId } : tw({})),
@@ -140,10 +141,13 @@ async function getDashboardMetrics(req, res) {
         tw(
           role === "researcher"
             ? { $or: [{ supervisorId: userId }, { createdBy: userId }, { coordinatorId: userId }] }
-            : {}
+            : {},
+          null
         )
       ),
-      Notification.countDocuments(tw({ userId, readAt: null })),
+      Notification.countDocuments(
+        role === "researcher" ? { userId, readAt: null } : req.tierWhere({ userId, readAt: null })
+      ),
       Project.countDocuments({ ...projectFilter, status: PROJECT_STATUSES.ACTIVE }),
       Project.find({ ...projectFilter, status: PROJECT_STATUSES.ACTIVE })
         .sort({ updatedAt: -1 })

@@ -30,6 +30,7 @@ function ownedListFilter(req, base = {}, { ownerField = "researcherId" } = {}) {
 /** Dashboard / analytics counts for researchers — never hide own data behind tier filter. */
 function researcherDashboardFilter(req, base = {}, ownerField = "researcherId") {
   if (req.user?.role === ROLES.RESEARCHER) {
+    if (ownerField == null) return { ...base };
     return { ...base, [ownerField]: req.user.id };
   }
   if (req.tierWhere) return req.tierWhere(base);

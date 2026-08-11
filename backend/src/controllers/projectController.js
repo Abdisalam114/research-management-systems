@@ -801,12 +801,9 @@ async function deleteProject(req, res) {
   const isOwner = String(project.researcherId?._id || project.researcherId) === String(req.user.id);
   if (!isDirector && !isOwner) throw new AppError("Forbidden", 403);
 
-  const tierScope = { programTier: project.programTier || req.programTier };
-
   if (!isDirector) {
     const blockedPub = await Publication.findOne({
       projectId: project._id,
-      ...tierScope,
       status: { $in: [PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.VALIDATED] },
     }).select("_id title status");
     if (blockedPub) {
@@ -817,7 +814,6 @@ async function deleteProject(req, res) {
     }
     const activeGrant = await Grant.findOne({
       projectId: project._id,
-      ...tierScope,
       status: { $in: [GRANT_STATUSES.ACTIVE, GRANT_STATUSES.PENDING_FINANCE, GRANT_STATUSES.APPROVED] },
     }).select("_id title status");
     if (activeGrant) {
@@ -832,7 +828,7 @@ async function deleteProject(req, res) {
   const projectId = project._id;
   const title = project.title;
 
-  const budgets = await Budget.find({ projectId, ...tierScope }).select("_id totalAllocated");
+  const budgets = await Budget.find({ projectId }).select("_id totalAllocated");
   const allocatedBudgets = budgets.filter((b) => Number(b.totalAllocated || 0) > 0);
   if (allocatedBudgets.length) {
     throw new AppError(
@@ -847,9 +843,9 @@ async function deleteProject(req, res) {
     await Budget.deleteMany({ _id: { $in: budgetIds } });
   }
 
-  await Publication.deleteMany({ projectId, ...tierScope });
-  await RepositoryItem.deleteMany({ projectId, ...tierScope });
-  await EthicsApplication.deleteMany({ projectId, ...tierScope });
+  await Publication.deleteMany({ projectId });
+  await RepositoryItem.deleteMany({ projectId });
+  await EthicsApplication.deleteMany({ projectId });
   await Grant.updateMany({ projectId }, { $set: { projectId: null } });
   await Project.deleteOne({ _id: projectId });
 

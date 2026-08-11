@@ -84,10 +84,9 @@ async function reconcileDisbursedFromPaid(req, budgets) {
 
 async function listBudgets(req, res) {
   const { role } = req.user;
-  const filter = {};
-  if (role === "researcher") filter.ownerResearcherId = req.user.id;
+  const filter = req.ownedWhere({}, { ownerField: "ownerResearcherId" });
   // finance_officer / director can view all
-  const budgets = await Budget.find(req.tierWhere(filter))
+  const budgets = await Budget.find(role === "researcher" ? filter : req.tierWhere({}))
     .sort({ createdAt: -1 })
     .populate({ path: "grantId", select: "title fundingSource amountAwarded status" })
     .populate({ path: "projectId", select: "title status" });
@@ -101,7 +100,10 @@ async function listBudgets(req, res) {
 
 async function getBudget(req, res) {
   const { id } = req.params;
-  const budget = await Budget.findOne(req.tierWhere({ _id: id }));
+  const budget =
+    req.user.role === "researcher"
+      ? await Budget.findOne({ _id: id, ownerResearcherId: req.user.id })
+      : await Budget.findOne(req.tierWhere({ _id: id }));
   if (!budget) throw new AppError("Budget not found", 404);
 
   const isOwner = String(budget.ownerResearcherId) === String(req.user.id);
@@ -135,7 +137,7 @@ async function createBudget(req, res) {
   const project = await Project.findOne({ _id: projectId, researcherId: req.user.id });
   if (!project) throw new AppError("Research project not found", 404);
 
-  const existing = await Budget.findOne(req.tierWhere({ projectId: project._id }));
+  const existing = await Budget.findOne({ projectId: project._id });
   if (existing && Number(existing.totalAllocated || 0) > 0) {
     throw new AppError(
       "This project already has a locked Budget allocated. It cannot be recreated or deleted.",
