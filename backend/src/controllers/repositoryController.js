@@ -67,7 +67,7 @@ async function assertCanAccessItem(req, item) {
   if (String(item.uploadedBy) === String(req.user.id)) return;
   if (item.access === REPOSITORY_ACCESS.INSTITUTION) return;
   if (item.access === REPOSITORY_ACCESS.GROUP && item.groupId) {
-    const group = await ResearchGroup.findOne(req.tierWhere({ _id: item.groupId }));
+    const group = await ResearchGroup.findById(item.groupId);
     const isMember = group && (group.members || []).some((m) => String(m.userId) === String(req.user.id));
     if (isMember) return;
   }
@@ -134,7 +134,7 @@ async function uploadItem(req, res) {
     if (!mongoose.Types.ObjectId.isValid(normalizedGroupId)) {
       throw new AppError("Invalid group ID", 400);
     }
-    const group = await ResearchGroup.findOne(req.tierWhere({ _id: normalizedGroupId }));
+    const group = await ResearchGroup.findById(normalizedGroupId);
     if (!group) throw new AppError("Research group not found", 404);
     const isMember = (group.members || []).some((m) => String(m.userId) === String(req.user.id));
     if (!isMember) throw new AppError("Forbidden", 403);

@@ -11,9 +11,11 @@ function isDirectorReq(req) {
   return req.user?.role === ROLES.RESEARCH_DIRECTOR;
 }
 
-/** Director sees/messages across UG+PG; others stay portal-scoped. */
+/** Director sees/messages across UG+PG; researchers: own threads only; other staff: portal-scoped. */
 function convWhere(req, base = {}) {
-  return isDirectorReq(req) ? base : req.tierWhere(base);
+  if (isDirectorReq(req)) return base;
+  if (req.user?.role === ROLES.RESEARCHER) return base;
+  return req.tierWhere(base);
 }
 
 function sanitizeConversation(c) {
@@ -119,7 +121,7 @@ async function listMyConversations(req, res) {
 
 async function openGroupChat(req, res) {
   const { groupId } = req.params;
-  const group = await ResearchGroup.findOne(convWhere(req, { _id: groupId }));
+  const group = await ResearchGroup.findById(groupId);
   if (!group) throw new AppError("Group not found", 404);
 
   const isMember = (group.members || []).some((m) => String(m.userId) === String(req.user.id));
@@ -175,7 +177,9 @@ async function createConversation(req, res) {
   const activeUsers = await User.find(
     isDirectorReq(req)
       ? { _id: { $in: others }, status: USER_STATUSES.ACTIVE }
-      : convWhere(req, { _id: { $in: others }, status: USER_STATUSES.ACTIVE })
+      : req.userWhere
+        ? req.userWhere({ _id: { $in: others }, status: USER_STATUSES.ACTIVE })
+        : { _id: { $in: others }, status: USER_STATUSES.ACTIVE }
   ).select("_id");
   if (activeUsers.length !== others.length) {
     throw new AppError("One or more selected users are invalid or inactive", 400);

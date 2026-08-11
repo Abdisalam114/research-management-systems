@@ -32,10 +32,12 @@ function sanitizePO(po) {
 }
 
 async function listPurchaseOrders(req, res) {
-  const { role, id } = req.user;
-  const filter = {};
-  if (role === "researcher") filter.requestedBy = id;
-  const pos = await PurchaseOrder.find(req.tierWhere(filter)).sort({ createdAt: -1 });
+  const { role } = req.user;
+  const filter =
+    role === "researcher"
+      ? req.ownedWhere({}, { ownerField: "requestedBy" })
+      : req.tierWhere({});
+  const pos = await PurchaseOrder.find(filter).sort({ createdAt: -1 });
   res.json({ purchaseOrders: pos.map(sanitizePO) });
 }
 
@@ -76,7 +78,10 @@ async function createPurchaseOrder(req, res) {
   if (!vendorName) throw new AppError("vendorName is required", 400);
   if (!Array.isArray(items) || items.length === 0) throw new AppError("at least one item is required", 400);
 
-  const budget = await Budget.findOne(req.tierWhere({ _id: budgetId }));
+  const budget =
+    req.user.role === "researcher"
+      ? await Budget.findOne({ _id: budgetId, ownerResearcherId: req.user.id })
+      : await Budget.findOne(req.tierWhere({ _id: budgetId }));
   if (!budget) throw new AppError("Budget not found", 404);
   if (req.user.role === "researcher" && String(budget.ownerResearcherId) !== String(req.user.id)) {
     throw new AppError("Forbidden: budget does not belong to you", 403);

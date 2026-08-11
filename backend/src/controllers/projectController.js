@@ -177,17 +177,11 @@ async function listProjects(req, res) {
 
     const out = await Promise.all(
       projects.map(async (p) => {
-        let proposalKind = "voluntary";
-        let fundingCallId = null;
-        if (p.proposalId) {
-          const linked = await Proposal.findById(p.proposalId).select("proposalKind fundingCallId");
-          if (linked) {
-            fundingCallId = linked.fundingCallId || null;
-            proposalKind = linked.proposalKind || (linked.fundingCallId ? "grant_fund_call" : "voluntary");
-          }
-        }
-        const isVoluntary = proposalKind === "voluntary" || (!fundingCallId && proposalKind !== "grant_fund_call");
-        return sanitizeProjectForFinanceClosure(p, { isVoluntary, proposalKind });
+        const kindMeta = await resolveProjectKindMeta(req, p);
+        return sanitizeProjectForFinanceClosure(p, {
+          isVoluntary: kindMeta.isVoluntary,
+          proposalKind: kindMeta.proposalKind,
+        });
       })
     );
 
@@ -609,7 +603,7 @@ async function finalizeClosedProject(req, project) {
 
   try {
     await Grant.updateMany(
-      req.tierWhere({ projectId: project._id, status: { $ne: GRANT_STATUSES.REJECTED } }),
+      { projectId: project._id, status: { $ne: GRANT_STATUSES.REJECTED } },
       { $set: { status: GRANT_STATUSES.CLOSED } }
     );
   } catch { /* best-effort */ }
@@ -697,14 +691,21 @@ async function archiveProject(req, res) {
 }
 
 async function exportTechnicalReportPdf(req, res) {
-  const project = await Project.findOne(req.tierWhere({ _id: req.params.id })).populate(PROJECT_POPULATE);
+  const baseProject =
+    req.user.role === "researcher"
+      ? await req.findOwned(Project, req.params.id)
+      : await Project.findOne(req.tierWhere({ _id: req.params.id }));
+  if (!baseProject) throw new AppError("Project not found", 404);
+  const project = await Project.findById(baseProject._id).populate(PROJECT_POPULATE);
   if (!project) throw new AppError("Project not found", 404);
 
   const isOwner = String(project.researcherId?._id || project.researcherId) === String(req.user.id);
   const isStaff = ["research_director", "faculty_coordinator", "finance_officer", "leadership"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 
-  const wf = await buildWorkflowForProject(project._id, req.tierWhere({}), req.user.role);
+  const wfScope =
+    req.user.role === "researcher" ? req.ownedWhere({}) : req.tierWhere({});
+  const wf = await buildWorkflowForProject(project._id, wfScope, req.user.role);
   const autoProgress = wf?.progressPercent ?? (project.status === PROJECT_STATUSES.COMPLETED ? 100 : null);
   const lines = [
     `Project: ${project.title}`,
@@ -794,7 +795,10 @@ async function backfillProjectFromApprovedProposal(req, res) {
 
 async function deleteProject(req, res) {
   const { id } = req.params;
-  const project = await Project.findOne(req.tierWhere({ _id: id }));
+  const project =
+    req.user.role === "researcher"
+      ? await req.findOwned(Project, id)
+      : await Project.findOne(req.tierWhere({ _id: id }));
   if (!project) throw new AppError("Project not found", 404);
 
   const isDirector = req.user.role === "research_director";

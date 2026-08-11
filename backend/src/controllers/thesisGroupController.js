@@ -30,6 +30,18 @@ const {
   applyThesisGroupStatusFromChapterProgress,
 } = require("../utils/thesisDefaults");
 
+/** Researchers: own groups by supervisor/createdBy (ignore stale programTier). Staff: portal-scoped. */
+function findAccessibleThesisGroup(req, id) {
+  if (req.user?.role === ROLES.RESEARCHER) {
+    const userId = req.user.id;
+    return ThesisGroup.findOne({
+      _id: id,
+      $or: [{ supervisorId: userId }, { createdBy: userId }, { coordinatorId: userId }],
+    });
+  }
+  return ThesisGroup.findOne(req.tierWhere({ _id: id }));
+}
+
 function resolveTitleProposal(plain) {
   const tp = plain.titleProposal || {};
   const status = tp.status || TITLE_PROPOSAL_STATUSES.NONE;
@@ -288,7 +300,9 @@ async function listGroups(req, res) {
     filter = { supervisorId: userId };
   }
 
-  const groups = await ThesisGroup.find(req.tierWhere(filter))
+  const groups = await ThesisGroup.find(
+    role === ROLES.RESEARCHER ? filter : req.tierWhere(filter)
+  )
     .sort({ createdAt: -1 })
     .populate("researchGroupId", "name departmentId members createdAt")
     .populate("supervisorId", "fullName email department")
@@ -305,7 +319,7 @@ async function listGroups(req, res) {
 async function getGroup(req, res) {
   const { role, id: userId } = req.user;
   const { id } = req.params;
-  const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }))
+  const group = await findAccessibleThesisGroup(req, id)
     .populate("researchGroupId", "name departmentId members createdAt")
     .populate("supervisorId", "fullName email department")
     .populate("coordinatorId", "fullName email")
@@ -432,7 +446,7 @@ async function updateGroup(req, res) {
   }
 
   const { id } = req.params;
-  const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }));
+  const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
 
   ensureChapters(group);
@@ -536,7 +550,7 @@ async function proposeTitle(req, res) {
   const trimmed = String(title || "").trim();
   if (!trimmed) throw new AppError("title is required", 400);
 
-  const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }));
+  const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
 
   if (!group.supervisorId || String(group.supervisorId) !== String(userId)) {
@@ -579,7 +593,7 @@ async function reviewTitleProposal(req, res) {
 
   const accepting = normalized === "accept" || normalized === "accepted";
   const unlocking = normalized === "unlock" || normalized === "reset";
-  const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }));
+  const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
 
   // Coordinator/Director may unlock an accepted title so supervisor can re-submit
@@ -648,7 +662,7 @@ async function updateChapter(req, res) {
   const { id, chapterKey } = req.params;
   const { status, notes } = req.body || {};
 
-  const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }));
+  const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
 
   ensureChapters(group);
@@ -718,7 +732,7 @@ async function markDefended(req, res) {
   }
 
   const { id } = req.params;
-  const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }));
+  const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
 
   ensureChapters(group);
@@ -755,7 +769,7 @@ async function markDefended(req, res) {
 async function addMeeting(req, res) {
   const { role, id: userId } = req.user;
   const { id } = req.params;
-  const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }));
+  const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
 
   ensureChapters(group);
@@ -823,7 +837,7 @@ async function addMeeting(req, res) {
 async function uploadFinalDocument(req, res) {
   const { role, id: userId } = req.user;
   const { id } = req.params;
-  const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }));
+  const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
 
   const supervisorRef = group.supervisorId?._id || group.supervisorId;
@@ -881,7 +895,7 @@ async function deleteGroup(req, res) {
   if (role !== ROLES.RESEARCH_DIRECTOR) throw new AppError("Only the director can delete thesis groups", 403);
 
   const { id } = req.params;
-  const group = await ThesisGroup.findOne(req.tierWhere({ _id: id }));
+  const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
   if (group.researchGroupId) {
     await ResearchGroup.deleteOne(req.tierWhere({ _id: group.researchGroupId, kind: GROUP_KINDS.THESIS }));

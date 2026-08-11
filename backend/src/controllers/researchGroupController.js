@@ -39,11 +39,25 @@ async function listGroups(req, res) {
   const { kind } = req.query || {};
   const filter = {};
   if (kind && Object.values(GROUP_KINDS).includes(kind)) filter.kind = kind;
-  const groups = await ResearchGroup.find(req.tierWhere(filter)).sort({ createdAt: -1 });
+
+  let query;
+  if (req.user.role === "researcher") {
+    query = {
+      ...filter,
+      $or: [{ createdBy: req.user.id }, { "members.userId": req.user.id }],
+    };
+  } else {
+    query = req.tierWhere(filter);
+  }
+  const groups = await ResearchGroup.find(query).sort({ createdAt: -1 });
 
   if (filter.kind === GROUP_KINDS.THESIS) {
     const ids = groups.map((g) => g._id);
-    const theses = await ThesisGroup.find(req.tierWhere({ researchGroupId: { $in: ids } }))
+    const thesisQuery =
+      req.user.role === "researcher"
+        ? { researchGroupId: { $in: ids } }
+        : req.tierWhere({ researchGroupId: { $in: ids } });
+    const theses = await ThesisGroup.find(thesisQuery)
       .select("title status faculty department supervisorId meetings meetingSchedule facultyResearchArea researchGroupId")
       .populate("supervisorId", "fullName department");
     const map = new Map(theses.map((t) => [String(t.researchGroupId), t]));
@@ -63,7 +77,15 @@ async function getGroupStats(req, res) {
 
 async function getGroup(req, res) {
   const { id } = req.params;
-  const group = await ResearchGroup.findOne(req.tierWhere({ _id: id }));
+  let group;
+  if (req.user.role === "researcher") {
+    group = await ResearchGroup.findOne({
+      _id: id,
+      $or: [{ createdBy: req.user.id }, { "members.userId": req.user.id }],
+    });
+  } else {
+    group = await ResearchGroup.findOne(req.tierWhere({ _id: id }));
+  }
   if (!group) throw new AppError("Research group not found", 404);
   res.json({ group: sanitizeGroup(group) });
 }
@@ -85,7 +107,7 @@ async function createGroup(req, res) {
 
 async function joinGroup(req, res) {
   const { id } = req.params;
-  const group = await ResearchGroup.findOne(req.tierWhere({ _id: id }));
+  const group = await ResearchGroup.findById(id);
   if (!group) throw new AppError("Research group not found", 404);
 
   const exists = (group.members || []).some((m) => String(m.userId) === String(req.user.id));
@@ -97,7 +119,13 @@ async function joinGroup(req, res) {
 
 async function leaveGroup(req, res) {
   const { id } = req.params;
-  const group = await ResearchGroup.findOne(req.tierWhere({ _id: id }));
+  const group =
+    req.user.role === "researcher"
+      ? await ResearchGroup.findOne({
+          _id: id,
+          $or: [{ createdBy: req.user.id }, { "members.userId": req.user.id }],
+        })
+      : await ResearchGroup.findOne(req.tierWhere({ _id: id }));
   if (!group) throw new AppError("Research group not found", 404);
 
   const isLead = (group.members || []).some(
@@ -112,7 +140,13 @@ async function leaveGroup(req, res) {
 
 async function deleteGroup(req, res) {
   const { id } = req.params;
-  const group = await ResearchGroup.findOne(req.tierWhere({ _id: id }));
+  const group =
+    req.user.role === "researcher"
+      ? await ResearchGroup.findOne({
+          _id: id,
+          $or: [{ createdBy: req.user.id }, { "members.userId": req.user.id }],
+        })
+      : await ResearchGroup.findOne(req.tierWhere({ _id: id }));
   if (!group) throw new AppError("Research group not found", 404);
 
   const isLead = (group.members || []).some(

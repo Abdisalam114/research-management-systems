@@ -92,7 +92,7 @@ async function loadPublicationForNotification(pub) {
 async function logPublicationOnProject(projectId, req, { subject, body, type = "note" }) {
   if (!projectId || !req.user?.id) return false;
   try {
-    const filter = req?.tierWhere ? req.tierWhere({ _id: projectId }) : { _id: projectId };
+    const filter = { _id: projectId };
     const updated = await Project.findOneAndUpdate(
       filter,
       {

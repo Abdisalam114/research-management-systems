@@ -131,10 +131,10 @@ async function buildResearcherFundingCallFilter(req, titleRx) {
   return { $or: orClauses };
 }
 
-async function searchRepository(req, titleRx, tw) {
+async function searchRepository(req, titleRx) {
   const base = await buildRepositoryAccessFilter(req);
   const docs = await RepositoryItem.find({
-    ...tw(base),
+    ...base,
     ...textMatch(["title", "description"], titleRx),
   })
     .sort({ updatedAt: -1 })
@@ -202,7 +202,11 @@ async function searchPayments(req, titleRx, tw) {
   const filter = { ...textMatch(["payee", "purpose", "notes"], titleRx) };
   if (role === ROLES.RESEARCHER) filter.requestedBy = userId;
 
-  const payments = await Payment.find(tw(filter)).sort({ updatedAt: -1 }).limit(LIMIT);
+  const payments = await Payment.find(
+    role === ROLES.RESEARCHER ? filter : tw(filter)
+  )
+    .sort({ updatedAt: -1 })
+    .limit(LIMIT);
   return payments.map((p) => ({
     id: idStr(p),
     title: `${p.payee} — ${p.purpose}`,
@@ -223,7 +227,11 @@ async function searchPurchaseOrders(req, titleRx, tw) {
   };
   if (role === ROLES.RESEARCHER) filter.requestedBy = userId;
 
-  const pos = await PurchaseOrder.find(tw(filter)).sort({ updatedAt: -1 }).limit(LIMIT);
+  const pos = await PurchaseOrder.find(
+    role === ROLES.RESEARCHER ? filter : tw(filter)
+  )
+    .sort({ updatedAt: -1 })
+    .limit(LIMIT);
   return pos.map((po) => ({
     id: idStr(po),
     title: po.poNumber ? `${po.poNumber} — ${po.vendorName}` : po.vendorName,
@@ -409,7 +417,7 @@ async function runGlobalSearch(req) {
     includeResearchGroups
       ? ResearchGroup.find(groupFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("name description kind")
       : Promise.resolve([]),
-    includeRepository ? searchRepository(req, titleRx, role === ROLES.RESEARCHER ? owned : tw) : Promise.resolve([]),
+    includeRepository ? searchRepository(req, titleRx) : Promise.resolve([]),
     searchBudgets(req, titleRx, role === ROLES.RESEARCHER ? owned : tw),
     searchPayments(req, titleRx, tw),
     InstitutionalPolicy.find(policyFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title status moduleKey"),
@@ -432,7 +440,7 @@ async function runGlobalSearch(req) {
       .limit(LIMIT)
       .select("title body link type"),
     searchPurchaseOrders(req, titleRx, tw),
-    searchConversations(req, titleRx, tw),
+    searchConversations(req, titleRx, role === ROLES.RESEARCHER ? ((b) => b) : tw),
     searchAuditEvents(req, titleRx, tw),
   ]);
 

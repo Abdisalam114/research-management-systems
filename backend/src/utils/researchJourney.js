@@ -594,13 +594,20 @@ async function buildResearchJourneyForResearcher(researcherId, tierFilter, viewe
     };
   }
 
-  function syntheticProposalForProject(project) {
+  function syntheticProposalForProject(project, linkedGrants = []) {
+    const funded = (linkedGrants || []).some(
+      (g) => g?.callId || Number(g?.amountAwarded || 0) > 0
+    );
     return {
       _id: project.proposalId || project.proposal || project._id,
       title: project.title,
       status: PROPOSAL_STATUSES.APPROVED,
       requiresEthics: false,
       ethicsStatus: ETHICS_STATUSES.NOT_REQUIRED,
+      proposalKind: funded ? "grant_fund_call" : "voluntary",
+      fundingCallId: funded
+        ? (linkedGrants.find((g) => g?.callId)?.callId || null)
+        : null,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
       submittedAt: project.createdAt,
@@ -609,9 +616,10 @@ async function buildResearchJourneyForResearcher(researcherId, tierFilter, viewe
 
   const projectsPipeline = projects.map((project) => {
     const proposalId = String(project.proposalId || project.proposal || "");
-    const proposal =
-      proposals.find((p) => String(p._id) === proposalId) || syntheticProposalForProject(project);
     const trackGrants = grantsByProject.get(String(project._id)) || [];
+    const proposal =
+      proposals.find((p) => String(p._id) === proposalId) ||
+      syntheticProposalForProject(project, trackGrants);
     const primaryGrant = pickPrimaryGrant(trackGrants);
     const budget = primaryGrant ? budgetByGrant.get(String(primaryGrant._id)) || null : null;
     return {
@@ -704,13 +712,20 @@ async function listResearchersForJourney(tierFilter, department) {
   return summaries;
 }
 
-function syntheticProposalForProject(project) {
+function syntheticProposalForProject(project, linkedGrants = []) {
+  const funded = (linkedGrants || []).some(
+    (g) => g?.callId || Number(g?.amountAwarded || 0) > 0
+  );
   return {
     _id: project.proposalId || project.proposal || project._id,
     title: project.title,
     status: PROPOSAL_STATUSES.APPROVED,
     requiresEthics: false,
     ethicsStatus: ETHICS_STATUSES.NOT_REQUIRED,
+    proposalKind: funded ? "grant_fund_call" : "voluntary",
+    fundingCallId: funded
+      ? linkedGrants.find((g) => g?.callId)?.callId || null
+      : null,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
     submittedAt: project.createdAt,
@@ -752,25 +767,36 @@ function buildTrackResult(proposal, project, trackGrants, budget, publications, 
 }
 
 async function buildWorkflowForProject(projectId, tierFilter, viewerRole = null) {
-  const project = await Project.findOne({ _id: projectId, ...tierFilter });
+  const ownerId = tierFilter?.researcherId || null;
+  const projectQuery = ownerId
+    ? { _id: projectId, researcherId: ownerId }
+    : { _id: projectId, ...(tierFilter || {}) };
+  const project = await Project.findOne(projectQuery);
   if (!project) return null;
 
-  const proposalId = project.proposalId || project.proposal;
-  let proposal = proposalId ? await Proposal.findOne({ _id: proposalId, ...tierFilter }) : null;
-  if (!proposal) proposal = syntheticProposalForProject(project);
+  // Related docs are linked by projectId — do not re-apply researcherId (wrong field on Budget/Repo).
+  const relatedScope =
+    ownerId || !tierFilter?.programTier ? {} : { programTier: tierFilter.programTier };
 
-  const researcherId = project.researcherId;
+  const proposalId = project.proposalId || project.proposal;
+  let proposal = proposalId
+    ? await Proposal.findOne({ _id: proposalId, ...(ownerId ? {} : relatedScope) })
+    : null;
+
   const [trackGrants, publications, repositoryItems] = await Promise.all([
     Grant.find({
       projectId: project._id,
       callId: { $ne: null, $exists: true },
-      ...tierFilter,
+      ...relatedScope,
     }).sort({ updatedAt: -1 }),
-    Publication.find({ projectId: project._id, ...tierFilter }).sort({ updatedAt: -1 }),
-    RepositoryItem.find({ projectId: project._id, ...tierFilter }).sort({ updatedAt: -1 }),
+    Publication.find({ projectId: project._id, ...relatedScope }).sort({ updatedAt: -1 }),
+    RepositoryItem.find({ projectId: project._id, ...relatedScope }).sort({ updatedAt: -1 }),
   ]);
+  if (!proposal) proposal = syntheticProposalForProject(project, trackGrants);
   const primaryGrant = pickPrimaryGrant(trackGrants);
-  const budget = primaryGrant ? await Budget.findOne({ grantId: primaryGrant._id, ...tierFilter }) : null;
+  const budget = primaryGrant
+    ? await Budget.findOne({ grantId: primaryGrant._id, ...relatedScope })
+    : null;
 
   const publication = pickPublicationForProject(publications, project);
   const repositoryItem = pickRepositoryForProject(repositoryItems, project);

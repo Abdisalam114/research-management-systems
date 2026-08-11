@@ -53,11 +53,11 @@ async function reconcileDisbursedFromPaid(req, budgets) {
   const ids = budgets.map((b) => b._id);
   const [payGroups, poGroups] = await Promise.all([
     Payment.aggregate([
-      { $match: { ...req.tierWhere({ budgetId: { $in: ids } }), status: PAYMENT_STATUSES.PAID } },
+      { $match: { budgetId: { $in: ids }, status: PAYMENT_STATUSES.PAID } },
       { $group: { _id: "$budgetId", total: { $sum: "$amount" } } },
     ]),
     PurchaseOrder.aggregate([
-      { $match: { ...req.tierWhere({ budgetId: { $in: ids } }), status: PO_STATUSES.PAID } },
+      { $match: { budgetId: { $in: ids }, status: PO_STATUSES.PAID } },
       { $group: { _id: "$budgetId", total: { $sum: "$totalAmount" } } },
     ]),
   ]);
@@ -119,7 +119,10 @@ async function createBudget(req, res) {
 
   // Manual totalAllocated is not accepted — allocation is system-managed from grant/proposal/call.
   if (grantId) {
-    const grant = await Grant.findOne(req.tierWhere({ _id: grantId }));
+    const grant =
+      req.user.role === "researcher"
+        ? await Grant.findOne({ _id: grantId, researcherId: req.user.id })
+        : await Grant.findOne(req.tierWhere({ _id: grantId }));
     if (!grant) throw new AppError("Grant not found", 404);
     if (String(grant.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
     if (projectId && grant.projectId && String(projectId) !== String(grant.projectId)) {
@@ -146,7 +149,11 @@ async function createBudget(req, res) {
   }
 
   const { ensureBudgetForProject } = require("../utils/ensureBudgetForProject");
-  const grant = grantId ? await Grant.findOne(req.tierWhere({ _id: grantId })) : null;
+  const grant = grantId
+    ? req.user.role === "researcher"
+      ? await Grant.findOne({ _id: grantId, researcherId: req.user.id })
+      : await Grant.findOne(req.tierWhere({ _id: grantId }))
+    : null;
   const result = await ensureBudgetForProject(project, { grant });
   if (!result.budget || !(Number(result.budget.totalAllocated || 0) > 0)) {
     throw new AppError(
@@ -169,7 +176,10 @@ async function addBudgetItem(req, res) {
   if (!Object.values(BUDGET_ITEM_TYPES).includes(type)) throw new AppError("Invalid type", 400);
   if (typeof amount !== "number" || amount < 0) throw new AppError("amount must be a non-negative number", 400);
 
-  const budget = await Budget.findOne(req.tierWhere({ _id: id }));
+  const budget =
+    req.user.role === "researcher"
+      ? await Budget.findOne({ _id: id, ownerResearcherId: req.user.id })
+      : await Budget.findOne(req.tierWhere({ _id: id }));
   if (!budget) throw new AppError("Budget not found", 404);
   if (String(budget.ownerResearcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
 

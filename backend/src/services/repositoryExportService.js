@@ -41,7 +41,7 @@ async function buildRepositoryAccessFilter(req) {
     return tw({ access: REPOSITORY_ACCESS.INSTITUTION, ...projectFilter });
   }
 
-  const groups = await ResearchGroup.find(tw({ "members.userId": req.user.id })).select("_id");
+  const groups = await ResearchGroup.find({ "members.userId": req.user.id }).select("_id");
   const groupIds = groups.map((g) => g._id);
 
   const accessOr = [

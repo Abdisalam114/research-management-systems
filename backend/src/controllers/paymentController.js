@@ -95,7 +95,11 @@ function sanitizePaymentDetail(p) {
 
 async function getPayment(req, res) {
   const { id } = req.params;
-  const payment = await Payment.findOne(req.tierWhere({ _id: id }))
+  const paymentFilter =
+    req.user.role === "researcher"
+      ? { _id: id, requestedBy: req.user.id }
+      : req.tierWhere({ _id: id });
+  const payment = await Payment.findOne(paymentFilter)
     .populate("requestedBy", "fullName email department rank")
     .populate({
       path: "budgetId",
@@ -115,9 +119,11 @@ async function getPayment(req, res) {
 
 async function listPayments(req, res) {
   const { role, id } = req.user;
-  const filter = {};
-  if (role === "researcher") filter.requestedBy = id;
-  const payments = await Payment.find(req.tierWhere(filter)).sort({ createdAt: -1 });
+  const filter =
+    role === "researcher"
+      ? req.ownedWhere({}, { ownerField: "requestedBy" })
+      : req.tierWhere({});
+  const payments = await Payment.find(filter).sort({ createdAt: -1 });
   res.json({ payments: payments.map(sanitizePayment) });
 }
 
@@ -130,7 +136,10 @@ async function createPayment(req, res) {
   if (!payee || !purpose) throw new AppError("payee and purpose are required", 400);
   if (typeof amount !== "number" || amount < 0) throw new AppError("amount must be a non-negative number", 400);
 
-  const budget = await Budget.findOne(req.tierWhere({ _id: budgetId }));
+  const budget =
+    req.user.role === "researcher"
+      ? await Budget.findOne({ _id: budgetId, ownerResearcherId: req.user.id })
+      : await Budget.findOne(req.tierWhere({ _id: budgetId }));
   if (!budget) throw new AppError("Budget not found", 404);
   if (req.user.role === "researcher" && String(budget.ownerResearcherId) !== String(req.user.id)) {
     throw new AppError("Forbidden: budget does not belong to you", 403);

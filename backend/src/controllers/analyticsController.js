@@ -155,8 +155,27 @@ async function getDashboardMetrics(req, res) {
         .populate("researcherId", "fullName name email")
         .select("title status progressReports researcherId endDate"),
       Publication.countDocuments({ ...pubFilter, status: { $ne: PUBLICATION_STATUSES.DRAFT } }),
-      FundingCall.countDocuments(tw({})),
-      FundingCall.countDocuments(tw({ status: CALL_STATUSES.OPEN })),
+      FundingCall.countDocuments(
+        role === "researcher"
+          ? {
+              $or: [
+                { programTier: req.programTier },
+                { eligibilityTier: "all" },
+              ],
+            }
+          : tw({})
+      ),
+      FundingCall.countDocuments(
+        role === "researcher"
+          ? {
+              status: CALL_STATUSES.OPEN,
+              $or: [
+                { programTier: req.programTier },
+                { eligibilityTier: "all" },
+              ],
+            }
+          : tw({ status: CALL_STATUSES.OPEN })
+      ),
     ]);
 
   let usersCount = 0;
@@ -893,25 +912,28 @@ async function getWorkflowOverview(req, res) {
     throw new AppError("Forbidden", 403);
   }
 
-  const tf = (extra = {}) => req.tierWhere(extra);
+  const tf = (extra = {}) =>
+    role === "researcher" ? req.ownedWhere(extra) : req.tierWhere(extra);
   const dept =
     role === "faculty_coordinator" ? String(req.user.department || "").trim() : "";
-  const researcherOnly = role === "researcher" ? req.user.id : null;
 
   const proposalFilter = tf({});
   const projectFilter = tf({});
   const ethicsFilter = tf({});
   const grantFilter = tf({});
   const pubFilter = tf({});
-  const thesisFilter = tf({});
+  const thesisFilter =
+    role === "researcher"
+      ? {
+          $or: [
+            { supervisorId: req.user.id },
+            { createdBy: req.user.id },
+            { coordinatorId: req.user.id },
+          ],
+        }
+      : tf({});
 
-  if (researcherOnly) {
-    proposalFilter.researcherId = researcherOnly;
-    projectFilter.researcherId = researcherOnly;
-    ethicsFilter.researcherId = researcherOnly;
-    grantFilter.researcherId = researcherOnly;
-    pubFilter.researcherId = researcherOnly;
-  } else if (dept) {
+  if (role !== "researcher" && dept) {
     proposalFilter.department = dept;
     projectFilter.department = dept;
   }
