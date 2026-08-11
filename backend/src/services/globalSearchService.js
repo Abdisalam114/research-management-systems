@@ -95,10 +95,9 @@ function thesisSubtitle(group) {
 }
 
 async function buildResearcherFundingCallFilter(req, titleRx) {
-  const tw = (base = {}) => req.tierWhere(base);
   const [myApps, myProps] = await Promise.all([
-    Grant.find(tw({ researcherId: req.user.id, callId: { $ne: null } })).select("callId"),
-    Proposal.find(tw({ researcherId: req.user.id, fundingCallId: { $ne: null } })).select("fundingCallId"),
+    Grant.find(req.ownedWhere({ callId: { $ne: null } })).select("callId"),
+    Proposal.find(req.ownedWhere({ fundingCallId: { $ne: null } })).select("fundingCallId"),
   ]);
   const appliedCallIds = [
     ...new Set([
@@ -281,6 +280,8 @@ async function runGlobalSearch(req) {
   const { role, id: userId, department } = req.user;
   const titleRx = new RegExp(escapeRegex(q), "i");
   const tw = (base = {}) => req.tierWhere(base);
+  const owned = (base = {}) =>
+    role === ROLES.RESEARCHER ? req.ownedWhere(base) : tw(base);
 
   const includeProjects = role !== ROLES.LEADERSHIP;
   const includePublications = role !== ROLES.LEADERSHIP;
@@ -301,20 +302,37 @@ async function runGlobalSearch(req) {
   let groupFilter = tw({ ...textMatch(["name", "description"], titleRx) });
 
   if (role === ROLES.RESEARCHER) {
-    proposalFilter.researcherId = userId;
-    projectFilter.researcherId = userId;
-    grantFilter.researcherId = userId;
-    pubFilter.researcherId = userId;
-    ethicsFilter.researcherId = userId;
-    thesisFilter.supervisorId = userId;
-    groupFilter = tw({
+    proposalFilter = owned(textMatch(["title", "abstract", "department", "researchArea"], titleRx));
+    projectFilter = owned(textMatch(["title"], titleRx));
+    grantFilter = owned(textMatch(["title", "fundingSource"], titleRx));
+    pubFilter = owned(textMatch(["title", "venue", "communityImpact", "authors"], titleRx));
+    ethicsFilter = owned(
+      textMatch(
+        [
+          "projectTitle",
+          "principal.firstName",
+          "principal.lastName",
+          "principal.department",
+          "principal.email",
+          "aimsObjectives",
+          "design",
+          "backgroundLiterature",
+        ],
+        titleRx
+      )
+    );
+    thesisFilter = {
+      ...textMatch(THESIS_TEXT_FIELDS, titleRx),
+      supervisorId: userId,
+    };
+    groupFilter = {
       $and: [
         textMatch(["name", "description"], titleRx),
         { $or: [{ createdBy: userId }, { "members.userId": userId }] },
       ],
-    });
+    };
 
-    const myProjects = await Project.find(tw({ researcherId: userId })).select("_id");
+    const myProjects = await Project.find(owned({})).select("_id");
     const myProjectIds = myProjects.map((p) => p._id);
     pubFilter.projectId = { $in: myProjectIds.length ? myProjectIds : ["000000000000000000000000"] };
 
@@ -405,7 +423,12 @@ async function runGlobalSearch(req) {
           .limit(LIMIT)
           .select("name code faculty")
       : Promise.resolve([]),
-    Notification.find(req.tierWhere(notificationFilter)).sort({ createdAt: -1 }).limit(LIMIT).select("title body link type"),
+    Notification.find(
+      role === ROLES.RESEARCHER ? notificationFilter : req.tierWhere(notificationFilter)
+    )
+      .sort({ createdAt: -1 })
+      .limit(LIMIT)
+      .select("title body link type"),
     searchPurchaseOrders(req, titleRx, tw),
     searchConversations(req, titleRx, tw),
     searchAuditEvents(req, titleRx, tw),

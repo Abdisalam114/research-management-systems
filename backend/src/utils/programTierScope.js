@@ -150,6 +150,14 @@ function assertTierDocument(req, doc) {
   }
 }
 
+const {
+  ownedListFilter,
+  findOwnedRecord,
+  createWithTier,
+  researcherDashboardFilter,
+  relatedRecordsFilter,
+} = require("./ownedRecordScope");
+
 function attachProgramTierHelpers(req) {
   req.isCrossTierStaff = isCrossTierRole(req.user?.role);
   req.tierWhere = (base = {}) => tierWhere(req, base);
@@ -159,6 +167,12 @@ function attachProgramTierHelpers(req) {
     requireWriteProgramTier(req, preferred, label);
   req.notifyProgramTier = (doc) => notifyProgramTier(doc, req);
   req.assertTierDocument = (doc) => assertTierDocument(req, doc);
+  req.ownedWhere = (base, opts) => ownedListFilter(req, base, opts);
+  req.findOwned = (Model, id, opts) => findOwnedRecord(Model, req, id, opts);
+  req.createWithTier = (data, label) => createWithTier(req, data, label);
+  req.researcherDashboardFilter = (base, ownerField) =>
+    researcherDashboardFilter(req, base, ownerField);
+  req.relatedWhere = (base, opts) => relatedRecordsFilter(req, base, opts);
 }
 
 module.exports = {

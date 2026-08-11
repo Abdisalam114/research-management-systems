@@ -1,6 +1,7 @@
 const { Project } = require("../models/Project");
 const { Publication } = require("../models/Publication");
 const { AppError } = require("../utils/AppError");
+const { repairOwnerProgramTier } = require("./ownedRecordScope");
 
 function indexByProjectId(items) {
   const map = new Map();
@@ -46,8 +47,9 @@ function pickRepositoryForProject(repositoryItems, project) {
 
 async function resolveOwnedProjectId(req, projectId, researcherId, { forRepository = false } = {}) {
   if (!projectId) return null;
-  const project = await Project.findOne(req.tierWhere({ _id: projectId, researcherId }));
+  const project = await Project.findOne({ _id: projectId, researcherId });
   if (!project) throw new AppError("Research project not found or does not belong to you", 404);
+  await repairOwnerProgramTier(project, req);
 
   // Must be a recognized project (appears on Projects — approved proposal when linked)
   if (project.proposalId) {
@@ -78,11 +80,13 @@ async function requireOwnedProjectId(req, projectId, researcherId, opts = {}) {
 
 async function validateProjectQuery(req, projectId, { ownerOnly = false } = {}) {
   if (!projectId) return null;
-  const filter = { _id: projectId };
+  let project;
   if (ownerOnly && req.user?.role === "researcher") {
-    filter.researcherId = req.user.id;
+    project = await Project.findOne({ _id: projectId, researcherId: req.user.id });
+    if (project) await repairOwnerProgramTier(project, req);
+  } else {
+    project = await Project.findOne(req.tierWhere({ _id: projectId }));
   }
-  const project = await Project.findOne(req.tierWhere(filter));
   if (!project) throw new AppError("Project not found", 404);
   return project._id;
 }
@@ -90,9 +94,10 @@ async function validateProjectQuery(req, projectId, { ownerOnly = false } = {}) 
 /** One research output per project (1:1). */
 async function assertSinglePublicationPerProject(req, projectId, { excludePublicationId } = {}) {
   if (!projectId) return;
-  const filter = { projectId };
-  if (excludePublicationId) filter._id = { $ne: excludePublicationId };
-  const existing = await Publication.findOne(req.tierWhere(filter)).select("_id title");
+  const existing = await Publication.findOne({
+    projectId,
+    ...(excludePublicationId ? { _id: { $ne: excludePublicationId } } : {}),
+  }).select("_id title");
   if (existing) {
     throw new AppError("This project already has a research output — only one output per project is allowed", 409);
   }

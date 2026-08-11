@@ -94,17 +94,16 @@ function applyPayload(target, payload) {
   }
 }
 
-/** Active portal tier only (Director included). */
+/** Active portal tier for staff; owner-first for researchers. */
 function ethicsScopeFilter(req, base = {}) {
-  return req.tierWhere(base);
+  return req.ownedWhere(base);
 }
 
 async function syncLinkedProposalEthics(proposalId, ethicsStatus, ethicsAppId, programTier = null) {
   let linked = null;
-  const tierFilter = programTier ? { programTier } : {};
-  if (proposalId) linked = await Proposal.findOne({ _id: proposalId, ...tierFilter });
+  if (proposalId) linked = await Proposal.findById(proposalId);
   if (!linked && ethicsAppId) {
-    linked = await Proposal.findOne({ ethicsApplicationId: ethicsAppId, ...tierFilter });
+    linked = await Proposal.findOne({ ethicsApplicationId: ethicsAppId });
   }
   if (!linked) return;
   linked.ethicsStatus = ethicsStatus;
@@ -126,14 +125,16 @@ async function syncLinkedProposalEthics(proposalId, ethicsStatus, ethicsAppId, p
 
 async function listEthicsApplications(req, res) {
   const { role, id } = req.user;
-  const filter = req.tierWhere({});
-  if (role === "researcher") filter.researcherId = id;
+  const filter = role === "researcher" ? { researcherId: id } : req.tierWhere({});
   const applications = await EthicsApplication.find(filter).sort({ createdAt: -1 });
   res.json({ applications: applications.map(sanitize) });
 }
 
 async function getEthicsApplication(req, res) {
-  const a = await EthicsApplication.findOne(ethicsScopeFilter(req, { _id: req.params.id }));
+  const a =
+    req.user.role === "researcher"
+      ? await req.findOwned(EthicsApplication, req.params.id)
+      : await EthicsApplication.findOne(req.tierWhere({ _id: req.params.id }));
   if (!a) throw new AppError("Application not found", 404);
   const isOwner = String(a.researcherId) === String(req.user.id);
   const isStaff = ["research_director", "faculty_coordinator"].includes(req.user.role);
@@ -142,14 +143,16 @@ if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
 }
 
 async function createEthicsApplication(req, res) {
-  const a = new EthicsApplication(req.tierAssign({ researcherId: req.user.id, status: ETHICS_STATUSES.DRAFT }));
+  const a = new EthicsApplication(
+    req.createWithTier({ researcherId: req.user.id, status: ETHICS_STATUSES.DRAFT }, "ethics program tier")
+  );
   applyPayload(a, req.body || {});
   await a.save();
   res.status(201).json({ application: sanitize(a) });
 }
 
 async function updateEthicsApplication(req, res) {
-  const a = await EthicsApplication.findOne(req.tierWhere({ _id: req.params.id }));
+  const a = await req.findOwned(EthicsApplication, req.params.id);
   if (!a) throw new AppError("Application not found", 404);
   if (String(a.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
   if (![ETHICS_STATUSES.DRAFT, ETHICS_STATUSES.REJECTED].includes(a.status)) {
@@ -161,7 +164,7 @@ async function updateEthicsApplication(req, res) {
 }
 
 async function submitEthicsApplication(req, res) {
-  const a = await EthicsApplication.findOne(req.tierWhere({ _id: req.params.id }));
+  const a = await req.findOwned(EthicsApplication, req.params.id);
   if (!a) throw new AppError("Application not found", 404);
   if (String(a.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
   if (![ETHICS_STATUSES.DRAFT, ETHICS_STATUSES.REJECTED].includes(a.status)) {

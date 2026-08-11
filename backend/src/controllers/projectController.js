@@ -45,7 +45,7 @@ async function resolveProjectKindMeta(req, project) {
   let fundingCallId = null;
 
   if (project?.proposalId) {
-    const linkedProposal = await Proposal.findOne(req.tierWhere({ _id: project.proposalId })).select(
+    const linkedProposal = await Proposal.findById(project.proposalId).select(
       "proposalKind fundingCallId"
     );
     if (linkedProposal) {
@@ -58,16 +58,14 @@ async function resolveProjectKindMeta(req, project) {
 
   // Projects created from an accepted grant (no proposal) are Grant Fund, not Voluntary
   if (proposalKind === "voluntary" && !fundingCallId) {
-    const fundedGrant = await Grant.findOne(
-      req.tierWhere({
-        projectId: project._id,
-        $or: [
-          { callId: { $ne: null, $exists: true } },
-          { amountAwarded: { $gt: 0 } },
-          { status: { $in: ["active", "pending_finance", "approved"] } },
-        ],
-      })
-    ).select("_id callId amountAwarded status");
+    const fundedGrant = await Grant.findOne({
+      projectId: project._id,
+      $or: [
+        { callId: { $ne: null, $exists: true } },
+        { amountAwarded: { $gt: 0 } },
+        { status: { $in: ["active", "pending_finance", "approved"] } },
+      ],
+    }).select("_id callId amountAwarded status");
     if (fundedGrant) {
       proposalKind = "grant_fund_call";
       if (fundedGrant.callId) fundingCallId = fundedGrant.callId;
@@ -159,7 +157,8 @@ function sanitizeProjectForFinanceClosure(p, { isVoluntary = false, proposalKind
 
 async function listProjects(req, res) {
   const { role } = req.user;
-  const tierFilter = req.tierWhere(role === "researcher" ? { researcherId: req.user.id } : {});
+  const tierFilter =
+    role === "researcher" ? req.ownedWhere({}) : req.tierWhere({});
 
   // Finance officers only see closure-related projects — not the general project catalogue.
   if (role === "finance_officer") {
@@ -181,7 +180,7 @@ async function listProjects(req, res) {
         let proposalKind = "voluntary";
         let fundingCallId = null;
         if (p.proposalId) {
-          const linked = await Proposal.findOne(req.tierWhere({ _id: p.proposalId })).select("proposalKind fundingCallId");
+          const linked = await Proposal.findById(p.proposalId).select("proposalKind fundingCallId");
           if (linked) {
             fundingCallId = linked.fundingCallId || null;
             proposalKind = linked.proposalKind || (linked.fundingCallId ? "grant_fund_call" : "voluntary");
@@ -219,7 +218,12 @@ async function listProjects(req, res) {
 
 async function getProject(req, res) {
   const { id } = req.params;
-  const project = await Project.findOne(req.tierWhere({ _id: id }))
+  const baseProject =
+    req.user.role === "researcher"
+      ? await req.findOwned(Project, id)
+      : await Project.findOne(req.tierWhere({ _id: id }));
+  if (!baseProject) throw new AppError("Project not found", 404);
+  const project = await Project.findById(baseProject._id)
     .populate(PROJECT_POPULATE)
     .populate("communicationLog.loggedBy", "fullName email role");
   if (!project) throw new AppError("Project not found", 404);
@@ -256,12 +260,12 @@ async function getProject(req, res) {
   }
 
 
-  const grantDocs = await Grant.find(req.tierWhere({
+  const grantDocs = await Grant.find(req.relatedWhere({
     $or: [
       { projectId: id },
       ...(project.proposalId ? [{ proposalId: project.proposalId }] : []),
     ],
-  })).sort({ createdAt: -1 }).select("title status amountRequested amountAwarded currency fundingSource callId projectId");
+  }, { isOwner })).sort({ createdAt: -1 }).select("title status amountRequested amountAwarded currency fundingSource callId projectId");
   // Back-link any grants found only via proposalId
   for (const g of grantDocs) {
     if (!g.projectId || String(g.projectId) !== String(id)) {
@@ -269,18 +273,20 @@ async function getProject(req, res) {
       try { await g.save(); } catch { /* ignore */ }
     }
   }
-  const tierFilter = req.tierWhere({});
+  const tierFilter = req.relatedWhere({}, { isOwner });
   const hasPublication = await Publication.exists({
-    ...tierFilter,
     projectId: project._id,
     status: { $in: [PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.VALIDATED] },
+    ...(Object.keys(tierFilter).length ? tierFilter : {}),
   });
   const canViewAwards = canViewProjectAwards({ role: req.user.role, hasProjectPublication: Boolean(hasPublication) });
 
   let proposalKind = "voluntary";
   let fundingCallId = null;
   if (project.proposalId) {
-    const linkedProposal = await Proposal.findOne(req.tierWhere({ _id: project.proposalId })).select("proposalKind fundingCallId");
+    const linkedProposal = project.proposalId
+      ? await Proposal.findById(project.proposalId).select("proposalKind fundingCallId")
+      : null;
     if (linkedProposal) {
       fundingCallId = linkedProposal.fundingCallId || null;
       proposalKind =
@@ -332,7 +338,7 @@ async function getProject(req, res) {
 }
 
 async function updateProject(req, res) {
-  const project = await Project.findOne(req.tierWhere({ _id: req.params.id }));
+  const project = await req.findOwned(Project, req.params.id);
   if (!project) throw new AppError("Project not found", 404);
 
   const isOwner = String(project.researcherId) === String(req.user.id);
@@ -412,7 +418,7 @@ async function submitClosure(req, res) {
   const { finalReport, auditNotes, assetHandover, lessonsLearned, checklist } = req.body || {};
   if (!finalReport) throw new AppError("finalReport is required", 400);
 
-  const project = await Project.findOne(req.tierWhere({ _id: req.params.id }));
+  const project = await req.findOwned(Project, req.params.id);
   if (!project) throw new AppError("Project not found", 404);
   if (String(project.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
   if (project.closure?.status && project.closure.status !== CLOSURE_STATUSES.NONE) {
@@ -478,7 +484,7 @@ async function submitClosure(req, res) {
 
 async function directorClosureApproval(req, res) {
   const { comment } = req.body || {};
-  const project = await Project.findOne(req.tierWhere({ _id: req.params.id }));
+  const project = await req.findOwned(Project, req.params.id);
   if (!project) throw new AppError("Project not found", 404);
   if (project.closure?.status !== CLOSURE_STATUSES.SUBMITTED) {
     throw new AppError("No closure pending director approval", 400);
@@ -557,7 +563,7 @@ async function directorClosureApproval(req, res) {
 
 async function financeClosureApproval(req, res) {
   const { comment } = req.body || {};
-  const project = await Project.findOne(req.tierWhere({ _id: req.params.id }));
+  const project = await req.findOwned(Project, req.params.id);
   if (!project) throw new AppError("Project not found", 404);
   if (project.closure?.status !== CLOSURE_STATUSES.DIRECTOR_APPROVED) {
     throw new AppError("Closure not ready for finance approval", 400);
@@ -663,7 +669,7 @@ async function finalizeClosedProject(req, project) {
 }
 
 async function archiveProject(req, res) {
-  const project = await Project.findOne(req.tierWhere({ _id: req.params.id }));
+  const project = await req.findOwned(Project, req.params.id);
   if (!project) throw new AppError("Project not found", 404);
   if (
     project.closure?.status !== CLOSURE_STATUSES.FINANCE_APPROVED &&
@@ -729,7 +735,7 @@ async function addCommunicationLog(req, res) {
   const { type, subject, body } = req.body || {};
   if (!body?.trim()) throw new AppError("body is required", 400);
 
-  const project = await Project.findOne(req.tierWhere({ _id: req.params.id }));
+  const project = await req.findOwned(Project, req.params.id);
   if (!project) throw new AppError("Project not found", 404);
 
   const isOwner = String(project.researcherId) === String(req.user.id);

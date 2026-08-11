@@ -32,11 +32,12 @@ async function redactGrantAwardsIfNeeded(out, req) {
     out.awardsHidden = true;
     return out;
   }
+  const pubFilter = {
+    projectId,
+    status: { $in: [PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.VALIDATED] },
+  };
   const hasPub = await Publication.exists(
-    req.tierWhere({
-      projectId,
-      status: { $in: [PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.VALIDATED] },
-    })
+    req.user.role === "researcher" ? pubFilter : req.tierWhere(pubFilter)
   );
   const canView = canViewProjectAwards({
     role: req.user.role,
@@ -127,14 +128,14 @@ function sanitizeGrant(g) {
 
 async function resolveGrantProjectId(req, projectId, researcherId) {
   if (!projectId) return null;
-  const project = await Project.findOne(req.tierWhere({ _id: projectId, researcherId }));
+  const project = await Project.findOne({ _id: projectId, researcherId });
   if (!project) throw new AppError("Research project not found or does not belong to you", 404);
   return project._id;
 }
 
 async function resolveGrantProposalId(req, proposalId, researcherId, call) {
   if (!proposalId) throw new AppError("A research proposal is required for funding call applications", 400);
-  const proposal = await Proposal.findOne(req.tierWhere({ _id: proposalId, researcherId }));
+  const proposal = await Proposal.findOne({ _id: proposalId, researcherId });
   if (!proposal) throw new AppError("Research proposal not found or does not belong to you", 404);
 
   const kind = proposal.proposalKind || (proposal.fundingCallId ? "grant_fund_call" : "voluntary");
@@ -147,7 +148,7 @@ async function resolveGrantProposalId(req, proposalId, researcherId, call) {
   if (call && String(proposal.fundingCallId) !== String(call._id)) {
     throw new AppError("This proposal is linked to a different funding call", 400);
   }
-  const project = await Project.findOne(req.tierWhere({ proposalId: proposal._id, researcherId }));
+  const project = await Project.findOne({ proposalId: proposal._id, researcherId });
   return { proposal, projectId: project?._id || null };
 }
 
@@ -203,9 +204,10 @@ async function assertGrantReadyForSubmit(grant, req) {
     throw new AppError("Link a research proposal before submitting this grant application", 400);
   }
 
-  const proposal = await Proposal.findOne(
-    req.tierWhere({ _id: grant.proposalId, researcherId: grant.researcherId })
-  );
+  const proposal = await Proposal.findOne({
+    _id: grant.proposalId,
+    researcherId: grant.researcherId,
+  });
   if (!proposal) throw new AppError("Linked research proposal not found", 404);
 
   if (proposal.status !== PROPOSAL_STATUSES.APPROVED) {
@@ -309,7 +311,7 @@ async function listGrants(req, res) {
   }
   if (callId) filter.callId = callId;
   if (role === "researcher") filter.researcherId = req.user.id;
-  const grants = await Grant.find(req.tierWhere(filter))
+  const grants = await Grant.find(role === "researcher" ? filter : req.tierWhere(filter))
     .sort({ createdAt: -1 })
     .populate("projectId", "title status")
     .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId")
@@ -319,7 +321,12 @@ res.json({ grants: sanitized });
 }
 
 async function getGrant(req, res) {
-  const grant = await Grant.findOne(req.tierWhere({ _id: req.params.id }))
+  const baseGrant =
+    req.user.role === "researcher"
+      ? await req.findOwned(Grant, req.params.id)
+      : await Grant.findOne(req.tierWhere({ _id: req.params.id }));
+  if (!baseGrant) throw new AppError("Grant not found", 404);
+  const grant = await Grant.findById(baseGrant._id)
     .populate("researcherId", "fullName email department rank researchInterests")
     .populate("projectId", "title status startDate endDate")
     .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId submittedAt")
@@ -377,21 +384,26 @@ async function createGrant(req, res) {
   const linkedProjectId = explicitProjectId || linkedProjectFromProposal;
   const checklist = parseRequirementChecklist(req.body, call);
   assertCallRequirementsComplete(call, checklist);
-  const grant = await Grant.create(req.tierAssign({
-    title: resolvedTitle,
-    fundingSource: String(call.fundingSource).trim(),
-    amountRequested: requested,
-    currency: currency ? String(currency).trim().toUpperCase() : budgetFields?.budgetCurrency || call.currency || "USD",
-    donorRef: donorRef ? String(donorRef).trim() : call.donorRef || "",
-    complianceNotes: complianceNotes ? String(complianceNotes) : "",
-    projectId: linkedProjectId,
-    proposalId: proposal._id,
-    callId: call._id,
-    researcherId: req.user.id,
-    status: GRANT_STATUSES.DRAFT,
-    requirementChecklist: checklist,
-    ...(budgetFields || { budgetBreakdown: [], budgetTotal: 0 }),
-  }));
+  const grant = await Grant.create(
+    req.createWithTier(
+      {
+        title: resolvedTitle,
+        fundingSource: String(call.fundingSource).trim(),
+        amountRequested: requested,
+        currency: currency ? String(currency).trim().toUpperCase() : budgetFields?.budgetCurrency || call.currency || "USD",
+        donorRef: donorRef ? String(donorRef).trim() : call.donorRef || "",
+        complianceNotes: complianceNotes ? String(complianceNotes) : "",
+        projectId: linkedProjectId,
+        proposalId: proposal._id,
+        callId: call._id,
+        researcherId: req.user.id,
+        status: GRANT_STATUSES.DRAFT,
+        requirementChecklist: checklist,
+        ...(budgetFields || { budgetBreakdown: [], budgetTotal: 0 }),
+      },
+      "grant program tier"
+    )
+  );
 
   await recordAudit({
     entityType: "grant",
@@ -412,7 +424,7 @@ async function createGrant(req, res) {
 }
 
 async function updateGrant(req, res) {
-  const grant = await Grant.findOne(req.tierWhere({ _id: req.params.id }));
+  const grant = await req.findOwned(Grant, req.params.id);
   if (!grant) throw new AppError("Grant not found", 404);
   if (String(grant.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
   if (![GRANT_STATUSES.DRAFT, GRANT_STATUSES.REJECTED].includes(grant.status)) {
@@ -482,7 +494,7 @@ async function updateGrant(req, res) {
 }
 
 async function submitGrant(req, res) {
-  const grant = await Grant.findOne(req.tierWhere({ _id: req.params.id }));
+  const grant = await req.findOwned(Grant, req.params.id);
   if (!grant) throw new AppError("Grant not found", 404);
   if (String(grant.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
   if (!grant.callId) {
@@ -525,7 +537,7 @@ async function directorDecision(req, res) {
     throw new AppError("Invalid decision", 400);
   }
 
-  const grant = await Grant.findOne(req.tierWhere({ _id: req.params.id }));
+  const grant = await req.findOwned(Grant, req.params.id);
   if (!grant) throw new AppError("Grant not found", 404);
   if (grant.status !== GRANT_STATUSES.SUBMITTED) throw new AppError("Grant is not decision-ready", 400);
 
@@ -605,7 +617,7 @@ async function financeDecision(req, res) {
   const { decision, comment } = req.body || {};
   if (!["approve", "reject"].includes(decision)) throw new AppError("Invalid decision", 400);
 
-  const grant = await Grant.findOne(req.tierWhere({ _id: req.params.id }));
+  const grant = await req.findOwned(Grant, req.params.id);
   if (!grant) throw new AppError("Grant not found", 404);
   if (grant.status !== GRANT_STATUSES.PENDING_FINANCE) {
     throw new AppError("Grant is not pending finance approval", 400);

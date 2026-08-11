@@ -132,7 +132,7 @@ async function createBudget(req, res) {
     throw new AppError("projectId is required — budgets are auto-allocated on the project", 400);
   }
 
-  const project = await Project.findOne(req.tierWhere({ _id: projectId, researcherId: req.user.id }));
+  const project = await Project.findOne({ _id: projectId, researcherId: req.user.id });
   if (!project) throw new AppError("Research project not found", 404);
 
   const existing = await Budget.findOne(req.tierWhere({ projectId: project._id }));

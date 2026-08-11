@@ -12,10 +12,9 @@ function isEthicsFormComplete(a) {
   return hasTitle && hasPrincipal && hasLevel && hasAims && hasDesign && hasSignature;
 }
 
-async function getEthicsForProposal(proposalId, programTier = null) {
-  const filter = { proposalId };
-  if (programTier) filter.programTier = programTier;
-  return EthicsApplication.findOne(filter);
+async function getEthicsForProposal(proposalId) {
+  if (!proposalId) return null;
+  return EthicsApplication.findOne({ proposalId });
 }
 
 async function syncProposalEthicsStatus(proposalId, ethicsStatus) {
@@ -24,7 +23,7 @@ async function syncProposalEthicsStatus(proposalId, ethicsStatus) {
 }
 
 async function assertEthicsReadyForProposalSubmit(proposal) {
-  const ethics = await getEthicsForProposal(proposal._id, proposal.programTier);
+  const ethics = await getEthicsForProposal(proposal._id);
   if (!ethics) {
     throw new Error("Ethics application is required for this proposal. Please complete the ethics form.");
   }
@@ -72,7 +71,7 @@ async function submitLinkedEthics(ethics) {
 }
 
 async function assertEthicsApprovedForDirectorApproval(proposal) {
-  const ethics = await getEthicsForProposal(proposal._id, proposal.programTier);
+  const ethics = await getEthicsForProposal(proposal._id);
   if (ethics && ethics.status === ETHICS_STATUSES.APPROVED) {
     // Keep proposal flag in sync (committee may have cleared ethics already)
     if (proposal.ethicsStatus !== PROPOSAL_ETHICS.APPROVED) {

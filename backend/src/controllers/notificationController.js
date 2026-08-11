@@ -17,9 +17,11 @@ function sanitizeNotification(n) {
   };
 }
 
-/** All roles (including Director) are scoped to the active portal tier. */
+/** Researchers: all notifications for this user (legacy rows may lack programTier). Staff: portal-scoped. */
 function notificationFilter(req) {
-  return req.tierWhere({ userId: req.user.id });
+  const base = { userId: req.user.id };
+  if (req.user?.role === "researcher") return base;
+  return req.tierWhere(base);
 }
 
 async function listMyNotifications(req, res) {
@@ -29,7 +31,7 @@ async function listMyNotifications(req, res) {
 
 async function markRead(req, res) {
   const { id } = req.params;
-  const n = await Notification.findOne(req.tierWhere({ _id: id, userId: req.user.id }));
+  const n = await Notification.findOne({ ...notificationFilter(req), _id: id });
   if (!n) throw new AppError("Notification not found", 404);
   if (String(n.userId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
   if (!n.readAt) n.readAt = new Date();

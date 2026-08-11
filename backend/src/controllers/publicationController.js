@@ -160,7 +160,7 @@ async function listPublications(req, res) {
       await validateProjectQuery(req, req.query.projectId, { ownerOnly: true });
       filter.projectId = req.query.projectId;
     } else if (!mineOnly) {
-      const myProjects = await Project.find(req.tierWhere({ researcherId: req.user.id })).select("_id");
+      const myProjects = await Project.find({ researcherId: req.user.id }).select("_id");
       filter.projectId = { $in: myProjects.map((p) => p._id) };
     }
   } else if (req.query.projectId) {
@@ -171,7 +171,7 @@ async function listPublications(req, res) {
     filter.projectId = { $ne: null, $exists: true };
   }
 
-  let pubs = await Publication.find(req.tierWhere(filter))
+  let pubs = await Publication.find(role === "researcher" ? filter : req.tierWhere(filter))
     .sort({ createdAt: -1 })
     .populate("researcherId", "fullName department")
     .populate("projectId", "title status");
@@ -208,13 +208,13 @@ async function getFacultyWorkflow(req, res) {
     filter.projectId = { $ne: null, $exists: true };
   }
 
-  let pubs = await Publication.find(req.tierWhere(filter))
+  let pubs = await Publication.find(role === "researcher" ? filter : req.tierWhere(filter))
     .sort({ updatedAt: -1 })
     .populate("researcherId", "fullName department")
     .populate("projectId", "title status");
 
   if (role === "researcher") {
-    const myProjects = await Project.find(req.tierWhere({ researcherId: req.user.id })).select("_id");
+    const myProjects = await Project.find({ researcherId: req.user.id }).select("_id");
     const myIds = new Set(myProjects.map((p) => String(p._id)));
     const uid = String(req.user.id);
     pubs = pubs.filter((p) => {
@@ -258,7 +258,7 @@ const sanitized = pubs.map(sanitizePublication);
 
 async function getPublication(req, res) {
   const { id } = req.params;
-  const pub = await Publication.findOne(req.tierWhere({ _id: id }));
+  const pub = await req.findOwned(Publication, id);
   if (!pub) throw new AppError("Publication not found", 404);
 
   const isOwner = String(pub.researcherId) === String(req.user.id);
@@ -299,17 +299,22 @@ async function createPublication(req, res) {
 
   const finalTitle = String(title || "").trim() || defaults.title;
   if (!finalTitle) throw new AppError("title is required", 400);
-const pub = await Publication.create(req.tierAssign({
-    title: finalTitle,
-    type: normalizedType,
-    year: year || new Date().getFullYear(),
-    venue: venue ? String(venue).trim() : "",
-    authors: authorList,
-    communityImpact: impactText,
-    researcherId: req.user.id,
-    projectId: linkedProjectId,
-    status: PUBLICATION_STATUSES.DRAFT,
-  }));
+const pub = await Publication.create(
+    req.createWithTier(
+      {
+        title: finalTitle,
+        type: normalizedType,
+        year: year || new Date().getFullYear(),
+        venue: venue ? String(venue).trim() : "",
+        authors: authorList,
+        communityImpact: impactText,
+        researcherId: req.user.id,
+        projectId: linkedProjectId,
+        status: PUBLICATION_STATUSES.DRAFT,
+      },
+      "publication program tier"
+    )
+  );
 
   const wantSubmit = submit === true || submit === "true";
   let sideEffects = null;
@@ -329,7 +334,7 @@ const pub = await Publication.create(req.tierAssign({
 
 async function updatePublication(req, res) {
   const { id } = req.params;
-  const pub = await Publication.findOne(req.tierWhere({ _id: id }));
+  const pub = await req.findOwned(Publication, id);
   if (!pub) throw new AppError("Publication not found", 404);
   if (String(pub.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
 
@@ -377,7 +382,7 @@ async function updatePublication(req, res) {
 
 async function submitPublication(req, res) {
   const { id } = req.params;
-  const pub = await Publication.findOne(req.tierWhere({ _id: id }));
+  const pub = await req.findOwned(Publication, id);
   if (!pub) throw new AppError("Publication not found", 404);
   if (String(pub.researcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
   if (!EDITABLE_STATUSES.includes(pub.status)) {
@@ -447,7 +452,7 @@ async function validatePublication(req, res) {
     throw new AppError("Invalid decision — use accept, reject, or revise", 400);
   }
 
-  const pub = await Publication.findOne(req.tierWhere({ _id: id }));
+  const pub = await req.findOwned(Publication, id);
   if (!pub) throw new AppError("Publication not found", 404);
   if (
     ![PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.REVISION_REQUESTED].includes(pub.status)
@@ -515,7 +520,7 @@ async function validatePublication(req, res) {
 async function addPublicationComment(req, res) {
   const { id } = req.params;
   const { comment } = req.body || {};
-  const pub = await Publication.findOne(req.tierWhere({ _id: id }));
+  const pub = await req.findOwned(Publication, id);
   if (!pub) throw new AppError("Publication not found", 404);
 
   const role = req.user.role;
@@ -541,7 +546,7 @@ async function addPublicationComment(req, res) {
 async function setJournalDecision(req, res) {
   const { id } = req.params;
   const { decision, note } = req.body || {};
-  const pub = await Publication.findOne(req.tierWhere({ _id: id }));
+  const pub = await req.findOwned(Publication, id);
   if (!pub) throw new AppError("Publication not found", 404);
 
   const role = req.user.role;
@@ -701,7 +706,7 @@ async function updateWorkflowStage(req, res) {
 
 async function deletePublication(req, res) {
   const { id } = req.params;
-  const pub = await Publication.findOne(req.tierWhere({ _id: id }));
+  const pub = await req.findOwned(Publication, id);
   if (!pub) throw new AppError("Publication not found", 404);
 
   const isDirector = req.user.role === "research_director";

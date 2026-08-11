@@ -525,18 +525,17 @@ function buildTimelineEvents({ proposals, projects, grants, publications }) {
 }
 
 async function buildResearchJourneyForResearcher(researcherId, tierFilter, viewerRole = null) {
-  const researcher = await User.findOne({ _id: researcherId, ...tierFilter }).select("fullName email department role");
+  const researcher = await User.findById(researcherId).select("fullName email department role");
   if (!researcher) return null;
 
-  const base = { researcherId, ...tierFilter };
+  const base = { researcherId };
   const [proposals, projects, grants, budgets, publications, repositoryItems] = await Promise.all([
     Proposal.find(base).sort({ updatedAt: -1 }),
     Project.find(base).sort({ updatedAt: -1 }),
-    // Include all researcher grants (call-linked and legacy) so workflow follows each project
     Grant.find(base).sort({ updatedAt: -1 }),
-    Budget.find({ ownerResearcherId: researcherId, ...tierFilter }).sort({ updatedAt: -1 }),
+    Budget.find({ ownerResearcherId: researcherId }).sort({ updatedAt: -1 }),
     Publication.find(base).sort({ updatedAt: -1 }),
-    RepositoryItem.find({ uploadedBy: researcherId, ...tierFilter }).sort({ updatedAt: -1 }),
+    RepositoryItem.find({ uploadedBy: researcherId }).sort({ updatedAt: -1 }),
   ]);
 
   const projectByProposal = new Map();

@@ -27,7 +27,7 @@ async function buildRepositoryAccessFilter(req) {
     await validateProjectQuery(req, projectIdQuery, { ownerOnly: role === "researcher" });
     projectFilter.projectId = projectIdQuery;
   } else if (role === "researcher") {
-    const myProjects = await Project.find(tw({ researcherId: req.user.id })).select("_id");
+    const myProjects = await Project.find({ researcherId: req.user.id }).select("_id");
     projectFilter.projectId = { $in: myProjects.map((p) => p._id) };
   } else {
     projectFilter.projectId = { $ne: null, $exists: true };
@@ -49,6 +49,10 @@ async function buildRepositoryAccessFilter(req) {
     { access: REPOSITORY_ACCESS.INSTITUTION },
     { access: REPOSITORY_ACCESS.GROUP, groupId: { $in: groupIds } },
   ];
+
+  if (role === "researcher") {
+    return { ...projectFilter, $or: accessOr };
+  }
 
   return tw({ ...projectFilter, $or: accessOr });
 }

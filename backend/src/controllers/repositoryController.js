@@ -150,18 +150,23 @@ async function uploadItem(req, res) {
   if (!linkedProjectId) {
     throw new AppError("projectId is required — select the research project this file belongs to", 400);
   }
-const item = await RepositoryItem.create(req.tierAssign({
-    type,
-    title: trimmedTitle,
-    description: description ? String(description) : "",
-    tags: Array.isArray(tags) ? tags.map((t) => String(t).trim()).filter(Boolean) : [],
-    filePath: `/uploads/${req.file.filename}`,
-    fileSize: req.file.size || 0,
-    access: normalizedAccess,
-    groupId: normalizedGroupId,
-    projectId: linkedProjectId,
-    uploadedBy: req.user.id,
-  }));
+const item = await RepositoryItem.create(
+    req.createWithTier(
+      {
+        type,
+        title: trimmedTitle,
+        description: description ? String(description) : "",
+        tags: Array.isArray(tags) ? tags.map((t) => String(t).trim()).filter(Boolean) : [],
+        filePath: `/uploads/${req.file.filename}`,
+        fileSize: req.file.size || 0,
+        access: normalizedAccess,
+        groupId: normalizedGroupId,
+        projectId: linkedProjectId,
+        uploadedBy: req.user.id,
+      },
+      "repository program tier"
+    )
+  );
 
   let projectCompletion = null;
   if (linkedProjectId) {
@@ -176,7 +181,7 @@ const item = await RepositoryItem.create(req.tierAssign({
 
 async function getItem(req, res) {
   const { id } = req.params;
-  const item = await RepositoryItem.findOne(req.tierWhere({ _id: id }));
+  const item = await RepositoryItem.findById(id);
   if (!item) throw new AppError("Repository item not found", 404);
 
   await assertCanAccessItem(req, item);
@@ -185,7 +190,7 @@ async function getItem(req, res) {
 
 async function downloadItemFile(req, res) {
   const { id } = req.params;
-  const item = await RepositoryItem.findOne(req.tierWhere({ _id: id }));
+  const item = await RepositoryItem.findById(id);
   if (!item) throw new AppError("Repository item not found", 404);
 
   await assertCanAccessItem(req, item);
@@ -199,7 +204,7 @@ async function downloadItemFile(req, res) {
 
 async function deleteItem(req, res) {
   const { id } = req.params;
-  const item = await RepositoryItem.findOne(req.tierWhere({ _id: id }));
+  const item = await RepositoryItem.findById(id);
   if (!item) throw new AppError("Repository item not found", 404);
 
   const isDirector = req.user.role === "research_director";

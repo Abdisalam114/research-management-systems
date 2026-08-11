@@ -107,15 +107,17 @@ async function getDashboardMetrics(req, res) {
   };
 
   const isStaffAll = ["research_director", "faculty_coordinator"].includes(role);
-  const tw = (base = {}) => req.tierWhere(base);
+  const tw = (base = {}) =>
+    role === "researcher" ? req.researcherDashboardFilter(base) : req.tierWhere(base);
 
-  const proposalFilter = tw(role === "researcher" ? { researcherId: userId } : {});
-  const projectFilter = tw(role === "researcher" ? { researcherId: userId } : {});
-  const grantFilter = tw(role === "researcher" ? { researcherId: userId } : {});
-  const pubFilter = tw(role === "researcher" ? { researcherId: userId } : {});
-  const repoFilter = tw(role === "researcher" ? { uploadedBy: userId } : {});
+  const proposalFilter = tw(role === "researcher" ? {} : {});
+  const projectFilter = tw(role === "researcher" ? {} : {});
+  const grantFilter = tw(role === "researcher" ? {} : {});
+  const pubFilter = tw(role === "researcher" ? {} : {});
+  const repoFilter = tw(role === "researcher" ? { uploadedBy: userId } : {}, "uploadedBy");
   const budgetFilter = tw(
-    role === "researcher" ? { ownerResearcherId: userId } : role === "finance_officer" ? {} : isStaffAll ? {} : {}
+    role === "researcher" ? { ownerResearcherId: userId } : role === "finance_officer" ? {} : isStaffAll ? {} : {},
+    role === "researcher" ? "ownerResearcherId" : "researcherId"
   );
 
   const [proposalCount, projectCount, grants, budgets, pubs, repoCount, collabGroupCount, ethicsCount, thesisCount, notifUnread, activeProjectCount, activeProjectDocs, workflowPubCount, fundingCallCount, openFundingCallCount] =
@@ -133,7 +135,7 @@ async function getDashboardMetrics(req, res) {
             : COLLAB_GROUP_FILTER
         )
       ),
-      EthicsApplication.countDocuments(tw(role === "researcher" ? { researcherId: userId } : {})),
+      EthicsApplication.countDocuments(role === "researcher" ? { researcherId: userId } : tw({})),
       ThesisGroup.countDocuments(
         tw(
           role === "researcher"
@@ -983,12 +985,11 @@ async function getWorkflowOverview(req, res) {
     },
     {
       key: "ethics_queue",
-      label: "Ethics (REC) — pending / submitted",
+      label: "Ethics (REC) — submitted",
       link: "/ethics",
-      count: ethicsApps.filter((e) => ["draft", "submitted", "pending"].includes(String(e.status).toLowerCase()))
-        .length,
+      count: ethicsApps.filter((e) => String(e.status).toLowerCase() === "submitted").length,
       items: sample(
-        ethicsApps.filter((e) => ["draft", "submitted", "pending"].includes(String(e.status).toLowerCase())),
+        ethicsApps.filter((e) => String(e.status).toLowerCase() === "submitted"),
         (e) => ({
           id: String(e._id),
           title: e.projectTitle || "Ethics application",

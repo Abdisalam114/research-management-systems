@@ -117,12 +117,12 @@ async function listFundingCalls(req, res) {
   let appliedCallIds = [];
   if (req.user.role === "researcher" && !status) {
     const [myApps, myProps] = await Promise.all([
-      Grant.find(req.tierWhere({ researcherId: req.user.id, callId: { $ne: null } })).select(
+      Grant.find(req.ownedWhere({ callId: { $ne: null } })).select(
         "callId status amountAwarded"
       ),
-      Proposal.find(
-        req.tierWhere({ researcherId: req.user.id, fundingCallId: { $ne: null } })
-      ).select("fundingCallId status"),
+      Proposal.find(req.ownedWhere({ fundingCallId: { $ne: null } })).select(
+        "fundingCallId status"
+      ),
     ]);
     appliedCallIds = [
       ...new Set([
@@ -140,10 +140,8 @@ async function listFundingCalls(req, res) {
       filter.status = CALL_STATUSES.OPEN;
     } else {
       const [myApps, myProps] = await Promise.all([
-        Grant.find(req.tierWhere({ researcherId: req.user.id, callId: { $ne: null } })).select("callId"),
-        Proposal.find(
-          req.tierWhere({ researcherId: req.user.id, fundingCallId: { $ne: null } })
-        ).select("fundingCallId"),
+        Grant.find(req.ownedWhere({ callId: { $ne: null } })).select("callId"),
+        Proposal.find(req.ownedWhere({ fundingCallId: { $ne: null } })).select("fundingCallId"),
       ]);
       appliedCallIds = [
         ...new Set([
