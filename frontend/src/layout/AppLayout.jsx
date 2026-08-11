@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { getPageTitle } from "../utils/navigation";
 import { logScrollProbe } from "../utils/scrollContainer";
 import { scrollToTopNow, useScrollToTop } from "../hooks/useScrollToTop";
@@ -11,6 +12,7 @@ export function AppLayout() {
   const location = useLocation();
   const contentRef = useRef(null);
   const title = getPageTitle(location.pathname);
+  const routeKey = `${location.pathname}${location.search}${location.hash}`;
 
   useEffect(() => {
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
@@ -32,7 +34,9 @@ export function AppLayout() {
       <div className="appContent" ref={contentRef}>
         <TopBar title={title} />
         <main className="appMain">
-          <Outlet />
+          <ErrorBoundary resetKey={routeKey}>
+            <Outlet />
+          </ErrorBoundary>
         </main>
       </div>
     </div>

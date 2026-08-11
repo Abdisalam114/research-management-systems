@@ -52,6 +52,8 @@ export function countForModule(key, metrics = {}, overview = {}) {
         metrics.reviewAssignments ??
         0
       );
+    case "committee_reviews":
+      return m.committeeReviews ?? o.committeeReviews ?? metrics.committeeReviews ?? 0;
     case "projects":
     case "projects_staff":
       return m.projects ?? o.projects ?? metrics.projects?.total ?? 0;
@@ -60,13 +62,17 @@ export function countForModule(key, metrics = {}, overview = {}) {
     case "funding_calls":
       return m.fundingCalls ?? o.fundingCalls ?? metrics.fundingCalls?.total ?? 0;
     case "policies":
-      return m.policies ?? o.policies ?? "—";
+      return m.policies ?? o.policies ?? metrics.policies?.total ?? 0;
     case "grants":
       return m.grants ?? o.grants ?? metrics.grants?.total ?? 0;
     case "budgets":
       return m.budgets ?? o.budgets ?? metrics.budgets?.total ?? 0;
     case "finance_reports":
-      return m.financeReports ?? o.financeReports ?? "—";
+    case "system_reports":
+    case "kpi":
+    case "donor":
+      // Navigation modules — show Open instead of a fake "—" count
+      return m[key] ?? o[key] ?? "Open";
     case "publications":
       return m.publications ?? o.publications ?? metrics.publications?.total ?? 0;
     case "workflow":
@@ -79,13 +85,7 @@ export function countForModule(key, metrics = {}, overview = {}) {
       return m.groups ?? o.groups ?? metrics.groups?.total ?? 0;
     case "thesis":
       return m.thesis ?? o.thesis ?? metrics.thesis?.total ?? 0;
-    case "system_reports":
-      return m.systemReports ?? o.systemReports ?? "—";
-    case "kpi":
-      return m.kpi ?? o.kpi ?? "—";
-    case "donor":
-      return m.donor ?? o.donor ?? "—";
     default:
-      return "—";
+      return 0;
   }
 }

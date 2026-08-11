@@ -17,6 +17,7 @@ const {
 const { applyEthicsPayload, parseEthicsJson } = require("../utils/ethicsFormMerge");
 const { ensureReviewPipeline, getCurrentReviewStage, defaultReviewPipeline, STAGE_STATUS, isVoluntaryProposal, peerReviewAssignedToUserFilter, clearPeerAssigneesIfInactive, assertStagesBeforeDirector } = require("../utils/proposalReviewPipeline");
 const { recordAudit } = require("../utils/audit");
+const { coordinatorMatchesResearcherDept } = require("../utils/facultyMatcher");
 
 function resolveProposalKind(doc) {
   if (doc.proposalKind && Object.values(PROPOSAL_KINDS).includes(doc.proposalKind)) {
@@ -602,6 +603,18 @@ res.json({ proposals: proposals.map(sanitizeProposal) });
     .populate("fundingCallId", "title status deadline amountCap currency")
     .sort({ submittedAt: -1, createdAt: -1 });
 
+  // Faculty coordinators only see proposals from their faculty / department
+  if (role === "faculty_coordinator") {
+    const filtered = proposals.filter((p) =>
+      coordinatorMatchesResearcherDept(
+        req.user.department,
+        p.department || p.researcherId?.department
+      )
+    );
+    res.json({ proposals: filtered.map(sanitizeProposal) });
+    return;
+  }
+
   res.json({ proposals: proposals.map(sanitizeProposal) });
 }
 
@@ -901,7 +914,7 @@ if (!Array.isArray(reviewerIds) || reviewerIds.length === 0) {
         type: "proposal",
         title: "Peer review assignment",
         body: `You were assigned to review: ${proposal.title}`,
-        link: `/review-assignments`,
+        link: `/proposals/${proposal._id}/review`,
         programTier: proposal.programTier || req.programTier,
       });
       notified += 1;
@@ -1030,7 +1043,7 @@ async function assignCommittee(req, res) {
         type: "proposal",
         title: "Committee review assignment",
         body: `You were assigned to committee-review: ${proposal.title}`,
-        link: `/committee-assignments`,
+        link: `/proposals/${proposal._id}/review`,
         programTier: proposal.programTier || req.programTier,
       });
     } catch {

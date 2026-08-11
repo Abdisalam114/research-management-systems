@@ -20,7 +20,7 @@ const {
   buildWorkflowForProject,
 } = require("../utils/researchJourney");
 const { Notification } = require("../models/Notification");
-const { FACULTIES, matchFacultyByName } = require("../utils/facultyMatcher");
+const { FACULTIES, matchFacultyByName, coordinatorMatchesResearcherDept } = require("../utils/facultyMatcher");
 const {
   COLLAB_GROUP_FILTER,
   METRIC_DEFINITIONS,
@@ -42,7 +42,7 @@ function reviewerRefId(ref) {
 }
 const { AppError } = require("../utils/AppError");
 const { userDisplayName } = require("../utils/userDisplay");
-const { ACTIVE_PEER_REVIEW_STATUSES, peerReviewDirectorQueueFilter, peerReviewLeadershipQueueFilter, STAGE_STATUS } = require("../utils/proposalReviewPipeline");
+const { ACTIVE_PEER_REVIEW_STATUSES, peerReviewDirectorQueueFilter, peerReviewLeadershipQueueFilter, STAGE_STATUS, committeeAssignedToUserFilter, committeeSentToMembersFilter } = require("../utils/proposalReviewPipeline");
 const PDFDocument = require("pdfkit");
 
 function countByField(docs, field) {
@@ -150,7 +150,21 @@ async function getDashboardMetrics(req, res) {
         )
       ),
       Notification.countDocuments(
-        role === "researcher" ? { userId, readAt: null } : req.tierWhere({ userId, readAt: null })
+        role === "researcher"
+          ? { userId, readAt: null }
+          : {
+              userId,
+              readAt: null,
+              ...(req.programTier
+                ? {
+                    $or: [
+                      { programTier: req.programTier },
+                      { programTier: { $exists: false } },
+                      { programTier: null },
+                    ],
+                  }
+                : {}),
+            }
       ),
       Project.countDocuments({ ...projectFilter, status: PROJECT_STATUSES.ACTIVE }),
       Project.find({ ...projectFilter, status: PROJECT_STATUSES.ACTIVE })
@@ -196,6 +210,28 @@ async function getDashboardMetrics(req, res) {
   }
 
   base.proposals.total = proposalCount;
+  if (role === "faculty_coordinator") {
+    const queueDocs = await Proposal.find(
+      tw({
+        status: {
+          $in: [
+            PROPOSAL_STATUSES.SUBMITTED,
+            PROPOSAL_STATUSES.UNDER_REVIEW,
+            PROPOSAL_STATUSES.REVISION_REQUESTED,
+          ],
+        },
+      })
+    )
+      .select("department")
+      .populate("researcherId", "department");
+    const facultyQueue = queueDocs.filter((p) =>
+      coordinatorMatchesResearcherDept(
+        req.user.department,
+        p.department || p.researcherId?.department
+      )
+    ).length;
+    base.proposals.total = facultyQueue;
+  }
   base.projects.total = projectCount;
   base.projects.active = activeProjectCount;
   base.activeProjects = await mapProjectDashboardRows(activeProjectDocs, {
@@ -264,11 +300,23 @@ async function getDashboardMetrics(req, res) {
   base.reviewAssignmentsPending = reviewAssignmentsPending;
   base.proposalsSentToReviewers = proposalsSentToReviewers;
 
+  let committeeReviews = 0;
+  if (role === "faculty_coordinator") {
+    committeeReviews = await Proposal.countDocuments(tw(committeeAssignedToUserFilter(userId)));
+  } else if (role === "research_director") {
+    committeeReviews = await Proposal.countDocuments(tw(committeeSentToMembersFilter()));
+  }
+  base.committeeReviews = committeeReviews;
+
+  const policiesCount = await InstitutionalPolicy.countDocuments(
+    req.programTier ? { programTier: req.programTier } : {}
+  );
+
   base.modules = {
     users: usersCount,
     departments: departmentsCount,
     ethics: ethicsCount,
-    proposals: proposalCount,
+    proposals: role === "faculty_coordinator" ? base.proposals.total : proposalCount,
     projects: projectCount,
     grants: grants.length,
     budgets: budgets.length,
@@ -280,6 +328,8 @@ async function getDashboardMetrics(req, res) {
     // Leadership tile prefers pending; Director tile = active sent queue (matches Peer Reviews page)
     reviews:
       role === "leadership" ? reviewAssignmentsPending || reviewAssignments : reviewAssignments,
+    committeeReviews,
+    policies: policiesCount,
     fundingCalls: openFundingCallCount || fundingCallCount,
     grantsPendingFinance: grants.filter((g) => g.status === GRANT_STATUSES.PENDING_FINANCE).length,
     closuresPending: closuresPendingCount,
@@ -287,6 +337,7 @@ async function getDashboardMetrics(req, res) {
     notificationsUnread: notifUnread,
   };
   base.fundingCalls = { total: fundingCallCount, open: openFundingCallCount };
+  base.policies = { total: policiesCount };
 res.json({ metrics: base, generatedAt: new Date().toISOString() });
 }
 

@@ -61,10 +61,12 @@ export function ProjectDetailsPage() {
     setProject(p);
     setMilestones(p.milestones?.length ? p.milestones : [emptyMilestone]);
     setTeamMembers(p.teamMembers?.length ? p.teamMembers : [emptyMember]);
-    setEndDate(p.endDate ? p.endDate.slice(0, 10) : "");
+    setEndDate(p.endDate ? String(p.endDate).slice(0, 10) : "");
   }
 
   useEffect(() => {
+    setProject(null);
+    setError("");
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load project"));
   }, [id, accessToken, programTier]);
 
@@ -90,7 +92,31 @@ export function ProjectDetailsPage() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [location.hash, project?.id]);
 
-  if (!project) return <div>{error || "Loading..."}</div>;
+  if (!project) {
+    return (
+      <div className="card" style={{ marginTop: 12 }}>
+        <div style={{ fontWeight: 800 }}>{error ? "Could not open project" : "Loading project…"}</div>
+        {error ? (
+          <>
+            <p className="muted" style={{ marginTop: 8 }}>{error}</p>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+              <button type="button" className="btn primary" onClick={() => load().catch((e) => setError(e?.response?.data?.message || "Failed to load project"))}>
+                Retry
+              </button>
+              <Link className="btn" to="/projects">
+                Back to projects
+              </Link>
+              <Link className="btn" to="/notifications">
+                Notifications
+              </Link>
+            </div>
+          </>
+        ) : (
+          <p className="muted" style={{ marginTop: 8 }}>Fetching project details and workflow…</p>
+        )}
+      </div>
+    );
+  }
 
   const isOwner = String(project.researcherId) === String(user?.id);
   const canEdit = isOwner || user?.role === "research_director";
@@ -297,6 +323,12 @@ export function ProjectDetailsPage() {
           isVoluntary,
         }}
       />
+      {!project.workflow && project.workflowError ? (
+        <div className="card" style={{ marginTop: 12, borderColor: "rgba(245,158,11,0.45)" }}>
+          <div style={{ fontWeight: 700 }}>Workflow temporarily unavailable</div>
+          <p className="muted" style={{ marginTop: 6, marginBottom: 0 }}>{project.workflowError}</p>
+        </div>
+      ) : null}
 
       <ProjectOutputsHub
         projectId={id}

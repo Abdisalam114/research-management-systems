@@ -90,9 +90,12 @@ export function EthicsApplicationForm({
 }, [missing.length, formComplete, embeddedInProposal]);
 
   const toggleInArray = (path, value) => {
-    const arr = path.split(".").reduce((acc, k) => acc?.[k], form) || [];
+    const raw = path.split(".").reduce((acc, k) => acc?.[k], form);
+    const arr = Array.isArray(raw) ? raw : [];
     set(path, arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value]);
   };
+
+  if (!form) return null;
 
   return (
     <>
@@ -661,12 +664,13 @@ function Textarea({ label, value, onChange, readOnly, id }) {
   );
 }
 
-function CheckGroup({ options, values = [], onToggle, readOnly }) {
+function CheckGroup({ options, values, onToggle, readOnly }) {
+  const list = Array.isArray(values) ? values : [];
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
       {options.map((o) => (
         <label key={o.value} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <input type="checkbox" disabled={readOnly} checked={values.includes(o.value)} onChange={() => onToggle(o.value)} />
+          <input type="checkbox" disabled={readOnly} checked={list.includes(o.value)} onChange={() => onToggle(o.value)} />
           {o.label}
         </label>
       ))}

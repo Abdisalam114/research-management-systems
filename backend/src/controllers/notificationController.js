@@ -17,11 +17,20 @@ function sanitizeNotification(n) {
   };
 }
 
-/** Researchers: all notifications for this user (legacy rows may lack programTier). Staff: portal-scoped. */
+/** Researchers: all notifications for this user (legacy rows may lack programTier).
+ *  Staff: active portal + untiered/legacy rows (so Open is never hidden by a default UG stamp). */
 function notificationFilter(req) {
   const base = { userId: req.user.id };
   if (req.user?.role === "researcher") return base;
-  return req.tierWhere(base);
+  if (!req.programTier) return base;
+  return {
+    ...base,
+    $or: [
+      { programTier: req.programTier },
+      { programTier: { $exists: false } },
+      { programTier: null },
+    ],
+  };
 }
 
 async function listMyNotifications(req, res) {

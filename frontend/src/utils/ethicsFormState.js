@@ -44,6 +44,18 @@ export function emptyEthicsForm() {
   };
 }
 
+function asArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function mergeSection(emptySection, raw) {
+  const merged = { ...emptySection, ...(raw && typeof raw === "object" ? raw : {}) };
+  if (Array.isArray(emptySection.items) || "items" in merged) {
+    merged.items = asArray(merged.items);
+  }
+  return merged;
+}
+
 export function ethicsApplicationToForm(a) {
   if (!a) return emptyEthicsForm();
   const dt = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
@@ -51,19 +63,22 @@ export function ethicsApplicationToForm(a) {
   const form = {
     ...empty,
     ...a,
-    principal: { ...empty.principal, ...(a.principal || {}) },
-    coResearcher: { ...empty.coResearcher, ...(a.coResearcher || {}) },
+    principal: mergeSection(empty.principal, a.principal),
+    coResearcher: mergeSection(empty.coResearcher, a.coResearcher),
     startDate: dt(a.startDate),
     endDate: dt(a.endDate),
-    risk: { ...empty.risk, ...(a.risk || {}) },
-    riskPrecautions: { ...empty.riskPrecautions, ...(a.riskPrecautions || {}) },
-    dataHandling: { ...empty.dataHandling, ...(a.dataHandling || {}) },
-    consent: { ...empty.consent, ...(a.consent || {}) },
-    dataSafety: { ...empty.dataSafety, ...(a.dataSafety || {}) },
-    privacy: { ...empty.privacy, ...(a.privacy || {}) },
-    conflictOfInterest: { ...empty.conflictOfInterest, ...(a.conflictOfInterest || {}) },
-    applicantSignature: { ...empty.applicantSignature, ...(a.applicantSignature || {}) },
-    otherInvestigators: a.otherInvestigators || [],
+    risk: mergeSection(empty.risk, a.risk),
+    riskPrecautions: mergeSection(empty.riskPrecautions, a.riskPrecautions),
+    dataHandling: mergeSection(empty.dataHandling, a.dataHandling),
+    consent: mergeSection(empty.consent, a.consent),
+    dataSafety: mergeSection(empty.dataSafety, a.dataSafety),
+    privacy: mergeSection(empty.privacy, a.privacy),
+    conflictOfInterest: mergeSection(empty.conflictOfInterest, a.conflictOfInterest),
+    applicantSignature: mergeSection(empty.applicantSignature, a.applicantSignature),
+    // Spread of `a` can overwrite empty arrays with null from Mongo — force lists.
+    subjectTypes: asArray(a.subjectTypes),
+    instruments: asArray(a.instruments),
+    otherInvestigators: asArray(a.otherInvestigators),
     projectLevel: normalizeProjectLevel(a.projectLevel),
   };
   return form;

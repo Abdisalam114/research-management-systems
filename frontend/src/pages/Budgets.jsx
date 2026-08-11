@@ -479,7 +479,7 @@ export function BudgetsPage() {
                 <div>
                   <div style={{ fontWeight: 700 }}>💳 Payment: {p.payee}</div>
                   <div className="muted">
-                    {p.category.replace(/_/g, " ")} • {p.currency} {p.amount} • {p.purpose}
+                    {p.category?.replace(/_/g, " ") || "—"} • {p.currency} {p.amount} • {p.purpose}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -521,7 +521,7 @@ export function BudgetsPage() {
                 <div>
                   <div style={{ fontWeight: 700 }}>💳 Payment: {p.payee}</div>
                   <div className="muted">
-                    {p.category.replace(/_/g, " ")} • {p.currency} {p.amount} • {p.purpose}
+                    {p.category?.replace(/_/g, " ") || "—"} • {p.currency} {p.amount} • {p.purpose}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -1168,7 +1168,7 @@ function BudgetCard({
                 <div>
                   <strong>{p.payee}</strong> • {p.purpose}
                   <div className="muted">
-                    {p.category.replace(/_/g, " ")} • {p.currency} {p.amount}{" "}
+                    {p.category?.replace(/_/g, " ") || "—"} • {p.currency} {p.amount}{" "}
                     {p.paymentMethod ? `• method: ${p.paymentMethod}` : ""}
                     {p.paymentMethodDetails ? ` (${p.paymentMethodDetails})` : ""}
                   </div>

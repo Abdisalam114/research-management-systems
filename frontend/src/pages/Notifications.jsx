@@ -90,6 +90,8 @@ export function NotificationsPage() {
       /* still navigate */
     }
 
+    setDetailNote(null);
+
     const needsPortalSwitch =
       n.programTier &&
       n.programTier !== programTier &&
@@ -99,11 +101,14 @@ export function NotificationsPage() {
       selectProgramTier(n.programTier);
     }
 
-    if (n.link) {
-      if (needsPortalSwitch) {
-        window.setTimeout(() => navigate(n.link), 0);
+    const link = typeof n.link === "string" ? n.link.trim() : "";
+    if (link) {
+      if (link.startsWith("http")) {
+        window.open(link, "_blank", "noopener,noreferrer");
+      } else if (needsPortalSwitch) {
+        window.setTimeout(() => navigate(link), 0);
       } else {
-        navigate(n.link);
+        navigate(link);
       }
     } else {
       await reload().catch(() => {});

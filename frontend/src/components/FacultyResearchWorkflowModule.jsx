@@ -100,6 +100,15 @@ export function FacultyResearchWorkflowModule({
     );
   }
 
+  if (!data && error) {
+    return (
+      <div className="card" style={{ marginTop: embedded ? 16 : 12, borderColor: "rgba(248,113,113,0.45)" }}>
+        <div style={{ fontWeight: 800 }}>Faculty publication workflow</div>
+        <p style={{ color: "#f87171", marginTop: 8 }}>{error}</p>
+      </div>
+    );
+  }
+
   const showStageTiles = !standalone || embedded;
   const listLimit = standalone || embedded ? 20 : 4;
 

@@ -254,12 +254,21 @@ async function getProject(req, res) {
   }
 
 
-  const grantDocs = await Grant.find(req.relatedWhere({
-    $or: [
-      { projectId: id },
-      ...(project.proposalId ? [{ proposalId: project.proposalId }] : []),
-    ],
-  }, { isOwner })).sort({ createdAt: -1 }).select("title status amountRequested amountAwarded currency fundingSource callId projectId");
+  const grantDocs = await Grant.find(
+    req.relatedWhere(
+      {
+        $or: [
+          { projectId: id },
+          ...(project.proposalId
+            ? [{ proposalId: project.proposalId?._id || project.proposalId }]
+            : []),
+        ],
+      },
+      { isOwner }
+    )
+  )
+    .sort({ createdAt: -1 })
+    .select("title status amountRequested amountAwarded currency fundingSource callId projectId");
   // Back-link any grants found only via proposalId
   for (const g of grantDocs) {
     if (!g.projectId || String(g.projectId) !== String(id)) {
@@ -326,8 +335,14 @@ async function getProject(req, res) {
   }
 
 
-  out.workflow = await buildWorkflowForProject(id, tierFilter, req.user.role);
-  if (out.workflow?.progressPercent != null) out.progressPercent = out.workflow.progressPercent;
+  try {
+    out.workflow = await buildWorkflowForProject(id, tierFilter, req.user.role);
+    if (out.workflow?.progressPercent != null) out.progressPercent = out.workflow.progressPercent;
+  } catch (err) {
+    // Still return the project dossier — workflow is helpful but must not blank the Open page.
+    out.workflow = null;
+    out.workflowError = err?.message || "Failed to build workflow";
+  }
   res.json({ project: out });
 }
 

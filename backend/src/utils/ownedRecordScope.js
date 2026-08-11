@@ -40,14 +40,20 @@ function researcherDashboardFilter(req, base = {}, ownerField = "researcherId") 
 /** Find one record: owner-first for researchers; tier-scoped for staff. */
 async function findOwnedRecord(Model, req, id, { ownerField = "researcherId" } = {}) {
   if (!id) return null;
-  if (isResearcherRole(req)) {
-    const doc = await Model.findOne({ _id: id, [ownerField]: req.user.id });
-    if (!doc) return null;
-    await repairOwnerProgramTier(doc, req);
-    return doc;
+  try {
+    if (isResearcherRole(req)) {
+      const doc = await Model.findOne({ _id: id, [ownerField]: req.user.id });
+      if (!doc) return null;
+      await repairOwnerProgramTier(doc, req);
+      return doc;
+    }
+    if (req.tierWhere) return Model.findOne(req.tierWhere({ _id: id }));
+    return Model.findById(id);
+  } catch (err) {
+    // Invalid Mongo id in /projects/:id (e.g. broken notification link) → not found, not 500.
+    if (err?.name === "CastError") return null;
+    throw err;
   }
-  if (req.tierWhere) return Model.findOne(req.tierWhere({ _id: id }));
-  return Model.findById(id);
 }
 
 /** Create payload with enforced programTier (avoids silent UG default). */
