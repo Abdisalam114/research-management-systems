@@ -25,6 +25,15 @@ async function requireActiveUser(req, res, next) {
   if (user.status !== USER_STATUSES.ACTIVE) return next(new AppError("Account is not active", 403));
 
   req.currentUser = user;
+  // Enrich JWT stub so controllers can use req.user.department / fullName consistently
+  req.user = {
+    id: String(user._id),
+    role: user.role,
+    department: user.department || "",
+    fullName: user.fullName || "",
+    email: user.email || "",
+    programTier: user.programTier || null,
+  };
   try {
     req.programTier = resolveProgramTier(req, user);
     attachProgramTierHelpers(req);

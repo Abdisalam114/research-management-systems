@@ -28,8 +28,8 @@ const CATEGORIES = [
   { value: "ethics", label: "Ethics (JUREC)" },
 ];
 
-function PolicyCard({ policy, isLeadership, busy, onEdit, onDelete }) {
-  const moduleRoute = policyModuleRoute(policy.moduleKey);
+function PolicyCard({ policy, isLeadership, busy, onEdit, onDelete, role }) {
+  const moduleRoute = policyModuleRoute(policy.moduleKey, role);
   return (
     <article className="card" style={{ padding: 16 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -333,6 +333,7 @@ export function PoliciesPage() {
                       key={p.id}
                       policy={p}
                       isLeadership={isLeadership}
+                      role={user?.role}
                       busy={busy}
                       onEdit={startEdit}
                       onDelete={handleDelete}

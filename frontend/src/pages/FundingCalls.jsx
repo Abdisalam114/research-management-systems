@@ -479,11 +479,18 @@ await fundingCallApi.publishFundingCall(accessToken, id);
         </p>
       ) : null}
 
-      {pendingFinanceCount > 0 && (isFinance || isDirector || isLeadership) ? (
+      {pendingFinanceCount > 0 && isFinance ? (
         <div className="fundingCallsBanner fundingCallsBannerOk" style={{ marginTop: 10 }}>
           {pendingFinanceCount} award{pendingFinanceCount === 1 ? "" : "s"} waiting for budget authorization.{" "}
           <Link to="/finance/grant-approvals" style={{ fontWeight: 700 }}>
             Go to Grant funding approval →
+          </Link>
+        </div>
+      ) : pendingFinanceCount > 0 && (isDirector || isLeadership) ? (
+        <div className="fundingCallsBanner fundingCallsBannerOk" style={{ marginTop: 10 }}>
+          {pendingFinanceCount} award{pendingFinanceCount === 1 ? "" : "s"} waiting for finance budget authorization.{" "}
+          <Link to="/grants?filter=pending_finance" style={{ fontWeight: 700 }}>
+            View pending grants →
           </Link>
         </div>
       ) : null}

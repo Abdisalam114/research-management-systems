@@ -37,7 +37,7 @@ const {
   buildResearcherPublicationNotice,
   loadPublicationForNotification,
 } = require("../utils/publicationSideEffects");
-const { coordinatorMatchesResearcherDept } = require("../utils/facultyMatcher");
+const { coordinatorMatchesResearcherDept, resolveCoordinatorDepartment } = require("../utils/facultyMatcher");
 
 const EDITABLE_STATUSES = [
   PUBLICATION_STATUSES.DRAFT,
@@ -182,18 +182,25 @@ async function listPublications(req, res) {
   if (role === "researcher") {
     const uid = String(req.user.id);
     pubs = pubs.filter((p) => String(p.researcherId?._id || p.researcherId) === uid);
+  } else if (role === "faculty_coordinator") {
+    const dept = resolveCoordinatorDepartment(req);
+    if (dept) {
+      pubs = pubs.filter(
+        (p) => p.researcherId && coordinatorMatchesResearcherDept(dept, p.researcherId.department)
+      );
+    }
   }
 
   res.json({ publications: pubs.map(sanitizePublication) });
 }
 
 async function getFacultyWorkflow(req, res) {
-  const { role, department } = req.user;
+  const { role } = req.user;
   if (!["faculty_coordinator", "research_director", "researcher"].includes(role)) {
     throw new AppError("Forbidden", 403);
   }
 
-  const dept = (department || "").trim();
+  const dept = role === "faculty_coordinator" ? resolveCoordinatorDepartment(req) : String(req.user.department || "").trim();
   const projectIdQuery = req.query.projectId ? String(req.query.projectId) : "";
   const filter = { status: { $ne: PUBLICATION_STATUSES.DRAFT } };
 
@@ -266,6 +273,7 @@ async function getPublication(req, res) {
   const isOwner = String(pub.researcherId) === String(req.user.id);
   const isStaff = ["faculty_coordinator", "research_director"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+  await assertCoordinatorPublicationFaculty(req, pub);
 
   res.json({ publication: sanitizePublication(pub) });
 }
@@ -435,6 +443,23 @@ async function submitPublication(req, res) {
   });
 }
 
+async function assertCoordinatorPublicationFaculty(req, publication) {
+  if (req.user.role !== "faculty_coordinator") return;
+  const dept = resolveCoordinatorDepartment(req);
+  if (!dept) return;
+  let researcherDept = "";
+  if (publication.researcherId && typeof publication.researcherId === "object") {
+    researcherDept = publication.researcherId.department || "";
+  } else if (publication.researcherId) {
+    const { User } = require("../models/User");
+    const owner = await User.findById(publication.researcherId).select("department").lean();
+    researcherDept = owner?.department || "";
+  }
+  if (!coordinatorMatchesResearcherDept(dept, researcherDept)) {
+    throw new AppError("Publication is outside your faculty", 403);
+  }
+}
+
 async function validatePublication(req, res) {
   const { id } = req.params;
   const { decision, comment } = req.body || {};
@@ -456,25 +481,17 @@ async function validatePublication(req, res) {
 
   const pub = await req.findOwned(Publication, id);
   if (!pub) throw new AppError("Publication not found", 404);
+  await assertCoordinatorPublicationFaculty(req, pub);
   if (
     ![PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.REVISION_REQUESTED].includes(pub.status)
   ) {
     throw new AppError("Publication is not ready for a review decision", 400);
   }
 
-  const journalDecision =
-    normalized === "accept"
-      ? JOURNAL_DECISIONS.ACCEPT
-      : normalized === "reject"
-        ? JOURNAL_DECISIONS.REJECT
-        : JOURNAL_DECISIONS.REVISE;
+  // Institutional faculty review only — do NOT write journalDecision here.
+  // Journal accept → Publish is gated separately via setJournalDecision (Pipeline only).
+  pushReviewerComment(pub, req, comment, null);
 
-  pushReviewerComment(pub, req, comment, journalDecision);
-
-  pub.journalDecision = journalDecision;
-  pub.journalDecisionNote = String(comment).trim();
-  pub.journalDecisionAt = new Date();
-  pub.journalDecisionBy = req.user.id;
   pub.validatedBy = req.user.id;
   pub.validatedAt = new Date();
   pub.validationComment = String(comment).trim();
@@ -555,6 +572,7 @@ async function setJournalDecision(req, res) {
   const isOwner = String(pub.researcherId) === String(req.user.id);
   const isStaff = ["faculty_coordinator", "research_director"].includes(role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+  await assertCoordinatorPublicationFaculty(req, pub);
   if (pub.status === PUBLICATION_STATUSES.DRAFT) {
     throw new AppError("Submit the publication before recording a journal decision", 400);
   }
@@ -661,7 +679,7 @@ async function updateWorkflowStage(req, res) {
   if (!isStaff) throw new AppError("Forbidden", 403);
 
   if (req.user.role === "faculty_coordinator") {
-    const dept = (req.user.department || "").trim();
+    const dept = resolveCoordinatorDepartment(req);
     const researcherDept = pub.researcherId?.department || "";
     const inScope = coordinatorMatchesResearcherDept(dept, researcherDept);
     if (dept && !inScope) {

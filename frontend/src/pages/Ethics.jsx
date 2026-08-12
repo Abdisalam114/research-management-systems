@@ -281,16 +281,11 @@ export function EthicsPage() {
 
   async function downloadCert(a) {
     try {
-      const blob = await ethicsApi.downloadCertificate(accessToken, a.id);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `JUREC-certificate-${a.approval?.refNumber || a.approval?.certificateNumber || a.id}.pdf`.replace(
-        /[^\w.-]+/g,
-        "-"
+      await ethicsApi.downloadAndSaveCertificate(
+        accessToken,
+        a.id,
+        `JUREC-certificate-${a.approval?.refNumber || a.approval?.certificateNumber || a.id}.pdf`
       );
-      link.click();
-      URL.revokeObjectURL(url);
     } catch (e) {
       setError(e?.message || "Failed to download certificate");
     }
@@ -488,6 +483,7 @@ export function EthicsPage() {
           validationIssues={validationIssues}
           approval={editing.approval}
           showCertificateMeta={editing.status === "approved"}
+          departments={departments}
         />
         </div>
       ) : null}
@@ -527,6 +523,7 @@ function EthicsEditor({
   validationIssues,
   approval,
   showCertificateMeta,
+  departments = [],
 }) {
   const { form } = editing;
   const showDirectorActions = isDirector && editing.status === "submitted";

@@ -23,6 +23,7 @@ import { ActiveProjectsPanel } from "./ActiveProjectsPanel";
 import { MetricProvenanceBar } from "./MetricProvenanceBar";
 import { SystemModulesGrid } from "./SystemModulesGrid";
 import { StatusBadge } from "./StatusBadge";
+import { triggerBlobDownload } from "../utils/downloadBlob";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
 import {
   DASH_AXIS_TICK,
@@ -54,12 +55,10 @@ export function DirectorDashboard() {
     try {
       setDownloadingPdf(true);
       const blob = await analyticsApi.downloadAnnualReportPdf(accessToken);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `JUST-RMS-Annual-Report-${data?.annualReport?.year ?? new Date().getFullYear()}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      triggerBlobDownload(
+        blob,
+        `JUST-RMS-Annual-Report-${data?.annualReport?.year ?? new Date().getFullYear()}.pdf`
+      );
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to download annual report PDF");
     } finally {

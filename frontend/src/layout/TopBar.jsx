@@ -89,9 +89,11 @@ export function TopBar({ title = "Dashboard" }) {
             {canSwitchTier ? " ▾" : ""}
           </button>
         ) : null}
-        <Link className="topBarIconBtn" to="/messages" title="Messages">
-          💬
-        </Link>
+        {["researcher", "faculty_coordinator", "research_director"].includes(user?.role) ? (
+          <Link className="topBarIconBtn" to="/messages" title="Messages">
+            💬
+          </Link>
+        ) : null}
         <Link className="topBarIconBtn topBarBell" to="/notifications" title="Notifications">
           🔔
           {unread > 0 ? <span className="topBarDot" aria-label={`${unread} unread`} /> : null}

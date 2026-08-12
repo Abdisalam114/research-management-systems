@@ -9,6 +9,7 @@ import { ProjectWorkflowPanel } from "../components/ProjectWorkflowPanel";
 import { ProjectExecutionPanel, CLOSURE_CHECKLIST_ITEMS } from "../components/ProjectExecutionPanel";
 import { ProjectOutputsHub } from "../components/ProjectOutputsHub";
 import { ProgramTierBadge } from "../components/ProgramTierBadge";
+import { triggerBlobDownload } from "../utils/downloadBlob";
 
 const emptyMilestone = { title: "", dueDate: "", completed: false };
 const emptyMember = { name: "", role: "member" };
@@ -496,12 +497,7 @@ export function ProjectDetailsPage() {
             onClick={async () => {
               try {
                 const blob = await analyticsApi.downloadTechnicalReportPdf(accessToken, id);
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `technical-report-${project.title || "project"}.pdf`;
-                a.click();
-                URL.revokeObjectURL(url);
+                triggerBlobDownload(blob, `technical-report-${project.title || "project"}.pdf`);
               } catch (e) {
                 setError(e?.response?.data?.message || "Failed to download technical report");
               }

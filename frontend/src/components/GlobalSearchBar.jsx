@@ -25,8 +25,10 @@ const GROUP_LABELS = {
   auditEvents: "Audit",
 };
 
+const MESSAGE_ROLES = new Set(["researcher", "faculty_coordinator", "research_director"]);
+
 export function GlobalSearchBar() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const { programTier } = useProgramTier();
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -36,6 +38,7 @@ export function GlobalSearchBar() {
   const [error, setError] = useState("");
 
   const trimmed = q.trim();
+  const canOpenMessages = MESSAGE_ROLES.has(user?.role);
 
   useEffect(() => {
     setResults(null);
@@ -73,18 +76,27 @@ export function GlobalSearchBar() {
 
   const flat = useMemo(() => {
     if (!results) return [];
-    if (Array.isArray(results.all) && results.all.length) {
-      return results.all.map((item) => ({
-        ...item,
-        group: item.section,
-        groupLabel: GROUP_LABELS[item.section] || item.section,
-      }));
-    }
-    return Object.entries(results).flatMap(([group, items]) => {
-      if (group === "all" || !Array.isArray(items)) return [];
-      return items.map((item) => ({ ...item, group, groupLabel: GROUP_LABELS[group] || group }));
+    const mapItem = (item, group) => ({
+      ...item,
+      group: group || item.section,
+      groupLabel: GROUP_LABELS[group || item.section] || group || item.section,
     });
-  }, [results]);
+    let items = [];
+    if (Array.isArray(results.all) && results.all.length) {
+      items = results.all.map((item) => mapItem(item, item.section));
+    } else {
+      items = Object.entries(results).flatMap(([group, list]) => {
+        if (group === "all" || !Array.isArray(list)) return [];
+        return list.map((item) => mapItem(item, group));
+      });
+    }
+    return items.filter((item) => {
+      const group = item.group || item.section;
+      if (group === "conversations" && !canOpenMessages) return false;
+      if (String(item.link || "").startsWith("/messages") && !canOpenMessages) return false;
+      return true;
+    });
+  }, [results, canOpenMessages]);
 
   const preview = flat.slice(0, 12);
 

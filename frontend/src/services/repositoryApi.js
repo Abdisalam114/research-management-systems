@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { blobErrorMessage, triggerBlobDownload } from "../utils/downloadBlob";
 
 export async function listRepositoryItems(accessToken, params = {}) {
   const res = await api.get("/api/repository", {
@@ -33,18 +34,17 @@ export async function deleteRepositoryItem(accessToken, id) {
 }
 
 async function downloadExport(accessToken, path, filename, params = {}) {
-  const res = await api.get(path, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    params,
-    responseType: "blob",
-  });
-  const blob = new Blob([res.data], { type: res.headers["content-type"] || "application/octet-stream" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  try {
+    const res = await api.get(path, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      params,
+      responseType: "blob",
+    });
+    const blob = new Blob([res.data], { type: res.headers["content-type"] || "application/octet-stream" });
+    triggerBlobDownload(blob, filename);
+  } catch (e) {
+    throw new Error(await blobErrorMessage(e, "Export failed"));
+  }
 }
 
 export async function downloadRepositoryCsv(accessToken, params = {}) {
@@ -60,17 +60,21 @@ export async function downloadRepositoryPdf(accessToken, params = {}) {
 }
 
 export async function openRepositoryFile(accessToken, id, filename = "repository-file") {
-  const res = await api.get(`/api/repository/${id}/file`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    responseType: "blob",
-  });
-  const blob = new Blob([res.data], { type: res.headers["content-type"] || "application/octet-stream" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.target = "_blank";
-  a.rel = "noopener noreferrer";
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  try {
+    const res = await api.get(`/api/repository/${id}/file`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      responseType: "blob",
+    });
+    const type = res.headers["content-type"] || "application/octet-stream";
+    const blob = new Blob([res.data], { type });
+    let name = filename || "repository-file";
+    if (!/\.\w{2,5}$/.test(name)) {
+      if (type.includes("pdf")) name = `${name}.pdf`;
+      else if (type.includes("word") || type.includes("msword")) name = `${name}.doc`;
+      else if (type.includes("sheet") || type.includes("excel")) name = `${name}.xls`;
+    }
+    triggerBlobDownload(blob, name);
+  } catch (e) {
+    throw new Error(await blobErrorMessage(e, "Could not open file"));
+  }
 }

@@ -42,8 +42,37 @@ export function policyModuleLabel(moduleKey) {
   return POLICY_MODULE_META[moduleKey]?.label || moduleKey || "—";
 }
 
-export function policyModuleRoute(moduleKey) {
-  return POLICY_MODULE_META[moduleKey]?.route || null;
+/** Return module route only if the role can open that path. */
+export function policyModuleRoute(moduleKey, role = null) {
+  const route = POLICY_MODULE_META[moduleKey]?.route || null;
+  if (!route || !role) return route;
+  const path = route.split("?")[0];
+  const allowed = {
+    "/dashboard": true,
+    "/program-tier": true,
+    "/notifications": true,
+    "/policies": true,
+    "/funding-calls": ["research_director", "faculty_coordinator", "finance_officer", "researcher", "leadership"],
+    "/proposals": ["research_director", "faculty_coordinator", "researcher", "leadership"],
+    "/projects": ["research_director", "faculty_coordinator", "researcher"],
+    "/research-workflow": ["research_director", "faculty_coordinator", "researcher"],
+    "/publications": ["research_director", "faculty_coordinator", "researcher"],
+    "/repository": ["research_director", "faculty_coordinator", "researcher"],
+    "/groups": ["research_director", "faculty_coordinator", "researcher"],
+    "/thesis": ["research_director", "faculty_coordinator", "researcher"],
+    "/review-assignments": ["research_director", "leadership"],
+    "/finance/grant-approvals": ["finance_officer"],
+    "/budgets": ["research_director", "finance_officer", "researcher"],
+    "/finance/closures": ["finance_officer"],
+    "/donor-reports": ["research_director", "finance_officer"],
+    "/kpi-dashboard": ["research_director", "faculty_coordinator", "leadership"],
+    "/ethics": ["research_director", "faculty_coordinator", "researcher"],
+    "/audit-trail": ["research_director", "faculty_coordinator"],
+  };
+  const rule = allowed[path];
+  if (rule === true) return route;
+  if (Array.isArray(rule) && rule.includes(role)) return route;
+  return null;
 }
 
 export function groupPoliciesByCategory(policies) {

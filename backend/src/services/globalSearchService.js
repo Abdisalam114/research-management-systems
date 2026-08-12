@@ -355,7 +355,6 @@ async function runGlobalSearch(req) {
   } else if (role === ROLES.FACULTY_COORDINATOR) {
     proposalFilter.status = { $in: ACTIVE_COORDINATOR_PROPOSAL_STATUSES };
     pubFilter.projectId = { $ne: null, $exists: true };
-    // Match thesis list page — coordinators see all groups in this portal (not only their department)
   } else {
     pubFilter.projectId = { $ne: null, $exists: true };
   }
@@ -390,11 +389,23 @@ async function runGlobalSearch(req) {
     conversations,
     auditEvents,
   ] = await Promise.all([
-    Proposal.find(proposalFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title status updatedAt"),
+    Proposal.find(proposalFilter)
+      .sort({ updatedAt: -1 })
+      .limit(role === ROLES.FACULTY_COORDINATOR ? LIMIT * 3 : LIMIT)
+      .select("title status department updatedAt")
+      .populate("researcherId", "department"),
     includeProjects
-      ? Project.find(projectFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title status updatedAt")
+      ? Project.find(projectFilter)
+          .sort({ updatedAt: -1 })
+          .limit(role === ROLES.FACULTY_COORDINATOR ? LIMIT * 3 : LIMIT)
+          .select("title status department updatedAt")
+          .populate("researcherId", "department")
       : Promise.resolve([]),
-    Grant.find(grantFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title status updatedAt"),
+    Grant.find(grantFilter)
+      .sort({ updatedAt: -1 })
+      .limit(role === ROLES.FACULTY_COORDINATOR ? LIMIT * 3 : LIMIT)
+      .select("title status updatedAt")
+      .populate("researcherId", "department"),
     includePublications
       ? Publication.find(pubFilter)
           .sort({ updatedAt: -1 })
@@ -406,7 +417,11 @@ async function runGlobalSearch(req) {
       ? FundingCall.find(callFilter).sort({ deadline: 1, updatedAt: -1 }).limit(LIMIT).select("title status deadline")
       : FundingCall.find(callFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("title status deadline"),
     includeEthics
-      ? EthicsApplication.find(ethicsFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("projectTitle status principal proposalId")
+      ? EthicsApplication.find(ethicsFilter)
+          .sort({ updatedAt: -1 })
+          .limit(LIMIT)
+          .select("projectTitle status principal proposalId")
+          .populate("researcherId", "department")
       : Promise.resolve([]),
     includeThesis
       ? ThesisGroup.find(thesisFilter)
@@ -456,30 +471,55 @@ async function runGlobalSearch(req) {
   if (role === ROLES.FACULTY_COORDINATOR && department) {
     const dept = String(department).trim();
     visibleEthics = ethicsApps.filter((a) => {
-      const d = a.principal?.department || "";
+      const d = a.principal?.department || a.researcherId?.department || "";
       return coordinatorMatchesResearcherDept(dept, d);
     });
   }
 
+  let visibleProposals = proposals;
+  let visibleProjects = projects;
+  let visibleGrants = grants;
+  if (role === ROLES.FACULTY_COORDINATOR && department) {
+    const dept = String(department).trim();
+    visibleProposals = proposals
+      .filter((p) =>
+        coordinatorMatchesResearcherDept(dept, p.department || p.researcherId?.department || "")
+      )
+      .slice(0, LIMIT);
+    visibleProjects = projects
+      .filter((p) =>
+        coordinatorMatchesResearcherDept(dept, p.department || p.researcherId?.department || "")
+      )
+      .slice(0, LIMIT);
+    visibleGrants = grants
+      .filter((g) => coordinatorMatchesResearcherDept(dept, g.researcherId?.department || ""))
+      .slice(0, LIMIT);
+  }
+
   let visibleThesis = thesisGroups;
-  // Coordinators: same visibility as Thesis page (all groups in portal tier)
+  if (role === ROLES.FACULTY_COORDINATOR && department) {
+    const dept = String(department).trim();
+    visibleThesis = thesisGroups.filter((g) =>
+      coordinatorMatchesResearcherDept(dept, g.department || g.faculty || "")
+    );
+  }
 
   const results = {
-    proposals: proposals.map((p) => ({
+    proposals: visibleProposals.map((p) => ({
       id: idStr(p),
       title: p.title,
       status: p.status,
       type: "proposal",
       link: proposalLink(role, idStr(p)),
     })),
-    projects: projects.map((p) => ({
+    projects: visibleProjects.map((p) => ({
       id: idStr(p),
       title: p.title,
       status: p.status,
       type: "project",
       link: `/projects/${idStr(p)}`,
     })),
-    grants: grants.map((g) => ({
+    grants: visibleGrants.map((g) => ({
       id: idStr(g),
       title: g.title,
       status: g.status,

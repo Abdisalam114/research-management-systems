@@ -205,9 +205,13 @@ setGrants(withCall);
                   {g.project?.title ? (
                     <div style={{ marginTop: 6, fontSize: 13 }}>
                       <span className="muted">Linked project: </span>
-                      <Link to={`/projects/${g.project.id}`} style={{ fontWeight: 700 }}>
-                        {g.project.title}
-                      </Link>
+                      {["researcher", "faculty_coordinator", "research_director"].includes(user?.role) ? (
+                        <Link to={`/projects/${g.project.id}`} style={{ fontWeight: 700 }}>
+                          {g.project.title}
+                        </Link>
+                      ) : (
+                        <strong>{g.project.title}</strong>
+                      )}
                     </div>
                   ) : (
                     <div className="muted" style={{ marginTop: 6, fontSize: 13 }}>

@@ -164,16 +164,11 @@ throw e;
             try {
               setBusy(true);
               setError("");
-              const blob = await ethicsApi.downloadCertificate(accessToken, ethics.id);
-              const url = URL.createObjectURL(blob);
-              const link = document.createElement("a");
-              link.href = url;
-              link.download = `JUREC-certificate-${ethics.approval?.refNumber || ethics.approval?.certificateNumber || ethics.id}.pdf`.replace(
-                /[^\w.-]+/g,
-                "-"
+              await ethicsApi.downloadAndSaveCertificate(
+                accessToken,
+                ethics.id,
+                `JUREC-certificate-${ethics.approval?.refNumber || ethics.approval?.certificateNumber || ethics.id}.pdf`
               );
-              link.click();
-              URL.revokeObjectURL(url);
             } catch (e) {
               setError(e?.message || "Failed to download certificate");
             } finally {

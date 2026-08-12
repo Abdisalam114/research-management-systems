@@ -162,7 +162,7 @@ async function createPayment(req, res) {
   }));
 try {
     await notifyUsersByRole("research_director", {
-      type: "payment",
+      type: "budget",
       title: "New payment request awaiting director approval",
       body: `${payment.payee}: ${payment.purpose}`,
       link: payment.projectId ? `/budgets?projectId=${payment.projectId}` : "/budgets",
@@ -198,7 +198,7 @@ async function directorDecision(req, res) {
   await payment.save();
 try {
     await notifyUser(payment.requestedBy, {
-      type: "payment",
+      type: "budget",
       title: `Payment ${decision === "approve" ? "approved by director" : "rejected by director"}`,
       body: `${payment.payee} — ${payment.purpose}`,
       link: payment.projectId ? `/budgets?projectId=${payment.projectId}` : "/budgets",
@@ -206,7 +206,7 @@ try {
     });
     if (decision === "approve") {
       await notifyUsersByRole("finance_officer", {
-        type: "payment",
+        type: "budget",
         title: "Director-approved payment awaiting disbursement",
         body: `${payment.payee} — ${payment.purpose}`,
         link: payment.projectId ? `/budgets?projectId=${payment.projectId}` : "/budgets",
@@ -262,7 +262,7 @@ async function financePay(req, res) {
   }
 try {
     await notifyUser(payment.requestedBy, {
-      type: "payment",
+      type: "budget",
       title: "Payment disbursed by finance",
       body: `${payment.payee} — ${payment.purpose} via ${paymentMethod}`,
       link: payment.projectId ? `/budgets?projectId=${payment.projectId}` : "/budgets",

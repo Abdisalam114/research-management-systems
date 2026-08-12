@@ -14,14 +14,14 @@ const TILES = [
     icon: "💬",
     title: "Messaging",
     desc: "Message any active user — each message creates a notification for the recipient.",
-    roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"],
+    roles: ["research_director", "faculty_coordinator", "researcher"],
   },
   {
     to: "/notifications",
     icon: "🔔",
     title: "Notifications",
     desc: "Your personal notifications: grants, ethics, messages, and more.",
-    roles: ["research_director", "faculty_coordinator", "finance_officer", "researcher"],
+    roles: ["research_director", "faculty_coordinator", "researcher"],
   },
   {
     to: "/groups",

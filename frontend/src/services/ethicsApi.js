@@ -1,7 +1,8 @@
 import { api } from "./api";
-import { apiOrigin } from "../config/apiBase";
+import { blobErrorMessage, triggerBlobDownload } from "../utils/downloadBlob";
 import { PROGRAM_TIER_HEADER } from "../constants/programTier";
 import { getProgramTier } from "../utils/programTierStorage";
+import { apiOrigin } from "../config/apiBase";
 
 function auth(t) { return { headers: { Authorization: `Bearer ${t}` } }; }
 
@@ -59,3 +60,14 @@ export async function downloadCertificate(t, id) {
   }
   return res.blob();
 }
+
+/** Fetch certificate and save it to disk in one step. */
+export async function downloadAndSaveCertificate(t, id, filename) {
+  const blob = await downloadCertificate(t, id);
+  triggerBlobDownload(
+    blob,
+    filename || `JUREC-certificate-${id}.pdf`
+  );
+}
+
+export { blobErrorMessage };

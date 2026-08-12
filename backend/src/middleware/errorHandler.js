@@ -17,17 +17,26 @@ function errorHandler(err, req, res, next) {
     return res.status(400).json({ message });
   }
 
+  if (err?.name === "CastError") {
+    return res.status(400).json({ message: "Invalid id" });
+  }
+
   if (err?.message && /files are allowed|file type|Only PDF/i.test(err.message)) {
     return res.status(400).json({ message: err.message });
   }
 
-  const statusCode = err instanceof AppError ? err.statusCode : 500;
+  const statusCode =
+    err instanceof AppError
+      ? err.statusCode
+      : Number(err?.statusCode) >= 400 && Number(err?.statusCode) < 600
+        ? Number(err.statusCode)
+        : 500;
 
   const payload = {
     message: err.message || "Server error",
   };
 
-  if (err instanceof AppError && err.code) {
+  if ((err instanceof AppError || err?.code) && err.code) {
     payload.code = err.code;
   }
 

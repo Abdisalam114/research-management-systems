@@ -20,7 +20,15 @@ const {
   buildWorkflowForProject,
 } = require("../utils/researchJourney");
 const { Notification } = require("../models/Notification");
-const { FACULTIES, matchFacultyByName, coordinatorMatchesResearcherDept } = require("../utils/facultyMatcher");
+const {
+  FACULTIES,
+  matchFacultyByName,
+  coordinatorMatchesResearcherDept,
+  resolveCoordinatorDepartment,
+  departmentNamesForCoordinatorScope,
+  mongoDepartmentInFaculty,
+  recordInCoordinatorFaculty,
+} = require("../utils/facultyMatcher");
 const {
   COLLAB_GROUP_FILTER,
   METRIC_DEFINITIONS,
@@ -210,7 +218,22 @@ async function getDashboardMetrics(req, res) {
   }
 
   base.proposals.total = proposalCount;
+  let facultyProjectCount = projectCount;
+  let facultyActiveProjectCount = activeProjectCount;
+  let facultyActiveProjectDocs = activeProjectDocs;
+  let facultyGrants = grants;
+  let facultyBudgets = budgets;
+  let facultyPubs = pubs;
+  let facultyEthicsCount = ethicsCount;
+  let facultyThesisCount = thesisCount;
+  let facultyWorkflowPubCount = workflowPubCount;
+  let facultyClosuresPendingCount = closuresPendingCount;
+
   if (role === "faculty_coordinator") {
+    const dept = resolveCoordinatorDepartment(req);
+    const inFac = (researcherDept) =>
+      !dept || coordinatorMatchesResearcherDept(dept, researcherDept || "");
+
     const queueDocs = await Proposal.find(
       tw({
         status: {
@@ -224,38 +247,85 @@ async function getDashboardMetrics(req, res) {
     )
       .select("department")
       .populate("researcherId", "department");
-    const facultyQueue = queueDocs.filter((p) =>
-      coordinatorMatchesResearcherDept(
-        req.user.department,
-        p.department || p.researcherId?.department
-      )
+    base.proposals.total = queueDocs.filter((p) =>
+      inFac(p.department || p.researcherId?.department)
     ).length;
-    base.proposals.total = facultyQueue;
+
+    const [projDocs, grantDocs, pubDocs, ethicsDocs, thesisDocs, activeDocs, closureDocs, budgetDocs] =
+      await Promise.all([
+        Project.find(projectFilter)
+          .populate("researcherId", "department")
+          .select("status department researcherId"),
+        Grant.find(grantFilter)
+          .populate("researcherId", "department")
+          .select("amountAwarded status researcherId"),
+        Publication.find(pubFilter)
+          .populate("researcherId", "department")
+          .select("status researcherId"),
+        EthicsApplication.find(tw({}))
+          .populate("researcherId", "department")
+          .select("status principal researcherId"),
+        ThesisGroup.find(tw({})).select("department faculty"),
+        Project.find({ ...projectFilter, status: PROJECT_STATUSES.ACTIVE })
+          .sort({ updatedAt: -1 })
+          .limit(DASHBOARD_ACTIVE_PROJECTS_LIMIT * 3)
+          .populate("researcherId", "fullName name email department")
+          .select("title status progressReports researcherId endDate department"),
+        Project.find({
+          ...projectFilter,
+          "closure.status": CLOSURE_STATUSES.DIRECTOR_APPROVED,
+        })
+          .populate("researcherId", "department")
+          .select("department researcherId"),
+        Budget.find(budgetFilter)
+          .populate("ownerResearcherId", "department")
+          .select("items ownerResearcherId"),
+      ]);
+
+    const projectsFac = projDocs.filter((p) => inFac(p.department || p.researcherId?.department));
+    facultyProjectCount = projectsFac.length;
+    facultyActiveProjectDocs = activeDocs
+      .filter((p) => inFac(p.department || p.researcherId?.department))
+      .slice(0, DASHBOARD_ACTIVE_PROJECTS_LIMIT);
+    facultyActiveProjectCount = projectsFac.filter((p) => p.status === PROJECT_STATUSES.ACTIVE).length;
+    facultyGrants = grantDocs.filter((g) => inFac(g.researcherId?.department));
+    facultyPubs = pubDocs.filter((p) => inFac(p.researcherId?.department));
+    facultyEthicsCount = ethicsDocs.filter(
+      (e) =>
+        String(e.status).toLowerCase() === "submitted" &&
+        inFac(e.principal?.department || e.researcherId?.department)
+    ).length;
+    facultyThesisCount = thesisDocs.filter((t) => inFac(t.department || t.faculty)).length;
+    facultyWorkflowPubCount = facultyPubs.filter((p) => p.status !== PUBLICATION_STATUSES.DRAFT).length;
+    facultyClosuresPendingCount = closureDocs.filter((p) =>
+      inFac(p.department || p.researcherId?.department)
+    ).length;
+    facultyBudgets = budgetDocs.filter((b) => inFac(b.ownerResearcherId?.department));
   }
-  base.projects.total = projectCount;
-  base.projects.active = activeProjectCount;
-  base.activeProjects = await mapProjectDashboardRows(activeProjectDocs, {
+  base.projects.total = facultyProjectCount;
+  base.projects.active = facultyActiveProjectCount;
+  base.activeProjects = await mapProjectDashboardRows(facultyActiveProjectDocs, {
     tierFilter: projectFilter,
     viewerRole: role,
   });
-  base.grants.total = grants.length;
-  base.grants.awardedTotal = sumAwardedAmount(grants);
-  base.grants.awardedCount = grants.filter(isAwardedGrant).length;
+  base.grants.total = facultyGrants.length;
+  base.grants.awardedTotal = sumAwardedAmount(facultyGrants);
+  base.grants.awardedCount = facultyGrants.filter(isAwardedGrant).length;
 
-  base.budgets.total = budgets.length;
-  const allItems = budgets.flatMap((b) => b.items || []);
+  base.budgets.total = facultyBudgets.length;
+  const allItems = facultyBudgets.flatMap((b) => b.items || []);
   base.budgets.itemsPending = allItems.filter((i) => i.status === BUDGET_ITEM_STATUSES.PENDING).length;
   base.budgets.itemsApproved = allItems.filter((i) => i.status === BUDGET_ITEM_STATUSES.APPROVED).length;
   base.budgets.itemsPaid = allItems.filter((i) => i.status === BUDGET_ITEM_STATUSES.PAID).length;
 
-  base.publications.total = pubs.length;
-  base.publications.validated = pubs.filter((p) => p.status === PUBLICATION_STATUSES.VALIDATED).length;
-  base.publications.submitted = pubs.filter((p) => p.status === PUBLICATION_STATUSES.SUBMITTED).length;
+  base.publications.total = facultyPubs.length;
+  base.publications.validated = facultyPubs.filter((p) => p.status === PUBLICATION_STATUSES.VALIDATED).length;
+  base.publications.submitted = facultyPubs.filter((p) => p.status === PUBLICATION_STATUSES.SUBMITTED).length;
 
   base.repository.total = repoCount;
   base.groups.total = collabGroupCount;
-  base.ethics = { total: ethicsCount };
-  base.thesis = { total: thesisCount };
+  base.ethics = { total: facultyEthicsCount };
+  base.thesis = { total: facultyThesisCount };
   base.notifications = { unread: notifUnread };
 
   // Peer-review assignments (Leadership dashboard + Director Peer Reviews tile)
@@ -315,24 +385,24 @@ async function getDashboardMetrics(req, res) {
   base.modules = {
     users: usersCount,
     departments: departmentsCount,
-    ethics: ethicsCount,
+    ethics: facultyEthicsCount,
     proposals: role === "faculty_coordinator" ? base.proposals.total : proposalCount,
-    projects: projectCount,
-    grants: grants.length,
-    budgets: budgets.length,
-    publications: pubs.length,
-    workflow: workflowPubCount,
+    projects: facultyProjectCount,
+    grants: facultyGrants.length,
+    budgets: facultyBudgets.length,
+    publications: facultyPubs.length,
+    workflow: facultyWorkflowPubCount,
     repository: repoCount,
     groups: collabGroupCount,
-    thesis: thesisCount,
+    thesis: facultyThesisCount,
     // Leadership tile prefers pending; Director tile = active sent queue (matches Peer Reviews page)
     reviews:
       role === "leadership" ? reviewAssignmentsPending || reviewAssignments : reviewAssignments,
     committeeReviews,
     policies: policiesCount,
     fundingCalls: openFundingCallCount || fundingCallCount,
-    grantsPendingFinance: grants.filter((g) => g.status === GRANT_STATUSES.PENDING_FINANCE).length,
-    closuresPending: closuresPendingCount,
+    grantsPendingFinance: facultyGrants.filter((g) => g.status === GRANT_STATUSES.PENDING_FINANCE).length,
+    closuresPending: facultyClosuresPendingCount,
     messages: "—",
     notificationsUnread: notifUnread,
   };
@@ -691,28 +761,38 @@ res.json(data);
 }
 
 async function getFacultyReport(req, res) {
-  const dept = (req.user.department || "").trim();
-  const filter = req.tierWhere(dept ? { department: dept } : {});
+  const dept = resolveCoordinatorDepartment(req);
+  const deptNames = dept ? await departmentNamesForCoordinatorScope(dept, Department) : null;
+  const deptClause = mongoDepartmentInFaculty(deptNames);
+  const filter = req.tierWhere(deptClause || {});
 
   const [proposals, projects, publications, deptUsers] = await Promise.all([
-    Proposal.find(filter).select("title status department researcherId createdAt updatedAt").populate("researcherId", "fullName"),
+    Proposal.find(filter).select("title status department researcherId createdAt updatedAt").populate("researcherId", "fullName department"),
     Project.find(req.tierWhere({})).populate("researcherId", "fullName department"),
     Publication.find(req.tierWhere({})).populate("researcherId", "fullName department"),
-    User.find(req.tierWhere({ department: dept, status: USER_STATUSES.ACTIVE })).select("fullName role"),
+    User.find(req.tierWhere({ status: USER_STATUSES.ACTIVE })).select("fullName role department"),
   ]);
 
   const facultyProjects = projects.filter(
-    (p) => p.researcherId && (p.researcherId.department === dept || !dept)
+    (p) =>
+      !dept ||
+      coordinatorMatchesResearcherDept(dept, p.department) ||
+      coordinatorMatchesResearcherDept(dept, p.researcherId?.department)
   );
   const facultyPublications = publications.filter(
-    (p) => p.researcherId && (p.researcherId.department === dept || !dept)
+    (p) => !dept || coordinatorMatchesResearcherDept(dept, p.researcherId?.department)
+  );
+  const facultyUsers = deptUsers.filter(
+    (u) => !dept || coordinatorMatchesResearcherDept(dept, u.department)
   );
 
   res.json({
-    department: dept || "All faculties",
+    department: dept || "Faculty",
+    faculty: matchFacultyByName(dept),
+    scope: dept ? `faculty:${dept}` : "portal",
     generatedAt: new Date().toISOString(),
     counts: {
-      researchers: deptUsers.filter((u) => u.role === ROLES.RESEARCHER).length,
+      researchers: facultyUsers.filter((u) => u.role === ROLES.RESEARCHER).length,
       proposals: proposals.length,
       projects: facultyProjects.length,
       activeProjects: facultyProjects.filter((p) => p.status === PROJECT_STATUSES.ACTIVE).length,
@@ -751,33 +831,41 @@ async function getFacultyReport(req, res) {
 }
 
 async function exportFacultyReportPdf(req, res) {
-  const dept = (req.user.department || "").trim();
-  const filter = req.tierWhere(dept ? { department: dept } : {});
+  const dept = resolveCoordinatorDepartment(req);
+  const deptNames = dept ? await departmentNamesForCoordinatorScope(dept, Department) : null;
+  const deptClause = mongoDepartmentInFaculty(deptNames);
+  const filter = req.tierWhere(deptClause || {});
 
   const [proposals, projects, publications, deptUsers] = await Promise.all([
     Proposal.find(filter).populate("researcherId", "fullName department"),
     Project.find(req.tierWhere({})).populate("researcherId", "fullName department"),
     Publication.find(req.tierWhere({})).populate("researcherId", "fullName department"),
-    User.find(req.tierWhere({ department: dept, status: USER_STATUSES.ACTIVE })).select("fullName role"),
+    User.find(req.tierWhere({ status: USER_STATUSES.ACTIVE })).select("fullName role department"),
   ]);
 
   const facultyProjects = projects.filter(
-    (p) => p.researcherId && (p.researcherId.department === dept || !dept)
+    (p) =>
+      !dept ||
+      coordinatorMatchesResearcherDept(dept, p.department) ||
+      coordinatorMatchesResearcherDept(dept, p.researcherId?.department)
   );
   const facultyPublications = publications.filter(
-    (p) => p.researcherId && (p.researcherId.department === dept || !dept)
+    (p) => !dept || coordinatorMatchesResearcherDept(dept, p.researcherId?.department)
+  );
+  const facultyUsers = deptUsers.filter(
+    (u) => !dept || coordinatorMatchesResearcherDept(dept, u.department)
   );
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
-    `attachment; filename="JUST-RMS-Faculty-Report-${(dept || "all").replace(/\s+/g, "-")}.pdf"`
+    `attachment; filename="JUST-RMS-Faculty-Report-${(dept || "faculty").replace(/\s+/g, "-")}.pdf"`
   );
 
   const doc = new PDFDocument({ size: "A4", margin: 54 });
   doc.pipe(res);
 
-  doc.fontSize(20).text(`Faculty Research Report — ${dept || "All faculties"}`, { align: "center" });
+  doc.fontSize(20).text(`Faculty Research Report — ${dept || "Faculty"}`, { align: "center" });
   doc.moveDown(0.5);
   doc.fontSize(11).fillColor("#444").text(`Generated: ${new Date().toLocaleString()}`, { align: "center" });
   doc.fillColor("#000");
@@ -786,7 +874,7 @@ async function exportFacultyReportPdf(req, res) {
   doc.fontSize(14).text("Faculty overview", { underline: true });
   doc.moveDown(0.4);
   doc.fontSize(12);
-  doc.text(`Researchers: ${deptUsers.filter((u) => u.role === ROLES.RESEARCHER).length}`);
+  doc.text(`Researchers: ${facultyUsers.filter((u) => u.role === ROLES.RESEARCHER).length}`);
   doc.text(`Proposals: ${proposals.length}`);
   doc.text(`Projects: ${facultyProjects.length}`);
   doc.text(`Publications: ${facultyPublications.length}`);
@@ -930,7 +1018,7 @@ res.json({
 }
 
 async function getResearchJourney(req, res) {
-  const { role, id: userId, department } = req.user;
+  const { role, id: userId } = req.user;
   const { researcherId: researcherIdQuery } = req.query || {};
   const tierFilter = req.tierWhere({});
 
@@ -940,11 +1028,12 @@ async function getResearchJourney(req, res) {
     if (role === "researcher") {
       const journey = await buildResearchJourneyForResearcher(userId, tierFilter, role);
       if (!journey) throw new AppError("Researcher not found", 404);
-return res.json({ mode: "journey", ...journey });
+      return res.json({ mode: "journey", ...journey });
     }
     if (!isStaff) throw new AppError("Forbidden", 403);
-    const dept = role === "faculty_coordinator" ? (department || "").trim() : "";
-    const researchers = await listResearchersForJourney(tierFilter, dept || undefined);
+    const dept = role === "faculty_coordinator" ? resolveCoordinatorDepartment(req) : "";
+    const deptNames = dept ? await departmentNamesForCoordinatorScope(dept, Department) : null;
+    const researchers = await listResearchersForJourney(tierFilter, deptNames || undefined);
     return res.json({ mode: "picker", researchers });
   }
 
@@ -956,8 +1045,8 @@ return res.json({ mode: "journey", ...journey });
   if (!journey) throw new AppError("Researcher not found", 404);
 
   if (role === "faculty_coordinator") {
-    const dept = (department || "").trim();
-    if (dept && journey.researcher.department !== dept) {
+    const dept = resolveCoordinatorDepartment(req);
+    if (dept && !coordinatorMatchesResearcherDept(dept, journey.researcher.department)) {
       throw new AppError("Researcher is outside your faculty", 403);
     }
   }
@@ -975,11 +1064,12 @@ async function getWorkflowOverview(req, res) {
   const tf = (extra = {}) =>
     role === "researcher" ? req.ownedWhere(extra) : req.tierWhere(extra);
   const researcherOnly = role === "researcher";
-  const dept =
-    role === "faculty_coordinator" ? String(req.user.department || "").trim() : "";
+  const dept = role === "faculty_coordinator" ? resolveCoordinatorDepartment(req) : "";
+  const deptNames = dept ? await departmentNamesForCoordinatorScope(dept, Department) : null;
+  const deptClause = mongoDepartmentInFaculty(deptNames);
 
-  const proposalFilter = tf({});
-  const projectFilter = tf({});
+  const proposalFilter = tf(deptClause || {});
+  const projectFilter = tf(deptClause || {});
   const ethicsFilter = tf({});
   const grantFilter = tf({});
   const pubFilter = tf({});
@@ -994,45 +1084,86 @@ async function getWorkflowOverview(req, res) {
         }
       : tf({});
 
-  if (role !== "researcher" && dept) {
-    proposalFilter.department = dept;
-    projectFilter.department = dept;
-  }
-
-  const [proposals, projects, ethicsApps, grants, publications, thesisGroups, fundingCalls] =
+  const [proposalsRaw, projectsRaw, ethicsAppsRaw, grantsRaw, publicationsRaw, thesisGroupsRaw, fundingCalls] =
     await Promise.all([
       Proposal.find(proposalFilter)
         .select("title status ethicsStatus department researcherId updatedAt")
+        .populate("researcherId", "department")
         .sort({ updatedAt: -1 })
         .limit(400)
         .lean(),
       Project.find(projectFilter)
         .select("title status department researcherId proposalId updatedAt")
+        .populate("researcherId", "department")
         .sort({ updatedAt: -1 })
         .limit(400)
         .lean(),
       EthicsApplication.find(ethicsFilter)
-        .select("projectTitle status updatedAt")
+        .select("projectTitle status updatedAt principal researcherId")
+        .populate("researcherId", "department")
         .sort({ updatedAt: -1 })
         .limit(200)
         .lean(),
       Grant.find(grantFilter)
         .select("title status amountAwarded amountRequested researcherId updatedAt")
+        .populate("researcherId", "department")
         .sort({ updatedAt: -1 })
         .limit(300)
         .lean(),
       Publication.find(pubFilter)
-        .select("title status workflowStage projectId updatedAt")
+        .select("title status workflowStage projectId researcherId updatedAt")
+        .populate("researcherId", "department")
         .sort({ updatedAt: -1 })
         .limit(300)
         .lean(),
       ThesisGroup.find(thesisFilter)
-        .select("title status titleProposal chapters supervisorId updatedAt")
+        .select("title status titleProposal chapters supervisorId department faculty updatedAt")
         .sort({ updatedAt: -1 })
         .limit(200)
         .lean(),
       FundingCall.find(tf({})).select("title status updatedAt").lean(),
     ]);
+
+  // Belt-and-suspenders: faculty match on department OR researcher department
+  const proposals =
+    role === "faculty_coordinator" && dept
+      ? proposalsRaw.filter((p) =>
+          coordinatorMatchesResearcherDept(dept, p.department || p.researcherId?.department)
+        )
+      : proposalsRaw;
+  const projects =
+    role === "faculty_coordinator" && dept
+      ? projectsRaw.filter((p) =>
+          coordinatorMatchesResearcherDept(dept, p.department || p.researcherId?.department)
+        )
+      : projectsRaw;
+  const ethicsApps =
+    role === "faculty_coordinator" && dept
+      ? ethicsAppsRaw.filter((e) =>
+          coordinatorMatchesResearcherDept(
+            dept,
+            e.principal?.department || e.researcherId?.department || ""
+          )
+        )
+      : ethicsAppsRaw;
+  const grants =
+    role === "faculty_coordinator" && dept
+      ? grantsRaw.filter((g) =>
+          coordinatorMatchesResearcherDept(dept, g.researcherId?.department || "")
+        )
+      : grantsRaw;
+  const publications =
+    role === "faculty_coordinator" && dept
+      ? publicationsRaw.filter((p) =>
+          coordinatorMatchesResearcherDept(dept, p.researcherId?.department || "")
+        )
+      : publicationsRaw;
+  const thesisGroups =
+    role === "faculty_coordinator" && dept
+      ? thesisGroupsRaw.filter((t) =>
+          coordinatorMatchesResearcherDept(dept, t.department || t.faculty || "")
+        )
+      : thesisGroupsRaw;
 
   const sample = (items, mapFn, n = 5) => items.slice(0, n).map(mapFn);
 
@@ -1182,43 +1313,88 @@ async function getSystemReport(req, res) {
 
   const isDirector = role === ROLES.RESEARCH_DIRECTOR;
   const tf = (extra = {}) => (isDirector ? extra : req.tierWhere(extra));
-  const dept =
-    role === "faculty_coordinator" ? String(req.user.department || "").trim() : "";
+  const dept = role === "faculty_coordinator" ? resolveCoordinatorDepartment(req) : "";
+  const deptNames = dept ? await departmentNamesForCoordinatorScope(dept, Department) : null;
+  const deptClause = mongoDepartmentInFaculty(deptNames);
 
-  const proposalQ = tf(dept ? { department: dept } : {});
-  const projectQ = tf(dept ? { department: dept } : {});
+  const proposalQ = tf(deptClause || {});
+  const projectQ = tf(deptClause || {});
 
   const [
-    proposals,
-    projects,
-    ethicsApps,
-    grants,
-    budgets,
-    payments,
-    purchaseOrders,
-    publications,
-    thesisGroups,
+    proposalsRaw,
+    projectsRaw,
+    ethicsAppsRaw,
+    grantsRaw,
+    budgetsRaw,
+    paymentsRaw,
+    purchaseOrdersRaw,
+    publicationsRaw,
+    thesisGroupsRaw,
     fundingCalls,
     users,
-    repositoryItems,
+    repositoryItemsRaw,
     policies,
   ] = await Promise.all([
-    Proposal.find(proposalQ).select("status ethicsStatus department").lean(),
-    Project.find(projectQ).select("status department kind").lean(),
-    EthicsApplication.find(tf({})).select("status").lean(),
-    Grant.find(tf({})).select("status amountAwarded amountRequested").lean(),
-    Budget.find(tf({})).select("totalAmount allocatedAmount spentAmount status").lean(),
-    Payment.find(tf({})).select("amount status").lean(),
-    PurchaseOrder.find(tf({})).select("totalAmount status").lean(),
-    Publication.find(tf({})).select("status workflowStage type").lean(),
-    ThesisGroup.find(tf({})).select("status titleProposal chapters").lean(),
+    Proposal.find(proposalQ).select("status ethicsStatus department researcherId").populate("researcherId", "department").lean(),
+    Project.find(projectQ).select("status department kind researcherId").populate("researcherId", "department").lean(),
+    EthicsApplication.find(tf({})).select("status principal researcherId").populate("researcherId", "department").lean(),
+    Grant.find(tf({})).select("status amountAwarded amountRequested researcherId").populate("researcherId", "department").lean(),
+    Budget.find(tf({})).select("totalAllocated totalDisbursed status ownerResearcherId").populate("ownerResearcherId", "department").lean(),
+    Payment.find(tf({})).select("amount status projectId").populate({ path: "projectId", select: "department researcherId", populate: { path: "researcherId", select: "department" } }).lean(),
+    PurchaseOrder.find(tf({})).select("totalAmount status projectId").populate({ path: "projectId", select: "department researcherId", populate: { path: "researcherId", select: "department" } }).lean(),
+    Publication.find(tf({})).select("status workflowStage type researcherId").populate("researcherId", "department").lean(),
+    ThesisGroup.find(tf({})).select("status titleProposal chapters department faculty").lean(),
     FundingCall.find(tf({})).select("status").lean(),
     isDirector
       ? User.find({ role: { $ne: ROLES.RESEARCH_DIRECTOR } }).select("role status programTier").lean()
       : Promise.resolve([]),
-    RepositoryItem.find(tf({})).select("title").lean(),
+    RepositoryItem.find(tf({})).select("title uploadedBy").populate("uploadedBy", "department").lean(),
     InstitutionalPolicy.find(isDirector ? {} : tf({})).select("status category").lean(),
   ]);
+
+  const inFaculty = (researcherDept, fallbackDept = "") =>
+    !dept || coordinatorMatchesResearcherDept(dept, researcherDept || fallbackDept || "");
+
+  const proposals =
+    role === "faculty_coordinator" && dept
+      ? proposalsRaw.filter((p) => inFaculty(p.department || p.researcherId?.department))
+      : proposalsRaw;
+  const projects =
+    role === "faculty_coordinator" && dept
+      ? projectsRaw.filter((p) => inFaculty(p.department || p.researcherId?.department))
+      : projectsRaw;
+  const ethicsApps =
+    role === "faculty_coordinator" && dept
+      ? ethicsAppsRaw.filter((e) => inFaculty(e.principal?.department || e.researcherId?.department))
+      : ethicsAppsRaw;
+  const grants =
+    role === "faculty_coordinator" && dept
+      ? grantsRaw.filter((g) => inFaculty(g.researcherId?.department))
+      : grantsRaw;
+  const publications =
+    role === "faculty_coordinator" && dept
+      ? publicationsRaw.filter((p) => inFaculty(p.researcherId?.department))
+      : publicationsRaw;
+  const thesisGroups =
+    role === "faculty_coordinator" && dept
+      ? thesisGroupsRaw.filter((t) => inFaculty(t.department || t.faculty))
+      : thesisGroupsRaw;
+  const budgets =
+    role === "faculty_coordinator" && dept
+      ? budgetsRaw.filter((b) => inFaculty(b.ownerResearcherId?.department))
+      : budgetsRaw;
+  const payments =
+    role === "faculty_coordinator" && dept
+      ? paymentsRaw.filter((p) =>
+          inFaculty(p.projectId?.department || p.projectId?.researcherId?.department)
+        )
+      : paymentsRaw;
+  const purchaseOrders =
+    role === "faculty_coordinator" && dept
+      ? purchaseOrdersRaw.filter((po) =>
+          inFaculty(po.projectId?.department || po.projectId?.researcherId?.department)
+        )
+      : purchaseOrdersRaw;
 
   const { REPOSITORY_ITEMS } = require("../scripts/seedRecords");
   const seedRepoTitles = new Set(
@@ -1229,6 +1405,10 @@ async function getSystemReport(req, res) {
         .trim()
     )
   );
+  const repositoryItems =
+    role === "faculty_coordinator" && dept
+      ? repositoryItemsRaw.filter((item) => inFaculty(item.uploadedBy?.department))
+      : repositoryItemsRaw;
   const visibleRepository = repositoryItems.filter((item) => {
     const key = String(item.title || "")
       .toLowerCase()
@@ -1238,8 +1418,8 @@ async function getSystemReport(req, res) {
   });
 
   const paidPayments = payments.filter((p) => p.status === PAYMENT_STATUSES.PAID || p.status === "paid");
-  const allocated = sum(budgets.map((b) => Number(b.allocatedAmount ?? b.totalAmount ?? 0)));
-  const spent = sum(budgets.map((b) => Number(b.spentAmount || 0)));
+  const allocated = sum(budgets.map((b) => Number(b.totalAllocated ?? 0)));
+  const spent = sum(budgets.map((b) => Number(b.totalDisbursed || 0)));
   const paid = sum(paidPayments.map((p) => Number(p.amount || 0)));
 
   const report = {
@@ -1400,17 +1580,44 @@ async function getDonorReport(req, res) {
 }
 
 async function getKpiDashboard(req, res) {
+  const role = req.user?.role;
   const tier = req.programTier;
   const tf = (base = {}) => (tier ? { ...base, programTier: tier } : { ...base });
+  const dept = role === "faculty_coordinator" ? resolveCoordinatorDepartment(req) : "";
 
-  const [proposals, grants, projects, publications, calls, closedProjects] = await Promise.all([
-    Proposal.find(tf({})).select("status createdAt submittedAt"),
-    Grant.find(tf({})).select("status amountAwarded amountRequested createdAt"),
-    Project.find(tf({})).select("status closure"),
-    Publication.find(tf({})).select("status type"),
+  const [proposalsRaw, grantsRaw, projectsRaw, publicationsRaw, calls, closedProjectsRaw] = await Promise.all([
+    Proposal.find(tf({})).select("status createdAt submittedAt department researcherId").populate("researcherId", "department"),
+    Grant.find(tf({})).select("status amountAwarded amountRequested createdAt researcherId").populate("researcherId", "department"),
+    Project.find(tf({})).select("status closure department researcherId").populate("researcherId", "department"),
+    Publication.find(tf({})).select("status type researcherId").populate("researcherId", "department"),
     FundingCall.find(tf({})).select("status callType amountCap"),
-    Project.countDocuments(tf({ "closure.status": "archived" })),
+    Project.find(tf({ "closure.status": "archived" }))
+      .select("department researcherId")
+      .populate("researcherId", "department"),
   ]);
+
+  const inFac = (researcherDept, fallback = "") =>
+    recordInCoordinatorFaculty(dept, researcherDept, fallback);
+
+  const proposals =
+    dept
+      ? proposalsRaw.filter((p) => inFac(p.department || p.researcherId?.department))
+      : proposalsRaw;
+  const grants =
+    dept
+      ? grantsRaw.filter((g) => inFac(g.researcherId?.department))
+      : grantsRaw;
+  const projects =
+    dept
+      ? projectsRaw.filter((p) => inFac(p.department || p.researcherId?.department))
+      : projectsRaw;
+  const publications =
+    dept
+      ? publicationsRaw.filter((p) => inFac(p.researcherId?.department))
+      : publicationsRaw;
+  const closedProjects = dept
+    ? closedProjectsRaw.filter((p) => inFac(p.department || p.researcherId?.department)).length
+    : closedProjectsRaw.length;
 
   const proposalApproved = proposals.filter((p) => p.status === PROPOSAL_STATUSES.APPROVED).length;
   const proposalDecided = proposals.filter((p) =>
@@ -1427,9 +1634,18 @@ async function getKpiDashboard(req, res) {
   const internalCalls = calls.filter((c) => (c.callType || "internal") === "internal").length;
   const externalCalls = calls.filter((c) => c.callType === "external").length;
 
+  let researchersActive = await User.countDocuments(tf({ role: ROLES.RESEARCHER, status: USER_STATUSES.ACTIVE }));
+  if (dept) {
+    const researchers = await User.find(tf({ role: ROLES.RESEARCHER, status: USER_STATUSES.ACTIVE })).select(
+      "department"
+    );
+    researchersActive = researchers.filter((u) => inFac(u.department)).length;
+  }
+
   res.json({
     generatedAt: new Date().toISOString(),
     programTier: tier,
+    scope: dept ? `faculty:${dept}` : tier ? "portal" : "all",
     kpis: {
       proposalApprovalRate,
       grantSuccessRate,
@@ -1441,7 +1657,7 @@ async function getKpiDashboard(req, res) {
       openFundingCalls: openCalls,
       internalFundingCalls: internalCalls,
       externalFundingCalls: externalCalls,
-      researchersActive: await User.countDocuments(tf({ role: ROLES.RESEARCHER, status: USER_STATUSES.ACTIVE })),
+      researchersActive,
     },
   });
 }

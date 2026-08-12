@@ -311,11 +311,24 @@ async function listGrants(req, res) {
   }
   if (callId) filter.callId = callId;
   if (role === "researcher") filter.researcherId = req.user.id;
-  const grants = await Grant.find(role === "researcher" ? filter : req.tierWhere(filter))
+  let grants = await Grant.find(role === "researcher" ? filter : req.tierWhere(filter))
     .sort({ createdAt: -1 })
     .populate("projectId", "title status")
     .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId")
-    .populate("callId", "title status fundingSource requiredDocuments deadline amountCap currency callType eligibilityTier");
+    .populate("callId", "title status fundingSource requiredDocuments deadline amountCap currency callType eligibilityTier")
+    .populate("researcherId", "fullName department");
+  if (role === "faculty_coordinator") {
+    const {
+      resolveCoordinatorDepartment,
+      coordinatorMatchesResearcherDept,
+    } = require("../utils/facultyMatcher");
+    const dept = resolveCoordinatorDepartment(req);
+    if (dept) {
+      grants = grants.filter((g) =>
+        coordinatorMatchesResearcherDept(dept, g.researcherId?.department || "")
+      );
+    }
+  }
   const sanitized = await Promise.all(grants.map(async (g) => redactGrantAwardsIfNeeded(sanitizeGrant(g), req)));
 res.json({ grants: sanitized });
 }
@@ -344,6 +357,16 @@ async function getGrant(req, res) {
     "leadership",
   ].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+  if (req.user.role === "faculty_coordinator") {
+    const {
+      resolveCoordinatorDepartment,
+      recordInCoordinatorFaculty,
+    } = require("../utils/facultyMatcher");
+    const dept = resolveCoordinatorDepartment(req);
+    if (dept && !recordInCoordinatorFaculty(dept, grant.researcherId?.department)) {
+      throw new AppError("Grant is outside your faculty", 403);
+    }
+  }
 
   const detail = sanitizeGrantDetail(grant);
   await redactGrantAwardsIfNeeded(detail, req);
@@ -641,7 +664,9 @@ async function financeDecision(req, res) {
         programTier: grant.programTier || req.programTier,
       });
     } catch { /* best-effort */ }
-    budgetResult = await ensureBudgetForGrant(grant);
+    try {
+      budgetResult = await ensureBudgetForGrant(grant);
+    } catch { /* best-effort */ }
 
     // Keep related proposal / call data consistent
     if (grant.callId) {

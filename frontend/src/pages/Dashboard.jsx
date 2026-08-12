@@ -168,6 +168,8 @@ function RoleDashboard({ role, user }) {
                   projects={metrics.activeProjects || []}
                   totalActive={metrics.projects?.active}
                   title="My Active Projects"
+                  showViewAll={["researcher", "faculty_coordinator", "research_director"].includes(role)}
+                  viewAllTo="/projects?filter=active"
                 />
             </section>
           ) : null}

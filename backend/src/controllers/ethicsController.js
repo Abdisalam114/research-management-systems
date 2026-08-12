@@ -123,10 +123,46 @@ async function syncLinkedProposalEthics(proposalId, ethicsStatus, ethicsAppId, p
   await linked.save();
 }
 
+async function assertCoordinatorEthicsFaculty(req, application) {
+  if (req.user.role !== "faculty_coordinator") return;
+  const {
+    resolveCoordinatorDepartment,
+    recordInCoordinatorFaculty,
+  } = require("../utils/facultyMatcher");
+  const dept = resolveCoordinatorDepartment(req);
+  if (!dept) return;
+  let researcherDept = application.principal?.department || "";
+  if (!researcherDept && application.researcherId) {
+    const { User } = require("../models/User");
+    const owner = await User.findById(application.researcherId).select("department").lean();
+    researcherDept = owner?.department || "";
+  }
+  if (!recordInCoordinatorFaculty(dept, researcherDept, application.principal?.department)) {
+    throw new AppError("Application is outside your faculty", 403);
+  }
+}
+
 async function listEthicsApplications(req, res) {
   const { role, id } = req.user;
   const filter = role === "researcher" ? { researcherId: id } : req.tierWhere({});
-  const applications = await EthicsApplication.find(filter).sort({ createdAt: -1 });
+  let applications = await EthicsApplication.find(filter)
+    .sort({ createdAt: -1 })
+    .populate("researcherId", "department");
+  if (role === "faculty_coordinator") {
+    const {
+      resolveCoordinatorDepartment,
+      coordinatorMatchesResearcherDept,
+    } = require("../utils/facultyMatcher");
+    const dept = resolveCoordinatorDepartment(req);
+    if (dept) {
+      applications = applications.filter((a) =>
+        coordinatorMatchesResearcherDept(
+          dept,
+          a.principal?.department || a.researcherId?.department || ""
+        )
+      );
+    }
+  }
   res.json({ applications: applications.map(sanitize) });
 }
 
@@ -138,7 +174,8 @@ async function getEthicsApplication(req, res) {
   if (!a) throw new AppError("Application not found", 404);
   const isOwner = String(a.researcherId) === String(req.user.id);
   const isStaff = ["research_director", "faculty_coordinator"].includes(req.user.role);
-if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+  if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+  await assertCoordinatorEthicsFaculty(req, a);
   res.json({ application: sanitize(a) });
 }
 
@@ -396,10 +433,11 @@ async function downloadCertificate(req, res) {
   const isOwner = String(a.researcherId) === String(req.user.id);
   const isStaff = ["research_director", "faculty_coordinator"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
+  await assertCoordinatorEthicsFaculty(req, a);
 
   const margin = 60;
   const pageWidth = 595.28;
-  const fileRef = (a.approval?.refNumber || a.approval?.certificateNumber || a._id)
+  const fileRef = String(a.approval?.refNumber || a.approval?.certificateNumber || a._id)
     .replace(/[^\w.-]+/g, "-")
     .slice(0, 80);
 

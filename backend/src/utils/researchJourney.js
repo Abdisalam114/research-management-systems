@@ -693,7 +693,12 @@ async function buildResearchJourneyForResearcher(researcherId, tierFilter, viewe
 
 async function listResearchersForJourney(tierFilter, department) {
   const filter = { role: "researcher", ...tierFilter };
-  if (department) filter.department = department;
+  // Accept a faculty label, a single department name, or an expanded name list from facultyMatcher.
+  if (Array.isArray(department) && department.length) {
+    filter.department = { $in: department };
+  } else if (typeof department === "string" && department.trim()) {
+    filter.department = department.trim();
+  }
   const researchers = await User.find(filter).select("fullName email department programTier").sort({ fullName: 1 });
 
   const summaries = await Promise.all(

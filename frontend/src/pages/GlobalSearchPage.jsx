@@ -31,7 +31,7 @@ const SECTION_ORDER = Object.keys(SECTION_META);
 function sectionsForRole(role) {
   if (role === "leadership") {
     return SECTION_ORDER.filter((k) =>
-      ["proposals", "grants", "fundingCalls", "policies", "notifications", "conversations"].includes(k)
+      ["proposals", "grants", "fundingCalls", "policies", "notifications"].includes(k)
     );
   }
   if (role === "researcher") {
@@ -42,7 +42,7 @@ function sectionsForRole(role) {
   }
   if (role === "finance_officer") {
     return SECTION_ORDER.filter((k) =>
-      ["grants", "fundingCalls", "budgets", "payments", "purchaseOrders", "policies", "notifications", "conversations"].includes(k)
+      ["grants", "fundingCalls", "budgets", "payments", "purchaseOrders", "policies", "notifications"].includes(k)
     );
   }
   return SECTION_ORDER;

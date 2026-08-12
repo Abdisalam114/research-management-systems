@@ -45,7 +45,8 @@ export function GrantDetailsPage() {
   const [message, setMessage] = useState("");
 
   const isDirector = user?.role === "research_director";
-  const isLeadership = user?.role === "leadership";  const isFinance = user?.role === "finance_officer";
+  const isLeadership = user?.role === "leadership";
+  const isFinance = user?.role === "finance_officer";
   const isOwner = grant && String(grant.researcherId) === String(user?.id);
   const canEditLink = isOwner && ["draft", "rejected"].includes(grant?.status || "");
   const canDecide = (isDirector || isLeadership) && grant?.status === "submitted";
@@ -440,9 +441,11 @@ export function GrantDetailsPage() {
                   <div style={{ fontWeight: 700 }}>{formatDate(grant.project.endDate)}</div>
                 </div>
               </div>
-              <Link className="btn" to={`/projects/${grant.project.id}`} style={{ marginTop: 12, display: "inline-block" }}>
-                Open project
-              </Link>
+              {["researcher", "faculty_coordinator", "research_director"].includes(user?.role) ? (
+                <Link className="btn" to={`/projects/${grant.project.id}`} style={{ marginTop: 12, display: "inline-block" }}>
+                  Open project
+                </Link>
+              ) : null}
             </div>
           ) : !isFinance && canEditLink && grant.callId ? (
             <div className="card" style={{ marginTop: 12 }}>

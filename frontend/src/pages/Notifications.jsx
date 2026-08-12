@@ -9,6 +9,7 @@ import { SYSTEM_REFRESH_MS } from "../constants/systemRefresh";
 import * as notificationApi from "../services/notificationApi";
 import * as ethicsApi from "../services/ethicsApi";
 import { apiOrigin } from "../config/apiBase";
+import { triggerBlobDownload } from "../utils/downloadBlob";
 
 function formatWhen(at) {
   if (!at) return "";
@@ -78,7 +79,7 @@ export function NotificationsPage() {
     const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${(n.title || "notification").slice(0, 60).replace(/[^\w\-]+/g, "_")}.txt`;
+    a.download = `${(n.title || "notification").slice(0, 60).replace(/[^\w-]+/g, "_")}.txt`;
     a.click();
     URL.revokeObjectURL(a.href);
   }
@@ -120,7 +121,11 @@ export function NotificationsPage() {
     if (ethicsId) {
       setDownloadBusy(n.id);
       try {
-        await ethicsApi.downloadCertificate(accessToken, ethicsId);
+        await ethicsApi.downloadAndSaveCertificate(
+          accessToken,
+          ethicsId,
+          `JUREC-certificate-${ethicsId}.pdf`
+        );
         if (!n.readAt) {
           await notificationApi.markNotificationRead(accessToken, n.id);
           await reload();
@@ -134,10 +139,21 @@ export function NotificationsPage() {
     }
 
     if (n.downloadLink?.startsWith("/uploads/")) {
-      window.open(`${apiOrigin()}${n.downloadLink}`, "_blank", "noopener,noreferrer");
-      if (!n.readAt) {
-        await notificationApi.markNotificationRead(accessToken, n.id);
-        await reload();
+      setDownloadBusy(n.id);
+      try {
+        const res = await fetch(`${apiOrigin()}${n.downloadLink}`);
+        if (!res.ok) throw new Error("File not found on server");
+        const blob = await res.blob();
+        const name = n.downloadLink.split("/").pop() || "download";
+        triggerBlobDownload(blob, name);
+        if (!n.readAt) {
+          await notificationApi.markNotificationRead(accessToken, n.id);
+          await reload();
+        }
+      } catch (e) {
+        setError(e?.message || "Could not download file");
+      } finally {
+        setDownloadBusy("");
       }
       return;
     }

@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { PageHeader } from "../components/PageHeader";
 import * as analyticsApi from "../services/analyticsApi";
+import { triggerBlobDownload } from "../utils/downloadBlob";
 
 function StatusTable({ title, total, byStatus }) {
   const rows = Object.entries(byStatus || {}).sort((a, b) => b[1] - a[1]);
@@ -70,12 +71,7 @@ export function SystemReportsPage() {
     setError("");
     try {
       const blob = await analyticsApi.downloadSystemReportCsv(accessToken);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `just-rms-system-report-${programTier || "portal"}.csv`;
-      a.click();
-      URL.revokeObjectURL(url);
+      triggerBlobDownload(blob, `just-rms-system-report-${programTier || "portal"}.csv`);
     } catch (e) {
       setError(e?.response?.data?.message || "CSV download failed");
     } finally {

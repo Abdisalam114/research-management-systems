@@ -7,6 +7,7 @@ import * as proposalApi from "../services/proposalApi";
 import { ActiveProjectsPanel } from "../components/ActiveProjectsPanel";
 import { SystemModulesGrid } from "../components/SystemModulesGrid";
 import { DASH_ERROR_BORDER } from "../constants/dashboardTheme";
+import { triggerBlobDownload } from "../utils/downloadBlob";
 import "./dashboard.css";
 
 export function CoordinatorDashboardPage() {
@@ -62,12 +63,10 @@ export function CoordinatorDashboardPage() {
     try {
       setDownloading(true);
       const blob = await analyticsApi.downloadFacultyReportPdf(accessToken);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Faculty-Report-${(user?.department || "all").replace(/\s+/g, "-")}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      triggerBlobDownload(
+        blob,
+        `Faculty-Report-${(user?.department || "all").replace(/\s+/g, "-")}.pdf`
+      );
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to download faculty report");
     } finally {

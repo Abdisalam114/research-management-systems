@@ -9,7 +9,15 @@ function projectPiName(p) {
   return "—";
 }
 
-export function ActiveProjectsPanel({ projects, totalActive, title = "Active Projects", showPi = true, previewMeta }) {
+export function ActiveProjectsPanel({
+  projects,
+  totalActive,
+  title = "Active Projects",
+  showPi = true,
+  previewMeta,
+  viewAllTo = "/projects?filter=active",
+  showViewAll = true,
+}) {
   const list = projects || [];
   const countLabel = totalActive != null ? totalActive : list.length;
   const showingHint =
@@ -26,9 +34,11 @@ export function ActiveProjectsPanel({ projects, totalActive, title = "Active Pro
           </div>
           {showingHint ? <div className="muted" style={{ fontSize: 11, marginTop: 4 }}>{showingHint}</div> : null}
         </div>
-        <Link className="btn btnSm" to="/projects?filter=active">
-          View all
-        </Link>
+        {showViewAll && viewAllTo ? (
+          <Link className="btn btnSm" to={viewAllTo}>
+            View all
+          </Link>
+        ) : null}
       </div>
       <div className="dashActiveProjectsPanelBody">
         <table className="dashTable dashActiveProjectsTable">

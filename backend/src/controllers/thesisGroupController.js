@@ -1,6 +1,6 @@
 const { ThesisGroup, THESIS_STATUSES } = require("../models/ThesisGroup");
 const { User, ROLES, USER_STATUSES } = require("../models/User");
-const { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } = require("../utils/facultyMatcher");
+const { FACULTIES, DEFAULT_FACULTY, matchFacultyByName, resolveCoordinatorDepartment, recordInCoordinatorFaculty } = require("../utils/facultyMatcher");
 function canonicalFaculty(value, fallbackName) {
   const raw = String(value || "").trim();
   if (raw && FACULTIES.includes(raw)) return raw;
@@ -9,6 +9,19 @@ function canonicalFaculty(value, fallbackName) {
 
 function facultiesMatch(a, b, fallbackName) {
   return canonicalFaculty(a, fallbackName) === canonicalFaculty(b, fallbackName);
+}
+
+function assertCoordinatorThesisFaculty(req, group) {
+  if (req.user?.role !== ROLES.FACULTY_COORDINATOR) return;
+  const dept = resolveCoordinatorDepartment(req);
+  if (!dept) return;
+  const ok = recordInCoordinatorFaculty(
+    dept,
+    group.department,
+    group.faculty,
+    group.supervisorId?.department
+  );
+  if (!ok) throw new AppError("Thesis group is outside your faculty", 403);
 }
 const { AppError } = require("../utils/AppError");
 const { ResearchGroup, GROUP_MEMBER_ROLES, GROUP_KINDS } = require("../models/ResearchGroup");
@@ -249,14 +262,18 @@ async function loadSanitizedGroup(id) {
 
 async function notifySupervisorAssignment(group, programTier) {
   if (!group.supervisorId) return;
-  const studentNames = (group.students || []).map((s) => s.fullName).filter(Boolean).join(", ");
-  await notifyUser(group.supervisorId, {
-    type: "system",
-    title: "Thesis supervision assignment",
-    body: `You have been assigned to supervise a thesis group${studentNames ? ` (${studentNames})` : ""}. When students choose their thesis title, enter it on the Thesis page.`,
-    link: `/thesis?groupId=${group._id}`,
-    programTier,
-  });
+  try {
+    const studentNames = (group.students || []).map((s) => s.fullName).filter(Boolean).join(", ");
+    await notifyUser(group.supervisorId, {
+      type: "system",
+      title: "Thesis supervision assignment",
+      body: `You have been assigned to supervise a thesis group${studentNames ? ` (${studentNames})` : ""}. When students choose their thesis title, enter it on the Thesis page.`,
+      link: `/thesis?groupId=${group._id}`,
+      programTier,
+    });
+  } catch {
+    /* best-effort */
+  }
 }
 
 async function findSupervisorResearcher(supervisorId, req) {
@@ -337,7 +354,7 @@ async function listGroups(req, res) {
     };
   }
 
-  const groups = await ThesisGroup.find(
+  let groups = await ThesisGroup.find(
     role === ROLES.RESEARCHER ? filter : req.tierWhere(filter)
   )
     .sort({ createdAt: -1 })
@@ -346,6 +363,20 @@ async function listGroups(req, res) {
     .populate("coordinatorId", "fullName email")
     .populate("createdBy", "fullName email role")
     .populate("meetings.loggedBy", "fullName email");
+
+  if (role === ROLES.FACULTY_COORDINATOR) {
+    const dept = resolveCoordinatorDepartment(req);
+    if (dept) {
+      groups = groups.filter((g) =>
+        recordInCoordinatorFaculty(
+          dept,
+          g.department,
+          g.faculty,
+          g.supervisorId?.department
+        )
+      );
+    }
+  }
 
   // One-time legacy title sync only — do not rewrite students from seed templates on every list
   await Promise.all(groups.map((g) => syncLegacyTitleProposal(g)));
@@ -370,6 +401,7 @@ async function getGroup(req, res) {
     const isSupervisor = group.supervisorId && String(group.supervisorId._id || group.supervisorId) === String(userId);
     if (!isSupervisor) throw new AppError("Forbidden", 403);
   }
+  assertCoordinatorThesisFaculty(req, group);
 
   res.json({ group: sanitize(group) });
 }
@@ -643,13 +675,17 @@ async function reviewTitleProposal(req, res) {
     group.titleProposal = emptyTitleProposal();
     await group.save();
     if (group.supervisorId) {
-      await notifyUser(group.supervisorId, {
-        type: "system",
-        title: "Thesis title unlocked",
-        body: "The accepted thesis title was unlocked. Please enter a new student-chosen title.",
-        link: `/thesis?groupId=${group._id}`,
-        programTier: group.programTier || req.programTier,
-      });
+      try {
+        await notifyUser(group.supervisorId, {
+          type: "system",
+          title: "Thesis title unlocked",
+          body: "The accepted thesis title was unlocked. Please enter a new student-chosen title.",
+          link: `/thesis?groupId=${group._id}`,
+          programTier: group.programTier || req.programTier,
+        });
+      } catch {
+        /* best-effort */
+      }
     }
     return res.json({ message: "Title unlocked", group: await loadSanitizedGroup(group._id) });
   }
@@ -686,15 +722,19 @@ async function reviewTitleProposal(req, res) {
   await clearTitleReviewNotifications(group);
 
   if (group.supervisorId) {
-    await notifyUser(group.supervisorId, {
-      type: "system",
-      title: accepting ? "Thesis title accepted" : "Thesis title rejected",
-      body: accepting
-        ? `The thesis title "${group.titleProposal.title}" has been accepted. You may begin supervision.`
-        : `The proposed thesis title was rejected.${note ? ` Note: ${note}` : ""}`,
-      link: `/thesis?groupId=${group._id}`,
-      programTier: group.programTier || req.programTier,
-    });
+    try {
+      await notifyUser(group.supervisorId, {
+        type: "system",
+        title: accepting ? "Thesis title accepted" : "Thesis title rejected",
+        body: accepting
+          ? `The thesis title "${group.titleProposal.title}" has been accepted. You may begin supervision.`
+          : `The proposed thesis title was rejected.${note ? ` Note: ${note}` : ""}`,
+        link: `/thesis?groupId=${group._id}`,
+        programTier: group.programTier || req.programTier,
+      });
+    } catch {
+      /* best-effort */
+    }
   }
 
   // Inform the other staff role so they know the title was already decided

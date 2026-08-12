@@ -58,7 +58,7 @@ if (!["approve", "reject"].includes(decision)) {
     po.rejectedReason = "";
     try {
       await notifyUsersByRole("research_director", {
-        type: "procurement",
+        type: "budget",
         title: "PO finance-reviewed — director approval needed",
         body: `${po.vendorName} — ${po.currency} ${po.totalAmount}`,
         link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
@@ -120,7 +120,7 @@ async function createPurchaseOrder(req, res) {
 
   try {
     await notifyUsersByRole("finance_officer", {
-      type: "procurement",
+      type: "budget",
       title: "New purchase order awaiting finance review",
       body: `${po.vendorName} — ${po.currency} ${po.totalAmount}`,
       link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
@@ -157,7 +157,7 @@ async function directorDecision(req, res) {
 
   try {
     await notifyUser(po.requestedBy, {
-      type: "procurement",
+      type: "budget",
       title: `PO ${decision === "approve" ? "approved by director" : "rejected by director"}`,
       body: po.vendorName,
       link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
@@ -165,7 +165,7 @@ async function directorDecision(req, res) {
     });
     if (decision === "approve") {
       await notifyUsersByRole("finance_officer", {
-        type: "procurement",
+        type: "budget",
         title: "Director-approved PO awaiting payment",
         body: `${po.vendorName} — ${po.currency} ${po.totalAmount}`,
         link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
@@ -220,7 +220,7 @@ async function financePay(req, res) {
   }
 try {
     await notifyUser(po.requestedBy, {
-      type: "procurement",
+      type: "budget",
       title: "PO paid by finance",
       body: `${po.vendorName} via ${paymentMethod}`,
       link: po.projectId ? `/budgets?projectId=${po.projectId}` : "/budgets",
