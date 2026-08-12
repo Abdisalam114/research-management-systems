@@ -974,6 +974,7 @@ async function getWorkflowOverview(req, res) {
 
   const tf = (extra = {}) =>
     role === "researcher" ? req.ownedWhere(extra) : req.tierWhere(extra);
+  const researcherOnly = role === "researcher";
   const dept =
     role === "faculty_coordinator" ? String(req.user.department || "").trim() : "";
 
