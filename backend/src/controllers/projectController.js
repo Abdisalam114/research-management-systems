@@ -13,6 +13,7 @@ const { notifyUsersByRole, notifyUser } = require("../utils/notify");
 const { buildProjectNotificationBody, loadProjectForNotification } = require("../utils/projectNotificationBody");
 const { writeSimplePdf } = require("../utils/pdf");
 const { resolveProjectStartDate, assertDateOnOrAfterProjectStart } = require("../utils/projectStartDate");
+const { assertDateNotInPast, assertDateOnOrAfter } = require("../utils/dateConstraints");
 
 function normalizeTeamMembers(team) {
   if (!Array.isArray(team)) return [];
@@ -389,19 +390,39 @@ async function updateProject(req, res) {
   const { milestones, teamMembers, workPlan, activities, endDate, status } = req.body;
   if (milestones !== undefined) {
     if (!Array.isArray(milestones)) throw new AppError("milestones must be an array", 400);
-    project.milestones = milestones.map((m) => {
+    project.milestones = milestones.map((m, idx) => {
       const dueDate = m.dueDate ? new Date(m.dueDate) : null;
-      if (dueDate) assertDateOnOrAfterProjectStart(project, dueDate, { fieldLabel: "Milestone due date" });
+      if (dueDate) {
+        assertDateOnOrAfterProjectStart(project, dueDate, { fieldLabel: "Milestone due date" });
+        assertDateNotInPast(dueDate, {
+          fieldLabel: "Milestone due date",
+          allowUnchangedFrom: project.milestones?.[idx]?.dueDate,
+        });
+      }
       return { title: m.title, dueDate, completed: Boolean(m.completed) };
     });
   }
   if (workPlan !== undefined) {
     if (!Array.isArray(workPlan)) throw new AppError("workPlan must be an array", 400);
-    project.workPlan = workPlan.map((w) => {
+    project.workPlan = workPlan.map((w, idx) => {
       const rowStart = w.startDate ? new Date(w.startDate) : null;
       const rowEnd = w.endDate ? new Date(w.endDate) : null;
-      if (rowStart) assertDateOnOrAfterProjectStart(project, rowStart, { fieldLabel: "Work plan start date" });
-      if (rowEnd) assertDateOnOrAfterProjectStart(project, rowEnd, { fieldLabel: "Work plan end date" });
+      const prev = project.workPlan?.[idx] || {};
+      if (rowStart) {
+        assertDateOnOrAfterProjectStart(project, rowStart, { fieldLabel: "Work plan start date" });
+        assertDateNotInPast(rowStart, {
+          fieldLabel: "Work plan start date",
+          allowUnchangedFrom: prev.startDate,
+        });
+      }
+      if (rowEnd) {
+        assertDateOnOrAfterProjectStart(project, rowEnd, { fieldLabel: "Work plan end date" });
+        assertDateNotInPast(rowEnd, {
+          fieldLabel: "Work plan end date",
+          allowUnchangedFrom: prev.endDate,
+        });
+        if (rowStart) assertDateOnOrAfter(rowEnd, rowStart, { fieldLabel: "Work plan end date", earlierLabel: "start date" });
+      }
       return {
         phase: String(w.phase || "").trim(),
         description: String(w.description || "").trim(),
@@ -414,9 +435,15 @@ async function updateProject(req, res) {
   }
   if (activities !== undefined) {
     if (!Array.isArray(activities)) throw new AppError("activities must be an array", 400);
-    project.activities = activities.map((a) => {
+    project.activities = activities.map((a, idx) => {
       const dueDate = a.dueDate ? new Date(a.dueDate) : null;
-      if (dueDate) assertDateOnOrAfterProjectStart(project, dueDate, { fieldLabel: "Activity due date" });
+      if (dueDate) {
+        assertDateOnOrAfterProjectStart(project, dueDate, { fieldLabel: "Activity due date" });
+        assertDateNotInPast(dueDate, {
+          fieldLabel: "Activity due date",
+          allowUnchangedFrom: project.activities?.[idx]?.dueDate,
+        });
+      }
       return {
         title: String(a.title || "").trim(),
         description: String(a.description || "").trim(),
@@ -434,7 +461,10 @@ async function updateProject(req, res) {
   }
   if (endDate !== undefined) {
     const nextEnd = endDate ? new Date(endDate) : null;
-    if (nextEnd) assertDateOnOrAfterProjectStart(project, nextEnd, { fieldLabel: "End date" });
+    if (nextEnd) {
+      assertDateOnOrAfterProjectStart(project, nextEnd, { fieldLabel: "End date" });
+      assertDateNotInPast(nextEnd, { fieldLabel: "End date", allowUnchangedFrom: project.endDate });
+    }
     project.endDate = nextEnd;
   }
   if (status !== undefined) {

@@ -133,6 +133,25 @@ const FACULTY_KEYWORDS = {
 // Fallback faculty so every department is normalized into one of the 6 faculties
 const DEFAULT_FACULTY = "Education";
 
+function escapeRegex(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Short keywords ("ai", "art", "it") must not substring-match unrelated names
+ * ("Training", "Earth Sciences"). Spaced keywords keep includes() semantics.
+ */
+function keywordMatchesName(lcName, kw) {
+  const raw = String(kw || "").toLowerCase();
+  if (!raw) return false;
+  if (raw !== raw.trim()) return lcName.includes(raw);
+  if (raw.length <= 3) {
+    // Whole word or word-prefix: "art"→"arts", "ai"→"AI"; not "ai"∈"Training"
+    return new RegExp(`(?:^|[^a-z0-9])${escapeRegex(raw)}`).test(lcName);
+  }
+  return lcName.includes(raw);
+}
+
 function matchFacultyByName(name) {
   if (!name) return DEFAULT_FACULTY;
   const lc = String(name).toLowerCase().trim();
@@ -142,7 +161,7 @@ function matchFacultyByName(name) {
   }
   for (const faculty of FACULTIES) {
     const kws = FACULTY_KEYWORDS[faculty];
-    if (kws.some((kw) => lc.includes(kw))) return faculty;
+    if (kws.some((kw) => keywordMatchesName(lc, kw))) return faculty;
   }
   return DEFAULT_FACULTY;
 }

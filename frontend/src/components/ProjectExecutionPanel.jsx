@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { minSelectableDate } from "../utils/dateConstraints";
 
 const ACTIVITY_STATUSES = [
   { value: "todo", label: "To do" },
@@ -24,6 +25,7 @@ export function ProjectExecutionPanel({ project, canEdit, onSave, onLogCommunica
     : project.createdAt
       ? String(project.createdAt).slice(0, 10)
       : "";
+  const minPlanDate = minSelectableDate(projectStartDate);
   const [workPlan, setWorkPlan] = useState(project.workPlan?.length ? project.workPlan : [emptyWorkPlan]);
   const [activities, setActivities] = useState(project.activities?.length ? project.activities : [emptyActivity]);
   const [commForm, setCommForm] = useState({ type: "note", subject: "", body: "" });
@@ -85,7 +87,7 @@ export function ProjectExecutionPanel({ project, canEdit, onSave, onLogCommunica
             <div className="row">
               <div className="field">
                 <label>Start</label>
-                <input type="date" disabled={!canEdit} min={projectStartDate || undefined} value={row.startDate ? String(row.startDate).slice(0, 10) : ""} onChange={(e) => {
+                <input type="date" disabled={!canEdit} min={minPlanDate} value={row.startDate ? String(row.startDate).slice(0, 10) : ""} onChange={(e) => {
                   const next = [...workPlan];
                   next[idx] = { ...next[idx], startDate: e.target.value };
                   setWorkPlan(next);
@@ -93,7 +95,7 @@ export function ProjectExecutionPanel({ project, canEdit, onSave, onLogCommunica
               </div>
               <div className="field">
                 <label>End</label>
-                <input type="date" disabled={!canEdit} min={projectStartDate || undefined} value={row.endDate ? String(row.endDate).slice(0, 10) : ""} onChange={(e) => {
+                <input type="date" disabled={!canEdit} min={minSelectableDate(projectStartDate, row.startDate)} value={row.endDate ? String(row.endDate).slice(0, 10) : ""} onChange={(e) => {
                   const next = [...workPlan];
                   next[idx] = { ...next[idx], endDate: e.target.value };
                   setWorkPlan(next);
@@ -135,7 +137,7 @@ export function ProjectExecutionPanel({ project, canEdit, onSave, onLogCommunica
             <div className="row">
               <div className="field">
                 <label>Due date</label>
-                <input type="date" disabled={!canEdit} min={projectStartDate || undefined} value={act.dueDate ? String(act.dueDate).slice(0, 10) : ""} onChange={(e) => {
+                <input type="date" disabled={!canEdit} min={minPlanDate} value={act.dueDate ? String(act.dueDate).slice(0, 10) : ""} onChange={(e) => {
                   const next = [...activities];
                   next[idx] = { ...next[idx], dueDate: e.target.value };
                   setActivities(next);

@@ -5,6 +5,10 @@ const { notifyUser } = require("../utils/notify");
 const { notifyProposalResearcher } = require("../utils/notifyProposalResearcher");
 const { recordAudit } = require("../utils/audit");
 const {
+  coordinatorMatchesResearcherDept,
+  resolveCoordinatorDepartment,
+} = require("../utils/facultyMatcher");
+const {
   STAGE_STATUS,
   ensureReviewPipeline,
   getCurrentReviewStage,
@@ -19,6 +23,20 @@ const {
   financeAssignedToUserFilter,
   financeSentToOfficersFilter,
 } = require("../utils/proposalReviewPipeline");
+
+async function assertCoordinatorProposalFaculty(req, proposal) {
+  if (req.user?.role !== "faculty_coordinator") return;
+  const dept = resolveCoordinatorDepartment(req);
+  if (!dept) return;
+  let researcherDept = proposal.department || "";
+  if (!researcherDept && proposal.researcherId) {
+    const owner = await User.findById(proposal.researcherId).select("department").lean();
+    researcherDept = owner?.department || "";
+  }
+  if (!coordinatorMatchesResearcherDept(dept, researcherDept)) {
+    throw new AppError("Proposal is outside your faculty", 403);
+  }
+}
 
 function sanitizeProposalBrief(p) {
   return {
@@ -42,6 +60,7 @@ async function adminScreening(req, res) {
 
   const proposal = await Proposal.findOne(req.tierWhere({ _id: req.params.id }));
   if (!proposal) throw new AppError("Proposal not found", 404);
+  await assertCoordinatorProposalFaculty(req, proposal);
   if (![PROPOSAL_STATUSES.SUBMITTED, PROPOSAL_STATUSES.UNDER_REVIEW].includes(proposal.status)) {
     throw new AppError("Proposal not in reviewable status", 400);
   }

@@ -13,6 +13,7 @@ const {
   renderJurecCertificatePdf,
   JUREC_CHAIRPERSON_OPTIONS,
 } = require("../utils/jurecCertificate");
+const { assertDateNotInPast, assertDateOnOrAfter } = require("../utils/dateConstraints");
 
 function sanitize(a) {
   return {
@@ -89,6 +90,34 @@ const EDITABLE_FIELDS = [
 ];
 
 function applyPayload(target, payload) {
+  const prevStart = target.startDate;
+  const prevEnd = target.endDate;
+  const prevCollection = target.dataCollectionDate;
+  if (payload.startDate) {
+    assertDateNotInPast(payload.startDate, {
+      fieldLabel: "Ethics start date",
+      allowUnchangedFrom: prevStart,
+    });
+  }
+  if (payload.endDate) {
+    assertDateNotInPast(payload.endDate, {
+      fieldLabel: "Ethics end date",
+      allowUnchangedFrom: prevEnd,
+    });
+    const start = payload.startDate !== undefined ? payload.startDate : prevStart;
+    if (start) {
+      assertDateOnOrAfter(payload.endDate, start, {
+        fieldLabel: "Ethics end date",
+        earlierLabel: "start date",
+      });
+    }
+  }
+  if (payload.dataCollectionDate && /^\d{4}-\d{2}-\d{2}/.test(String(payload.dataCollectionDate))) {
+    assertDateNotInPast(payload.dataCollectionDate, {
+      fieldLabel: "Data collection date",
+      allowUnchangedFrom: prevCollection,
+    });
+  }
   for (const key of EDITABLE_FIELDS) {
     if (payload[key] !== undefined) target[key] = payload[key];
   }
@@ -333,7 +362,8 @@ async function directorDecision(req, res) {
   if (!JUREC_CHAIRPERSON_OPTIONS.some((s) => s.key === chairKey)) {
     throw new AppError("Select a chairperson: Kasim Abdi Jimale or Dr. Nur Rashid Ahmed", 400);
   }
-const issueDate = parseOptionalDate(signedAt, new Date());
+  const issueDate = parseOptionalDate(signedAt, new Date());
+  assertDateNotInPast(issueDate, { fieldLabel: "Certificate date of issue" });
   const jurec = await buildJurecApprovalMeta(a, {
     EthicsApplication,
     tierFilter: a.programTier ? { programTier: a.programTier } : req.tierWhere({}),

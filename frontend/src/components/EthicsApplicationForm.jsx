@@ -9,6 +9,7 @@ import {
 import { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } from "../constants/faculties";
 import { getEthicsMissingFields } from "../utils/proposalSubmitValidation";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
+import { minSelectableDate } from "../utils/dateConstraints";
 import "./ethicsLevelPicker.css";
 
 function facultyKeyForDepartment(d) {
@@ -356,7 +357,13 @@ export function EthicsApplicationForm({
         <div className="row">
           <div className="field">
             <label>10. Data collection dates</label>
-            <input disabled={readOnly} value={form.dataCollectionDate} onChange={(e) => set("dataCollectionDate", e.target.value)} />
+            <input
+              type="date"
+              disabled={readOnly}
+              min={minSelectableDate()}
+              value={form.dataCollectionDate && /^\d{4}-\d{2}-\d{2}/.test(form.dataCollectionDate) ? form.dataCollectionDate.slice(0, 10) : form.dataCollectionDate || ""}
+              onChange={(e) => set("dataCollectionDate", e.target.value)}
+            />
           </div>
           <div className="field">
             <label>11. Sample size</label>

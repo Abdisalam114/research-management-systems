@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import * as ethicsApi from "../services/ethicsApi";
 import { JurecCertificatePreview } from "./JurecCertificatePreview";
 import { toDateInputValue } from "../utils/jurecFormat";
+import { isDateInPast, minSelectableDate, pastDateMessage, todayIso } from "../utils/dateConstraints";
 
 const defaultAcademicYear = () => {
   const y = new Date().getFullYear();
@@ -162,6 +163,10 @@ export function EthicsDirectorDecisionModal({
         setLocalError("Dooro chairperson — Kasim Abdi Jimale ama Dr. Nur Rashid Ahmed.");
         return;
       }
+      if (cert.signedAt && isDateInPast(cert.signedAt)) {
+        setLocalError(pastDateMessage("Certificate date of issue"));
+        return;
+      }
       onConfirm({
         decision: "approve",
         academicYear: academicYear.trim() || defaultAcademicYear(),
@@ -275,15 +280,15 @@ export function EthicsDirectorDecisionModal({
                 <div style={{ marginTop: 4 }}>
                   <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8 }}>Approval Details</div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                    <DateBox label="Received" value={cert.receivedAt} onChange={(v) => updateCert("receivedAt", v)} disabled={busy} />
-                    <DateBox label="Reviewed" value={cert.reviewedAt} onChange={(v) => updateCert("reviewedAt", v)} disabled={busy} />
-                    <DateBox label="Approved" value={cert.signedAt} onChange={(v) => updateCert("signedAt", v)} disabled={busy} />
+                    <DateBox label="Received" value={cert.receivedAt} onChange={(v) => updateCert("receivedAt", v)} disabled={busy} max={todayIso()} />
+                    <DateBox label="Reviewed" value={cert.reviewedAt} onChange={(v) => updateCert("reviewedAt", v)} disabled={busy} max={todayIso()} />
+                    <DateBox label="Approved" value={cert.signedAt} onChange={(v) => updateCert("signedAt", v)} disabled={busy} min={minSelectableDate()} />
                   </div>
                 </div>
 
                 <div className="field">
                   <label>Date of issue (header date)</label>
-                  <input type="date" value={cert.signedAt} onChange={(e) => updateCert("signedAt", e.target.value)} disabled={busy} />
+                  <input type="date" min={minSelectableDate()} value={cert.signedAt} onChange={(e) => updateCert("signedAt", e.target.value)} disabled={busy} />
                 </div>
 
                 <div className="field">
@@ -395,7 +400,7 @@ export function EthicsDirectorDecisionModal({
   );
 }
 
-function DateBox({ label, value, onChange, disabled }) {
+function DateBox({ label, value, onChange, disabled, min, max }) {
   return (
     <div
       style={{
@@ -409,6 +414,8 @@ function DateBox({ label, value, onChange, disabled }) {
       <input
         type="date"
         value={value}
+        min={min}
+        max={max}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
         style={{ width: "100%", fontSize: 12 }}

@@ -44,12 +44,30 @@ const FACULTY_KEYWORDS = {
 // is bucketed into one of the 6 faculties (no "unknown" / "other").
 export const DEFAULT_FACULTY = "Education";
 
+function escapeRegex(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Short keywords must not substring-match unrelated names (e.g. "ai" in "Training"). */
+function keywordMatchesName(lcName, kw) {
+  const raw = String(kw || "").toLowerCase();
+  if (!raw) return false;
+  if (raw !== raw.trim()) return lcName.includes(raw);
+  if (raw.length <= 3) {
+    return new RegExp(`(?:^|[^a-z0-9])${escapeRegex(raw)}`).test(lcName);
+  }
+  return lcName.includes(raw);
+}
+
 export function matchFacultyByName(name) {
   if (!name) return DEFAULT_FACULTY;
-  const lc = String(name).toLowerCase();
+  const lc = String(name).toLowerCase().trim();
+  for (const f of FACULTIES) {
+    if (lc === f.value.toLowerCase()) return f.value;
+  }
   for (const f of FACULTIES) {
     const kws = FACULTY_KEYWORDS[f.value];
-    if (kws.some((kw) => lc.includes(kw))) return f.value;
+    if (kws.some((kw) => keywordMatchesName(lc, kw))) return f.value;
   }
   return DEFAULT_FACULTY;
 }

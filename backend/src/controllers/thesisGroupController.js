@@ -451,6 +451,12 @@ async function createGroup(req, res) {
     department,
     faculty,
   });
+  if (role === ROLES.FACULTY_COORDINATOR) {
+    const coordDept = resolveCoordinatorDepartment(req);
+    if (coordDept && !recordInCoordinatorFaculty(coordDept, cleanDepartment, facultyValue)) {
+      throw new AppError("Thesis group must be within your faculty", 403);
+    }
+  }
   const coordinatorId = role === ROLES.FACULTY_COORDINATOR ? userId : null;
 
   const leadId = resolvedSupervisorId || userId;
@@ -517,6 +523,7 @@ async function updateGroup(req, res) {
   const { id } = req.params;
   const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
+  assertCoordinatorThesisFaculty(req, group);
 
   ensureChapters(group);
 
@@ -668,6 +675,7 @@ async function reviewTitleProposal(req, res) {
   const unlocking = normalized === "unlock" || normalized === "reset";
   const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
+  assertCoordinatorThesisFaculty(req, group);
 
   // Coordinator/Director may unlock an accepted title so supervisor can re-submit
   if (unlocking) {
@@ -771,6 +779,7 @@ async function updateChapter(req, res) {
 
   const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
+  assertCoordinatorThesisFaculty(req, group);
 
   ensureChapters(group);
 
@@ -845,6 +854,7 @@ async function markDefended(req, res) {
   const { id } = req.params;
   const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
+  assertCoordinatorThesisFaculty(req, group);
 
   ensureChapters(group);
 
@@ -882,6 +892,7 @@ async function addMeeting(req, res) {
   const { id } = req.params;
   const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
+  assertCoordinatorThesisFaculty(req, group);
 
   ensureChapters(group);
 
@@ -954,6 +965,7 @@ async function uploadFinalDocument(req, res) {
   const { id } = req.params;
   const group = await findAccessibleThesisGroup(req, id);
   if (!group) throw new AppError("Thesis group not found", 404);
+  assertCoordinatorThesisFaculty(req, group);
 
   const supervisorRef = group.supervisorId?._id || group.supervisorId;
   const isSupervisor = supervisorRef && String(supervisorRef) === String(userId);

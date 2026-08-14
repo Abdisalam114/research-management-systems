@@ -9,6 +9,7 @@ const { tierMatchesCall } = require("../utils/fundingCallEligibility");
 const { closeExpiredOpenCalls } = require("../utils/fundingCallAutoClose");
 const { PROGRAM_TIERS, isValidProgramTier } = require("../constants/programTier");
 const { isCrossTierRole } = require("../utils/programTierScope");
+const { assertDateNotInPast } = require("../utils/dateConstraints");
 
 function isDirectorReq(req) {
   return req.user?.role === ROLES.RESEARCH_DIRECTOR;
@@ -270,7 +271,11 @@ async function createFundingCall(req, res) {
       donorRef: donorRef ? String(donorRef).trim() : "",
       amountCap: typeof amountCap === "number" ? amountCap : Number(amountCap) || 0,
       currency: currency ? String(currency).trim().toUpperCase() : "USD",
-      deadline: deadline ? new Date(deadline) : null,
+      deadline: deadline ? (() => {
+        const d = new Date(deadline);
+        assertDateNotInPast(d, { fieldLabel: "Application deadline" });
+        return d;
+      })() : null,
       eligibilityTier: eligibility,
       requiredDocuments: docs,
       status: CALL_STATUSES.DRAFT,
@@ -306,7 +311,15 @@ async function updateFundingCall(req, res) {
   const fields = ["title", "description", "fundingSource", "donorRef", "amountCap", "currency", "deadline", "eligibilityTier", "requiredDocuments", "callType"];
   for (const f of fields) {
     if (req.body?.[f] !== undefined) {
-      if (f === "deadline") call.deadline = req.body.deadline ? new Date(req.body.deadline) : null;
+      if (f === "deadline") {
+        if (!req.body.deadline) {
+          call.deadline = null;
+        } else {
+          const d = new Date(req.body.deadline);
+          assertDateNotInPast(d, { fieldLabel: "Application deadline", allowUnchangedFrom: call.deadline });
+          call.deadline = d;
+        }
+      }
       else if (f === "amountCap") call.amountCap = Number(req.body.amountCap) || 0;
       else if (f === "currency") call.currency = String(req.body.currency).trim().toUpperCase();
       else if (f === "callType") {
@@ -336,6 +349,10 @@ async function publishFundingCall(req, res) {
 
   if (req.user.role !== "research_director") {
     throw new AppError("Only Research Director can publish funding calls", 403);
+  }
+
+  if (call.deadline) {
+    assertDateNotInPast(call.deadline, { fieldLabel: "Application deadline" });
   }
 
   call.status = CALL_STATUSES.OPEN;

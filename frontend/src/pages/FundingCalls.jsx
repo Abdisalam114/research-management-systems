@@ -10,6 +10,7 @@ import * as grantApi from "../services/grantApi";
 import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
 import { filterByStatKey, isAwardedItem, statFilterLabel } from "../utils/pageHeaderFilters";
+import { isDateInPast, minSelectableDate, pastDateMessage } from "../utils/dateConstraints";
 import "./fundingCalls.css";
 
 function defaultRequiredDocuments(callType) {
@@ -348,6 +349,10 @@ export function FundingCallsPage() {
     const resolvedType = form.callType === "external" ? "external" : "internal";
     if (resolvedType === "external" && !form.donorRef.trim()) {
       setError("Donor / agency reference is required for external calls.");
+      return;
+    }
+    if (form.deadline && isDateInPast(form.deadline)) {
+      setError(pastDateMessage("Application deadline"));
       return;
     }
 
@@ -693,6 +698,7 @@ await fundingCallApi.publishFundingCall(accessToken, id);
                 <input
                   id="fc-deadline"
                   type="date"
+                  min={minSelectableDate()}
                   value={form.deadline}
                   onChange={(e) => setForm({ ...form, deadline: e.target.value })}
                 />

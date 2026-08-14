@@ -10,6 +10,7 @@ import { ProjectExecutionPanel, CLOSURE_CHECKLIST_ITEMS } from "../components/Pr
 import { ProjectOutputsHub } from "../components/ProjectOutputsHub";
 import { ProgramTierBadge } from "../components/ProgramTierBadge";
 import { triggerBlobDownload } from "../utils/downloadBlob";
+import { dateIso, isDateInPast, minSelectableDate, pastDateMessage } from "../utils/dateConstraints";
 
 const emptyMilestone = { title: "", dueDate: "", completed: false };
 const emptyMember = { name: "", role: "member" };
@@ -133,6 +134,7 @@ export function ProjectDetailsPage() {
     : project.createdAt
       ? String(project.createdAt).slice(0, 10)
       : "";
+  const minPlanDate = minSelectableDate(projectStartDate);
 
   return (
     <div>
@@ -285,7 +287,7 @@ export function ProjectDetailsPage() {
               <label>End date</label>
               <input
                 type="date"
-                min={projectStartDate || undefined}
+                min={minPlanDate}
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
               />
@@ -391,7 +393,7 @@ export function ProjectDetailsPage() {
               <input
                 type="date"
                 disabled={!canEdit}
-                min={projectStartDate || undefined}
+                min={minPlanDate}
                 value={m.dueDate ? String(m.dueDate).slice(0, 10) : ""}
                 onChange={(e) => {
                   const next = [...milestones];
@@ -470,6 +472,19 @@ export function ProjectDetailsPage() {
             setError("");
             setMessage("");
             try {
+              const origEnd = dateIso(project.endDate);
+              if (endDate && isDateInPast(endDate) && dateIso(endDate) !== origEnd) {
+                setError(pastDateMessage("End date"));
+                return;
+              }
+              const pastMilestone = milestones.find((m, idx) => {
+                if (!m.title.trim() || !isDateInPast(m.dueDate)) return false;
+                return dateIso(m.dueDate) !== dateIso(project.milestones?.[idx]?.dueDate);
+              });
+              if (pastMilestone) {
+                setError(pastDateMessage("Milestone due date"));
+                return;
+              }
               await projectApi.updateProject(accessToken, id, {
                 milestones: milestones.filter((m) => m.title.trim()),
                 teamMembers: teamMembers.filter((m) => m.name.trim()),
