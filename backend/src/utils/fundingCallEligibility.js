@@ -1,5 +1,6 @@
 const { AppError } = require("./AppError");
 const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
+const { isDeadlinePassed } = require("./dateConstraints");
 
 function tierMatchesCall(req, call) {
   if (!call) return false;
@@ -13,12 +14,20 @@ function tierMatchesCall(req, call) {
   return call.programTier === req.programTier;
 }
 
+function assertCallStillOpen(call) {
+  if (!call) throw new AppError("Funding call is required", 400);
+  if (call.status && call.status !== CALL_STATUSES.OPEN) {
+    throw new AppError("This funding call is closed. New applications are no longer accepted.", 400);
+  }
+}
+
 function assertEligibleForCall(req, call) {
   if (!call) throw new AppError("Funding call is required", 400);
+  assertCallStillOpen(call);
   if (!tierMatchesCall(req, call)) {
     throw new AppError("You are not eligible for this funding call (portal tier mismatch)", 403);
   }
-  if (call.deadline && new Date(call.deadline) < new Date()) {
+  if (isDeadlinePassed(call.deadline)) {
     throw new AppError("Funding call deadline has passed", 400);
   }
 }
@@ -34,4 +43,4 @@ async function findOpenEligibleCall(req, callId) {
   return call;
 }
 
-module.exports = { tierMatchesCall, assertEligibleForCall, findOpenEligibleCall };
+module.exports = { tierMatchesCall, assertEligibleForCall, assertCallStillOpen, findOpenEligibleCall };

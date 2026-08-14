@@ -786,8 +786,21 @@ await fundingCallApi.publishFundingCall(accessToken, id);
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <h3 className="fundingCallCardTitle">{c.title}</h3>
-                  <span className={statusClass(c.status)}>{c.status}</span>
+                  <span className={statusClass(c.status)}>
+                    {c.status === "closed" &&
+                    ((grantsByCallId[String(c.id)] || []).some(isAcceptedGrant) ||
+                      (proposalsByCallId[String(c.id)] || []).some(isAcceptedProposal))
+                      ? "closed — awarded"
+                      : c.status}
+                  </span>
                 </div>
+                {c.status === "closed" &&
+                ((grantsByCallId[String(c.id)] || []).some(isAcceptedGrant) ||
+                  (proposalsByCallId[String(c.id)] || []).some(isAcceptedProposal)) ? (
+                  <p className="muted" style={{ margin: "6px 0 0", fontSize: 12 }}>
+                    Closed automatically after a researcher was accepted. New applications are not allowed.
+                  </p>
+                ) : null}
 
                 <div className="fundingCallMetaRow">
                   <span className={`fundingCallMetaChip ${c.callType === "external" ? "fundingCallTypeExternal" : "fundingCallTypeInternal"}`}>
@@ -827,7 +840,11 @@ await fundingCallApi.publishFundingCall(accessToken, id);
               </div>
 
               <div className="fundingCallActions">
-                {isResearcher && c.status === "open" && !(grantsByCallId[String(c.id)] || []).length ? (
+                {isResearcher &&
+                c.status === "open" &&
+                !(grantsByCallId[String(c.id)] || []).some(isAcceptedGrant) &&
+                !(proposalsByCallId[String(c.id)] || []).some(isAcceptedProposal) &&
+                !(grantsByCallId[String(c.id)] || []).length ? (
                   <Link
                     className="btn primary"
                     to={

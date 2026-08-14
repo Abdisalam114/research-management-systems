@@ -57,7 +57,7 @@ export function GrantAwardModal({ open, grant, busy, onClose, onConfirm }) {
           </p>
         ) : null}
         <p className="muted" style={{ marginTop: 0, fontSize: 12, lineHeight: 1.45 }}>
-          A budget will be created automatically for the researcher when you approve this award.
+          A budget will be created automatically. The funding call, proposal, grant, project, and budget will be linked — you will see a confirmation after approve.
         </p>
         <div className="field">
           <label>Amount awarded ({grant?.currency || "USD"})</label>

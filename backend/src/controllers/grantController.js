@@ -18,6 +18,7 @@ const {
   parseCallRequirementLabels,
 } = require("../utils/fundingCallRequirements");
 const { closeExpiredOpenCalls, closeCallAfterGrantAccepted } = require("../utils/fundingCallAutoClose");
+const { isDeadlinePassed } = require("../utils/dateConstraints");
 const { ROLES } = require("../models/User");
 const { canViewProjectAwards } = require("../utils/researchJourney");
 
@@ -222,6 +223,15 @@ async function assertGrantReadyForSubmit(grant, req) {
   }
 
   const call = grant.callId ? await FundingCall.findById(grant.callId) : null;
+  if (call) {
+    await closeExpiredOpenCalls({
+      actorId: req.user?.id,
+      actorRole: req.user?.role,
+      programTier: req.programTier,
+    });
+    const fresh = await FundingCall.findById(grant.callId);
+    assertEligibleForCall(req, fresh || call);
+  }
   const checklist = buildRequirementChecklist(call?.requiredDocuments || "", grant.requirementChecklist || []);
   try {
     assertRequirementsMet(checklist);
@@ -242,7 +252,7 @@ async function resolveOpenCall(req, callId) {
   });
   const call = await findOpenEligibleCall(req, callId);
   if (!call) throw new AppError("Funding call not found or not open", 404);
-  if (call.deadline && new Date(call.deadline) < new Date()) {
+  if (isDeadlinePassed(call.deadline)) {
     throw new AppError("Funding call deadline has passed", 400);
   }
   if (req.user.role === "researcher") assertEligibleForCall(req, call);
@@ -579,12 +589,23 @@ async function directorDecision(req, res) {
   await grant.save();
 
   let projectResult = null;
+  let fundCallLinks = null;
   // Accepted grant must enter Projects (create/link), not stay only on Grants
   if (decision === GRANT_STATUSES.APPROVED) {
     try {
-      projectResult = await ensureProjectForAcceptedGrant(grant, {
-        programTier: grant.programTier || req.programTier,
-      });
+      if (grant.callId || grant.proposalId) {
+        const { linkFundCallAwardChain } = require("../utils/linkFundCallAwardChain");
+        const chain = await linkFundCallAwardChain({
+          grant,
+          programTier: grant.programTier || req.programTier,
+        });
+        fundCallLinks = chain?.summary || null;
+        projectResult = chain?.project ? { project: chain.project, created: chain.created?.project } : null;
+      } else {
+        projectResult = await ensureProjectForAcceptedGrant(grant, {
+          programTier: grant.programTier || req.programTier,
+        });
+      }
     } catch { /* best-effort — finance approve will retry */ }
   }
 
@@ -633,7 +654,13 @@ async function directorDecision(req, res) {
     programTier: req.programTier,
   });
 
-  res.json({ message: "Decision saved", grant: sanitizeGrant(grant) });
+  res.json({
+    message: fundCallLinks?.message
+      ? `Grant accepted. ${fundCallLinks.message} Finance still authorizes the allocated budget.`
+      : "Decision saved",
+    grant: sanitizeGrant(grant),
+    links: fundCallLinks,
+  });
 }
 
 async function financeDecision(req, res) {
@@ -652,6 +679,7 @@ async function financeDecision(req, res) {
 
   let budgetResult = null;
   let projectResult = null;
+  let fundCallLinks = null;
   if (decision === "approve") {
     grant.status = GRANT_STATUSES.ACTIVE;
     if (/awaiting finance approval/i.test(grant.complianceNotes || "")) {
@@ -660,13 +688,28 @@ async function financeDecision(req, res) {
     await grant.save();
     // Ensure grant has a Project so it appears under Projects, not only Grants
     try {
-      projectResult = await ensureProjectForAcceptedGrant(grant, {
-        programTier: grant.programTier || req.programTier,
-      });
+      if (grant.callId || grant.proposalId) {
+        const { linkFundCallAwardChain } = require("../utils/linkFundCallAwardChain");
+        const chain = await linkFundCallAwardChain({
+          grant,
+          programTier: grant.programTier || req.programTier,
+        });
+        fundCallLinks = chain?.summary || null;
+        projectResult = chain?.project ? { project: chain.project, created: chain.created?.project } : null;
+        budgetResult = chain?.budget
+          ? { budget: chain.budget, created: chain.created?.budget }
+          : null;
+      } else {
+        projectResult = await ensureProjectForAcceptedGrant(grant, {
+          programTier: grant.programTier || req.programTier,
+        });
+      }
     } catch { /* best-effort */ }
-    try {
-      budgetResult = await ensureBudgetForGrant(grant);
-    } catch { /* best-effort */ }
+    if (!budgetResult?.budget) {
+      try {
+        budgetResult = await ensureBudgetForGrant(grant);
+      } catch { /* best-effort */ }
+    }
 
     // Keep related proposal / call data consistent
     if (grant.callId) {
@@ -688,8 +731,8 @@ try {
       const projectId = projectResult?.project?._id || grant.projectId;
       await notifyUser(grant.researcherId, {
         type: "grant",
-        title: "Grant authorized — project funded",
-        body: `${grant.title} — funds are allocated; open the project to continue work.`,
+        title: "Grant authorized — records linked",
+        body: `${fundCallLinks?.message || "Budget allocated."} Open the project to continue; payments are made later from Budgets.`,
         link: projectId ? `/projects/${projectId}` : "/budgets",
         programTier: grant.programTier || req.programTier,
       });
@@ -722,9 +765,12 @@ try {
   res.json({
     message:
       decision === "approve"
-        ? "Budget authorized (allocated). This is not a payment — disburse later via Budgets."
+        ? fundCallLinks?.message
+          ? `Budget authorized (allocated). ${fundCallLinks.message} This is not a payment — disburse later via Budgets.`
+          : "Budget authorized (allocated). This is not a payment — disburse later via Budgets."
         : "Finance decision saved",
     grant: sanitizeGrant(grant),
+    links: fundCallLinks,
     budget: budgetResult?.budget
       ? {
           id: budgetResult.budget._id,

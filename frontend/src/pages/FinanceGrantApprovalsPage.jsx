@@ -46,11 +46,9 @@ export function FinanceGrantApprovalsPage() {
       setError("");
       setMessage("");
       const res = await grantApi.financeDecision(accessToken, id, { decision: "approve", comment });
-      const allocated = res?.budget?.totalAllocated;
-      const paid = res?.budget?.totalDisbursed ?? 0;
       setMessage(
         res?.message ||
-          `Budget authorized — allocated${allocated != null ? ` (${allocated})` : ""}. Paid so far: ${paid}. Not a disbursement.`
+          "Budget authorized. Funding call, proposal, grant, project, and budget are linked. This is not a payment."
       );
       await reload();
     } catch (e) {

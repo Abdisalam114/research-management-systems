@@ -78,9 +78,8 @@ export function GrantDetailsPage() {
       });
       setAwardOpen(false);
       setMessage(
-        res?.budget?.created
-          ? "Grant approved and budget created."
-          : "Grant awarded — pending finance approval before budget activation."
+        res?.message ||
+          "Grant accepted. The funding call, proposal, grant, project, and budget are being linked automatically. Finance still authorizes the allocated budget."
       );
       await reload();
     } catch (e) {
@@ -447,7 +446,7 @@ export function GrantDetailsPage() {
                 </Link>
               ) : null}
             </div>
-          ) : !isFinance && canEditLink && grant.callId ? (
+          ) : !isFinance && canEditLink && grant.callId && ["draft", "submitted"].includes(grant.status) ? (
             <div className="card" style={{ marginTop: 12 }}>
               <div style={{ fontWeight: 900, marginBottom: 10 }}>Link research project (optional)</div>
               <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
@@ -470,7 +469,7 @@ export function GrantDetailsPage() {
                 {linkBusy ? "Saving…" : "Save project link"}
               </button>
             </div>
-          ) : !isFinance && grant.callId && !grant.project ? (
+          ) : !isFinance && grant.callId && !grant.project && ["draft", "submitted"].includes(grant.status) ? (
             <div className="card" style={{ marginTop: 12, fontSize: 13 }}>
               <div style={{ fontWeight: 800 }}>No linked project</div>
               <p className="muted" style={{ margin: "6px 0 0" }}>

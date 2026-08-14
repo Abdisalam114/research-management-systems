@@ -21,6 +21,7 @@ export function ProposalReviewPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [ethicsDecisionModal, setEthicsDecisionModal] = useState(null);
+  const [message, setMessage] = useState("");
 
   useScrollToTop([id, proposal?.id]);
 
@@ -111,6 +112,11 @@ throw e;
       </div>
 
       {error ? <div className="card" style={{ borderColor: "rgba(255, 99, 132, 0.55)" }}>{error}</div> : null}
+      {message ? (
+        <div className="card" style={{ borderColor: "rgba(45,212,191,0.4)", marginTop: 12 }}>
+          {message}
+        </div>
+      ) : null}
 
       <div className="card" style={{ marginTop: 12, borderColor: "rgba(14,165,233,0.25)" }}>
         <div style={{ fontWeight: 800, fontSize: 18 }}>{proposal.title}</div>
@@ -196,7 +202,17 @@ throw e;
 
       {showFinalDecision ? (
         <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800, marginBottom: 8 }}>Proposal decision</div>
+          <div style={{ fontWeight: 800, marginBottom: 8 }}>
+            {proposal.fundingCallId || proposal.proposalKind === "grant_fund_call"
+              ? "Proposal decision — funding call"
+              : "Proposal decision"}
+          </div>
+          {proposal.fundingCallId || proposal.proposalKind === "grant_fund_call" ? (
+            <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+              Approving automatically links this funding call to the proposal, grant, project, and budget. Finance
+              still authorizes the allocated amount (not a payment).
+            </p>
+          ) : null}
           {isDirector && proposal.requiresEthics && !ethicsApproved ? (
             <div className="muted" style={{ marginBottom: 10, fontSize: 13 }}>
               Approve ethics (certificate) above first. Then you can approve the proposal to create the project.
@@ -241,9 +257,16 @@ throw e;
             onClick={async () => {
               setBusy(true);
               setError("");
+              setMessage("");
               try {
                 if (isDirector) {
-                  await proposalApi.directorDecision(accessToken, id, selected, comment.trim());
+                  const res = await proposalApi.directorDecision(accessToken, id, selected, comment.trim());
+                  setMessage(
+                    res?.message ||
+                      (selected === "approved" && (proposal.fundingCallId || proposal.proposalKind === "grant_fund_call")
+                        ? "Funding call accepted. Proposal, grant, project, and budget are being linked automatically."
+                        : "Decision saved")
+                  );
                 }
                 setComment("");
                 await load();

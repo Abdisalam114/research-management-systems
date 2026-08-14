@@ -296,6 +296,12 @@ async function createProposal(req, res) {
       );
     }
     const { findOpenEligibleCall } = require("../utils/fundingCallEligibility");
+    const { closeExpiredOpenCalls } = require("../utils/fundingCallAutoClose");
+    await closeExpiredOpenCalls({
+      actorId: req.user.id,
+      actorRole: req.user.role,
+      programTier: req.programTier,
+    });
     const call = await findOpenEligibleCall(req, fundingCallId);
     if (!call) throw new AppError("Funding call not found or not open", 404);
     if (req.user.role === ROLES.RESEARCHER) assertEligibleForCall(req, call);
@@ -473,6 +479,18 @@ async function submitProposal(req, res) {
 
   if (![PROPOSAL_STATUSES.DRAFT, PROPOSAL_STATUSES.REVISION_REQUESTED].includes(proposal.status)) {
     throw new AppError("Proposal cannot be submitted in its current status", 400);
+  }
+
+  if (proposal.fundingCallId) {
+    const { closeExpiredOpenCalls } = require("../utils/fundingCallAutoClose");
+    const { assertCallStillOpen } = require("../utils/fundingCallEligibility");
+    await closeExpiredOpenCalls({
+      actorId: req.user.id,
+      actorRole: req.user.role,
+      programTier: req.programTier,
+    });
+    const call = await FundingCall.findById(proposal.fundingCallId).select("status deadline");
+    assertCallStillOpen(call);
   }
 
   if (proposal.requiresEthics) {
@@ -813,9 +831,10 @@ async function directorDecision(req, res) {
     programTier: req.notifyProgramTier?.(proposal) || proposal.programTier,
   });
 
+  let fundCallLinks = null;
   if (decision === PROPOSAL_STATUSES.APPROVED) {
     const existing = await Project.findOne(req.tierWhere({ proposalId: proposal._id }));
-    if (!existing) {
+    if (!existing && !proposal.fundingCallId) {
       const project = await Project.create(req.tierAssign({
         proposalId: proposal._id,
         title: proposal.title,
@@ -837,11 +856,39 @@ async function directorDecision(req, res) {
       } catch { /* best-effort */ }
     }
 
-    // Fund-call proposal accepted → queue money for Finance + close the call
     if (proposal.fundingCallId) {
       try {
-        const { ensurePendingFinanceGrantFromProposal } = require("../utils/ensurePendingFinanceGrantFromProposal");
-        await ensurePendingFinanceGrantFromProposal(proposal, { notify: true });
+        const { linkFundCallAwardChain } = require("../utils/linkFundCallAwardChain");
+        const { notifyUsersByRole } = require("../utils/notify");
+        const chain = await linkFundCallAwardChain({
+          proposal,
+          programTier: proposal.programTier || req.programTier,
+        });
+        fundCallLinks = chain?.summary || null;
+        try {
+          await notifyUsersByRole(
+            "finance_officer",
+            {
+              type: "grant",
+              title: "Funding call award — finance approval needed",
+              body: chain?.grant
+                ? `${chain.grant.title} (${chain.grant.amountAwarded || 0} ${chain.grant.currency || "USD"}) — automatically linked to the project.`
+                : proposal.title,
+              link: "/finance/grant-approvals",
+            },
+            proposal.programTier
+          );
+        } catch { /* best-effort */ }
+        const projectId = chain?.project?._id;
+        try {
+          await notifyUser(proposal.researcherId, {
+            type: "proposal",
+            title: "Funding call accepted — records linked",
+            body: `${fundCallLinks?.message || "Automatically linked."} Your proposal, grant, project, and budget are connected. Finance still authorizes the allocated amount.`,
+            link: projectId ? `/projects/${projectId}` : `/proposals/${proposal._id}`,
+            programTier: proposal.programTier,
+          });
+        } catch { /* best-effort */ }
       } catch { /* best-effort */ }
       try {
         const { closeCallAfterGrantAccepted } = require("../utils/fundingCallAutoClose");
@@ -853,22 +900,17 @@ async function directorDecision(req, res) {
         });
       } catch { /* best-effort */ }
     }
-
-    // Auto-allocate project budget from proposal / grant / call amount
-    try {
-      const { ensureBudgetForProject } = require("../utils/ensureBudgetForProject");
-      const projectDoc =
-        (await Project.findOne(req.tierWhere({ proposalId: proposal._id }))) ||
-        existing ||
-        null;
-      if (projectDoc) {
-        const result = await ensureBudgetForProject(projectDoc, { proposal });
-}
-    } catch { /* best-effort */ }
   }
 
   const populated = await Proposal.findById(proposal._id).populate("fundingCallId", "title status deadline");
-  res.json({ message: "Decision saved", proposal: sanitizeProposal(populated || proposal) });
+  const message = fundCallLinks?.message
+    ? `Funding call accepted. ${fundCallLinks.message} Finance still authorizes the allocated budget (not a payment).`
+    : "Decision saved";
+  res.json({
+    message,
+    proposal: sanitizeProposal(populated || proposal),
+    links: fundCallLinks,
+  });
 }
 
 async function ethicsDecision(req, res) {
