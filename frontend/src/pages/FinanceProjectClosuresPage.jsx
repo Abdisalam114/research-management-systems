@@ -5,6 +5,7 @@ import { useProgramTier } from "../hooks/useProgramTier";
 import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
+import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 
 /** Finance-only project closure — no general project workflow / team / progress. */
 export function FinanceProjectClosuresPage() {
@@ -18,7 +19,7 @@ function FinanceClosureList() {
   const { programTier } = useProgramTier();
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState("");
-  const [tab, setTab] = useState("awaiting"); // awaiting | cleared
+  const [tab, setTab] = useUrlStatFilter("awaiting", ["awaiting", "cleared"]);
 
   useEffect(() => {
     projectApi

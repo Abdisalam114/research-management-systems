@@ -68,7 +68,9 @@ function submitForm(form) {
     form.requestSubmit();
     return;
   }
-  const submitBtn = form.querySelector('button[type="submit"], button.btn.primary, .btn.primary');
+  const submitBtn =
+    form.querySelector('button[type="submit"]') ||
+    form.querySelector("[data-form-submit]");
   if (submitBtn && !submitBtn.disabled) submitBtn.click();
 }
 

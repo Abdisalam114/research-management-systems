@@ -337,6 +337,8 @@ async function listGrants(req, res) {
       grants = grants.filter((g) =>
         coordinatorMatchesResearcherDept(dept, g.researcherId?.department || "")
       );
+    } else {
+      grants = [];
     }
   }
   const sanitized = await Promise.all(grants.map(async (g) => redactGrantAwardsIfNeeded(sanitizeGrant(g), req)));
@@ -565,6 +567,9 @@ async function submitGrant(req, res) {
 }
 
 async function directorDecision(req, res) {
+  if (req.user?.role !== ROLES.RESEARCH_DIRECTOR) {
+    throw new AppError("Only the Research Director can accept or reject grants", 403);
+  }
   const { decision, amountAwarded, complianceNotes } = req.body || {};
   if (![GRANT_STATUSES.APPROVED, GRANT_STATUSES.REJECTED].includes(decision)) {
     throw new AppError("Invalid decision", 400);

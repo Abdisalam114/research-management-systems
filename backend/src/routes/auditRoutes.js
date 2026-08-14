@@ -16,6 +16,7 @@ router.get(
   "/:entityType/:entityId",
   authenticateUser,
   requireActiveUser,
+  authorizeRoles("research_director", "faculty_coordinator", "finance_officer", "leadership"),
   asyncHandler(auditController.getEntityAudit)
 );
 

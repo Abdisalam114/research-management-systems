@@ -230,10 +230,8 @@ export function ProjectsListPage({
     const onHoldCount = byStatus("on_hold");
     const voluntaryCount = projects.filter((p) => projectKind(p) === "voluntary").length;
     const grantCount = projects.filter((p) => projectKind(p) === "grant_fund_call").length;
-    // Total = Active + Closing + Completed (+ On hold if any)
-    const sumParts = activeCount + closingCount + completedCount + onHoldCount;
     return [
-      { label: "Total", value: sumParts || projects.length, filterKey: "all" },
+      { label: "Total", value: projects.length, filterKey: "all" },
       { label: "Voluntary", value: voluntaryCount, filterKey: "kind:voluntary", accent: "#38bdf8" },
       { label: "Grant Fund", value: grantCount, filterKey: "kind:grant_fund_call", accent: "#eab308" },
       { label: "Active", value: activeCount, filterKey: "active", accent: "#38bdf8" },

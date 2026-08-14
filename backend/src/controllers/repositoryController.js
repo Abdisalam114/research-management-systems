@@ -61,10 +61,29 @@ function fileBasename(filePath) {
   return parts[parts.length - 1] || rel || "file";
 }
 
+async function assertCoordinatorRepositoryFaculty(req, item) {
+  const { resolveCoordinatorDepartment, recordInCoordinatorFaculty } = require("../utils/facultyMatcher");
+  const dept = resolveCoordinatorDepartment(req);
+  if (!dept) throw new AppError("Forbidden", 403);
+  await item.populate([
+    { path: "uploadedBy", select: "department" },
+    { path: "projectId", select: "researcherId", populate: { path: "researcherId", select: "department" } },
+  ]);
+  const uploaderDept = item.uploadedBy?.department;
+  const ownerDept = item.projectId?.researcherId?.department;
+  if (!recordInCoordinatorFaculty(dept, uploaderDept, ownerDept)) {
+    throw new AppError("Forbidden", 403);
+  }
+}
+
 async function assertCanAccessItem(req, item) {
-  const isStaff = ["research_director", "faculty_coordinator"].includes(req.user.role);
-  if (isStaff) return;
-  if (String(item.uploadedBy) === String(req.user.id)) return;
+  if (req.user.role === "research_director") return;
+  if (req.user.role === "faculty_coordinator") {
+    await assertCoordinatorRepositoryFaculty(req, item);
+    return;
+  }
+  const uploaderId = item.uploadedBy?._id || item.uploadedBy;
+  if (String(uploaderId) === String(req.user.id)) return;
   if (item.access === REPOSITORY_ACCESS.INSTITUTION) return;
   if (item.access === REPOSITORY_ACCESS.GROUP && item.groupId) {
     const group = await ResearchGroup.findById(item.groupId);
@@ -90,7 +109,7 @@ function sanitizeItem(i) {
     projectId: i.projectId?._id ? String(i.projectId._id) : i.projectId || null,
     projectTitle:
       i.projectId && typeof i.projectId === "object" && i.projectId.title ? i.projectId.title : null,
-    uploadedBy: i.uploadedBy,
+    uploadedBy: i.uploadedBy?._id || i.uploadedBy,
     createdAt: i.createdAt,
     updatedAt: i.updatedAt,
   };

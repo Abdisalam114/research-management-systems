@@ -258,7 +258,7 @@ export function RepositoryPage() {
 
       {statusFilter !== "all" ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          Showing: <strong>{statFilterLabel(stats, statusFilter)}</strong> ({filteredItems.length})
+          Showing: <strong>{statFilterLabel(stats, statusFilter)}</strong> ({groupedByProject.length})
         </p>
       ) : null}
       {loading ? <p className="muted">Loading repository…</p> : null}

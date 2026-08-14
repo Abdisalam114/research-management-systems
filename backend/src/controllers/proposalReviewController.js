@@ -125,13 +125,7 @@ function proposalScopeFilter(req, base = {}) {
 
 async function findProposalForReview(req, id) {
   let proposal = await Proposal.findOne(proposalScopeFilter(req, { _id: id }));
-  const crossPortalRoles = [
-    ROLES.RESEARCH_DIRECTOR,
-    ROLES.FACULTY_COORDINATOR,
-    ROLES.LEADERSHIP,
-    ROLES.FINANCE_OFFICER,
-  ];
-  if (!proposal && crossPortalRoles.includes(req.user?.role)) {
+  if (!proposal && req.user?.role === ROLES.RESEARCH_DIRECTOR) {
     proposal = await Proposal.findById(id);
   }
   return proposal;

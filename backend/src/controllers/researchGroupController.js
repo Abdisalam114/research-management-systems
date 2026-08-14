@@ -61,7 +61,15 @@ async function listGroups(req, res) {
       .select("title status faculty department supervisorId meetings meetingSchedule facultyResearchArea researchGroupId")
       .populate("supervisorId", "fullName department");
     const map = new Map(theses.map((t) => [String(t.researchGroupId), t]));
-    return res.json({ groups: groups.map((g) => sanitizeGroup(g, map.get(String(g._id)))) });
+    let out = groups.map((g) => sanitizeGroup(g, map.get(String(g._id))));
+    if (req.user.role === "faculty_coordinator") {
+      const { resolveCoordinatorDepartment, recordInCoordinatorFaculty } = require("../utils/facultyMatcher");
+      const dept = resolveCoordinatorDepartment(req);
+      out = dept
+        ? out.filter((g) => recordInCoordinatorFaculty(dept, g.thesis?.department, g.thesis?.faculty))
+        : [];
+    }
+    return res.json({ groups: out });
   }
 
   res.json({ groups: groups.map((g) => sanitizeGroup(g, null)) });
@@ -107,16 +115,11 @@ async function createGroup(req, res) {
 
 async function joinGroup(req, res) {
   const { id } = req.params;
-  const group = await ResearchGroup.findById(id);
+  const group =
+    req.user.role === "research_director"
+      ? await ResearchGroup.findById(id)
+      : await ResearchGroup.findOne(req.tierWhere({ _id: id }));
   if (!group) throw new AppError("Research group not found", 404);
-  if (
-    req.programTier &&
-    group.programTier &&
-    group.programTier !== req.programTier &&
-    req.user.role !== "research_director"
-  ) {
-    throw new AppError("Research group not found", 404);
-  }
 
   const exists = (group.members || []).some((m) => String(m.userId) === String(req.user.id));
   if (!exists) group.members.push({ userId: req.user.id, role: GROUP_MEMBER_ROLES.MEMBER });

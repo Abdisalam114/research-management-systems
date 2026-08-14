@@ -6,6 +6,7 @@ import { FacultyResearchWorkflowModule } from "../components/FacultyResearchWork
 import { ResearchJourneyPanel } from "../components/ResearchJourneyPanel";
 import { PageHeader } from "../components/PageHeader";
 import * as analyticsApi from "../services/analyticsApi";
+import { FACULTY_WORKFLOW_STAGES } from "../constants/facultyWorkflow";
 
 const TABS = [
   { id: "ops", label: "All jobs (ops board)" },
@@ -18,7 +19,14 @@ export function ResearchWorkflowPage() {
   const { programTier } = useProgramTier();
   const [searchParams, setSearchParams] = useSearchParams();
   const projectIdFromUrl = searchParams.get("projectId") || "";
-  const tab = TABS.some((t) => t.id === searchParams.get("tab")) ? searchParams.get("tab") : "ops";
+  const urlFilter = searchParams.get("filter") || "";
+  const workflowStageIds = FACULTY_WORKFLOW_STAGES.map((s) => s.id);
+  const tabFromUrl = searchParams.get("tab");
+  const tab = TABS.some((t) => t.id === tabFromUrl)
+    ? tabFromUrl
+    : workflowStageIds.includes(urlFilter)
+      ? "publications"
+      : "ops";
   const canManage = ["faculty_coordinator", "research_director"].includes(user?.role);
   const departmentLabel =
     user?.role === "research_director"

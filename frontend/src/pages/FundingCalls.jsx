@@ -958,15 +958,19 @@ await fundingCallApi.publishFundingCall(accessToken, id);
             <div className="fundingCallEmptyIcon" aria-hidden="true">
               📢
             </div>
-            <div style={{ fontWeight: 800 }}>No funding calls yet</div>
+            <div style={{ fontWeight: 800 }}>
+              {calls.length === 0 ? "No funding calls yet" : "No funding calls match this filter"}
+            </div>
             <p className="muted" style={{ marginTop: 8, fontSize: 14 }}>
-              {isDirector
-                ? "Create your first funding call (Internal or External), then Publish."
-                : isLeadership
+              {calls.length > 0
+                ? "Taabo Total ama filter kale si aad u aragto calls kale."
+                : isDirector
+                  ? "Create your first funding call (Internal or External), then Publish."
+                  : isLeadership
                     ? "Funding calls are published by the Research Director. Your peer-review work is under Peer Reviews."
                     : "When the Research Office publishes a call, it will appear here for application."}
             </p>
-            {canCreate ? (
+            {canCreate && calls.length === 0 ? (
               <button type="button" className="btn primary" style={{ marginTop: 14 }} onClick={startCreate}>
                 {"+ Create funding call"}
               </button>

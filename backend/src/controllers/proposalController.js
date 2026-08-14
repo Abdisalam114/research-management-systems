@@ -632,6 +632,10 @@ res.json({ proposals: proposals.map(sanitizeProposal) });
   // Faculty coordinators only see proposals from their faculty / department
   if (role === "faculty_coordinator") {
     const dept = resolveCoordinatorDepartment(req);
+    if (!dept) {
+      res.json({ proposals: [] });
+      return;
+    }
     const filtered = proposals.filter((p) =>
       coordinatorMatchesResearcherDept(
         dept,

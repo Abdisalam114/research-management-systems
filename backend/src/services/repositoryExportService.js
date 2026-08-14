@@ -1,6 +1,7 @@
 const { RepositoryItem, REPOSITORY_ACCESS } = require("../models/RepositoryItem");
 const { ResearchGroup } = require("../models/ResearchGroup");
 const { Project } = require("../models/Project");
+require("../models/User");
 const { validateProjectQuery } = require("../utils/projectScopedRecords");
 const { REPOSITORY_ITEMS } = require("../scripts/seedRecords");
 
@@ -59,9 +60,24 @@ async function buildRepositoryAccessFilter(req) {
   return tw({ ...projectFilter, $or: accessOr });
 }
 
+async function scopeCoordinatorFacultyItems(req, items) {
+  if (req.user?.role !== "faculty_coordinator") return items;
+  const { resolveCoordinatorDepartment, recordInCoordinatorFaculty } = require("../utils/facultyMatcher");
+  const dept = resolveCoordinatorDepartment(req);
+  if (!dept) return [];
+  const populated = await RepositoryItem.populate(items, [
+    { path: "uploadedBy", select: "department" },
+    { path: "projectId", select: "title status researcherId", populate: { path: "researcherId", select: "department" } },
+  ]);
+  return populated.filter((item) =>
+    recordInCoordinatorFaculty(dept, item.uploadedBy?.department, item.projectId?.researcherId?.department)
+  );
+}
+
 async function fetchItemsForUser(req) {
   const filter = await buildRepositoryAccessFilter(req);
-  return RepositoryItem.find(filter).sort({ createdAt: -1 });
+  const items = await RepositoryItem.find(filter).sort({ createdAt: -1 });
+  return scopeCoordinatorFacultyItems(req, items);
 }
 
 function itemsToExportRows(items, fileBaseUrl = "") {

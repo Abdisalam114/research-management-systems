@@ -25,8 +25,13 @@ export function FacultyResearchWorkflowModule({
   const [internalStageFilter, setInternalStageFilter] = useState(null);
   const [urlStageFilter, setUrlStageFilter] = useUrlStatFilter("all");
 
-  const stageFilter = standalone ? (urlStageFilter === "all" ? null : urlStageFilter) : internalStageFilter;
-  const setStageFilter = standalone
+  const useUrlStages = standalone || (embedded && !projectIdProp);
+  const stageFilter = useUrlStages
+    ? urlStageFilter === "all"
+      ? null
+      : urlStageFilter
+    : internalStageFilter;
+  const setStageFilter = useUrlStages
     ? (key) => setUrlStageFilter(key || "all")
     : setInternalStageFilter;
 

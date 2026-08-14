@@ -370,7 +370,7 @@ setPublications(list);
 
     // Researcher: show My Projects without outputs only on "all" / draft — never under Submitted/Validated
     // (otherwise published outputs disappear and empty cards look like they still need Submit)
-    if (user?.role === "researcher" && !projectIdFromUrl && (statusFilter === "all" || statusFilter === "draft")) {
+    if (user?.role === "researcher" && !projectIdFromUrl && statusFilter === "all") {
       for (const proj of projects) {
         const key = String(proj.id);
         if (!map.has(key)) {
@@ -496,7 +496,7 @@ setPublications(list);
 
       {statusFilter !== "all" ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          Showing: <strong>{statFilterLabel(stats, statusFilter)}</strong> ({filtered.length})
+          Showing: <strong>{statFilterLabel(stats, statusFilter)}</strong> ({groupedByProject.length})
           {typeFilter !== "all" ? ` • type: ${OUTPUT_TRACKING_CATEGORIES.find((c) => c.id === typeFilter)?.label}` : ""}
         </p>
       ) : null}

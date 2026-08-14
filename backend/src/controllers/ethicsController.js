@@ -190,6 +190,8 @@ async function listEthicsApplications(req, res) {
           a.principal?.department || a.researcherId?.department || ""
         )
       );
+    } else {
+      applications = [];
     }
   }
   res.json({ applications: applications.map(sanitize) });

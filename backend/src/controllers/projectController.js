@@ -65,7 +65,7 @@ async function resolveProjectKindMeta(req, project) {
       { $or: grantMatch },
       {
         $or: [
-          { callId: { $ne: null, $exists: true } },
+          { callId: { $ne: null, $exists: true }, status: { $in: ["pending_finance", "active", "approved"] } },
           { amountAwarded: { $gt: 0 } },
         ],
       },
@@ -207,6 +207,8 @@ async function listProjects(req, res) {
           p.department || p.researcherId?.department || ""
         )
       );
+    } else {
+      projects = [];
     }
   }
   const sanitized = await Promise.all(

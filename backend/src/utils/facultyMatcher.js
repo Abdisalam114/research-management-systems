@@ -214,7 +214,7 @@ function mongoDepartmentInFaculty(departmentNames) {
 /** True when any candidate department/faculty belongs to the coordinator's faculty. */
 function recordInCoordinatorFaculty(coordinatorDept, ...candidates) {
   const cd = String(coordinatorDept || "").trim();
-  if (!cd) return true;
+  if (!cd) return false;
   return candidates.some((c) => {
     const v = String(c || "").trim();
     return v && coordinatorMatchesResearcherDept(cd, v);

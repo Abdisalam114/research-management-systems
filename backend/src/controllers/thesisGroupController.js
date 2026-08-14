@@ -14,7 +14,7 @@ function facultiesMatch(a, b, fallbackName) {
 function assertCoordinatorThesisFaculty(req, group) {
   if (req.user?.role !== ROLES.FACULTY_COORDINATOR) return;
   const dept = resolveCoordinatorDepartment(req);
-  if (!dept) return;
+  if (!dept) throw new AppError("Coordinator department not configured", 403);
   const ok = recordInCoordinatorFaculty(
     dept,
     group.department,
@@ -256,6 +256,7 @@ async function loadSanitizedGroup(id) {
     .populate("coordinatorId", "fullName email")
     .populate("createdBy", "fullName email role")
     .populate("meetings.loggedBy", "fullName email");
+  if (!populated) return null;
   return sanitize(populated);
 }
 
@@ -365,15 +366,9 @@ async function listGroups(req, res) {
 
   if (role === ROLES.FACULTY_COORDINATOR) {
     const dept = resolveCoordinatorDepartment(req);
-    if (dept) {
-      groups = groups.filter((g) =>
-        recordInCoordinatorFaculty(
-          dept,
-          g.department,
-          g.faculty
-        )
-      );
-    }
+    groups = dept
+      ? groups.filter((g) => recordInCoordinatorFaculty(dept, g.department, g.faculty))
+      : [];
   }
 
   // One-time legacy title sync only — do not rewrite students from seed templates on every list
@@ -569,6 +564,7 @@ async function updateGroup(req, res) {
     });
     group.department = resolved.cleanDepartment;
     group.faculty = resolved.facultyValue;
+    assertCoordinatorThesisFaculty(req, group);
     if (group.researchGroupId && resolved.linkedDepartmentId) {
       await ResearchGroup.updateOne(
         req.tierWhere({ _id: group.researchGroupId }),

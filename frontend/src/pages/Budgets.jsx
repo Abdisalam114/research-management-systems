@@ -65,6 +65,66 @@ function formatMoney(n, currency = "USD") {
 }
 
 const BUDGET_STATUS_FILTERS = ["all", "pending", "disbursed"];
+const PENDING_PAY_STATUSES = ["requested", "director_approved"];
+const PENDING_PO_STATUSES = ["requested", "procurement_approved", "director_approved"];
+
+function budgetHasPending(b, paymentsByBudget, posByBudget) {
+  const pays = paymentsByBudget[String(b.id)] || [];
+  const poList = posByBudget[String(b.id)] || [];
+  return (
+    pays.some((p) => PENDING_PAY_STATUSES.includes(p.status)) ||
+    poList.some((p) => PENDING_PO_STATUSES.includes(p.status))
+  );
+}
+
+function budgetHasDisbursed(b, paymentsByBudget, posByBudget) {
+  const pays = paymentsByBudget[String(b.id)] || [];
+  const poList = posByBudget[String(b.id)] || [];
+  return pays.some((p) => p.status === "paid") || poList.some((p) => p.status === "paid");
+}
+
+function computeBudgetTotals(list, paymentsByBudget, posByBudget) {
+  const allocated = list.reduce((acc, b) => acc + Number(b.totalAllocated || 0), 0);
+  const remaining = list.reduce(
+    (acc, b) =>
+      acc +
+      Number(
+        b.remainingBalance != null
+          ? b.remainingBalance
+          : Math.max(0, Number(b.totalAllocated || 0) - Number(b.totalDisbursed || 0))
+      ),
+    0
+  );
+  const disbursedFromBudgets = list.reduce((acc, b) => acc + Number(b.totalDisbursed || 0), 0);
+  let disbursedPay = 0;
+  let disbursedPO = 0;
+  let itemPaid = 0;
+  let pendingPay = 0;
+  let pendingPO = 0;
+  for (const b of list) {
+    const pays = paymentsByBudget[String(b.id)] || [];
+    const poList = posByBudget[String(b.id)] || [];
+    disbursedPay += pays.filter((p) => p.status === "paid").reduce((acc, p) => acc + Number(p.amount || 0), 0);
+    disbursedPO += poList.filter((p) => p.status === "paid").reduce((acc, p) => acc + Number(p.totalAmount || 0), 0);
+    itemPaid += (b.items || []).filter((i) => i.status === "paid").reduce((a, i) => a + Number(i.amount || 0), 0);
+    pendingPay += pays.filter((p) => PENDING_PAY_STATUSES.includes(p.status)).length;
+    pendingPO += poList.filter((p) => PENDING_PO_STATUSES.includes(p.status)).length;
+  }
+  const disbursed = Math.max(disbursedFromBudgets, disbursedPay + disbursedPO + itemPaid);
+  const currency = list[0]?.currency || "USD";
+  return {
+    allocated,
+    remaining,
+    disbursed,
+    disbursedPayments: disbursedPay,
+    disbursedPOs: disbursedPO,
+    pending: pendingPay + pendingPO,
+    pendingPayments: pendingPay,
+    pendingPOs: pendingPO,
+    utilizationPercent: allocated > 0 ? Math.min(100, Math.round((disbursed / allocated) * 100)) : 0,
+    currency,
+  };
+}
 
 export function BudgetsPage() {
   const { accessToken, user } = useAuth();
@@ -186,36 +246,36 @@ export function BudgetsPage() {
     return m;
   }, [pos]);
 
-  const totals = useMemo(() => {
-    const allocated = budgets.reduce((acc, b) => acc + Number(b.totalAllocated || 0), 0);
-    const remaining = budgets.reduce(
-      (acc, b) => acc + Number(b.remainingBalance != null ? b.remainingBalance : Math.max(0, Number(b.totalAllocated || 0) - Number(b.totalDisbursed || 0))),
-      0
-    );
-    const disbursedFromBudgets = budgets.reduce((acc, b) => acc + Number(b.totalDisbursed || 0), 0);
-    const disbursedPay = payments.filter((p) => p.status === "paid").reduce((acc, p) => acc + Number(p.amount || 0), 0);
-    const disbursedPO = pos.filter((p) => p.status === "paid").reduce((acc, p) => acc + Number(p.totalAmount || 0), 0);
-    const itemPaid = budgets.reduce(
-      (acc, b) => acc + (b.items || []).filter((i) => i.status === "paid").reduce((a, i) => a + Number(i.amount || 0), 0),
-      0
-    );
-    const pendingPay = payments.filter((p) => ["requested", "director_approved"].includes(p.status)).length;
-    const pendingPO = pos.filter((p) => ["requested", "procurement_approved", "director_approved"].includes(p.status)).length;
-    const currency = budgets[0]?.currency || "USD";
-    const disbursed = Math.max(disbursedFromBudgets, disbursedPay + disbursedPO + itemPaid);
-    return {
-      allocated,
-      remaining,
-      disbursed,
-      disbursedPayments: disbursedPay,
-      disbursedPOs: disbursedPO,
-      pending: pendingPay + pendingPO,
-      pendingPayments: pendingPay,
-      pendingPOs: pendingPO,
-      utilizationPercent: allocated > 0 ? Math.min(100, Math.round((disbursed / allocated) * 100)) : 0,
-      currency,
-    };
-  }, [budgets, payments, pos]);
+  const scopedBudgets = useMemo(() => {
+    if (!projectIdFromUrl) return budgets;
+    return budgets.filter((b) => String(b.projectId || b.project?.id || "") === String(projectIdFromUrl));
+  }, [budgets, projectIdFromUrl]);
+
+  const pendingBudgets = useMemo(
+    () => scopedBudgets.filter((b) => budgetHasPending(b, paymentsByBudget, posByBudget)),
+    [scopedBudgets, paymentsByBudget, posByBudget]
+  );
+
+  const disbursedBudgets = useMemo(
+    () => scopedBudgets.filter((b) => budgetHasDisbursed(b, paymentsByBudget, posByBudget)),
+    [scopedBudgets, paymentsByBudget, posByBudget]
+  );
+
+  const filteredBudgets = useMemo(() => {
+    if (statusFilter === "pending") return pendingBudgets;
+    if (statusFilter === "disbursed") return disbursedBudgets;
+    return scopedBudgets;
+  }, [statusFilter, pendingBudgets, disbursedBudgets, scopedBudgets]);
+
+  const totals = useMemo(
+    () => computeBudgetTotals(scopedBudgets, paymentsByBudget, posByBudget),
+    [scopedBudgets, paymentsByBudget, posByBudget]
+  );
+
+  const visibleTotals = useMemo(
+    () => computeBudgetTotals(filteredBudgets, paymentsByBudget, posByBudget),
+    [filteredBudgets, paymentsByBudget, posByBudget]
+  );
 
   const methodBreakdown = useMemo(() => {
     const m = {};
@@ -313,72 +373,46 @@ export function BudgetsPage() {
     }
   }
 
-  const filteredBudgets = useMemo(() => {
-    let list = budgets;
-    if (projectIdFromUrl) {
-      list = list.filter((b) => String(b.projectId || b.project?.id || "") === String(projectIdFromUrl));
-    }
-    if (statusFilter === "all") return list;
-    if (statusFilter === "pending") {
-      return list.filter((b) => {
-        const pays = paymentsByBudget[String(b.id)] || [];
-        const poList = posByBudget[String(b.id)] || [];
-        return (
-          pays.some((p) => ["requested", "director_approved"].includes(p.status)) ||
-          poList.some((p) => ["requested", "procurement_approved", "director_approved"].includes(p.status))
-        );
-      });
-    }
-    if (statusFilter === "disbursed") {
-      return list.filter((b) => {
-        const pays = paymentsByBudget[String(b.id)] || [];
-        const poList = posByBudget[String(b.id)] || [];
-        return pays.some((p) => p.status === "paid") || poList.some((p) => p.status === "paid");
-      });
-    }
-    return list;
-  }, [budgets, statusFilter, paymentsByBudget, posByBudget, projectIdFromUrl]);
-
   const headerStats = [
     {
       label: isResearcher ? "My total budget" : "Institutional total budget",
       value: formatMoney(totals.allocated, totals.currency),
       sub: isResearcher
-        ? `${budgets.length} of your budget${budgets.length === 1 ? "" : "s"}`
-        : "Across the whole university",
+        ? `${scopedBudgets.length} of your budget${scopedBudgets.length === 1 ? "" : "s"}`
+        : `${scopedBudgets.length} budget${scopedBudgets.length === 1 ? "" : "s"}`,
       accent: "#0ea5e9",
       filterKey: "all",
     },
     {
       label: "Disbursed (paid)",
       value: formatMoney(totals.disbursed, totals.currency),
-      sub: `Payments ${formatMoney(totals.disbursedPayments, totals.currency)} • POs ${formatMoney(totals.disbursedPOs, totals.currency)}`,
+      sub: `${disbursedBudgets.length} budget${disbursedBudgets.length === 1 ? "" : "s"} • Payments ${formatMoney(totals.disbursedPayments, totals.currency)} • POs ${formatMoney(totals.disbursedPOs, totals.currency)}`,
       accent: "#16a34a",
       filterKey: "disbursed",
     },
     {
       label: "Remaining budget",
-      value: formatMoney(totals.remaining, totals.currency),
-      sub: "Allocated − paid (auto-deducted)",
+      value: formatMoney(visibleTotals.remaining, visibleTotals.currency),
+      sub: statusFilter === "all" ? "Allocated − paid (auto-deducted)" : "Remaining in the filtered list",
       accent: "#38bdf8",
     },
     {
       label: "Utilization",
-      value: `${totals.utilizationPercent}%`,
-      sub: "Disbursed ÷ allocated",
+      value: `${visibleTotals.utilizationPercent}%`,
+      sub: statusFilter === "all" ? "Disbursed ÷ allocated" : "Disbursed ÷ allocated (filtered list)",
       accent: "#7dd3fc",
     },
     {
       label: "Pending approval",
-      value: totals.pending,
+      value: pendingBudgets.length,
       sub: `${totals.pendingPayments} payments • ${totals.pendingPOs} POs`,
       accent: "#7dd3fc",
       filterKey: "pending",
     },
     {
       label: "Total budgets",
-      value: `${budgets.length} • ${formatMoney(totals.disbursed, totals.currency)} spent`,
-      sub: isResearcher ? "Your budgets & disbursed total" : "All budgets & disbursed total",
+      value: `${filteredBudgets.length} • ${formatMoney(visibleTotals.disbursed, visibleTotals.currency)} spent`,
+      sub: "Visible budgets & disbursed total",
       accent: "#38bdf8",
     },
   ];

@@ -188,6 +188,8 @@ async function listPublications(req, res) {
       pubs = pubs.filter(
         (p) => p.researcherId && coordinatorMatchesResearcherDept(dept, p.researcherId.department)
       );
+    } else {
+      pubs = [];
     }
   }
 
