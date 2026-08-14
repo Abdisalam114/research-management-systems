@@ -67,7 +67,6 @@ async function resolveProjectKindMeta(req, project) {
         $or: [
           { callId: { $ne: null, $exists: true } },
           { amountAwarded: { $gt: 0 } },
-          { status: { $in: ["active", "pending_finance", "approved"] } },
         ],
       },
     ],

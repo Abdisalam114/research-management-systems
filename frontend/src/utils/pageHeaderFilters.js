@@ -17,7 +17,9 @@ export function buildStatusFilterStats(items, statusField = "status", extraStats
 }
 
 export function isAwardedItem(item, statusField = "status") {
-  return Number(item.amountAwarded || 0) > 0;
+  const status = item?.[statusField];
+  if (["pending_finance", "submitted", "draft", "rejected"].includes(status)) return false;
+  return Number(item.amountAwarded || 0) > 0 && ["active", "approved"].includes(status);
 }
 
 function itemKind(item) {

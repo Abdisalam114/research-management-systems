@@ -18,8 +18,7 @@ function assertCoordinatorThesisFaculty(req, group) {
   const ok = recordInCoordinatorFaculty(
     dept,
     group.department,
-    group.faculty,
-    group.supervisorId?.department
+    group.faculty
   );
   if (!ok) throw new AppError("Thesis group is outside your faculty", 403);
 }
@@ -371,8 +370,7 @@ async function listGroups(req, res) {
         recordInCoordinatorFaculty(
           dept,
           g.department,
-          g.faculty,
-          g.supervisorId?.department
+          g.faculty
         )
       );
     }

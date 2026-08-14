@@ -122,6 +122,7 @@ setGrants(withCall);
     let list = filterByStatKey(grants, statusFilter, {
       customFilters: {
         accepted: (g) => ["pending_finance", "active", "approved"].includes(g.status),
+        awarded: (g) => isAwardedItem(g),
       },
     });
     if (donorFilter) list = list.filter((g) => g.donorRef && g.donorRef.trim());

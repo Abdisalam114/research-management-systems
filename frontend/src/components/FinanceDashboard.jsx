@@ -179,7 +179,7 @@ export function FinanceDashboard() {
           <div className="label">Active grants</div>
           <div className="value">{s.activeGrants ?? 0}</div>
         </Link>
-        <Link to="/grants?filter=awarded" className="overviewTile" style={{ textDecoration: "none" }}>
+        <Link to="/grants?filter=active" className="overviewTile" style={{ textDecoration: "none" }}>
           <div className="label">Awarded total</div>
           <div className="value">{formatMoney(s.awardedTotal)}</div>
         </Link>

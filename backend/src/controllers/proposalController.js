@@ -889,15 +889,17 @@ async function directorDecision(req, res) {
             programTier: proposal.programTier,
           });
         } catch { /* best-effort */ }
-      } catch { /* best-effort */ }
-      try {
-        const { closeCallAfterGrantAccepted } = require("../utils/fundingCallAutoClose");
-        await closeCallAfterGrantAccepted(proposal.fundingCallId, {
-          actorId: req.user.id,
-          actorRole: req.user.role,
-          programTier: proposal.programTier || req.programTier,
-          grantTitle: proposal.title,
-        });
+        if (chain) {
+          try {
+            const { closeCallAfterGrantAccepted } = require("../utils/fundingCallAutoClose");
+            await closeCallAfterGrantAccepted(proposal.fundingCallId, {
+              actorId: req.user.id,
+              actorRole: req.user.role,
+              programTier: proposal.programTier || req.programTier,
+              grantTitle: proposal.title,
+            });
+          } catch { /* best-effort */ }
+        }
       } catch { /* best-effort */ }
     }
   }

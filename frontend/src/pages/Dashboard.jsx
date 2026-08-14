@@ -57,14 +57,14 @@ function RoleDashboard({ role, user }) {
     research_director: { title: "Research Director", focus: "Approve proposals, ethics, users, funding calls (internal & external), donor reports, and overall system oversight." },
     leadership: {
       title: "University Leadership",
-      focus: "Peer review assignments, approve funding calls, grant awards, KPIs, and institutional policy (siyaasada guud).",
+      focus: "Peer review assignments, view funding calls, grant awards, KPIs, and institutional policy (siyaasada guud).",
     },
   };
 
   const quickLinksByRole = {
     leadership: [
       { to: "/review-assignments", label: "Peer review assignments", primary: true },
-      { to: "/funding-calls", label: "Approve funding calls" },
+      { to: "/funding-calls", label: "View funding calls" },
       { to: "/policies", label: "Institutional policies" },
       { to: "/grants", label: "Grant awards" },
       { to: "/kpi-dashboard", label: "KPI dashboard" },

@@ -506,7 +506,7 @@ await fundingCallApi.publishFundingCall(accessToken, id);
       {statusFilter !== "all" ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
           Showing: <strong>{statFilterLabel(fundingCallStatTiles, statusFilter)}</strong>{" "}
-          ({statusFilter === "accepted" ? acceptedTotal : filteredCalls.length})
+          ({filteredCalls.length})
         </p>
       ) : null}
 
@@ -842,9 +842,8 @@ await fundingCallApi.publishFundingCall(accessToken, id);
               <div className="fundingCallActions">
                 {isResearcher &&
                 c.status === "open" &&
-                !(grantsByCallId[String(c.id)] || []).some(isAcceptedGrant) &&
-                !(proposalsByCallId[String(c.id)] || []).some(isAcceptedProposal) &&
-                !(grantsByCallId[String(c.id)] || []).length ? (
+                !(grantsByCallId[String(c.id)] || []).length &&
+                !(proposalsByCallId[String(c.id)] || []).length ? (
                   <Link
                     className="btn primary"
                     to={
@@ -862,6 +861,13 @@ await fundingCallApi.publishFundingCall(accessToken, id);
                     to={`/grants/${grantsByCallId[String(c.id)][0].id}`}
                   >
                     Open my application
+                  </Link>
+                ) : isResearcher && (proposalsByCallId[String(c.id)] || []).length ? (
+                  <Link
+                    className="btn primary"
+                    to={`/proposals/${proposalsByCallId[String(c.id)][0].id}`}
+                  >
+                    Open my proposal
                   </Link>
                 ) : null}
                 {canEditCall(c) ? (

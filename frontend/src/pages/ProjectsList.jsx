@@ -202,8 +202,7 @@ export function ProjectsListPage({
     try {
       await projectApi.directorClosureApproval(accessToken, p.id, "Director approved");
       setMessage(
-        p.isVoluntary === true ||
-        (p.isVoluntary !== false && p.proposalKind === "voluntary")
+        projectKind(p) === "voluntary"
           ? `${p.title}: approved — project closed.`
           : `${p.title}: Director approved — waiting for Finance. After Finance clears, the project closes automatically.`
       );
@@ -234,7 +233,7 @@ export function ProjectsListPage({
     // Total = Active + Closing + Completed (+ On hold if any)
     const sumParts = activeCount + closingCount + completedCount + onHoldCount;
     return [
-      { label: "Total", value: projects.length, filterKey: "all" },
+      { label: "Total", value: sumParts || projects.length, filterKey: "all" },
       { label: "Voluntary", value: voluntaryCount, filterKey: "kind:voluntary", accent: "#38bdf8" },
       { label: "Grant Fund", value: grantCount, filterKey: "kind:grant_fund_call", accent: "#eab308" },
       { label: "Active", value: activeCount, filterKey: "active", accent: "#38bdf8" },
@@ -244,21 +243,25 @@ export function ProjectsListPage({
     ];
   }, [projects]);
 
-  const filtered = useMemo(
-    () =>
-      filterByStatKey(projects, statusFilter, {
-        customFilters: {
-          active: (p) => p.status === "active",
-          closing: (p) => p.status === "closing",
-          completed: (p) => ["completed", "closed"].includes(p.status),
-          "kind:voluntary": (p) => projectKind(p) === "voluntary",
-          voluntary: (p) => projectKind(p) === "voluntary",
-          "kind:grant_fund_call": (p) => projectKind(p) === "grant_fund_call",
-          grant_fund_call: (p) => projectKind(p) === "grant_fund_call",
-        },
-      }),
-    [projects, statusFilter]
-  );
+  const filtered = useMemo(() => {
+    const list = filterByStatKey(projects, statusFilter, {
+      customFilters: {
+        active: (p) => p.status === "active",
+        closing: (p) => p.status === "closing",
+        completed: (p) => ["completed", "closed"].includes(p.status),
+        "kind:voluntary": (p) => projectKind(p) === "voluntary",
+        voluntary: (p) => projectKind(p) === "voluntary",
+        "kind:grant_fund_call": (p) => projectKind(p) === "grant_fund_call",
+        grant_fund_call: (p) => projectKind(p) === "grant_fund_call",
+      },
+    });
+    if (!isDirector) return list;
+    const closureIds = new Set(
+      projects.filter((p) => p.closure?.status === "submitted").map((p) => String(p.id))
+    );
+    if (!closureIds.size) return list;
+    return list.filter((p) => !closureIds.has(String(p.id)));
+  }, [projects, statusFilter, isDirector]);
 
   const voluntaryProjects = useMemo(
     () => filtered.filter((p) => projectKind(p) === "voluntary"),
