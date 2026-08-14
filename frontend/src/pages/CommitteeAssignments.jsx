@@ -24,8 +24,12 @@ export function CommitteeAssignmentsPage() {
   const { loading, error, reload } = useModuleLoad(accessToken, load, [location.pathname]);
 
   const pending = useMemo(
-    () => assignments.filter((a) => (isDirector ? true : a.actionRequired)),
-    [assignments, isDirector]
+    () => assignments.filter((a) => a.actionRequired),
+    [assignments]
+  );
+  const done = useMemo(
+    () => assignments.filter((a) => !a.actionRequired),
+    [assignments]
   );
 
   const stats = useMemo(
@@ -35,20 +39,35 @@ export function CommitteeAssignmentsPage() {
         value: assignments.length,
         filterKey: "all",
       },
-      {
-        label: isDirector ? "Still pending" : "Action required",
-        value: pending.length,
-        filterKey: "pending",
-        accent: "#fbbf24",
-      },
+      ...(!isDirector
+        ? [
+            {
+              label: "Action required",
+              value: pending.length,
+              filterKey: "pending",
+              accent: "#fbbf24",
+            },
+            ...(done.length > 0
+              ? [
+                  {
+                    label: "Done",
+                    value: done.length,
+                    filterKey: "done",
+                    accent: "#22c55e",
+                  },
+                ]
+              : []),
+          ]
+        : []),
     ],
-    [assignments.length, pending.length, isDirector]
+    [assignments.length, pending.length, done.length, isDirector]
   );
 
   const filtered = useMemo(() => {
     if (statusFilter === "pending") return pending;
+    if (statusFilter === "done") return done;
     return filterByStatKey(assignments, statusFilter === "all" ? "all" : statusFilter);
-  }, [assignments, statusFilter, pending]);
+  }, [assignments, statusFilter, pending, done]);
 
   return (
     <div>

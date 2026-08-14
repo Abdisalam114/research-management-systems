@@ -3,7 +3,6 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { useModuleLoad } from "../hooks/useModuleLoad";
-import { useScrollToTop } from "../hooks/useScrollToTop";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import * as fundingCallApi from "../services/fundingCallApi";
 import * as grantApi from "../services/grantApi";
@@ -146,7 +145,6 @@ export function FundingCallsPage() {
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all", FUNDING_CALL_STATUS_FILTERS);
   const [highlightedCallId, setHighlightedCallId] = useState("");
 
-  useScrollToTop([showForm, editingId]);
 
   const load = useCallback(async () => {
     const res = await fundingCallApi.listFundingCalls(accessToken);
@@ -242,17 +240,21 @@ export function FundingCallsPage() {
   const draftCount = calls.filter((c) => c.status === "draft").length;
   const closedCount = calls.filter((c) => c.status === "closed").length;
 
-  const filteredCalls = useMemo(() => {
-    if (statusFilter === "accepted") {
-      return calls.filter((c) => {
+  const acceptedCalls = useMemo(
+    () =>
+      calls.filter((c) => {
         const key = String(c.id);
         const grants = grantsByCallId[key] || [];
         const props = proposalsByCallId[key] || [];
         return grants.some(isAcceptedGrant) || props.some(isAcceptedProposal);
-      });
-    }
+      }),
+    [calls, grantsByCallId, proposalsByCallId]
+  );
+
+  const filteredCalls = useMemo(() => {
+    if (statusFilter === "accepted") return acceptedCalls;
     return filterByStatKey(calls, statusFilter);
-  }, [calls, statusFilter, grantsByCallId, proposalsByCallId]);
+  }, [calls, statusFilter, acceptedCalls]);
 
   const fundingCallStatTiles = [
     { label: "Total calls", filterKey: "all" },
@@ -442,10 +444,10 @@ await fundingCallApi.publishFundingCall(accessToken, id);
           { label: "Closed", value: closedCount, filterKey: "closed", accent: "#94a3b8" },
           {
             label: "Accepted",
-            value: acceptedTotal,
+            value: acceptedCalls.length,
             filterKey: "accepted",
             accent: "#38bdf8",
-            sub: "Proposals + grants",
+            sub: acceptedTotal ? `${acceptedTotal} application${acceptedTotal === 1 ? "" : "s"}` : "Proposals + grants",
           },
         ]}
         activeFilter={statusFilter}

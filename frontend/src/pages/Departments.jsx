@@ -4,7 +4,6 @@ import { useProgramTier } from "../hooks/useProgramTier";
 import * as departmentApi from "../services/departmentApi";
 import { PageHeader } from "../components/PageHeader";
 import { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } from "../constants/faculties";
-import { useScrollToTop } from "../hooks/useScrollToTop";
 
 export function DepartmentsPage() {
   const { accessToken } = useAuth();
@@ -16,7 +15,6 @@ export function DepartmentsPage() {
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
 
-  useScrollToTop([showForm, editingId]);
 
   async function load() {
     try {

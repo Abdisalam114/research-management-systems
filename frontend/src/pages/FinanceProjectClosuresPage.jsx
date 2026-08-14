@@ -67,6 +67,7 @@ function FinanceClosureList() {
         onFilterChange={(key) => {
           if (key === "cleared" || key === "awaiting") setTab(key);
         }}
+        disableFilterToggle
         actions={
           <Link className="btn" to="/finance/reviews">
             Finance review (Proposals)

@@ -15,7 +15,6 @@ import {
 import { isEthicsFormComplete } from "../utils/ethicsForm";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
 import { useProgramTier } from "../hooks/useProgramTier";
-import { useScrollToTop } from "../hooks/useScrollToTop";
 import { ProposalApplicationExtras } from "../components/ProposalApplicationExtras";
 import {
   collectSubmitValidationIssues,
@@ -75,8 +74,6 @@ export function ProposalFormPage() {
     }
     return isVoluntary ? "New Voluntary Proposal + Ethics" : "New Grant Fund Call Proposal + Ethics";
   }, [isEdit, isVoluntary]);
-
-  useScrollToTop([id, fundingCallId, loaded]);
 
   // New grant-fund-call proposal: auto-fill call title + department from portal.
   useEffect(() => {
@@ -288,7 +285,7 @@ requestAnimationFrame(() => {
   }
 
   return (
-    <div>
+    <div data-app-form>
       <h2 style={{ marginTop: 0 }}>{heading}</h2>
       <p className="muted" style={{ marginTop: 0, maxWidth: 720 }}>
         {isVoluntary

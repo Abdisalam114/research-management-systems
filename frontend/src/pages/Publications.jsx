@@ -4,7 +4,6 @@ import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
-import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as publicationApi from "../services/publicationApi";
 import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
@@ -70,7 +69,6 @@ export function PublicationsPage() {
   const [decisionBusy, setDecisionBusy] = useState(false);
   const [viewPub, setViewPub] = useState(null);
 
-  useScrollToTop([showForm, viewPub?.id, decisionModal?.publication?.id, projectIdFromUrl]);
 
   function downloadPublicationSummary(p) {
     const lines = [
@@ -498,7 +496,7 @@ setPublications(list);
 
       {statusFilter !== "all" ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          Showing status: <strong>{statFilterLabel(stats, statusFilter)}</strong>
+          Showing: <strong>{statFilterLabel(stats, statusFilter)}</strong> ({filtered.length})
           {typeFilter !== "all" ? ` • type: ${OUTPUT_TRACKING_CATEGORIES.find((c) => c.id === typeFilter)?.label}` : ""}
         </p>
       ) : null}
@@ -562,7 +560,14 @@ setPublications(list);
       ) : null}
 
       {canCreate && showForm && canAddNewOutput ? (
-        <div className="card" style={{ marginTop: 12 }}>
+        <form
+          className="card"
+          style={{ marginTop: 12 }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveOutput({ submitNow: true });
+          }}
+        >
           <div style={{ fontWeight: 800 }}>Register research output</div>
           {autoFilled && linkedProject ? (
             <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
@@ -687,12 +692,12 @@ setPublications(list);
               <button type="button" className="btn" disabled={busy} onClick={() => saveOutput({ submitNow: false })}>
                 {busy ? "Saving…" : "Save draft"}
               </button>
-              <button type="button" className="btn primary" disabled={busy} onClick={() => saveOutput({ submitNow: true })}>
+              <button type="submit" className="btn primary" disabled={busy}>
                 {busy ? "Submitting…" : "Create & submit"}
               </button>
             </div>
           </div>
-        </div>
+        </form>
       ) : null}
 
       <div className="card" style={{ marginTop: 12 }}>

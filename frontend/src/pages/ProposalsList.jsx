@@ -9,6 +9,10 @@ import { StatusBadge } from "../components/StatusBadge";
 import { ProgramTierBadge } from "../components/ProgramTierBadge";
 import { filterByStatKey, hideEmptyStatTiles, statFilterLabel } from "../utils/pageHeaderFilters";
 
+function proposalKindKey(p) {
+  return p.proposalKind === "grant_fund_call" || p.fundingCallId ? "grant_fund_call" : "voluntary";
+}
+
 export function ProposalsListPage() {
   const { accessToken, user } = useAuth();
   const { programTier } = useProgramTier();
@@ -41,9 +45,16 @@ export function ProposalsListPage() {
 
   const stats = useMemo(() => {
     const by = (s) => proposals.filter((p) => p.status === s).length;
+    const voluntaryCount = proposals.filter((p) => proposalKindKey(p) === "voluntary").length;
+    const grantCount = proposals.filter((p) => proposalKindKey(p) === "grant_fund_call").length;
+    const kindTiles = [
+      { label: "Voluntary", value: voluntaryCount, filterKey: "kind:voluntary", accent: "#38bdf8", alwaysShow: true },
+      { label: "Grant Fund", value: grantCount, filterKey: "kind:grant_fund_call", accent: "#eab308", alwaysShow: true },
+    ];
     if (isStaffQueue) {
       return hideEmptyStatTiles([
         { label: "Total", value: proposals.length, filterKey: "all" },
+        ...kindTiles,
         { label: "Submitted", value: by("submitted"), filterKey: "submitted", accent: "#38bdf8" },
         { label: "Under review", value: by("under_review"), filterKey: "under_review", accent: "#fcd34d" },
         { label: "Revision", value: by("revision_requested"), filterKey: "revision_requested", accent: "#fb923c" },
@@ -53,15 +64,28 @@ export function ProposalsListPage() {
     }
     return hideEmptyStatTiles([
       { label: "Total", value: proposals.length, filterKey: "all" },
+      ...kindTiles,
       { label: "Draft", value: by("draft"), filterKey: "draft" },
       { label: "Submitted", value: by("submitted"), filterKey: "submitted", accent: "#38bdf8" },
       { label: "Under review", value: by("under_review"), filterKey: "under_review", accent: "#fcd34d" },
+      { label: "Revision", value: by("revision_requested"), filterKey: "revision_requested", accent: "#fb923c" },
       { label: "Approved", value: by("approved"), filterKey: "approved", accent: "#16a34a" },
       { label: "Rejected", value: by("rejected"), filterKey: "rejected" },
     ]);
   }, [proposals, isStaffQueue]);
 
-  const filtered = useMemo(() => filterByStatKey(proposals, statusFilter), [proposals, statusFilter]);
+  const filtered = useMemo(
+    () =>
+      filterByStatKey(proposals, statusFilter, {
+        customFilters: {
+          "kind:voluntary": (p) => proposalKindKey(p) === "voluntary",
+          voluntary: (p) => proposalKindKey(p) === "voluntary",
+          "kind:grant_fund_call": (p) => proposalKindKey(p) === "grant_fund_call",
+          grant_fund_call: (p) => proposalKindKey(p) === "grant_fund_call",
+        },
+      }),
+    [proposals, statusFilter]
+  );
 
   async function load() {
     setError("");
@@ -77,8 +101,7 @@ export function ProposalsListPage() {
   }, [accessToken, programTier, user?.role]);
 
   function kindLabel(p) {
-    const kind = p.proposalKind || (p.fundingCallId ? "grant_fund_call" : "voluntary");
-    return kind === "grant_fund_call" ? "Grant Fund Call" : "Voluntary";
+    return proposalKindKey(p) === "grant_fund_call" ? "Grant Fund Call" : "Voluntary";
   }
 
   function canDeleteProposal(p) {

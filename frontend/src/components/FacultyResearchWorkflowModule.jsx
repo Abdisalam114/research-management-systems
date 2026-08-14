@@ -176,13 +176,13 @@ export function FacultyResearchWorkflowModule({
         </div>
       ) : null}
 
-      {stageFilter && filteredStage ? (
+      {stageFilter ? (
         <div style={{ marginTop: 12 }}>
           <div style={{ fontWeight: 700, marginBottom: 8 }}>
-            {filteredStage.label} ({filteredStage.items?.length || 0})
+            {filteredStage?.label || stageFilter} ({filteredStage?.items?.length || 0})
           </div>
           <div style={{ display: "grid", gap: 8 }}>
-            {(filteredStage.items || []).map((p) => (
+            {(filteredStage?.items || []).map((p) => (
               <WorkflowRow
                 key={p.id}
                 pub={p}
@@ -192,7 +192,7 @@ export function FacultyResearchWorkflowModule({
                 onJournalPublish={journalPublish}
               />
             ))}
-            {(filteredStage.items || []).length === 0 ? <div className="muted">No items in this stage.</div> : null}
+            {!(filteredStage?.items || []).length ? <div className="muted">No items in this stage.</div> : null}
           </div>
         </div>
       ) : (
@@ -262,7 +262,7 @@ export function FacultyResearchWorkflowModule({
         />
         {urlStageFilter !== "all" ? (
           <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-            Showing: <strong>{statFilterLabel(stats, urlStageFilter)}</strong>
+            Showing: <strong>{statFilterLabel(stats, urlStageFilter)}</strong> ({filteredStage?.items?.length || 0})
           </p>
         ) : null}
         <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.35)" }}>

@@ -7,6 +7,7 @@ import * as conversationApi from "../services/conversationApi";
 import { PageHeader } from "../components/PageHeader";
 import { GroupsModuleNav } from "../components/GroupsModuleNav";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
+import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import "./groups.css";
 
 const CREATE_ROLES = ["researcher", "faculty_coordinator", "research_director"];
@@ -22,7 +23,7 @@ export function GroupsPage() {
   const [stats, setStats] = useState({ total: 0, thesis: 0, collaboration: 0 });
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
   const canCreate = CREATE_ROLES.includes(user?.role);
 
   const load = useCallback(async () => {
@@ -104,29 +105,29 @@ export function GroupsPage() {
       {error ? <div className="card" style={{ borderColor: "rgba(255,99,132,0.55)" }}>{error}</div> : null}
 
       {canCreate && showForm ? (
-        <div className="card groupsCreateForm">
+        <form
+          className="card groupsCreateForm"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            try {
+              setError("");
+              await groupApi.createGroup(accessToken, { name });
+              setName("");
+              setShowForm(false);
+              await reload();
+            } catch (err) {
+              setError(err?.response?.data?.message || "Failed to create group");
+            }
+          }}
+        >
           <div style={{ fontWeight: 800 }}>Create research group</div>
           <div className="inlineFormRow">
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Group name" />
-            <button
-              type="button"
-              className="btn primary"
-              onClick={async () => {
-                try {
-                  setError("");
-                  await groupApi.createGroup(accessToken, { name });
-                  setName("");
-                  setShowForm(false);
-                  await reload();
-                } catch (e) {
-                  setError(e?.response?.data?.message || "Failed to create group");
-                }
-              }}
-            >
+            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Group name" required />
+            <button type="submit" className="btn primary">
               Create
             </button>
           </div>
-        </div>
+        </form>
       ) : null}
 
       <div className="card">

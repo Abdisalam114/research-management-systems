@@ -2,11 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
-import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as repositoryApi from "../services/repositoryApi";
 import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
-
+import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { filterByStatKey, statFilterLabel, totalStatTile, typeStatTile } from "../utils/pageHeaderFilters";
 
 export function RepositoryPage() {
@@ -18,13 +17,12 @@ export function RepositoryPage() {
   const [projects, setProjects] = useState([]);
   const [linkedProject, setLinkedProject] = useState(null);
   const [showForm, setShowForm] = useState(Boolean(projectIdFromUrl));
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
   const [form, setForm] = useState({ title: "", description: "", access: "private", groupId: "", projectId: projectIdFromUrl });
   const [file, setFile] = useState(null);
   const [exporting, setExporting] = useState("");
   const [openingFileId, setOpeningFileId] = useState("");
 
-  useScrollToTop([showForm, projectIdFromUrl]);
 
   const canUpload = ["researcher", "faculty_coordinator", "research_director"].includes(user?.role);
 
@@ -182,6 +180,41 @@ export function RepositoryPage() {
     }
   }
 
+  async function handleUpload(e) {
+    e.preventDefault();
+    try {
+      setError("");
+      if (!file) throw new Error("Pick a PDF, Word, CSV, Excel, TXT, or ZIP file");
+      const ext = file.name.split(".").pop()?.toLowerCase();
+      if (!["pdf", "doc", "docx", "csv", "xlsx", "xls", "txt", "zip"].includes(ext || "")) {
+        throw new Error("Only PDF, Word, CSV, Excel, TXT, or ZIP files are allowed");
+      }
+      if (!form.projectId) throw new Error("Select the research project this file belongs to");
+      if (!form.title.trim()) throw new Error("Enter a title for this file");
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("title", form.title.trim());
+      fd.append("description", form.description);
+      fd.append("access", form.access);
+      fd.append("projectId", form.projectId);
+      if (form.access === "group") fd.append("groupId", form.groupId);
+
+      await repositoryApi.uploadRepositoryItem(accessToken, fd);
+      setForm({
+        title: "",
+        description: "",
+        access: "private",
+        groupId: "",
+        projectId: projects.length === 1 ? projects[0].id : projectIdFromUrl || "",
+      });
+      setFile(null);
+      setShowForm(false);
+      await reload();
+    } catch (err) {
+      setError(err?.response?.data?.message || err.message || "Upload failed");
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -236,7 +269,7 @@ export function RepositoryPage() {
       ) : null}
 
       {canUpload && showForm ? (
-        <div className="card" style={{ marginTop: 12 }}>
+        <form className="card" style={{ marginTop: 12 }} onSubmit={handleUpload}>
           <div style={{ fontWeight: 800 }}>Upload file</div>
           <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
             Allowed: PDF, Word, CSV, Excel, TXT, or ZIP (max 10 MB).
@@ -307,48 +340,12 @@ export function RepositoryPage() {
               />
             </div>
             <div className="formActions">
-              <button
-                type="button"
-                className="btn primary"
-                onClick={async () => {
-                  try {
-                    setError("");
-                    if (!file) throw new Error("Pick a PDF, Word, CSV, Excel, TXT, or ZIP file");
-                    const ext = file.name.split(".").pop()?.toLowerCase();
-                    if (!["pdf", "doc", "docx", "csv", "xlsx", "xls", "txt", "zip"].includes(ext || "")) {
-                      throw new Error("Only PDF, Word, CSV, Excel, TXT, or ZIP files are allowed");
-                    }
-                    if (!form.projectId) throw new Error("Select the research project this file belongs to");
-                    if (!form.title.trim()) throw new Error("Enter a title for this file");
-                    const fd = new FormData();
-                    fd.append("file", file);
-                    fd.append("title", form.title.trim());
-                    fd.append("description", form.description);
-                    fd.append("access", form.access);
-                    fd.append("projectId", form.projectId);
-                    if (form.access === "group") fd.append("groupId", form.groupId);
-
-                    await repositoryApi.uploadRepositoryItem(accessToken, fd);
-                    setForm({
-                      title: "",
-                      description: "",
-                      access: "private",
-                      groupId: "",
-                      projectId: projects.length === 1 ? projects[0].id : projectIdFromUrl || "",
-                    });
-                    setFile(null);
-                    setShowForm(false);
-                    await reload();
-                  } catch (e) {
-                    setError(e?.response?.data?.message || e.message || "Upload failed");
-                  }
-                }}
-              >
+              <button type="submit" className="btn primary">
                 Upload
               </button>
             </div>
           </div>
-        </div>
+        </form>
       ) : null}
 
       <div className="card" style={{ marginTop: 12 }}>

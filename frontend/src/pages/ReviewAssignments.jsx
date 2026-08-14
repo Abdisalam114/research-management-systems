@@ -51,8 +51,18 @@ export function ReviewAssignmentsPage() {
         filterKey: "pending",
         accent: "#fbbf24",
       },
+      ...(received.length > 0
+        ? [
+            {
+              label: isDirector ? "Completed" : "Submitted",
+              value: received.length,
+              filterKey: "done",
+              accent: "#22c55e",
+            },
+          ]
+        : []),
     ],
-    [assignments.length, awaiting.length, isDirector]
+    [assignments.length, awaiting.length, received.length, isDirector]
   );
 
   const filtered = useMemo(() => {

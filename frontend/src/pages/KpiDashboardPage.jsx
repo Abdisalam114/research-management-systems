@@ -11,37 +11,37 @@ function kpiRoutesForRole(role) {
   const canProjects = ["research_director", "faculty_coordinator", "researcher"].includes(role);
   return [
     { key: "grantSuccessRate", label: "Grant success rate", format: (v) => `${v ?? 0}%`, to: "/grants" },
-    { key: "proposalApprovalRate", label: "Proposal approval", format: (v) => `${v ?? 0}%`, to: "/proposals" },
+    { key: "proposalApprovalRate", label: "Proposal approval", format: (v) => `${v ?? 0}%`, to: "/proposals?filter=approved" },
     {
       key: "totalFundingAwarded",
       label: "Funding awarded",
       format: (v) => `$${Number(v || 0).toLocaleString()}`,
-      to: canFinance ? "/finance-reports" : "/grants",
+      to: canFinance ? "/finance-reports" : "/grants?filter=awarded",
     },
     {
       key: "activeProjects",
       label: "Active projects",
       format: (v) => v ?? 0,
-      to: canProjects ? "/projects" : "/system-reports",
+      to: canProjects ? "/projects?filter=active" : "/system-reports",
     },
     {
       key: "projectsArchived",
       label: "Archived projects",
       format: (v) => v ?? 0,
-      to: canProjects ? "/projects" : "/system-reports",
+      to: canProjects ? "/projects?filter=completed" : "/system-reports",
     },
     {
       key: "publicationsValidated",
       label: "Validated publications",
       format: (v) => v ?? 0,
-      to: canProjects ? "/publications" : "/system-reports",
+      to: canProjects ? "/publications?filter=validated" : "/system-reports",
     },
     {
       key: "openFundingCalls",
       label: "Open funding calls",
       format: (v) => v ?? 0,
       sub: (kpis) => `Internal ${kpis.internalFundingCalls ?? 0} · External ${kpis.externalFundingCalls ?? 0}`,
-      to: "/funding-calls",
+      to: "/funding-calls?filter=open",
     },
   ];
 }

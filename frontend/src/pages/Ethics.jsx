@@ -3,7 +3,6 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { useModuleLoad } from "../hooks/useModuleLoad";
-import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as ethicsApi from "../services/ethicsApi";
 import * as proposalApi from "../services/proposalApi";
 import * as departmentApi from "../services/departmentApi";
@@ -53,7 +52,6 @@ export function EthicsPage() {
   const autoOpenedRef = useRef(false);
   const applicationIdFromUrl = searchParams.get("applicationId");
 
-  useScrollToTop([editing?.id, applicationIdFromUrl]);
   const load = useCallback(async () => {
     const [res, deptRes] = await Promise.all([
       ethicsApi.listEthicsApplications(accessToken),
@@ -99,23 +97,29 @@ export function EthicsPage() {
 
   const stats = useMemo(() => {
     const by = (s) => applications.filter((a) => a.status === s).length;
+    const revisionCount = by("revision_requested");
     return [
       { label: "Total", value: applications.length, filterKey: "all" },
       { label: "Draft", value: by("draft"), filterKey: "draft" },
       { label: "Submitted", value: by("submitted"), filterKey: "submitted", accent: "#38bdf8" },
+      ...(revisionCount > 0
+        ? [{ label: "Revision", value: revisionCount, filterKey: "revision_requested", accent: "#f59e0b" }]
+        : []),
       { label: "Approved", value: by("approved"), filterKey: "approved", accent: "#16a34a" },
       { label: "Rejected", value: by("rejected"), filterKey: "rejected", accent: "#ef4444" },
     ];
   }, [applications]);
 
-  const filteredApplications = useMemo(
-    () => filterByStatKey(applications, statusFilter),
-    [applications, statusFilter]
-  );
-
   const directorQueue = applications.filter((a) => a.status === "submitted");
   const showDirectorQueue =
     canDecideEthics && directorQueue.length > 0 && (statusFilter === "all" || statusFilter === "submitted");
+
+  const filteredApplications = useMemo(() => {
+    const list = filterByStatKey(applications, statusFilter);
+    if (!showDirectorQueue) return list;
+    const queueIds = new Set(directorQueue.map((a) => String(a.id)));
+    return list.filter((a) => !queueIds.has(String(a.id)));
+  }, [applications, statusFilter, showDirectorQueue, directorQueue]);
 
   function openNew() {
     setValidationIssues([]);
@@ -341,7 +345,10 @@ export function EthicsPage() {
 
       {statusFilter !== "all" ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
-          Showing: <strong>{statFilterLabel(stats, statusFilter)}</strong> ({filteredApplications.length})
+          Showing: <strong>{statFilterLabel(stats, statusFilter)}</strong> (
+          {(statusFilter === "submitted" && showDirectorQueue ? directorQueue.length : 0) +
+            filteredApplications.length}
+          )
         </p>
       ) : null}
 
@@ -387,6 +394,7 @@ export function EthicsPage() {
         </div>
       ) : null}
 
+      {!(showDirectorQueue && statusFilter === "submitted" && filteredApplications.length === 0) ? (
       <div className="card" style={{ marginTop: 12 }}>
         <div style={{ fontWeight: 800 }}>Applications</div>
         <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
@@ -452,9 +460,10 @@ export function EthicsPage() {
           ) : null}
         </div>
       </div>
+      ) : null}
 
       {editing ? (
-        <div id="ethics-editor-panel" ref={editorRef}>
+        <div id="ethics-editor-panel" ref={editorRef} data-app-form>
         <EthicsEditor
           editing={editing}
           setEditing={setEditing}

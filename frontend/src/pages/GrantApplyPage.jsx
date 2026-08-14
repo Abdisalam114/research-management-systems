@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
-import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as fundingCallApi from "../services/fundingCallApi";
 import * as proposalApi from "../services/proposalApi";
 import * as grantApi from "../services/grantApi";
@@ -59,8 +58,6 @@ export function GrantApplyPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const budgetInitRef = useRef(false);
-
-  useScrollToTop([callId, step, call?.id]);
 
   const syncProposalsForCall = useCallback(
     async (c) => {
@@ -273,7 +270,7 @@ setError(e?.response?.data?.message || "Could not save grant application.");
       ) : null}
 
       {call && step === 2 ? (
-        <div className="card">
+        <div className="card" data-app-form>
           <div style={{ fontWeight: 800 }}>Step 2 — Research proposal</div>
           <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
             Grant applications must be tied to a proposal. You can use an existing proposal or start a new one for this call.
@@ -335,7 +332,7 @@ setError(e?.response?.data?.message || "Could not save grant application.");
       ) : null}
 
       {call && step === 3 ? (
-        <div className="card">
+        <div className="card" data-app-form>
           <div style={{ fontWeight: 800 }}>Step 3 — Funding call requirements</div>
           <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>
             Confirm each item required by the Research Office for this call. Grant submission is blocked until all are checked.
@@ -397,7 +394,7 @@ setError(e?.response?.data?.message || "Could not save grant application.");
       ) : null}
 
       {call && step === 4 ? (
-        <div className="card">
+        <div className="card" data-app-form>
           <div style={{ fontWeight: 800 }}>Step 4 — Budget & save draft</div>
           {selectedProposal ? (
             <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>

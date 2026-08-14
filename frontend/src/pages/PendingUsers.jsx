@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
-import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as userApi from "../services/userApi";
 import { formatRole } from "../utils/roleLabels";
 import { SYSTEM_ROLES } from "../constants/systemRoles";
@@ -40,7 +39,6 @@ export function PendingUsersPage() {
   const [busyId, setBusyId] = useState("");
   const [creating, setCreating] = useState(false);
 
-  useScrollToTop([edit?.id, creating]);
   const [savingEdit, setSavingEdit] = useState(false);
 
   async function handleDeleteUser(u) {
@@ -306,7 +304,7 @@ export function PendingUsersPage() {
           Staff roles (Coordinator / Finance / Leadership) are system-wide. Researchers need an UG or PG assignment
           below.
         </p>
-        <form onSubmit={handleCreate}>
+        <form onSubmit={handleCreate} data-app-form-skip="true">
           <div className="row">
             <div className="field">
               <label>Full name</label>

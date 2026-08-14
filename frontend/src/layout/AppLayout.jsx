@@ -6,6 +6,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { getPageTitle } from "../utils/navigation";
 import { logScrollProbe } from "../utils/scrollContainer";
 import { scrollToTopNow, useScrollToTop } from "../hooks/useScrollToTop";
+import { useAppFormBehavior } from "../hooks/useAppFormBehavior";
 import "./layout.css";
 
 export function AppLayout() {
@@ -21,6 +22,7 @@ export function AppLayout() {
   }, []);
 
   useScrollToTop([location.pathname, location.search, location.hash, location.key]);
+  useAppFormBehavior(contentRef);
 
   useEffect(() => {
     requestAnimationFrame(() => {

@@ -5,7 +5,7 @@ function normalizeStatFilter(raw, defaultFilter, allowedFilters) {
   if (!raw || raw === "all") return defaultFilter;
   if (!allowedFilters?.length) return raw;
   if (allowedFilters.includes(raw)) return raw;
-  if (raw.startsWith("type:") || raw.startsWith("field:")) return raw;
+  if (raw.startsWith("type:") || raw.startsWith("field:") || raw.startsWith("kind:")) return raw;
   return defaultFilter;
 }
 

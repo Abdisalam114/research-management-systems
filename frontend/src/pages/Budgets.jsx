@@ -361,7 +361,6 @@ export function BudgetsPage() {
       value: formatMoney(totals.remaining, totals.currency),
       sub: "Allocated − paid (auto-deducted)",
       accent: "#38bdf8",
-      filterKey: "all",
     },
     {
       label: "Utilization",
@@ -821,7 +820,7 @@ function TopPaymentForm({ budgets, accessToken, onClose, onChange, setError }) {
   }
 
   return (
-    <div className="card" style={{ marginTop: 12 }}>
+    <form className="card" style={{ marginTop: 12 }} onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <div style={{ fontWeight: 800, marginBottom: 8 }}>💳 New payment request</div>
       {budget ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
@@ -866,10 +865,10 @@ function TopPaymentForm({ budgets, accessToken, onClose, onChange, setError }) {
         <input value={form.notes} onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))} disabled={busy} />
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <button type="button" className="btn primary" onClick={submit} disabled={busy}>{busy ? "Submitting…" : "Submit for director approval"}</button>
+        <button type="submit" className="btn primary" disabled={busy}>{busy ? "Submitting…" : "Submit for director approval"}</button>
         <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
       </div>
-    </div>
+    </form>
   );
 }
 
@@ -934,7 +933,7 @@ function TopPOForm({ budgets, accessToken, onClose, onChange, setError }) {
   }
 
   return (
-    <div className="card" style={{ marginTop: 12 }}>
+    <form className="card" style={{ marginTop: 12 }} onSubmit={(e) => { e.preventDefault(); submit(); }}>
       <div style={{ fontWeight: 800, marginBottom: 8 }}>🛒 New purchase order</div>
       {budget ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
@@ -990,10 +989,10 @@ function TopPOForm({ budgets, accessToken, onClose, onChange, setError }) {
         <input value={form.notes} onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))} />
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        <button type="button" className="btn primary" onClick={submit} disabled={busy}>{busy ? "Submitting…" : "Submit PO for approval"}</button>
+        <button type="submit" className="btn primary" disabled={busy}>{busy ? "Submitting…" : "Submit PO for approval"}</button>
         <button type="button" className="btn" onClick={onClose} disabled={busy}>Cancel</button>
       </div>
-    </div>
+    </form>
   );
 }
 

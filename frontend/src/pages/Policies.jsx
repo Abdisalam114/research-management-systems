@@ -4,6 +4,8 @@ import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as policyApi from "../services/policyApi";
 import { PageHeader } from "../components/PageHeader";
+import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
+import { statFilterLabel } from "../utils/pageHeaderFilters";
 import {
   POLICY_CATEGORY_LABELS,
   POLICY_CATEGORY_ORDER,
@@ -80,7 +82,7 @@ export function PoliciesPage() {
   const { accessToken, user } = useAuth();
   const isLeadership = user?.role === "leadership";
   const [policies, setPolicies] = useState([]);
-  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useUrlStatFilter("all");
   const [form, setForm] = useState(EMPTY);
   const [editingId, setEditingId] = useState(null);
   const [showForm, setShowForm] = useState(false);
@@ -215,6 +217,12 @@ export function PoliciesPage() {
           ) : null
         }
       />
+
+      {categoryFilter !== "all" ? (
+        <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
+          Showing: <strong>{statFilterLabel(stats, categoryFilter)}</strong> ({filtered.length})
+        </p>
+      ) : null}
 
       {message ? (
         <div className="fundingCallsBanner fundingCallsBannerOk" style={{ marginBottom: 12 }}>

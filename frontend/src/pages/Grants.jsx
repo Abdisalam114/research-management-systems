@@ -115,6 +115,9 @@ setGrants(withCall);
       { label: "Awarded", value: awardedCount, filterKey: "awarded", accent: "#16a34a", sub: "From funding calls" },
       { label: "Awarded $", value: `$${totalAwarded.toLocaleString()}`, accent: "#38bdf8", sub: "Total awarded amount" },
       { label: "Active", value: by("active"), filterKey: "active", accent: "#0ea5e9" },
+      ...(by("rejected") > 0
+        ? [{ label: "Rejected", value: by("rejected"), filterKey: "rejected", accent: "#ef4444" }]
+        : []),
     ];
   }, [grants]);
 

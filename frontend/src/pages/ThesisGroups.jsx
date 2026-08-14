@@ -3,13 +3,13 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { useModuleLoad } from "../hooks/useModuleLoad";
-import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as thesisApi from "../services/thesisGroupApi";
 import * as userApi from "../services/userApi";
 import * as departmentApi from "../services/departmentApi";
 import { PageHeader } from "../components/PageHeader";
 import { GroupsModuleNav } from "../components/GroupsModuleNav";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
+import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } from "../constants/faculties";
 import { apiOrigin } from "../config/apiBase";
 import "./groups.css";
@@ -221,11 +221,10 @@ export function ThesisGroupsPage() {
   const [finalDocFile, setFinalDocFile] = useState(null);
   const [markThesisCompleted, setMarkThesisCompleted] = useState(true);
   const [uploadingFinalDoc, setUploadingFinalDoc] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
 
   const [message, setMessage] = useState("");
 
-  useScrollToTop([showForm, editingId, expandedId]);
 
   const canManage = MANAGE_ROLES.includes(user?.role);
 
@@ -321,11 +320,13 @@ export function ThesisGroupsPage() {
   const stats = useMemo(() => {
     const validGroups = groups.filter(isValidThesisGroup);
     const titleAccepted = validGroups.filter(isTitleAccepted).length;
-    const withTitle = validGroups.filter((g) => Boolean(displayTitle(g))).length;
+    const completedCount = groups.filter((g) => g.status === "completed").length;
+    const defendedCount = groups.filter((g) => g.status === "defended").length;
     const totalStudents = validGroups.reduce((acc, g) => acc + (g.students?.length || 0), 0);
     return [
-      { label: "Thesis groups", value: validGroups.length, filterKey: "validGroups", accent: "#0ea5e9" },
-      { label: "With title", value: withTitle, filterKey: "hasTitle", accent: "#f59e0b" },
+      { label: "Total", value: groups.length, filterKey: "all" },
+      { label: "Completed", value: completedCount, filterKey: "completed", accent: "#16a34a", alwaysShow: true },
+      { label: "Defended", value: defendedCount, filterKey: "defended", accent: "#0ea5e9", alwaysShow: true },
       { label: "Title recorded", value: titleAccepted, filterKey: "titleAccepted", accent: "#22c55e" },
       {
         label: "With supervisor",
@@ -341,8 +342,8 @@ export function ThesisGroupsPage() {
     () =>
       filterByStatKey(groups, statusFilter, {
         customFilters: {
-          validGroups: isValidThesisGroup,
-          hasTitle: (g) => Boolean(g.title?.trim()),
+          completed: (g) => g.status === "completed",
+          defended: (g) => g.status === "defended",
           hasSupervisor: (g) => Boolean(g.supervisorId) && isValidThesisGroup(g),
           hasStudents: (g) => isValidThesisGroup(g) && (g.students?.length || 0) > 0,
           titleAccepted: (g) => isTitleAccepted(g) && isValidThesisGroup(g),
