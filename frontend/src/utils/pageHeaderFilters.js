@@ -20,7 +20,15 @@ export function isAwardedItem(item, statusField = "status") {
   return Number(item.amountAwarded || 0) > 0;
 }
 
-/** filterKey conventions: all | status value | type:X | field:value | custom keys in customFilters */
+function itemKind(item) {
+  if (item?.isVoluntary === false) return "grant_fund_call";
+  if (item?.proposalKind === "grant_fund_call" || item?.fundingCallId) return "grant_fund_call";
+  if (item?.kind) return String(item.kind);
+  if (item?.proposalKind) return String(item.proposalKind);
+  return "voluntary";
+}
+
+/** filterKey conventions: all | status value | kind:X | type:X | field:value | custom keys in customFilters */
 export function filterByStatKey(items, filterKey, options = {}) {
   const opts = typeof options === "string" ? { statusField: options } : options;
   const { statusField = "status", customFilters = {} } = opts;
@@ -29,6 +37,10 @@ export function filterByStatKey(items, filterKey, options = {}) {
   if (customFilters[filterKey]) return items.filter((i) => customFilters[filterKey](i));
   if (filterKey === "awarded" || filterKey === "awarded_total") return items.filter((i) => isAwardedItem(i, statusField));
 
+  if (filterKey.startsWith("kind:") || filterKey === "voluntary" || filterKey === "grant_fund_call") {
+    const value = filterKey.startsWith("kind:") ? filterKey.slice(5) : filterKey;
+    return items.filter((i) => itemKind(i) === value);
+  }
   if (filterKey.startsWith("type:")) {
     const value = filterKey.slice(5);
     return items.filter((i) => i.type === value);

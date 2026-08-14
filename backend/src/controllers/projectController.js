@@ -44,9 +44,10 @@ function attachPrincipalInvestigator(out, p) {
 async function resolveProjectKindMeta(req, project) {
   let proposalKind = "voluntary";
   let fundingCallId = null;
+  const proposalId = project?.proposalId?._id || project?.proposalId || null;
 
-  if (project?.proposalId) {
-    const linkedProposal = await Proposal.findById(project.proposalId).select(
+  if (proposalId) {
+    const linkedProposal = await Proposal.findById(proposalId).select(
       "proposalKind fundingCallId"
     );
     if (linkedProposal) {
@@ -57,24 +58,27 @@ async function resolveProjectKindMeta(req, project) {
     }
   }
 
-  // Projects created from an accepted grant (no proposal) are Grant Fund, not Voluntary
-  if (proposalKind === "voluntary" && !fundingCallId) {
-    const fundedGrant = await Grant.findOne({
-      projectId: project._id,
-      $or: [
-        { callId: { $ne: null, $exists: true } },
-        { amountAwarded: { $gt: 0 } },
-        { status: { $in: ["active", "pending_finance", "approved"] } },
-      ],
-    }).select("_id callId amountAwarded status");
-    if (fundedGrant) {
-      proposalKind = "grant_fund_call";
-      if (fundedGrant.callId) fundingCallId = fundedGrant.callId;
-    }
+  const grantMatch = [{ projectId: project._id }];
+  if (proposalId) grantMatch.push({ proposalId });
+  const fundedGrant = await Grant.findOne({
+    $and: [
+      { $or: grantMatch },
+      {
+        $or: [
+          { callId: { $ne: null, $exists: true } },
+          { amountAwarded: { $gt: 0 } },
+          { status: { $in: ["active", "pending_finance", "approved"] } },
+        ],
+      },
+    ],
+  }).select("_id callId amountAwarded status");
+
+  if (fundedGrant) {
+    proposalKind = "grant_fund_call";
+    if (fundedGrant.callId) fundingCallId = fundedGrant.callId;
   }
 
-  const isVoluntary =
-    proposalKind === "voluntary" || (!fundingCallId && proposalKind !== "grant_fund_call");
+  const isVoluntary = proposalKind !== "grant_fund_call" && !fundingCallId && !fundedGrant;
 
   return {
     proposalKind: isVoluntary ? "voluntary" : "grant_fund_call",
@@ -317,26 +321,13 @@ async function getProject(req, res) {
   });
   const canViewAwards = canViewProjectAwards({ role: req.user.role, hasProjectPublication: Boolean(hasPublication) });
 
-  let proposalKind = "voluntary";
-  let fundingCallId = null;
-  if (project.proposalId) {
-    const linkedProposal = project.proposalId
-      ? await Proposal.findById(project.proposalId).select("proposalKind fundingCallId")
-      : null;
-    if (linkedProposal) {
-      fundingCallId = linkedProposal.fundingCallId || null;
-      proposalKind =
-        linkedProposal.proposalKind ||
-        (linkedProposal.fundingCallId ? "grant_fund_call" : "voluntary");
-    }
-  }
-  // Also treat as funded if any linked grant has a callId
-  const hasFundedGrant = grantDocs.some((g) => g.callId || Number(g.amountAwarded || 0) > 0);
-  const isVoluntary = (proposalKind === "voluntary" || (!fundingCallId && proposalKind !== "grant_fund_call")) && !hasFundedGrant;
+  const kindMeta = await resolveProjectKindMeta(req, project);
+  const isVoluntary = kindMeta.isVoluntary;
 
   const out = sanitizeProject(project);
-  out.proposalKind = proposalKind;
+  out.proposalKind = kindMeta.proposalKind;
   out.isVoluntary = isVoluntary;
+  out.fundingCallId = kindMeta.fundingCallId;
   // Show linked grants on the project as soon as funding is linked — not only after Completed
   out.grantsVisible = !isVoluntary;
   out.awardsVisible = !isVoluntary && canViewAwards;

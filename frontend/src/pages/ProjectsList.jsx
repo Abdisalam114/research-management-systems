@@ -13,7 +13,23 @@ import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 function projectKind(p) {
   if (p?.isVoluntary === false) return "grant_fund_call";
   if (p?.proposalKind === "grant_fund_call" || p?.fundingCallId) return "grant_fund_call";
+  if (p?.isVoluntary === true || p?.proposalKind === "voluntary") return "voluntary";
   return "voluntary";
+}
+
+function isKindFilter(key) {
+  return (
+    key === "kind:voluntary" ||
+    key === "voluntary" ||
+    key === "kind:grant_fund_call" ||
+    key === "grant_fund_call"
+  );
+}
+
+function kindFilterValue(key) {
+  if (key === "kind:voluntary" || key === "voluntary") return "voluntary";
+  if (key === "kind:grant_fund_call" || key === "grant_fund_call") return "grant_fund_call";
+  return null;
 }
 
 function kindLabel(p) {
@@ -167,10 +183,15 @@ export function ProjectsListPage({
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load projects"));
   }, [accessToken, programTier]);
 
-  const pendingDirectorClosures = useMemo(
-    () => (isDirector ? projects.filter((p) => p.closure?.status === "submitted") : []),
-    [projects, isDirector]
-  );
+  const pendingDirectorClosures = useMemo(() => {
+    if (!isDirector) return [];
+    const kind = kindFilterValue(statusFilter);
+    return projects.filter((p) => {
+      if (p.closure?.status !== "submitted") return false;
+      if (kind && projectKind(p) !== kind) return false;
+      return true;
+    });
+  }, [projects, isDirector, statusFilter]);
 
 
   async function approveClosure(p) {
@@ -231,7 +252,9 @@ export function ProjectsListPage({
           closing: (p) => p.status === "closing",
           completed: (p) => ["completed", "closed"].includes(p.status),
           "kind:voluntary": (p) => projectKind(p) === "voluntary",
+          voluntary: (p) => projectKind(p) === "voluntary",
           "kind:grant_fund_call": (p) => projectKind(p) === "grant_fund_call",
+          grant_fund_call: (p) => projectKind(p) === "grant_fund_call",
         },
       }),
     [projects, statusFilter]
@@ -246,8 +269,8 @@ export function ProjectsListPage({
     [filtered]
   );
 
-  const kindOnlyFilter =
-    statusFilter === "kind:voluntary" || statusFilter === "kind:grant_fund_call";
+  const kindOnlyFilter = isKindFilter(statusFilter);
+  const selectedKind = kindFilterValue(statusFilter);
 
   return (
     <div>
@@ -278,11 +301,25 @@ export function ProjectsListPage({
         }
       />
 
-      <div className="card" style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5 }}>
-        <strong>Voluntary</strong> — research project ka yimid voluntary proposal (ethics + workflow).
-        <br />
-        <strong>Grant Fund Call</strong> — project ka yimid funding call / grant la aqbalay.
-      </div>
+      {kindOnlyFilter ? (
+        <div className="card" style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5 }}>
+          {selectedKind === "voluntary" ? (
+            <>
+              <strong>Voluntary</strong> — kaliya projects ka yimid voluntary proposal (ethics + workflow). Grant Fund Call lama muujinayo.
+            </>
+          ) : (
+            <>
+              <strong>Grant Fund Call</strong> — kaliya projects ka yimid funding call / grant la aqbalay. Voluntary lama muujinayo.
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="card" style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5 }}>
+          <strong>Voluntary</strong> — research project ka yimid voluntary proposal (ethics + workflow).
+          <br />
+          <strong>Grant Fund Call</strong> — project ka yimid funding call / grant la aqbalay.
+        </div>
+      )}
 
       {statusFilter !== "all" ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
@@ -347,8 +384,7 @@ export function ProjectsListPage({
         </div>
       ) : (
         <>
-          {(statusFilter === "all" || voluntaryProjects.length > 0) &&
-          statusFilter !== "kind:grant_fund_call" ? (
+          {(statusFilter === "all" || (!kindOnlyFilter && voluntaryProjects.length > 0)) ? (
             <ProjectSection
               title={`Voluntary research (${voluntaryProjects.length})`}
               hint="Projects from voluntary proposals — no funding-call award."
@@ -359,8 +395,7 @@ export function ProjectsListPage({
               busyId={busyId}
             />
           ) : null}
-          {(statusFilter === "all" || grantProjects.length > 0) &&
-          statusFilter !== "kind:voluntary" ? (
+          {(statusFilter === "all" || (!kindOnlyFilter && grantProjects.length > 0)) ? (
             <ProjectSection
               title={`Grant Fund Call (${grantProjects.length})`}
               hint="Projects linked to an accepted funding-call grant or fund-call proposal."
