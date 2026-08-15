@@ -11,7 +11,7 @@ import { GroupsModuleNav } from "../components/GroupsModuleNav";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } from "../constants/faculties";
-import { todayIso } from "../utils/dateConstraints";
+import { dateIso } from "../utils/dateConstraints";
 import { openProtectedUpload } from "../utils/protectedFile";
 import "./groups.css";
 
@@ -135,6 +135,11 @@ function formTitleValue(g) {
 
 function isTitleAccepted(g) {
   return g.titleProposal?.status === "accepted";
+}
+
+function titleAcceptedDateIso(g) {
+  const at = g?.titleProposal?.reviewedAt || g?.titleProposal?.proposedAt || g?.createdAt;
+  return dateIso(at);
 }
 
 function isValidThesisGroup(g) {
@@ -481,6 +486,14 @@ export function ThesisGroupsPage() {
       setMessage("");
       if (!meetingForm.date) {
         setError("Meeting date is required");
+        return;
+      }
+      const group = groups.find((x) => String(x.id) === String(groupId));
+      const minDate = titleAcceptedDateIso(group);
+      if (minDate && meetingForm.date < minDate) {
+        setError(
+          `Meeting date cannot be before the title was accepted (${minDate}). Use that date or any date after it.`
+        );
         return;
       }
       const res = await thesisApi.addThesisMeeting(accessToken, groupId, meetingForm);
@@ -1280,11 +1293,16 @@ export function ThesisGroupsPage() {
                             <label>Date</label>
                             <input
                               type="date"
-                              max={todayIso()}
+                              min={titleAcceptedDateIso(g) || undefined}
                               value={meetingForm.date}
                               onChange={(e) => setMeetingForm({ ...meetingForm, date: e.target.value })}
                               required
                             />
+                            {titleAcceptedDateIso(g) ? (
+                              <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                                From title accepted ({titleAcceptedDateIso(g)}) onward.
+                              </div>
+                            ) : null}
                           </div>
                           <div className="field">
                             <label>Location</label>

@@ -92,6 +92,24 @@ function resolveTitleProposal(plain) {
   return emptyTitleProposal();
 }
 
+function campusCalendarIso(value) {
+  if (!value) return "";
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Mogadishu",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function titleAcceptedCalendarIso(group) {
+  const at = group?.titleProposal?.reviewedAt || group?.titleProposal?.proposedAt || group?.createdAt;
+  return campusCalendarIso(at);
+}
+
 function isTitleAcceptedForProgress(group) {
   const tp = group.titleProposal || {};
   const status = tp.status || TITLE_PROPOSAL_STATUSES.NONE;
@@ -889,11 +907,12 @@ async function addMeeting(req, res) {
     throw new AppError("Invalid meeting date", 400);
   }
 
-  const meetingDay = new Date(`${dateStr}T23:59:59.999Z`);
-  const todayEnd = new Date();
-  todayEnd.setUTCHours(23, 59, 59, 999);
-  if (meetingDay.getTime() > todayEnd.getTime()) {
-    throw new AppError("Meeting date cannot be in the future", 400);
+  const acceptedIso = titleAcceptedCalendarIso(group);
+  if (acceptedIso && dateStr < acceptedIso) {
+    throw new AppError(
+      `Meeting date cannot be before the title was accepted (${acceptedIso}). Use that date or any date after it.`,
+      400
+    );
   }
 
   group.meetings.push({
