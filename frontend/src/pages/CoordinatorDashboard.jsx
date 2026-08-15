@@ -65,7 +65,7 @@ export function CoordinatorDashboardPage() {
       const blob = await analyticsApi.downloadFacultyReportPdf(accessToken);
       triggerBlobDownload(
         blob,
-        `Faculty-Report-${(user?.department || "all").replace(/\s+/g, "-")}.pdf`
+        `Faculty-Report-all-faculties.pdf`
       );
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to download faculty report");
@@ -78,7 +78,7 @@ export function CoordinatorDashboardPage() {
     <div className="dashboardPage">
       <header className="dashPageHeader">
         <h1 className="dashPageTitle">Faculty research monitoring</h1>
-        <p className="dashPageSub">Faculty Coordinator — {user?.department || "your faculty"}</p>
+        <p className="dashPageSub">Faculty Coordinator — all faculties</p>
       </header>
 
       {error ? <div className="card" style={{ borderColor: DASH_ERROR_BORDER }}>{error}</div> : null}
@@ -103,7 +103,7 @@ export function CoordinatorDashboardPage() {
         <div className="dashCard">
           <div className="dashCardTitle">Proposal pre-review queue</div>
         {queue.length === 0 ? (
-          <p className="muted">No proposals awaiting review in your faculty.</p>
+          <p className="muted">No proposals awaiting review.</p>
         ) : (
           <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
             {queue.map((p) => (
@@ -172,7 +172,7 @@ export function CoordinatorDashboardPage() {
               principalInvestigator: p.pi,
             }))}
             totalActive={facultyReport.counts?.activeProjects}
-            title="Active Projects (Faculty)"
+            title="Active Projects"
           />
         </section>
       ) : null}

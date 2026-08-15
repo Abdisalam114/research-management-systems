@@ -16,7 +16,6 @@ const { Notification } = require("../models/Notification");
 const { PurchaseOrder } = require("../models/PurchaseOrder");
 const { Conversation } = require("../models/Conversation");
 const { AuditEvent } = require("../models/AuditEvent");
-const { coordinatorMatchesResearcherDept } = require("../utils/facultyMatcher");
 const { peerReviewLeadershipQueueFilter } = require("../utils/proposalReviewPipeline");
 const { buildRepositoryAccessFilter, isSeedRepositoryItem } = require("./repositoryExportService");
 
@@ -287,7 +286,7 @@ async function searchAuditEvents(req, titleRx, tw) {
 
 async function runGlobalSearch(req) {
   const q = String(req.query?.q || "").trim();
-  const { role, id: userId, department } = req.user;
+  const { role, id: userId } = req.user;
   const titleRx = new RegExp(escapeRegex(q), "i");
   const tw = (base = {}) => req.tierWhere(base);
   const owned = (base = {}) =>
@@ -427,7 +426,7 @@ async function runGlobalSearch(req) {
       ? ThesisGroup.find(thesisFilter)
           .sort({ updatedAt: -1 })
           .limit(LIMIT)
-          .select("title titleProposal students status department faculty supervisorId")
+          .select("title titleProposal students status department faculty supervisorId coordinatorId createdBy")
       : Promise.resolve([]),
     includeResearchGroups
       ? ResearchGroup.find(groupFilter).sort({ updatedAt: -1 }).limit(LIMIT).select("name description kind")
@@ -459,74 +458,29 @@ async function runGlobalSearch(req) {
     searchAuditEvents(req, titleRx, tw),
   ]);
 
-  let visiblePublications = publications;
-  if (role === ROLES.FACULTY_COORDINATOR && department) {
-    const dept = String(department).trim();
-    visiblePublications = publications.filter(
-      (p) => p.researcherId && coordinatorMatchesResearcherDept(dept, p.researcherId.department)
-    );
-  }
-
-  let visibleEthics = ethicsApps;
-  if (role === ROLES.FACULTY_COORDINATOR && department) {
-    const dept = String(department).trim();
-    visibleEthics = ethicsApps.filter((a) => {
-      const d = a.principal?.department || a.researcherId?.department || "";
-      return coordinatorMatchesResearcherDept(dept, d);
-    });
-  }
-
-  let visibleProposals = proposals;
-  let visibleProjects = projects;
-  let visibleGrants = grants;
-  if (role === ROLES.FACULTY_COORDINATOR && department) {
-    const dept = String(department).trim();
-    visibleProposals = proposals
-      .filter((p) =>
-        coordinatorMatchesResearcherDept(dept, p.department || p.researcherId?.department || "")
-      )
-      .slice(0, LIMIT);
-    visibleProjects = projects
-      .filter((p) =>
-        coordinatorMatchesResearcherDept(dept, p.department || p.researcherId?.department || "")
-      )
-      .slice(0, LIMIT);
-    visibleGrants = grants
-      .filter((g) => coordinatorMatchesResearcherDept(dept, g.researcherId?.department || ""))
-      .slice(0, LIMIT);
-  }
-
-  let visibleThesis = thesisGroups;
-  if (role === ROLES.FACULTY_COORDINATOR && department) {
-    const dept = String(department).trim();
-    visibleThesis = thesisGroups.filter((g) =>
-      coordinatorMatchesResearcherDept(dept, g.department || g.faculty || "")
-    );
-  }
-
   const results = {
-    proposals: visibleProposals.map((p) => ({
+    proposals: proposals.map((p) => ({
       id: idStr(p),
       title: p.title,
       status: p.status,
       type: "proposal",
       link: proposalLink(role, idStr(p)),
     })),
-    projects: visibleProjects.map((p) => ({
+    projects: projects.map((p) => ({
       id: idStr(p),
       title: p.title,
       status: p.status,
       type: "project",
       link: `/projects/${idStr(p)}`,
     })),
-    grants: visibleGrants.map((g) => ({
+    grants: grants.map((g) => ({
       id: idStr(g),
       title: g.title,
       status: g.status,
       type: "grant",
       link: `/grants/${idStr(g)}`,
     })),
-    publications: visiblePublications.map((p) => ({
+    publications: publications.map((p) => ({
       id: idStr(p),
       title: p.title,
       status: p.status,
@@ -540,7 +494,7 @@ async function runGlobalSearch(req) {
       type: "funding_call",
       link: `/funding-calls?callId=${idStr(c)}`,
     })),
-    ethics: visibleEthics.map((a) => ({
+    ethics: ethicsApps.map((a) => ({
       id: idStr(a),
       title: ethicsTitle(a),
       status: a.status,
@@ -551,7 +505,7 @@ async function runGlobalSearch(req) {
           : `/proposals/${idStr(a.proposalId)}/review`
         : `/ethics?applicationId=${idStr(a)}`,
     })),
-    thesisGroups: visibleThesis.map((g) => ({
+    thesisGroups: thesisGroups.map((g) => ({
       id: idStr(g),
       title: thesisTitle(g),
       subtitle: thesisSubtitle(g),

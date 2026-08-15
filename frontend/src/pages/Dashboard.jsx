@@ -51,7 +51,7 @@ function RoleDashboard({ role, user }) {
   }, [role, accessToken, programTier]);
 
   const roleHints = {
-    faculty_coordinator: { title: "Department (Faculty Coordinator)", focus: "Support and approve internal department priority." },
+    faculty_coordinator: { title: "Faculty Coordinator", focus: "Support and review research across all faculties on this portal." },
     finance_officer: { title: "Finance Office", focus: "Budgets, payments, purchase-order review, grant funding, and financial reports." },
     researcher: { title: "Researcher / PI", focus: "Apply for grants via funding calls, proposals, projects, reports." },
     research_director: { title: "Research Director", focus: "Approve proposals, ethics, users, funding calls (internal & external), donor reports, and overall system oversight." },

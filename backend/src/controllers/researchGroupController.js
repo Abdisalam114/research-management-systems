@@ -62,13 +62,6 @@ async function listGroups(req, res) {
       .populate("supervisorId", "fullName department");
     const map = new Map(theses.map((t) => [String(t.researchGroupId), t]));
     let out = groups.map((g) => sanitizeGroup(g, map.get(String(g._id))));
-    if (req.user.role === "faculty_coordinator") {
-      const { resolveCoordinatorDepartment, recordInCoordinatorFaculty } = require("../utils/facultyMatcher");
-      const dept = resolveCoordinatorDepartment(req);
-      out = dept
-        ? out.filter((g) => recordInCoordinatorFaculty(dept, g.thesis?.department, g.thesis?.faculty))
-        : [];
-    }
     return res.json({ groups: out });
   }
 

@@ -228,7 +228,7 @@ export function ThesisGroupsPage() {
 
 
   const canManage = MANAGE_ROLES.includes(user?.role);
-  const lockFaculty = user?.role === "faculty_coordinator";
+  const lockFaculty = false;
   const homeFaculty = defaultFacultyForUser(user);
 
   const load = useCallback(async () => {

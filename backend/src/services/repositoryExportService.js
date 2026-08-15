@@ -60,18 +60,8 @@ async function buildRepositoryAccessFilter(req) {
   return tw({ ...projectFilter, $or: accessOr });
 }
 
-async function scopeCoordinatorFacultyItems(req, items) {
-  if (req.user?.role !== "faculty_coordinator") return items;
-  const { resolveCoordinatorDepartment, recordInCoordinatorFaculty } = require("../utils/facultyMatcher");
-  const dept = resolveCoordinatorDepartment(req);
-  if (!dept) return [];
-  const populated = await RepositoryItem.populate(items, [
-    { path: "uploadedBy", select: "department" },
-    { path: "projectId", select: "title status researcherId", populate: { path: "researcherId", select: "department" } },
-  ]);
-  return populated.filter((item) =>
-    recordInCoordinatorFaculty(dept, item.uploadedBy?.department, item.projectId?.researcherId?.department)
-  );
+async function scopeCoordinatorFacultyItems(_req, items) {
+  return items;
 }
 
 async function fetchItemsForUser(req) {

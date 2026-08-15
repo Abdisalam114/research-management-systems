@@ -1,6 +1,6 @@
 const { ThesisGroup, THESIS_STATUSES } = require("../models/ThesisGroup");
 const { User, ROLES, USER_STATUSES } = require("../models/User");
-const { FACULTIES, DEFAULT_FACULTY, matchFacultyByName, resolveCoordinatorDepartment, recordInCoordinatorFaculty } = require("../utils/facultyMatcher");
+const { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } = require("../utils/facultyMatcher");
 function canonicalFaculty(value, fallbackName) {
   const raw = String(value || "").trim();
   if (raw && FACULTIES.includes(raw)) return raw;
@@ -11,17 +11,8 @@ function facultiesMatch(a, b, fallbackName) {
   return canonicalFaculty(a, fallbackName) === canonicalFaculty(b, fallbackName);
 }
 
-function assertCoordinatorThesisFaculty(req, group) {
-  if (req.user?.role !== ROLES.FACULTY_COORDINATOR) return;
-  const dept = resolveCoordinatorDepartment(req);
-  if (!dept) throw new AppError("Coordinator department not configured", 403);
-  const ok = recordInCoordinatorFaculty(
-    dept,
-    group.department,
-    group.faculty
-  );
-  if (!ok) throw new AppError("Thesis group is outside your faculty", 403);
-}
+/** Coordinators work across all faculties (portal UG/PG still applies). */
+function assertCoordinatorThesisFaculty(_req, _group) {}
 const { AppError } = require("../utils/AppError");
 const { ResearchGroup, GROUP_MEMBER_ROLES, GROUP_KINDS } = require("../models/ResearchGroup");
 const { Department } = require("../models/Department");
@@ -286,12 +277,6 @@ async function findSupervisorResearcher(supervisorId, req) {
   const scoped = req?.userWhere ? req.userWhere(filter) : filter;
   const sup = await User.findOne(scoped);
   if (!sup) return null;
-  if (req.user?.role === ROLES.FACULTY_COORDINATOR) {
-    const dept = resolveCoordinatorDepartment(req);
-    if (dept && !recordInCoordinatorFaculty(dept, sup.department)) {
-      throw new AppError("Supervisor must be in your faculty", 403);
-    }
-  }
   return sup;
 }
 
@@ -372,13 +357,6 @@ async function listGroups(req, res) {
     .populate("createdBy", "fullName email role")
     .populate("meetings.loggedBy", "fullName email");
 
-  if (role === ROLES.FACULTY_COORDINATOR) {
-    const dept = resolveCoordinatorDepartment(req);
-    groups = dept
-      ? groups.filter((g) => recordInCoordinatorFaculty(dept, g.department, g.faculty))
-      : [];
-  }
-
   // One-time legacy title sync only — do not rewrite students from seed templates on every list
   await Promise.all(groups.map((g) => syncLegacyTitleProposal(g)));
 
@@ -451,12 +429,6 @@ async function createGroup(req, res) {
     department,
     faculty,
   });
-  if (role === ROLES.FACULTY_COORDINATOR) {
-    const coordDept = resolveCoordinatorDepartment(req);
-    if (coordDept && !recordInCoordinatorFaculty(coordDept, cleanDepartment, facultyValue)) {
-      throw new AppError("Thesis group must be within your faculty", 403);
-    }
-  }
   const coordinatorId = role === ROLES.FACULTY_COORDINATOR ? userId : null;
 
   const leadId = resolvedSupervisorId || userId;

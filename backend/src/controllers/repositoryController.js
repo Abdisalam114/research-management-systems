@@ -62,20 +62,7 @@ function fileBasename(filePath) {
   return parts[parts.length - 1] || rel || "file";
 }
 
-async function assertCoordinatorRepositoryFaculty(req, item) {
-  const { resolveCoordinatorDepartment, recordInCoordinatorFaculty } = require("../utils/facultyMatcher");
-  const dept = resolveCoordinatorDepartment(req);
-  if (!dept) throw new AppError("Forbidden", 403);
-  await item.populate([
-    { path: "uploadedBy", select: "department" },
-    { path: "projectId", select: "researcherId", populate: { path: "researcherId", select: "department" } },
-  ]);
-  const uploaderDept = item.uploadedBy?.department;
-  const ownerDept = item.projectId?.researcherId?.department;
-  if (!recordInCoordinatorFaculty(dept, uploaderDept, ownerDept)) {
-    throw new AppError("Forbidden", 403);
-  }
-}
+async function assertCoordinatorRepositoryFaculty(_req, _item) {}
 
 async function assertCanAccessItem(req, item) {
   if (req.user.role === "research_director") return;

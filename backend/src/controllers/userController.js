@@ -176,15 +176,7 @@ async function listUsers(req, res) {
   const users = await userFind(req, filter).sort({
     createdAt: -1,
   });
-  let list = users;
-  if (req.user?.role === ROLES.FACULTY_COORDINATOR) {
-    const { coordinatorMatchesResearcherDept, resolveCoordinatorDepartment } = require("../utils/facultyMatcher");
-    const dept = resolveCoordinatorDepartment(req);
-    list = dept
-      ? users.filter((u) => coordinatorMatchesResearcherDept(dept, u.department))
-      : [];
-  }
-  res.json({ users: list.map(sanitizeUser) });
+  res.json({ users: users.map(sanitizeUser) });
 }
 
 async function approveUser(req, res) {

@@ -194,23 +194,6 @@ async function listProjects(req, res) {
   }
 
   let projects = await Project.find(tierFilter).sort({ createdAt: -1 }).populate(PROJECT_POPULATE);
-  if (role === "faculty_coordinator") {
-    const {
-      resolveCoordinatorDepartment,
-      coordinatorMatchesResearcherDept,
-    } = require("../utils/facultyMatcher");
-    const dept = resolveCoordinatorDepartment(req);
-    if (dept) {
-      projects = projects.filter((p) =>
-        coordinatorMatchesResearcherDept(
-          dept,
-          p.department || p.researcherId?.department || ""
-        )
-      );
-    } else {
-      projects = [];
-    }
-  }
   const sanitized = await Promise.all(
     projects.map(async (p) => {
       const base = sanitizeProject(p);
@@ -246,23 +229,6 @@ async function getProject(req, res) {
   const isOwner = String(project.researcherId?._id || project.researcherId) === String(req.user.id);
   const isStaff = ["faculty_coordinator", "research_director", "finance_officer"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
-  if (req.user.role === "faculty_coordinator") {
-    const {
-      resolveCoordinatorDepartment,
-      recordInCoordinatorFaculty,
-    } = require("../utils/facultyMatcher");
-    const dept = resolveCoordinatorDepartment(req);
-    if (
-      dept &&
-      !recordInCoordinatorFaculty(
-        dept,
-        project.department,
-        project.researcherId?.department
-      )
-    ) {
-      throw new AppError("Project is outside your faculty", 403);
-    }
-  }
 
   // Finance: return closure/finance payload only — never general project dossier.
   if (req.user.role === "finance_officer") {

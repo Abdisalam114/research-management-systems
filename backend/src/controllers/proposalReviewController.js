@@ -1,13 +1,9 @@
 const { Proposal, PROPOSAL_STATUSES } = require("../models/Proposal");
-const { User, ROLES } = require("../models/User");
+const { ROLES } = require("../models/User");
 const { AppError } = require("../utils/AppError");
 const { notifyUser } = require("../utils/notify");
 const { notifyProposalResearcher } = require("../utils/notifyProposalResearcher");
 const { recordAudit } = require("../utils/audit");
-const {
-  coordinatorMatchesResearcherDept,
-  resolveCoordinatorDepartment,
-} = require("../utils/facultyMatcher");
 const {
   STAGE_STATUS,
   ensureReviewPipeline,
@@ -24,19 +20,7 @@ const {
   financeSentToOfficersFilter,
 } = require("../utils/proposalReviewPipeline");
 
-async function assertCoordinatorProposalFaculty(req, proposal) {
-  if (req.user?.role !== "faculty_coordinator") return;
-  const dept = resolveCoordinatorDepartment(req);
-  if (!dept) return;
-  let researcherDept = proposal.department || "";
-  if (!researcherDept && proposal.researcherId) {
-    const owner = await User.findById(proposal.researcherId).select("department").lean();
-    researcherDept = owner?.department || "";
-  }
-  if (!coordinatorMatchesResearcherDept(dept, researcherDept)) {
-    throw new AppError("Proposal is outside your faculty", 403);
-  }
-}
+async function assertCoordinatorProposalFaculty(_req, _proposal) {}
 
 function sanitizeProposalBrief(p) {
   return {

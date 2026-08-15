@@ -167,24 +167,7 @@ async function syncLinkedProposalEthics(proposalId, ethicsStatus, ethicsAppId, p
   await linked.save();
 }
 
-async function assertCoordinatorEthicsFaculty(req, application) {
-  if (req.user.role !== "faculty_coordinator") return;
-  const {
-    resolveCoordinatorDepartment,
-    recordInCoordinatorFaculty,
-  } = require("../utils/facultyMatcher");
-  const dept = resolveCoordinatorDepartment(req);
-  if (!dept) return;
-  let researcherDept = application.principal?.department || "";
-  if (!researcherDept && application.researcherId) {
-    const { User } = require("../models/User");
-    const owner = await User.findById(application.researcherId).select("department").lean();
-    researcherDept = owner?.department || "";
-  }
-  if (!recordInCoordinatorFaculty(dept, researcherDept, application.principal?.department)) {
-    throw new AppError("Application is outside your faculty", 403);
-  }
-}
+async function assertCoordinatorEthicsFaculty(_req, _application) {}
 
 async function listEthicsApplications(req, res) {
   const { role, id } = req.user;
@@ -192,23 +175,6 @@ async function listEthicsApplications(req, res) {
   let applications = await EthicsApplication.find(filter)
     .sort({ createdAt: -1 })
     .populate("researcherId", "department");
-  if (role === "faculty_coordinator") {
-    const {
-      resolveCoordinatorDepartment,
-      coordinatorMatchesResearcherDept,
-    } = require("../utils/facultyMatcher");
-    const dept = resolveCoordinatorDepartment(req);
-    if (dept) {
-      applications = applications.filter((a) =>
-        coordinatorMatchesResearcherDept(
-          dept,
-          a.principal?.department || a.researcherId?.department || ""
-        )
-      );
-    } else {
-      applications = [];
-    }
-  }
   res.json({ applications: applications.map(sanitize) });
 }
 

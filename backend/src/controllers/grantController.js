@@ -330,20 +330,6 @@ async function listGrants(req, res) {
     .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId")
     .populate("callId", "title status fundingSource requiredDocuments deadline amountCap currency callType eligibilityTier")
     .populate("researcherId", "fullName department");
-  if (role === "faculty_coordinator") {
-    const {
-      resolveCoordinatorDepartment,
-      coordinatorMatchesResearcherDept,
-    } = require("../utils/facultyMatcher");
-    const dept = resolveCoordinatorDepartment(req);
-    if (dept) {
-      grants = grants.filter((g) =>
-        coordinatorMatchesResearcherDept(dept, g.researcherId?.department || "")
-      );
-    } else {
-      grants = [];
-    }
-  }
   const sanitized = await Promise.all(grants.map(async (g) => redactGrantAwardsIfNeeded(sanitizeGrant(g), req)));
 res.json({ grants: sanitized });
 }
@@ -372,16 +358,6 @@ async function getGrant(req, res) {
     "leadership",
   ].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
-  if (req.user.role === "faculty_coordinator") {
-    const {
-      resolveCoordinatorDepartment,
-      recordInCoordinatorFaculty,
-    } = require("../utils/facultyMatcher");
-    const dept = resolveCoordinatorDepartment(req);
-    if (dept && !recordInCoordinatorFaculty(dept, grant.researcherId?.department)) {
-      throw new AppError("Grant is outside your faculty", 403);
-    }
-  }
 
   const detail = sanitizeGrantDetail(grant);
   await redactGrantAwardsIfNeeded(detail, req);

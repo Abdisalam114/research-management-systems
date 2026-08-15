@@ -1,6 +1,6 @@
 const ROLE_LABELS = {
   research_director: "Research Director (Research Office)",
-  faculty_coordinator: "Faculty Coordinator (Department)",
+  faculty_coordinator: "Faculty Coordinator",
   finance_officer: "Finance Officer",
   leadership: "University Leadership",
   researcher: "Researcher / PI",

@@ -17,7 +17,7 @@ const {
 const { applyEthicsPayload, parseEthicsJson } = require("../utils/ethicsFormMerge");
 const { ensureReviewPipeline, getCurrentReviewStage, defaultReviewPipeline, STAGE_STATUS, isVoluntaryProposal, peerReviewAssignedToUserFilter, clearPeerAssigneesIfInactive, assertStagesBeforeDirector } = require("../utils/proposalReviewPipeline");
 const { recordAudit } = require("../utils/audit");
-const { coordinatorMatchesResearcherDept, resolveCoordinatorDepartment } = require("../utils/facultyMatcher");
+const { coordinatorMatchesResearcherDept } = require("../utils/facultyMatcher");
 
 function resolveDepartmentForResearcher(req, requested) {
   const home = String(req.user?.department || "").trim();
@@ -619,14 +619,6 @@ async function listProposals(req, res) {
       .populate("researcherId", "fullName email department")
       .populate("fundingCallId", "title status deadline")
       .sort({ updatedAt: -1 });
-    if (role === "faculty_coordinator") {
-      const dept = resolveCoordinatorDepartment(req);
-      const filtered = proposals.filter((p) =>
-        coordinatorMatchesResearcherDept(dept, p.department || p.researcherId?.department)
-      );
-      res.json({ proposals: filtered.map(sanitizeProposal) });
-      return;
-    }
     res.json({ proposals: proposals.map(sanitizeProposal) });
     return;
   }
@@ -667,23 +659,6 @@ res.json({ proposals: proposals.map(sanitizeProposal) });
     .populate("fundingCallId", "title status deadline amountCap currency")
     .sort({ submittedAt: -1, createdAt: -1 });
 
-  // Faculty coordinators only see proposals from their faculty / department
-  if (role === "faculty_coordinator") {
-    const dept = resolveCoordinatorDepartment(req);
-    if (!dept) {
-      res.json({ proposals: [] });
-      return;
-    }
-    const filtered = proposals.filter((p) =>
-      coordinatorMatchesResearcherDept(
-        dept,
-        p.department || p.researcherId?.department
-      )
-    );
-    res.json({ proposals: filtered.map(sanitizeProposal) });
-    return;
-  }
-
   res.json({ proposals: proposals.map(sanitizeProposal) });
 }
 
@@ -710,20 +685,6 @@ async function getProposal(req, res) {
     (r) => refId(r.userId) === String(req.user.id)
   );
   if (!isOwner && !isStaff && !isAssignedReviewer) throw new AppError("Forbidden", 403);
-  if (req.user.role === "faculty_coordinator" && !isAssignedReviewer) {
-    const dept = resolveCoordinatorDepartment(req);
-    let researcherDept = proposal.department || "";
-    if (!researcherDept && proposal.researcherId) {
-      const owner = await User.findById(proposal.researcherId).select("department").lean();
-      researcherDept = owner?.department || "";
-    }
-    if (
-      dept &&
-      !coordinatorMatchesResearcherDept(dept, researcherDept)
-    ) {
-      throw new AppError("Proposal is outside your faculty", 403);
-    }
-  }
 
   // Keep ethicsStatus in sync only — do NOT soft-pass committee (assign-first Phase 3).
   try {
@@ -761,19 +722,7 @@ async function getProposal(req, res) {
   res.json({ proposal: await attachEthicsSummary(proposal) });
 }
 
-async function assertCoordinatorProposalFaculty(req, proposal) {
-  if (req.user?.role !== "faculty_coordinator") return;
-  const dept = resolveCoordinatorDepartment(req);
-  if (!dept) return;
-  let researcherDept = proposal.department || "";
-  if (!researcherDept && proposal.researcherId) {
-    const owner = await User.findById(proposal.researcherId).select("department").lean();
-    researcherDept = owner?.department || "";
-  }
-  if (!coordinatorMatchesResearcherDept(dept, researcherDept)) {
-    throw new AppError("Proposal is outside your faculty", 403);
-  }
-}
+async function assertCoordinatorProposalFaculty(_req, _proposal) {}
 
 async function coordinatorReview(req, res) {
   const { id } = req.params;

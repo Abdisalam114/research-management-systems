@@ -37,7 +37,6 @@ const {
   buildResearcherPublicationNotice,
   loadPublicationForNotification,
 } = require("../utils/publicationSideEffects");
-const { coordinatorMatchesResearcherDept, resolveCoordinatorDepartment } = require("../utils/facultyMatcher");
 
 const EDITABLE_STATUSES = [
   PUBLICATION_STATUSES.DRAFT,
@@ -182,15 +181,6 @@ async function listPublications(req, res) {
   if (role === "researcher") {
     const uid = String(req.user.id);
     pubs = pubs.filter((p) => String(p.researcherId?._id || p.researcherId) === uid);
-  } else if (role === "faculty_coordinator") {
-    const dept = resolveCoordinatorDepartment(req);
-    if (dept) {
-      pubs = pubs.filter(
-        (p) => p.researcherId && coordinatorMatchesResearcherDept(dept, p.researcherId.department)
-      );
-    } else {
-      pubs = [];
-    }
   }
 
   res.json({ publications: pubs.map(sanitizePublication) });
@@ -202,7 +192,6 @@ async function getFacultyWorkflow(req, res) {
     throw new AppError("Forbidden", 403);
   }
 
-  const dept = role === "faculty_coordinator" ? resolveCoordinatorDepartment(req) : String(req.user.department || "").trim();
   const projectIdQuery = req.query.projectId ? String(req.query.projectId) : "";
   const filter = { status: { $ne: PUBLICATION_STATUSES.DRAFT } };
 
@@ -233,10 +222,6 @@ async function getFacultyWorkflow(req, res) {
       const projectOk = p.projectId && myIds.has(String(p.projectId._id || p.projectId));
       return ownerOk && projectOk;
     });
-  } else if (role === "faculty_coordinator" && dept) {
-    pubs = pubs.filter(
-      (p) => p.researcherId && coordinatorMatchesResearcherDept(dept, p.researcherId.department)
-    );
   }
 const sanitized = pubs.map(sanitizePublication);
   const byStage = {};
@@ -245,7 +230,7 @@ const sanitized = pubs.map(sanitizePublication);
   });
 
   const deptLabel =
-    role === "research_director" ? "All faculties" : role === "researcher" ? "My outputs" : dept || "Faculty";
+    role === "researcher" ? "My outputs" : "All faculties";
 
   let projectFilter = null;
   if (projectIdQuery) {
@@ -445,22 +430,7 @@ async function submitPublication(req, res) {
   });
 }
 
-async function assertCoordinatorPublicationFaculty(req, publication) {
-  if (req.user.role !== "faculty_coordinator") return;
-  const dept = resolveCoordinatorDepartment(req);
-  if (!dept) return;
-  let researcherDept = "";
-  if (publication.researcherId && typeof publication.researcherId === "object") {
-    researcherDept = publication.researcherId.department || "";
-  } else if (publication.researcherId) {
-    const { User } = require("../models/User");
-    const owner = await User.findById(publication.researcherId).select("department").lean();
-    researcherDept = owner?.department || "";
-  }
-  if (!coordinatorMatchesResearcherDept(dept, researcherDept)) {
-    throw new AppError("Publication is outside your faculty", 403);
-  }
-}
+async function assertCoordinatorPublicationFaculty(_req, _publication) {}
 
 async function validatePublication(req, res) {
   const { id } = req.params;
@@ -679,15 +649,6 @@ async function updateWorkflowStage(req, res) {
 
   const isStaff = ["faculty_coordinator", "research_director"].includes(req.user.role);
   if (!isStaff) throw new AppError("Forbidden", 403);
-
-  if (req.user.role === "faculty_coordinator") {
-    const dept = resolveCoordinatorDepartment(req);
-    const researcherDept = pub.researcherId?.department || "";
-    const inScope = coordinatorMatchesResearcherDept(dept, researcherDept);
-    if (dept && !inScope) {
-      throw new AppError("Publication is outside your faculty", 403);
-    }
-  }
 
   const current = resolveWorkflowStage(pub);
   if (stage === WORKFLOW_STAGES.PUBLISHED) {

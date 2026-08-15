@@ -24,7 +24,6 @@ const {
   FACULTIES,
   matchFacultyByName,
   coordinatorMatchesResearcherDept,
-  resolveCoordinatorDepartment,
   departmentNamesForCoordinatorScope,
   mongoDepartmentInFaculty,
   recordInCoordinatorFaculty,
@@ -229,79 +228,6 @@ async function getDashboardMetrics(req, res) {
   let facultyWorkflowPubCount = workflowPubCount;
   let facultyClosuresPendingCount = closuresPendingCount;
 
-  if (role === "faculty_coordinator") {
-    const dept = resolveCoordinatorDepartment(req);
-    const inFac = (researcherDept) =>
-      !dept || coordinatorMatchesResearcherDept(dept, researcherDept || "");
-
-    const queueDocs = await Proposal.find(
-      tw({
-        status: {
-          $in: [
-            PROPOSAL_STATUSES.SUBMITTED,
-            PROPOSAL_STATUSES.UNDER_REVIEW,
-            PROPOSAL_STATUSES.REVISION_REQUESTED,
-          ],
-        },
-      })
-    )
-      .select("department")
-      .populate("researcherId", "department");
-    base.proposals.total = queueDocs.filter((p) =>
-      inFac(p.department || p.researcherId?.department)
-    ).length;
-
-    const [projDocs, grantDocs, pubDocs, ethicsDocs, thesisDocs, activeDocs, closureDocs, budgetDocs] =
-      await Promise.all([
-        Project.find(projectFilter)
-          .populate("researcherId", "department")
-          .select("status department researcherId"),
-        Grant.find(grantFilter)
-          .populate("researcherId", "department")
-          .select("amountAwarded status researcherId"),
-        Publication.find(pubFilter)
-          .populate("researcherId", "department")
-          .select("status researcherId"),
-        EthicsApplication.find(tw({}))
-          .populate("researcherId", "department")
-          .select("status principal researcherId"),
-        ThesisGroup.find(tw({})).select("department faculty"),
-        Project.find({ ...projectFilter, status: PROJECT_STATUSES.ACTIVE })
-          .sort({ updatedAt: -1 })
-          .limit(DASHBOARD_ACTIVE_PROJECTS_LIMIT * 3)
-          .populate("researcherId", "fullName name email department")
-          .select("title status progressReports researcherId endDate department"),
-        Project.find({
-          ...projectFilter,
-          "closure.status": CLOSURE_STATUSES.DIRECTOR_APPROVED,
-        })
-          .populate("researcherId", "department")
-          .select("department researcherId"),
-        Budget.find(budgetFilter)
-          .populate("ownerResearcherId", "department")
-          .select("items ownerResearcherId"),
-      ]);
-
-    const projectsFac = projDocs.filter((p) => inFac(p.department || p.researcherId?.department));
-    facultyProjectCount = projectsFac.length;
-    facultyActiveProjectDocs = activeDocs
-      .filter((p) => inFac(p.department || p.researcherId?.department))
-      .slice(0, DASHBOARD_ACTIVE_PROJECTS_LIMIT);
-    facultyActiveProjectCount = projectsFac.filter((p) => p.status === PROJECT_STATUSES.ACTIVE).length;
-    facultyGrants = grantDocs.filter((g) => inFac(g.researcherId?.department));
-    facultyPubs = pubDocs.filter((p) => inFac(p.researcherId?.department));
-    facultyEthicsCount = ethicsDocs.filter(
-      (e) =>
-        String(e.status).toLowerCase() === "submitted" &&
-        inFac(e.principal?.department || e.researcherId?.department)
-    ).length;
-    facultyThesisCount = thesisDocs.filter((t) => inFac(t.department || t.faculty)).length;
-    facultyWorkflowPubCount = facultyPubs.filter((p) => p.status !== PUBLICATION_STATUSES.DRAFT).length;
-    facultyClosuresPendingCount = closureDocs.filter((p) =>
-      inFac(p.department || p.researcherId?.department)
-    ).length;
-    facultyBudgets = budgetDocs.filter((b) => inFac(b.ownerResearcherId?.department));
-  }
   base.projects.total = facultyProjectCount;
   base.projects.active = facultyActiveProjectCount;
   base.activeProjects = await mapProjectDashboardRows(facultyActiveProjectDocs, {
@@ -761,10 +687,7 @@ res.json(data);
 }
 
 async function getFacultyReport(req, res) {
-  const dept = resolveCoordinatorDepartment(req);
-  const deptNames = dept ? await departmentNamesForCoordinatorScope(dept, Department) : null;
-  const deptClause = mongoDepartmentInFaculty(deptNames);
-  const filter = req.tierWhere(deptClause || {});
+  const filter = req.tierWhere({});
 
   const [proposals, projects, publications, deptUsers] = await Promise.all([
     Proposal.find(filter).select("title status department researcherId createdAt updatedAt").populate("researcherId", "fullName department"),
@@ -773,23 +696,14 @@ async function getFacultyReport(req, res) {
     User.find(req.tierWhere({ status: USER_STATUSES.ACTIVE })).select("fullName role department"),
   ]);
 
-  const facultyProjects = projects.filter(
-    (p) =>
-      !dept ||
-      coordinatorMatchesResearcherDept(dept, p.department) ||
-      coordinatorMatchesResearcherDept(dept, p.researcherId?.department)
-  );
-  const facultyPublications = publications.filter(
-    (p) => !dept || coordinatorMatchesResearcherDept(dept, p.researcherId?.department)
-  );
-  const facultyUsers = deptUsers.filter(
-    (u) => !dept || coordinatorMatchesResearcherDept(dept, u.department)
-  );
+  const facultyProjects = projects;
+  const facultyPublications = publications;
+  const facultyUsers = deptUsers;
 
   res.json({
-    department: dept || "Faculty",
-    faculty: matchFacultyByName(dept),
-    scope: dept ? `faculty:${dept}` : "portal",
+    department: "All faculties",
+    faculty: "All faculties",
+    scope: "portal",
     generatedAt: new Date().toISOString(),
     counts: {
       researchers: facultyUsers.filter((u) => u.role === ROLES.RESEARCHER).length,
@@ -831,10 +745,7 @@ async function getFacultyReport(req, res) {
 }
 
 async function exportFacultyReportPdf(req, res) {
-  const dept = resolveCoordinatorDepartment(req);
-  const deptNames = dept ? await departmentNamesForCoordinatorScope(dept, Department) : null;
-  const deptClause = mongoDepartmentInFaculty(deptNames);
-  const filter = req.tierWhere(deptClause || {});
+  const filter = req.tierWhere({});
 
   const [proposals, projects, publications, deptUsers] = await Promise.all([
     Proposal.find(filter).populate("researcherId", "fullName department"),
@@ -843,29 +754,20 @@ async function exportFacultyReportPdf(req, res) {
     User.find(req.tierWhere({ status: USER_STATUSES.ACTIVE })).select("fullName role department"),
   ]);
 
-  const facultyProjects = projects.filter(
-    (p) =>
-      !dept ||
-      coordinatorMatchesResearcherDept(dept, p.department) ||
-      coordinatorMatchesResearcherDept(dept, p.researcherId?.department)
-  );
-  const facultyPublications = publications.filter(
-    (p) => !dept || coordinatorMatchesResearcherDept(dept, p.researcherId?.department)
-  );
-  const facultyUsers = deptUsers.filter(
-    (u) => !dept || coordinatorMatchesResearcherDept(dept, u.department)
-  );
+  const facultyProjects = projects;
+  const facultyPublications = publications;
+  const facultyUsers = deptUsers;
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader(
     "Content-Disposition",
-    `attachment; filename="JUST-RMS-Faculty-Report-${(dept || "faculty").replace(/\s+/g, "-")}.pdf"`
+    `attachment; filename="JUST-RMS-Faculty-Report-all-faculties.pdf"`
   );
 
   const doc = new PDFDocument({ size: "A4", margin: 54 });
   doc.pipe(res);
 
-  doc.fontSize(20).text(`Faculty Research Report — ${dept || "Faculty"}`, { align: "center" });
+  doc.fontSize(20).text("Faculty Research Report — All faculties", { align: "center" });
   doc.moveDown(0.5);
   doc.fontSize(11).fillColor("#444").text(`Generated: ${new Date().toLocaleString()}`, { align: "center" });
   doc.fillColor("#000");
@@ -1031,9 +933,7 @@ async function getResearchJourney(req, res) {
       return res.json({ mode: "journey", ...journey });
     }
     if (!isStaff) throw new AppError("Forbidden", 403);
-    const dept = role === "faculty_coordinator" ? resolveCoordinatorDepartment(req) : "";
-    const deptNames = dept ? await departmentNamesForCoordinatorScope(dept, Department) : null;
-    const researchers = await listResearchersForJourney(tierFilter, deptNames || undefined);
+    const researchers = await listResearchersForJourney(tierFilter, undefined);
     return res.json({ mode: "picker", researchers });
   }
 
@@ -1043,13 +943,6 @@ async function getResearchJourney(req, res) {
 
   const journey = await buildResearchJourneyForResearcher(researcherIdQuery, tierFilter, role);
   if (!journey) throw new AppError("Researcher not found", 404);
-
-  if (role === "faculty_coordinator") {
-    const dept = resolveCoordinatorDepartment(req);
-    if (dept && !coordinatorMatchesResearcherDept(dept, journey.researcher.department)) {
-      throw new AppError("Researcher is outside your faculty", 403);
-    }
-  }
 
   res.json({ mode: "journey", ...journey });
 }
@@ -1064,7 +957,7 @@ async function getWorkflowOverview(req, res) {
   const tf = (extra = {}) =>
     role === "researcher" ? req.ownedWhere(extra) : req.tierWhere(extra);
   const researcherOnly = role === "researcher";
-  const dept = role === "faculty_coordinator" ? resolveCoordinatorDepartment(req) : "";
+  const dept = "";
   const deptNames = dept ? await departmentNamesForCoordinatorScope(dept, Department) : null;
   const deptClause = mongoDepartmentInFaculty(deptNames);
 
@@ -1313,8 +1206,8 @@ async function getSystemReport(req, res) {
 
   const isDirector = role === ROLES.RESEARCH_DIRECTOR;
   const tf = (extra = {}) => (isDirector ? extra : req.tierWhere(extra));
-  const dept = role === "faculty_coordinator" ? resolveCoordinatorDepartment(req) : "";
-  const deptNames = dept ? await departmentNamesForCoordinatorScope(dept, Department) : null;
+  const dept = "";
+  const deptNames = null;
   const deptClause = mongoDepartmentInFaculty(deptNames);
 
   const proposalQ = tf(deptClause || {});
@@ -1580,10 +1473,9 @@ async function getDonorReport(req, res) {
 }
 
 async function getKpiDashboard(req, res) {
-  const role = req.user?.role;
   const tier = req.programTier;
   const tf = (base = {}) => (tier ? { ...base, programTier: tier } : { ...base });
-  const dept = role === "faculty_coordinator" ? resolveCoordinatorDepartment(req) : "";
+  const dept = "";
 
   const [proposalsRaw, grantsRaw, projectsRaw, publicationsRaw, calls, closedProjectsRaw] = await Promise.all([
     Proposal.find(tf({})).select("status createdAt submittedAt department researcherId").populate("researcherId", "department"),
