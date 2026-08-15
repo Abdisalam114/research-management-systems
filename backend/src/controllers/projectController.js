@@ -820,81 +820,72 @@ async function backfillProjectFromApprovedProposal(req, res) {
   const existing = await Project.findOne(req.tierWhere({ proposalId: proposal._id })).populate(PROJECT_POPULATE);
   if (existing) return res.json({ message: "Project already exists", project: sanitizeProject(existing) });
 
-  const project = await Project.create(req.tierAssign({
-    proposalId: proposal._id,
-    title: proposal.title,
-    researcherId: proposal.researcherId,
-    programTier: proposal.programTier,
-    teamMembers: [],
-    milestones: [],
-    status: "active",
-    progressReports: [],
-  }));
-
-  const created = await Project.findById(project._id).populate(PROJECT_POPULATE);
+  proposal.openProjectDeletedAt = null;
+  await proposal.save();
+  const { ensureOpenProjectForProposal } = require("../utils/ensureOpenProjectForProposal");
+  const createdDoc = await ensureOpenProjectForProposal(req, proposal, { force: true });
+  const created = await Project.findById(createdDoc._id).populate(PROJECT_POPULATE);
   res.status(201).json({ message: "Project created", project: sanitizeProject(created) });
 }
 
 async function deleteProject(req, res) {
   const { id } = req.params;
-  const project =
-    req.user.role === "researcher"
-      ? await req.findOwned(Project, id)
-      : await Project.findOne(req.tierWhere({ _id: id }));
+  const isDirector = req.user.role === "research_director";
+  const userId = String(req.user.id);
+
+  let project;
+  if (isDirector) {
+    project = (await Project.findById(id)) || (await Project.findOne(req.tierWhere({ _id: id })));
+  } else if (req.user.role === "researcher") {
+    project =
+      (await req.findOwned(Project, id)) ||
+      (await Project.findOne({
+        _id: id,
+        $or: [{ researcherId: req.user.id }, { leadResearcher: req.user.id }],
+      }));
+  } else {
+    project = await Project.findOne(req.tierWhere({ _id: id }));
+  }
   if (!project) throw new AppError("Project not found", 404);
 
-  const isDirector = req.user.role === "research_director";
-  const isOwner = String(project.researcherId?._id || project.researcherId) === String(req.user.id);
+  const isOwner =
+    String(project.researcherId?._id || project.researcherId || "") === userId ||
+    String(project.leadResearcher?._id || project.leadResearcher || "") === userId;
   if (!isDirector && !isOwner) throw new AppError("Forbidden", 403);
-
-  if (!isDirector) {
-    const blockedPub = await Publication.findOne({
-      projectId: project._id,
-      status: { $in: [PUBLICATION_STATUSES.SUBMITTED, PUBLICATION_STATUSES.VALIDATED] },
-    }).select("_id title status");
-    if (blockedPub) {
-      throw new AppError(
-        "Cannot delete project while it has a submitted or validated output. Delete or withdraw the output first.",
-        400
-      );
-    }
-    const activeGrant = await Grant.findOne({
-      projectId: project._id,
-      status: { $in: [GRANT_STATUSES.ACTIVE, GRANT_STATUSES.PENDING_FINANCE, GRANT_STATUSES.APPROVED] },
-    }).select("_id title status");
-    if (activeGrant) {
-      throw new AppError("Cannot delete project with an active or approved grant", 400);
-    }
-  }
 
   const { Budget } = require("../models/Budget");
   const { Payment } = require("../models/Payment");
-  const { EthicsApplication } = require("../models/EthicsApplication");
+  const { PurchaseOrder } = require("../models/PurchaseOrder");
 
   const projectId = project._id;
   const title = project.title;
 
   const budgets = await Budget.find({ projectId }).select("_id totalAllocated");
-  const allocatedBudgets = budgets.filter((b) => Number(b.totalAllocated || 0) > 0);
-  if (allocatedBudgets.length) {
-    throw new AppError(
-      "Cannot delete project: Budget allocated is locked system-wide. Allocated budgets cannot be deleted.",
-      400
-    );
-  }
+  const emptyBudgetIds = budgets.filter((b) => Number(b.totalAllocated || 0) <= 0).map((b) => b._id);
+  const allocatedBudgetIds = budgets.filter((b) => Number(b.totalAllocated || 0) > 0).map((b) => b._id);
 
-  const budgetIds = budgets.map((b) => b._id);
-  if (budgetIds.length) {
-    await Payment.deleteMany({ budgetId: { $in: budgetIds } });
-    await Budget.deleteMany({ _id: { $in: budgetIds } });
+  if (emptyBudgetIds.length) {
+    await Payment.deleteMany({ budgetId: { $in: emptyBudgetIds } });
+    await Budget.deleteMany({ _id: { $in: emptyBudgetIds } });
+  }
+  if (allocatedBudgetIds.length) {
+    await Budget.updateMany({ _id: { $in: allocatedBudgetIds } }, { $set: { projectId: null } });
   }
 
   await Publication.deleteMany({ projectId });
   await RepositoryItem.deleteMany({ projectId });
-  await EthicsApplication.deleteMany({ projectId });
   await Grant.updateMany({ projectId }, { $set: { projectId: null } });
+  await Payment.updateMany({ projectId }, { $set: { projectId: null } });
+  await PurchaseOrder.updateMany({ projectId }, { $set: { projectId: null } });
   await Project.deleteOne({ _id: projectId });
 
+  const proposalId = project.proposalId || project.proposal;
+  if (proposalId) {
+    await Proposal.updateOne(
+      { _id: proposalId },
+      { $set: { openProjectDeletedAt: new Date() } }
+    );
+  }
 
   try {
     await recordAudit({

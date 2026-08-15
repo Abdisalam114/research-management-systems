@@ -36,7 +36,7 @@ function kindLabel(p) {
   return projectKind(p) === "grant_fund_call" ? "Grant Fund Call" : "Voluntary";
 }
 
-function ProjectCard({ p, isDirector, onApproveClosure, busyId }) {
+function ProjectCard({ p, isDirector, canDelete, onApproveClosure, onDelete, busyId }) {
   const needsDirectorClosure = isDirector && p.closure?.status === "submitted";
   return (
     <div
@@ -125,6 +125,17 @@ function ProjectCard({ p, isDirector, onApproveClosure, busyId }) {
             <Link className="btn primary" to={`/projects/${p.id}#${needsDirectorClosure ? "closure" : "workflow"}`}>
               {needsDirectorClosure ? "Open closure" : "Open workflow"}
             </Link>
+            {canDelete ? (
+              <button
+                type="button"
+                className="btn"
+                style={{ borderColor: "rgba(248,113,113,0.6)", color: "#f87171" }}
+                disabled={busyId === p.id}
+                onClick={() => onDelete?.(p)}
+              >
+                {busyId === p.id ? "Deleting…" : "Delete"}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -132,7 +143,7 @@ function ProjectCard({ p, isDirector, onApproveClosure, busyId }) {
   );
 }
 
-function ProjectSection({ title, hint, items, emptyText, isDirector, onApproveClosure, busyId }) {
+function ProjectSection({ title, hint, items, emptyText, isDirector, canDeleteProject, onApproveClosure, onDelete, busyId }) {
   return (
     <div className="card" style={{ marginTop: 12 }}>
       <div style={{ marginBottom: 10 }}>
@@ -152,7 +163,9 @@ function ProjectSection({ title, hint, items, emptyText, isDirector, onApproveCl
               key={p.id}
               p={p}
               isDirector={isDirector}
+              canDelete={canDeleteProject?.(p)}
               onApproveClosure={onApproveClosure}
+              onDelete={onDelete}
               busyId={busyId}
             />
           ))}
@@ -175,6 +188,13 @@ export function ProjectsListPage({
   const [busyId, setBusyId] = useState("");
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
   const isDirector = user?.role === "research_director";
+  const isResearcher = user?.role === "researcher";
+
+  function canDeleteProject(p) {
+    if (isDirector) return true;
+    if (!isResearcher || !p) return false;
+    return String(p.researcherId || "") === String(user?.id || "");
+  }
 
   async function load() {
     setError("");
@@ -218,11 +238,27 @@ export function ProjectsListPage({
     }
   }
 
+  async function deleteProject(p) {
+    if (!p?.id || busyId) return;
+    const ok = window.confirm(`Delete project "${p.title}"?`);
+    if (!ok) return;
+    setBusyId(p.id);
+    setError("");
+    setMessage("");
+    try {
+      await projectApi.deleteProject(accessToken, p.id);
+      setProjects((prev) => prev.filter((row) => String(row.id) !== String(p.id)));
+      setMessage(`${p.title}: deleted.`);
+    } catch (e) {
+      setError(e?.response?.data?.message || "Failed to delete project");
+    } finally {
+      setBusyId("");
+    }
+  }
+
   const title =
     pageTitle || (user?.role === "researcher" ? "My Projects" : "Projects");
-  const subtitle =
-    pageSubtitle ||
-    "Total = Open + Closing + Completed. Labada nooc: Voluntary iyo Grant Fund Call. Modules kale (Publications, Workflow) waxay ka akhriyaan xogtan.";
+  const subtitle = pageSubtitle || "";
 
   const stats = useMemo(() => {
     const byStatus = (s) => projects.filter((p) => p.status === s).length;
@@ -276,7 +312,6 @@ export function ProjectsListPage({
   );
 
   const kindOnlyFilter = isKindFilter(statusFilter);
-  const selectedKind = kindFilterValue(statusFilter);
 
   return (
     <div>
@@ -306,26 +341,6 @@ export function ProjectsListPage({
           )
         }
       />
-
-      {kindOnlyFilter ? (
-        <div className="card" style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5 }}>
-          {selectedKind === "voluntary" ? (
-            <>
-              <strong>Voluntary</strong> — kaliya projects ka yimid voluntary proposal (ethics + workflow). Grant Fund Call lama muujinayo.
-            </>
-          ) : (
-            <>
-              <strong>Grant Fund Call</strong> — kaliya projects ka yimid funding call / grant la aqbalay. Voluntary lama muujinayo.
-            </>
-          )}
-        </div>
-      ) : (
-        <div className="card" style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5 }}>
-          <strong>Voluntary</strong> — research project ka yimid voluntary proposal (ethics + workflow).
-          <br />
-          <strong>Grant Fund Call</strong> — project ka yimid funding call / grant la aqbalay.
-        </div>
-      )}
 
       {statusFilter !== "all" ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
@@ -360,7 +375,9 @@ export function ProjectsListPage({
                 key={`closure-${p.id}`}
                 p={p}
                 isDirector
+                canDelete={canDeleteProject(p)}
                 onApproveClosure={approveClosure}
+                onDelete={deleteProject}
                 busyId={busyId}
               />
             ))}
@@ -382,7 +399,9 @@ export function ProjectsListPage({
                 key={p.id}
                 p={p}
                 isDirector={isDirector}
+                canDelete={canDeleteProject(p)}
                 onApproveClosure={approveClosure}
+                onDelete={deleteProject}
                 busyId={busyId}
               />
             ))}
@@ -393,22 +412,24 @@ export function ProjectsListPage({
           {(statusFilter === "all" || (!kindOnlyFilter && voluntaryProjects.length > 0)) ? (
             <ProjectSection
               title={`Voluntary research (${voluntaryProjects.length})`}
-              hint="Projects from voluntary proposals — no funding-call award."
               items={voluntaryProjects}
               emptyText="No voluntary projects in this filter."
               isDirector={isDirector}
+              canDeleteProject={canDeleteProject}
               onApproveClosure={approveClosure}
+              onDelete={deleteProject}
               busyId={busyId}
             />
           ) : null}
           {(statusFilter === "all" || (!kindOnlyFilter && grantProjects.length > 0)) ? (
             <ProjectSection
               title={`Grant Fund Call (${grantProjects.length})`}
-              hint="Projects linked to an accepted funding-call grant or fund-call proposal."
               items={grantProjects}
               emptyText="No grant-funded projects in this filter."
               isDirector={isDirector}
+              canDeleteProject={canDeleteProject}
               onApproveClosure={approveClosure}
+              onDelete={deleteProject}
               busyId={busyId}
             />
           ) : null}

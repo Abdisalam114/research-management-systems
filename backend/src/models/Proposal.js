@@ -167,6 +167,8 @@ const proposalSchema = new mongoose.Schema(
       index: true,
     },
     fundingCallId: { type: mongoose.Schema.Types.ObjectId, ref: "FundingCall", default: null, index: true },
+    /** Set when the Open project is deleted so listing does not recreate it. */
+    openProjectDeletedAt: { type: Date, default: null },
     ...programTierField,
   },
   { timestamps: true }

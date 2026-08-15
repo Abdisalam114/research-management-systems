@@ -157,9 +157,7 @@ export function ProjectDetailsPage() {
               className="btn"
               style={{ borderColor: "rgba(248,113,113,0.6)", color: "#f87171" }}
               onClick={async () => {
-                const ok = window.confirm(
-                  `Delete project "${project.title}"?\n\nIf Budget allocated exists, delete will be blocked (allocated budgets are locked system-wide).`
-                );
+                const ok = window.confirm(`Delete project "${project.title}"?`);
                 if (!ok) return;
                 try {
                   setError("");

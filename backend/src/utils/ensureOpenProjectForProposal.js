@@ -25,7 +25,7 @@ function assignPayload(req, data) {
   return data;
 }
 
-async function ensureOpenProjectForProposal(req, proposal) {
+async function ensureOpenProjectForProposal(req, proposal, { force = false } = {}) {
   if (!proposal?._id) return null;
   const researcherId = ownerId(proposal);
 
@@ -33,7 +33,19 @@ async function ensureOpenProjectForProposal(req, proposal) {
     $or: [{ proposalId: proposal._id }, { proposal: proposal._id }],
   });
 
+  if (!project && proposal.openProjectDeletedAt && !force) {
+    return null;
+  }
+
   if (!project) {
+    if (proposal.openProjectDeletedAt && force) {
+      proposal.openProjectDeletedAt = null;
+      if (typeof proposal.save === "function") {
+        await proposal.save();
+      } else {
+        await Proposal.updateOne({ _id: proposal._id }, { $set: { openProjectDeletedAt: null } });
+      }
+    }
     project = await Project.create(
       assignPayload(req, {
         proposalId: proposal._id,
@@ -92,7 +104,9 @@ async function backfillOpenProjectsForApprovedProposals(req) {
       ? req.ownedWhere({ status: PROPOSAL_STATUSES.APPROVED })
       : req.tierWhere({ status: PROPOSAL_STATUSES.APPROVED });
 
-  const approved = await Proposal.find(proposalFilter).select("_id title researcherId programTier");
+  const approved = await Proposal.find(proposalFilter).select(
+    "_id title researcherId programTier openProjectDeletedAt"
+  );
   if (!approved.length) return;
 
   const ids = approved.map((p) => p._id);
@@ -107,6 +121,7 @@ async function backfillOpenProjectsForApprovedProposals(req) {
   }
 
   for (const proposal of approved) {
+    if (proposal.openProjectDeletedAt) continue;
     if (hasProject.has(String(proposal._id))) continue;
     if (!ownerId(proposal)) continue;
     try {

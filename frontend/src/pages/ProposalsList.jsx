@@ -131,7 +131,7 @@ export function ProposalsListPage() {
     <div>
       <PageHeader
         title={title}
-        subtitle="Voluntary research proposals from here. Funded applications start from Funding Calls."
+        subtitle=""
         stats={stats}
         activeFilter={statusFilter}
         onFilterChange={setStatusFilter}
@@ -151,15 +151,6 @@ export function ProposalsListPage() {
           </>
         }
       />
-
-      {canCreate ? (
-        <div className="card" style={{ marginTop: 12, fontSize: 13, lineHeight: 1.5 }}>
-          <strong>Voluntary</strong> — research proposal + ethics (create with <em>New Voluntary Proposal</em>).
-          <br />
-          <strong>Grant Fund Call</strong> — start only from{" "}
-          <Link to="/funding-calls">Funding Calls</Link> → Apply.
-        </div>
-      ) : null}
 
       {statusFilter !== "all" ? (
         <p className="muted" style={{ fontSize: 13, marginTop: 8 }}>
