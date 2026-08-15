@@ -62,6 +62,8 @@ export function EthicsApplicationForm({
   autoFillHint = false,
   hideFundingFields = false,
   departments = [],
+  lockPrincipalFaculty = false,
+  principalFaculty = "",
 }) {
   const set = (path, value) => setForm((prev) => patchForm(prev, path, value));
   const departmentsByFaculty = useMemo(() => {
@@ -89,6 +91,12 @@ export function EthicsApplicationForm({
 
   useEffect(() => {
 }, [missing.length, formComplete, embeddedInProposal]);
+
+  useEffect(() => {
+    if (!lockPrincipalFaculty || !principalFaculty || readOnly) return;
+    if (form?.principal?.faculty === principalFaculty) return;
+    set("principal.faculty", principalFaculty);
+  }, [lockPrincipalFaculty, principalFaculty, readOnly, form?.principal?.faculty]);
 
   const toggleInArray = (path, value) => {
     const raw = path.split(".").reduce((acc, k) => acc?.[k], form);
@@ -263,6 +271,8 @@ export function EthicsApplicationForm({
           readOnly={readOnly}
           hideNameFields={!readOnly}
           departmentsByFaculty={departmentsByFaculty}
+          lockFaculty={lockPrincipalFaculty}
+          lockedFaculty={principalFaculty}
         />
         <PersonFields
           label="Co-researcher / Supervisor"
@@ -566,14 +576,25 @@ function Section({ title, children, highlight = false }) {
   );
 }
 
-function PersonFields({ label, person, onChange, readOnly, hideNameFields = false, departmentsByFaculty = {} }) {
+function PersonFields({
+  label,
+  person,
+  onChange,
+  readOnly,
+  hideNameFields = false,
+  departmentsByFaculty = {},
+  lockFaculty = false,
+  lockedFaculty = "",
+}) {
   const facultyValue =
-    person.faculty && FACULTIES.some((f) => f.value === person.faculty)
+    (lockFaculty && lockedFaculty) ||
+    (person.faculty && FACULTIES.some((f) => f.value === person.faculty)
       ? person.faculty
-      : matchFacultyByName(person.department) || DEFAULT_FACULTY;
+      : matchFacultyByName(person.department) || DEFAULT_FACULTY);
   const deptOptions = departmentsByFaculty[facultyValue] || [];
 
   function onFacultyChange(faculty) {
+    if (lockFaculty) return;
     onChange("faculty", faculty);
     onChange("department", "");
   }
@@ -614,13 +635,22 @@ function PersonFields({ label, person, onChange, readOnly, hideNameFields = fals
       <div className="row">
         <div className="field">
           <label>Faculty</label>
-          <select disabled={readOnly} value={facultyValue} onChange={(e) => onFacultyChange(e.target.value)}>
+          <select
+            disabled={readOnly || lockFaculty}
+            value={facultyValue}
+            onChange={(e) => onFacultyChange(e.target.value)}
+          >
             {FACULTIES.map((f) => (
               <option key={f.value} value={f.value}>
                 {f.value}
               </option>
             ))}
           </select>
+          {lockFaculty ? (
+            <p className="muted" style={{ fontSize: 12, margin: "6px 0 0" }}>
+              Faculty is locked to your profile.
+            </p>
+          ) : null}
         </div>
         <div className="field">
           <label>Department</label>
@@ -640,10 +670,10 @@ function PersonFields({ label, person, onChange, readOnly, hideNameFields = fals
             </select>
           ) : (
             <input
-              disabled={readOnly}
+              disabled={readOnly || lockFaculty}
               value={person.department || ""}
               onChange={(e) => onChange("department", e.target.value)}
-              placeholder="Select faculty first or type department"
+              placeholder={lockFaculty ? "Department from your faculty" : "Select faculty first or type department"}
             />
           )}
         </div>

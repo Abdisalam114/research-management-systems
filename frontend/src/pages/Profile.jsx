@@ -69,9 +69,15 @@ export function ProfilePage() {
               <div className="row" style={{ marginTop: 0 }}>
                 <FacultyDepartmentSelect
                   departments={departments}
-                  value={deptPick}
+                  lockFaculty
+                  value={{
+                    ...deptPick,
+                    faculty: matchFacultyByName(user?.department) || deptPick.faculty,
+                  }}
                   onChange={(next) => {
-                    setDeptPick(next);
+                    const homeFaculty = matchFacultyByName(user?.department);
+                    if (homeFaculty && next.faculty && next.faculty !== homeFaculty) return;
+                    setDeptPick({ ...next, faculty: homeFaculty || next.faculty });
                     setDepartment(next.department || "");
                   }}
                 />

@@ -13,6 +13,7 @@ import { EthicsDirectorDecisionModal } from "../components/EthicsDirectorDecisio
 import { AppButton } from "../components/AppButton";
 import { SubmitValidationAlert } from "../components/SubmitValidationAlert";
 import { isEthicsFormComplete } from "../utils/ethicsForm";
+import { matchFacultyByName } from "../constants/faculties";
 import { getEthicsMissingFields } from "../utils/proposalSubmitValidation";
 import { ethicsApplicationToForm, emptyEthicsForm } from "../utils/ethicsFormState";
 import { projectLevelLabel } from "../constants/ethicsFormOptions";
@@ -493,6 +494,8 @@ export function EthicsPage() {
           approval={editing.approval}
           showCertificateMeta={editing.status === "approved"}
           departments={departments}
+          lockPrincipalFaculty={isResearcher}
+          principalFaculty={matchFacultyByName(user?.department)}
         />
         </div>
       ) : null}
@@ -533,6 +536,8 @@ function EthicsEditor({
   approval,
   showCertificateMeta,
   departments = [],
+  lockPrincipalFaculty = false,
+  principalFaculty = "",
 }) {
   const { form } = editing;
   const showDirectorActions = isDirector && editing.status === "submitted";
@@ -565,6 +570,8 @@ function EthicsEditor({
         embeddedInProposal={linkedToProposal}
         hideFundingFields={hideFundingFields}
         departments={departments}
+        lockPrincipalFaculty={lockPrincipalFaculty}
+        principalFaculty={principalFaculty}
       />
 
       {isApproved ? (

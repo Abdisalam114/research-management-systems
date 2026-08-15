@@ -102,9 +102,13 @@ function ProjectCard({ p, isDirector, onApproveClosure, busyId }) {
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
           <StatusBadge
-            status={p.status === "closed" ? "completed" : p.status}
+            status={p.status === "closed" ? "completed" : p.status === "active" ? "open" : p.status}
             label={
-              p.status === "completed" || p.status === "closed" ? "Completed / Closed" : undefined
+              p.status === "completed" || p.status === "closed"
+                ? "Completed / Closed"
+                : p.status === "active"
+                  ? "Open"
+                  : undefined
             }
           />
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -218,7 +222,7 @@ export function ProjectsListPage({
     pageTitle || (user?.role === "researcher" ? "My Projects" : "Projects");
   const subtitle =
     pageSubtitle ||
-    "Total = Active + Closing + Completed. Labada nooc: Voluntary iyo Grant Fund Call. Modules kale (Publications, Workflow) waxay ka akhriyaan xogtan.";
+    "Total = Open + Closing + Completed. Labada nooc: Voluntary iyo Grant Fund Call. Modules kale (Publications, Workflow) waxay ka akhriyaan xogtan.";
 
   const stats = useMemo(() => {
     const byStatus = (s) => projects.filter((p) => p.status === s).length;
@@ -234,7 +238,7 @@ export function ProjectsListPage({
       { label: "Total", value: projects.length, filterKey: "all" },
       { label: "Voluntary", value: voluntaryCount, filterKey: "kind:voluntary", accent: "#38bdf8" },
       { label: "Grant Fund", value: grantCount, filterKey: "kind:grant_fund_call", accent: "#eab308" },
-      { label: "Active", value: activeCount, filterKey: "active", accent: "#38bdf8" },
+      { label: "Open", value: activeCount, filterKey: "active", accent: "#38bdf8" },
       { label: "Closing", value: closingCount, filterKey: "closing", accent: "#f59e0b" },
       { label: "Completed", value: completedCount, filterKey: "completed", accent: "#16a34a" },
       ...(onHoldCount > 0 ? [{ label: "On hold", value: onHoldCount, filterKey: "on_hold" }] : []),
@@ -245,6 +249,7 @@ export function ProjectsListPage({
     const list = filterByStatKey(projects, statusFilter, {
       customFilters: {
         active: (p) => p.status === "active",
+        open: (p) => p.status === "active",
         closing: (p) => p.status === "closing",
         completed: (p) => ["completed", "closed"].includes(p.status),
         "kind:voluntary": (p) => projectKind(p) === "voluntary",

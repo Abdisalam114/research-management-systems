@@ -280,7 +280,17 @@ async function updateMyProfile(req, res) {
 
   const { fullName, department, rank, researchInterests } = req.body;
   if (fullName) user.fullName = fullName;
-  if (department) user.department = department;
+  if (department) {
+    const nextDept = String(department).trim();
+    if (user.role === "researcher") {
+      const home = String(user.department || "").trim();
+      const { coordinatorMatchesResearcherDept } = require("../utils/facultyMatcher");
+      if (home && nextDept && !coordinatorMatchesResearcherDept(home, nextDept)) {
+        throw new AppError("You can only stay in your own faculty", 400);
+      }
+    }
+    user.department = nextDept;
+  }
   if (rank) user.rank = rank;
   if (researchInterests !== undefined) user.researchInterests = String(researchInterests).trim();
 

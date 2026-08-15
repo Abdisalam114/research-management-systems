@@ -32,7 +32,7 @@ export function ProposalReviewPage() {
   const actions = useMemo(() => {
     if (isDirector) {
       return [
-        { id: "approved", label: "Approve proposal (creates project)" },
+        { id: "approved", label: "Approve proposal (creates Open project)" },
         { id: "revision_requested", label: "Request Revision" },
         { id: "rejected", label: "Reject" },
       ];
@@ -201,7 +201,50 @@ throw e;
       ) : null}
 
       {showFinalDecision ? (
-        <div className="card" style={{ marginTop: 12 }}>
+        <form
+          className="card"
+          style={{ marginTop: 12 }}
+          data-app-form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!selected) {
+              setError("Choose an action.");
+              return;
+            }
+            if (!comment.trim()) {
+              setError("Write a short comment, then submit.");
+              return;
+            }
+            if (isDirector && selected === "approved" && proposal.requiresEthics && !ethicsApproved) {
+              setError("Approve ethics first, then submit Approve.");
+              return;
+            }
+            setBusy(true);
+            setError("");
+            setMessage("");
+            try {
+              if (isDirector) {
+                const res = await proposalApi.directorDecision(accessToken, id, selected, comment.trim());
+                const projectId = res?.project?.id;
+                setMessage(
+                  res?.message ||
+                    (selected === "approved"
+                      ? "Proposal approved. An Open project was created for the researcher."
+                      : "Decision saved")
+                );
+                if (selected === "approved" && projectId) {
+                  setMessage((prev) => `${prev} Open it under Projects.`);
+                }
+              }
+              setComment("");
+              await load();
+            } catch (err) {
+              setError(err?.response?.data?.message || "Action failed");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
           <div style={{ fontWeight: 800, marginBottom: 8 }}>
             {proposal.fundingCallId || proposal.proposalKind === "grant_fund_call"
               ? "Proposal decision — funding call"
@@ -209,18 +252,23 @@ throw e;
           </div>
           {proposal.fundingCallId || proposal.proposalKind === "grant_fund_call" ? (
             <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
-              Approving automatically links this funding call to the proposal, grant, project, and budget. Finance
-              still authorizes the allocated amount (not a payment).
+              Approving creates an Open project for the researcher (listed under Projects) and links the funding
+              call, grant, and budget. Finance still authorizes the allocated amount (not a payment).
             </p>
-          ) : null}
+          ) : (
+            <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
+              Approve creates an Open project for the researcher. It appears immediately under Projects — not
+              rejected, not hidden.
+            </p>
+          )}
           {isDirector && proposal.requiresEthics && !ethicsApproved ? (
             <div className="muted" style={{ marginBottom: 10, fontSize: 13 }}>
-              Approve ethics (certificate) above first. Then you can approve the proposal to create the project.
+              Approve ethics (certificate) above first. Then you can approve the proposal to create the Open project.
             </div>
           ) : null}
           {isDirector && proposal.requiresEthics && ethicsApproved ? (
             <div className="muted" style={{ marginBottom: 10, fontSize: 13, color: "#0369a1" }}>
-              Ethics is cleared — approve the proposal below to create the project (it will appear under Projects).
+              Ethics is cleared — approve below to create an Open project (it will appear under Projects).
             </div>
           ) : null}
 
@@ -236,50 +284,19 @@ throw e;
           </div>
 
           <div className="field">
-            <label>Comment</label>
+            <label>Comment *</label>
             <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Write review notes..." />
           </div>
 
           <button
-            type="button"
+            type="submit"
             className="btn primary"
-            disabled={
-              busy ||
-              !selected ||
-              !comment.trim() ||
-              (isDirector && selected === "approved" && proposal.requiresEthics && !ethicsApproved)
-            }
-            title={
-              isDirector && selected === "approved" && !ethicsApproved
-                ? "Approve ethics first"
-                : undefined
-            }
-            onClick={async () => {
-              setBusy(true);
-              setError("");
-              setMessage("");
-              try {
-                if (isDirector) {
-                  const res = await proposalApi.directorDecision(accessToken, id, selected, comment.trim());
-                  setMessage(
-                    res?.message ||
-                      (selected === "approved" && (proposal.fundingCallId || proposal.proposalKind === "grant_fund_call")
-                        ? "Funding call accepted. Proposal, grant, project, and budget are being linked automatically."
-                        : "Decision saved")
-                  );
-                }
-                setComment("");
-                await load();
-              } catch (e) {
-                setError(e?.response?.data?.message || "Action failed");
-              } finally {
-                setBusy(false);
-              }
-            }}
+            data-form-submit
+            disabled={busy}
           >
             {busy ? "Saving..." : "Submit decision"}
           </button>
-        </div>
+        </form>
       ) : null}
 
       <EthicsDirectorDecisionModal

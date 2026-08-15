@@ -396,15 +396,18 @@ requestAnimationFrame(() => {
           {user?.role === "researcher" ? (
             <FacultyDepartmentSelect
               departments={departments}
+              lockFaculty
               value={{
-                faculty: deptPick.faculty || matchFacultyByName(proposal.department),
-                department: proposal.department,
+                faculty: matchFacultyByName(user?.department) || deptPick.faculty,
+                department: proposal.department || user?.department || "",
                 departmentId: deptPick.departmentId,
               }}
               disabled={readOnly}
               onChange={(next) => {
-                setDeptPick(next);
-                setProposal({ ...proposal, department: next.department || "" });
+                const homeFaculty = matchFacultyByName(user?.department);
+                if (homeFaculty && next.faculty && next.faculty !== homeFaculty) return;
+                setDeptPick({ ...next, faculty: homeFaculty || next.faculty });
+                setProposal({ ...proposal, department: next.department || user?.department || "" });
               }}
             />
           ) : (
@@ -458,6 +461,8 @@ requestAnimationFrame(() => {
             autoFillHint={!readOnly}
             hideFundingFields={isVoluntary}
             departments={departments}
+            lockPrincipalFaculty
+            principalFaculty={matchFacultyByName(user?.department)}
           />
         </div>
       ) : null}

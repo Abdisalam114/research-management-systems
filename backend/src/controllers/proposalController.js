@@ -1,5 +1,5 @@
 const { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES, PROPOSAL_KINDS } = require("../models/Proposal");
-const { Project } = require("../models/Project");
+const { Project, PROJECT_STATUSES } = require("../models/Project");
 const { User, ROLES } = require("../models/User");
 const { EthicsApplication } = require("../models/EthicsApplication");
 const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
@@ -18,6 +18,17 @@ const { applyEthicsPayload, parseEthicsJson } = require("../utils/ethicsFormMerg
 const { ensureReviewPipeline, getCurrentReviewStage, defaultReviewPipeline, STAGE_STATUS, isVoluntaryProposal, peerReviewAssignedToUserFilter, clearPeerAssigneesIfInactive, assertStagesBeforeDirector } = require("../utils/proposalReviewPipeline");
 const { recordAudit } = require("../utils/audit");
 const { coordinatorMatchesResearcherDept, resolveCoordinatorDepartment } = require("../utils/facultyMatcher");
+
+function resolveDepartmentForResearcher(req, requested) {
+  const home = String(req.user?.department || "").trim();
+  const dept = String(requested || "").trim();
+  if (req.user?.role !== ROLES.RESEARCHER) return dept || home;
+  if (!home) {
+    throw new AppError("Your profile has no faculty. Contact the Research Director.", 400);
+  }
+  if (!dept || !coordinatorMatchesResearcherDept(home, dept)) return home;
+  return dept;
+}
 
 function resolveProposalKind(doc) {
   if (doc.proposalKind && Object.values(PROPOSAL_KINDS).includes(doc.proposalKind)) {
@@ -209,6 +220,18 @@ async function persistProposalEthics(proposal, user, reqBody) {
     ethics.projectTitle = proposal.title;
     if (proposal.department) ethics.principal = { ...(ethics.principal || {}), department: proposal.department };
   }
+  const homeDept = String(user?.department || proposal.department || "").trim();
+  if (homeDept && user?.role === ROLES.RESEARCHER) {
+    const { matchFacultyByName } = require("../utils/facultyMatcher");
+    const lockedFaculty = matchFacultyByName(homeDept);
+    const incomingDept = String(ethics.principal?.department || "").trim();
+    const deptOk = incomingDept && coordinatorMatchesResearcherDept(homeDept, incomingDept);
+    ethics.principal = {
+      ...(ethics.principal || {}),
+      faculty: lockedFaculty,
+      department: deptOk ? incomingDept : homeDept,
+    };
+  }
   const voluntary =
     proposal.proposalKind === PROPOSAL_KINDS.VOLUNTARY ||
     (!proposal.fundingCallId && proposal.proposalKind !== PROPOSAL_KINDS.GRANT_FUND_CALL);
@@ -272,7 +295,7 @@ function applyProposalDocuments(proposal, req) {
 
 async function createProposal(req, res) {
   const { title, abstract, researchArea, requiresEthics, fundingCallId, proposalKind } = req.body;
-  const department = String(req.body.department || req.user.department || "").trim();
+  const department = resolveDepartmentForResearcher(req, req.body.department);
   if (!title || !abstract || !department || !researchArea) {
     throw new AppError("title, abstract, department, and researchArea are required", 400);
   }
@@ -373,7 +396,7 @@ async function updateProposal(req, res) {
   const { title, abstract, department, researchArea, requiresEthics } = req.body;
   if (title) proposal.title = title;
   if (abstract) proposal.abstract = abstract;
-  if (department) proposal.department = department;
+  if (department) proposal.department = resolveDepartmentForResearcher(req, department);
   if (researchArea) proposal.researchArea = researchArea;
 
   applyProposalDocuments(proposal, req);
@@ -768,6 +791,32 @@ async function coordinatorReview(req, res) {
   res.json({ message: "Review saved", proposal: sanitizeProposal(proposal) });
 }
 
+async function ensureOpenProjectForProposal(req, proposal) {
+  let project = await Project.findOne({
+    $or: [{ proposalId: proposal._id }, { proposal: proposal._id }],
+  });
+  if (!project) {
+    project = await Project.create(
+      req.tierAssign({
+        proposalId: proposal._id,
+        title: proposal.title,
+        researcherId: proposal.researcherId,
+        programTier: proposal.programTier || req.programTier,
+        teamMembers: [],
+        milestones: [],
+        status: PROJECT_STATUSES.ACTIVE,
+        progressReports: [],
+      })
+    );
+  } else if (project.status !== PROJECT_STATUSES.ACTIVE && project.status !== PROJECT_STATUSES.CLOSING) {
+    if (!["completed", "closed"].includes(project.status)) {
+      project.status = PROJECT_STATUSES.ACTIVE;
+      await project.save();
+    }
+  }
+  return project;
+}
+
 async function directorDecision(req, res) {
   const { id } = req.params;
   const { decision, comment } = req.body;
@@ -836,29 +885,9 @@ async function directorDecision(req, res) {
   });
 
   let fundCallLinks = null;
+  let createdProject = null;
   if (decision === PROPOSAL_STATUSES.APPROVED) {
-    const existing = await Project.findOne(req.tierWhere({ proposalId: proposal._id }));
-    if (!existing && !proposal.fundingCallId) {
-      const project = await Project.create(req.tierAssign({
-        proposalId: proposal._id,
-        title: proposal.title,
-        researcherId: proposal.researcherId,
-        programTier: proposal.programTier,
-        teamMembers: [],
-        milestones: [],
-        status: "active",
-        progressReports: [],
-      }));
-      try {
-        await notifyUser(proposal.researcherId, {
-          type: "proposal",
-          title: "Congratulations — proposal accepted",
-          body: `Your proposal "${proposal.title}" has been fully accepted. A research project has been created — please proceed with your research.`,
-          link: `/projects/${project._id}`,
-          programTier: proposal.programTier,
-        });
-      } catch { /* best-effort */ }
-    }
+    createdProject = await ensureOpenProjectForProposal(req, proposal);
 
     if (proposal.fundingCallId) {
       try {
@@ -869,6 +898,7 @@ async function directorDecision(req, res) {
           programTier: proposal.programTier || req.programTier,
         });
         fundCallLinks = chain?.summary || null;
+        if (chain?.project) createdProject = chain.project;
         try {
           await notifyUsersByRole(
             "finance_officer",
@@ -883,16 +913,6 @@ async function directorDecision(req, res) {
             proposal.programTier
           );
         } catch { /* best-effort */ }
-        const projectId = chain?.project?._id;
-        try {
-          await notifyUser(proposal.researcherId, {
-            type: "proposal",
-            title: "Funding call accepted — records linked",
-            body: `${fundCallLinks?.message || "Automatically linked."} Your proposal, grant, project, and budget are connected. Finance still authorizes the allocated amount.`,
-            link: projectId ? `/projects/${projectId}` : `/proposals/${proposal._id}`,
-            programTier: proposal.programTier,
-          });
-        } catch { /* best-effort */ }
         if (chain) {
           try {
             const { closeCallAfterGrantAccepted } = require("../utils/fundingCallAutoClose");
@@ -904,17 +924,38 @@ async function directorDecision(req, res) {
             });
           } catch { /* best-effort */ }
         }
-      } catch { /* best-effort */ }
+      } catch (chainErr) {
+        fundCallLinks = {
+          message: `Open project created for the researcher. Funding-call link incomplete: ${chainErr.message || "try Finance approval next."}`,
+        };
+      }
     }
+
+    try {
+      const projectId = createdProject?._id;
+      await notifyUser(proposal.researcherId, {
+        type: "proposal",
+        title: "Proposal accepted — project is Open",
+        body: `Your proposal "${proposal.title}" was accepted. An Open research project is now in Projects — continue your work there.`,
+        link: projectId ? `/projects/${projectId}` : "/projects",
+        programTier: proposal.programTier,
+      });
+    } catch { /* best-effort */ }
   }
 
   const populated = await Proposal.findById(proposal._id).populate("fundingCallId", "title status deadline");
-  const message = fundCallLinks?.message
-    ? `Funding call accepted. ${fundCallLinks.message} Finance still authorizes the allocated budget (not a payment).`
-    : "Decision saved";
+  const message =
+    decision === PROPOSAL_STATUSES.APPROVED
+      ? fundCallLinks?.message
+        ? `Proposal approved. An Open project was created for the researcher. ${fundCallLinks.message}`
+        : "Proposal approved. An Open project was created for the researcher and is listed under Projects."
+      : "Decision saved";
   res.json({
     message,
     proposal: sanitizeProposal(populated || proposal),
+    project: createdProject
+      ? { id: createdProject._id, title: createdProject.title, status: createdProject.status || "active" }
+      : null,
     links: fundCallLinks,
   });
 }

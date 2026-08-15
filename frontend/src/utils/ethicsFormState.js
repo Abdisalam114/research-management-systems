@@ -122,7 +122,7 @@ export function syncEthicsFromProposal(ethics, proposal, user, programTier) {
     principal: {
       ...ethics.principal,
       department: dept,
-      faculty: ethics.principal?.faculty || matchFacultyByName(dept),
+      faculty: matchFacultyByName(user?.department || dept),
       email: user?.email || ethics.principal?.email || "",
       firstName: ethics.principal?.firstName || parts[0] || "",
       lastName: ethics.principal?.lastName || parts.slice(1).join(" ") || "",
