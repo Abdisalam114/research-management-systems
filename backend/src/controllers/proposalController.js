@@ -567,16 +567,6 @@ async function submitProposal(req, res) {
       body: proposal.title,
       link: `/proposals/${proposal._id}/review`,
     }, req.notifyProgramTier?.(proposal) || proposal.programTier || req.programTier);
-    if (proposal.requiresEthics) {
-      await notifyUsersByRole("research_director", {
-        type: "ethics",
-        title: "Proposal ethics ready for director review",
-        body: proposal.title,
-        link: proposal.ethicsApplicationId
-          ? `/ethics?applicationId=${proposal.ethicsApplicationId}`
-          : "/ethics",
-      }, req.notifyProgramTier?.(proposal) || proposal.programTier || req.programTier);
-    }
 } catch {
     /* notifications best-effort */
   }
@@ -896,18 +886,20 @@ async function directorDecision(req, res) {
     }
 
     try {
-      const projectId = createdProject?._id;
+      const projectId = createdProject?._id || createdProject?.id;
+      const projectLink = projectId ? `/projects/${projectId}` : "/projects";
       await notifyUser(proposal.researcherId, {
         type: "proposal",
         title: "Proposal accepted — project is Open",
         body: `Your proposal "${proposal.title}" was accepted. An Open research project is now in Projects — continue your work there.`,
-        link: projectId ? `/projects/${projectId}` : "/projects",
+        link: projectLink,
         programTier: proposal.programTier,
       });
     } catch { /* best-effort */ }
   }
 
   const populated = await Proposal.findById(proposal._id).populate("fundingCallId", "title status deadline");
+  const openProjectId = createdProject?._id || createdProject?.id || null;
   const message =
     decision === PROPOSAL_STATUSES.APPROVED
       ? fundCallLinks?.message
@@ -917,8 +909,12 @@ async function directorDecision(req, res) {
   res.json({
     message,
     proposal: sanitizeProposal(populated || proposal),
-    project: createdProject
-      ? { id: createdProject._id, title: createdProject.title, status: createdProject.status || "active" }
+    project: openProjectId
+      ? {
+          id: String(openProjectId),
+          title: createdProject.title,
+          status: createdProject.status || "active",
+        }
       : null,
     links: fundCallLinks,
   });

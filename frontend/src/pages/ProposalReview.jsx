@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { useScrollToTop } from "../hooks/useScrollToTop";
@@ -13,6 +13,7 @@ import { openProtectedUpload } from "../utils/protectedFile";
 
 export function ProposalReviewPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { accessToken, user } = useAuth();
   const { programTier } = useProgramTier();
   const [proposal, setProposal] = useState(null);
@@ -170,9 +171,6 @@ throw e;
           onApproveEthics={() => setEthicsDecisionModal("approve")}
           onIssueCertificate={() => setEthicsDecisionModal("approve")}
           onRejectEthics={() => setEthicsDecisionModal("reject")}
-          onViewEthics={() => {
-            if (ethics?.id) window.location.assign(`/ethics?applicationId=${ethics.id}`);
-          }}
           onDownloadCertificate={async () => {
             if (!ethics?.id) return;
             try {
@@ -233,16 +231,12 @@ throw e;
             try {
               if (isDirector) {
                 const res = await proposalApi.directorDecision(accessToken, id, selected, comment.trim());
-                const projectId = res?.project?.id;
-                setMessage(
-                  res?.message ||
-                    (selected === "approved"
-                      ? "Proposal approved. An Open project was created for the researcher."
-                      : "Decision saved")
-                );
-                if (selected === "approved" && projectId) {
-                  setMessage((prev) => `${prev} Open it under Projects.`);
+                const projectId = res?.project?.id ? String(res.project.id) : "";
+                if (selected === "approved") {
+                  navigate(projectId ? `/projects/${projectId}` : "/projects", { replace: true });
+                  return;
                 }
+                setMessage(res?.message || "Decision saved");
               }
               setComment("");
               await load();

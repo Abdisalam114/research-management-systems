@@ -330,7 +330,7 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
     steps.push(
       step("ethics", "Ethics (REC) approval", ethicsStatus, {
         at: ts(proposal.updatedAt),
-        link: `/proposals/${proposal._id}`,
+        link: project ? `/projects/${project._id}` : `/proposals/${proposal._id}`,
         detail: proposal.ethicsStatus,
       })
     );
