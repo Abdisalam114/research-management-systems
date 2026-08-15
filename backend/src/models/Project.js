@@ -120,13 +120,12 @@ const projectSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-projectSchema.pre("save", function setProjectStartOnCreate(next) {
+projectSchema.pre("save", function setProjectStartOnCreate() {
   if (this.isNew && !this.startDate) {
     this.startDate = new Date();
   }
   const start = resolveProjectStartDate(this);
   if (start) this.startDate = start;
-  next();
 });
 
 const Project = mongoose.model("Project", projectSchema);

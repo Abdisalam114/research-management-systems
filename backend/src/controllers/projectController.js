@@ -14,6 +14,7 @@ const { buildProjectNotificationBody, loadProjectForNotification } = require("..
 const { writeSimplePdf } = require("../utils/pdf");
 const { resolveProjectStartDate, assertDateOnOrAfterProjectStart } = require("../utils/projectStartDate");
 const { assertDateNotInPast, assertDateOnOrAfter } = require("../utils/dateConstraints");
+const { backfillOpenProjectsForApprovedProposals } = require("../utils/ensureOpenProjectForProposal");
 
 function normalizeTeamMembers(team) {
   if (!Array.isArray(team)) return [];
@@ -160,6 +161,12 @@ function sanitizeProjectForFinanceClosure(p, { isVoluntary = false, proposalKind
 }
 
 async function listProjects(req, res) {
+  try {
+    await backfillOpenProjectsForApprovedProposals(req);
+  } catch {
+    /* listing still proceeds */
+  }
+
   const { role } = req.user;
   const tierFilter =
     role === "researcher" ? req.ownedWhere({}) : req.tierWhere({});

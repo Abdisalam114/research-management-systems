@@ -20,6 +20,7 @@ const {
   buildWorkflowForProject,
 } = require("../utils/researchJourney");
 const { Notification } = require("../models/Notification");
+const { backfillOpenProjectsForApprovedProposals } = require("../utils/ensureOpenProjectForProposal");
 const {
   FACULTIES,
   matchFacultyByName,
@@ -99,6 +100,12 @@ async function mapProjectDashboardRows(projects, { tierFilter = {}, viewerRole =
 }
 
 async function getDashboardMetrics(req, res) {
+  try {
+    await backfillOpenProjectsForApprovedProposals(req);
+  } catch {
+    /* dashboard still proceeds */
+  }
+
   const { role } = req.user;
   const userId = req.user.id;
 
@@ -921,6 +928,12 @@ res.json({
 }
 
 async function getResearchJourney(req, res) {
+  try {
+    await backfillOpenProjectsForApprovedProposals(req);
+  } catch {
+    /* journey still proceeds */
+  }
+
   const { role, id: userId } = req.user;
   const { researcherId: researcherIdQuery } = req.query || {};
   const tierFilter = req.tierWhere({});

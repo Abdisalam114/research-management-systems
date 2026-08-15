@@ -1,5 +1,5 @@
 const { Proposal, PROPOSAL_STATUSES, ETHICS_STATUSES, PROPOSAL_KINDS } = require("../models/Proposal");
-const { Project, PROJECT_STATUSES } = require("../models/Project");
+const { Project } = require("../models/Project");
 const { User, ROLES } = require("../models/User");
 const { EthicsApplication } = require("../models/EthicsApplication");
 const { FundingCall, CALL_STATUSES } = require("../models/FundingCall");
@@ -18,6 +18,7 @@ const { applyEthicsPayload, parseEthicsJson } = require("../utils/ethicsFormMerg
 const { ensureReviewPipeline, getCurrentReviewStage, defaultReviewPipeline, STAGE_STATUS, isVoluntaryProposal, peerReviewAssignedToUserFilter, clearPeerAssigneesIfInactive, assertStagesBeforeDirector } = require("../utils/proposalReviewPipeline");
 const { recordAudit } = require("../utils/audit");
 const { coordinatorMatchesResearcherDept } = require("../utils/facultyMatcher");
+const { ensureOpenProjectForProposal } = require("../utils/ensureOpenProjectForProposal");
 
 function resolveDepartmentForResearcher(req, requested) {
   const home = String(req.user?.department || "").trim();
@@ -745,32 +746,6 @@ async function coordinatorReview(req, res) {
   res.json({ message: "Review saved", proposal: sanitizeProposal(proposal) });
 }
 
-async function ensureOpenProjectForProposal(req, proposal) {
-  let project = await Project.findOne({
-    $or: [{ proposalId: proposal._id }, { proposal: proposal._id }],
-  });
-  if (!project) {
-    project = await Project.create(
-      req.tierAssign({
-        proposalId: proposal._id,
-        title: proposal.title,
-        researcherId: proposal.researcherId,
-        programTier: proposal.programTier || req.programTier,
-        teamMembers: [],
-        milestones: [],
-        status: PROJECT_STATUSES.ACTIVE,
-        progressReports: [],
-      })
-    );
-  } else if (project.status !== PROJECT_STATUSES.ACTIVE && project.status !== PROJECT_STATUSES.CLOSING) {
-    if (!["completed", "closed"].includes(project.status)) {
-      project.status = PROJECT_STATUSES.ACTIVE;
-      await project.save();
-    }
-  }
-  return project;
-}
-
 async function directorDecision(req, res) {
   const { id } = req.params;
   const { decision, comment } = req.body;
@@ -801,6 +776,11 @@ async function directorDecision(req, res) {
     } catch (e) {
       throw new AppError(e.message || "Complete Multi-stage review before final approval", e.statusCode || 400);
     }
+  }
+
+  let createdProject = null;
+  if (decision === PROPOSAL_STATUSES.APPROVED) {
+    createdProject = await ensureOpenProjectForProposal(req, proposal);
   }
 
   proposal.status = decision;
@@ -839,10 +819,7 @@ async function directorDecision(req, res) {
   });
 
   let fundCallLinks = null;
-  let createdProject = null;
   if (decision === PROPOSAL_STATUSES.APPROVED) {
-    createdProject = await ensureOpenProjectForProposal(req, proposal);
-
     if (proposal.fundingCallId) {
       try {
         const { linkFundCallAwardChain } = require("../utils/linkFundCallAwardChain");
