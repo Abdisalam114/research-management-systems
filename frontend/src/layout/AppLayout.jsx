@@ -21,7 +21,9 @@ export function AppLayout() {
     return () => document.body.classList.remove("appShellActive");
   }, []);
 
-  useScrollToTop([location.pathname, location.search, location.hash, location.key]);
+  useScrollToTop([location.pathname, location.search, location.hash, location.key], {
+    skip: Boolean(location.hash),
+  });
   useAppFormBehavior(contentRef);
 
   useEffect(() => {

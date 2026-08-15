@@ -88,10 +88,15 @@ export function ProjectDetailsPage() {
     if (!hash || !project?.id) return;
     const id = hash.replace(/^#/, "");
     if (!["closure", "project-outputs", "project-workflow", "workflow"].includes(id)) return;
-    const el =
-      document.getElementById(id) ||
-      (id === "workflow" ? document.getElementById("project-workflow") : null);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    const scrollToAnchor = () => {
+      const el =
+        document.getElementById(id) ||
+        (id === "workflow" ? document.getElementById("project-workflow") : null);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    scrollToAnchor();
+    const t = window.setTimeout(scrollToAnchor, 120);
+    return () => window.clearTimeout(t);
   }, [location.hash, project?.id]);
 
   if (!project) {

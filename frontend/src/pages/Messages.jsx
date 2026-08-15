@@ -18,11 +18,12 @@ export function MessagesPage() {
   const { accessToken, user } = useAuth();
   const { programTier } = useProgramTier();
   const [searchParams, setSearchParams] = useSearchParams();
+  const urlConversationId = searchParams.get("conversationId") || "";
   const [conversations, setConversations] = useState([]);
   const [users, setUsers] = useState([]);
   const [userQuery, setUserQuery] = useState("");
   const [selectedUserId, setSelectedUserId] = useState("");
-  const [activeId, setActiveId] = useState(searchParams.get("conversationId") || "");
+  const [activeId, setActiveId] = useState(urlConversationId);
   const [active, setActive] = useState(null);
   const [error, setError] = useState("");
   const [messageBody, setMessageBody] = useState("");
@@ -51,10 +52,15 @@ export function MessagesPage() {
     [accessToken, programTier]
   );
 
+  function openConversation(id) {
+    const next = id ? String(id) : "";
+    setActiveId(next);
+    setSearchParams(next ? { conversationId: next } : {}, { replace: true });
+  }
+
   useEffect(() => {
-    setActiveId("");
-    setActive(null);
-  }, [programTier]);
+    setActiveId(urlConversationId);
+  }, [urlConversationId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,13 +84,7 @@ export function MessagesPage() {
 
   useEffect(() => {
     loadActive(activeId).catch((e) => setError(e?.response?.data?.message || "Failed to load conversation"));
-    if (activeId && searchParams.get("conversationId") !== activeId) {
-      setSearchParams({ conversationId: activeId }, { replace: true });
-    }
-    if (!activeId && searchParams.get("conversationId")) {
-      setSearchParams({}, { replace: true });
-    }
-  }, [activeId, accessToken, loadActive, searchParams, setSearchParams]);
+  }, [activeId, loadActive]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -118,7 +118,7 @@ export function MessagesPage() {
       setSelectedUserId("");
       setUserQuery("");
       await loadList();
-      setActiveId(res.conversation.id);
+      openConversation(res.conversation.id);
     } catch (e) {
       setError(e?.response?.data?.message || "Failed to start conversation");
     }
@@ -186,7 +186,7 @@ export function MessagesPage() {
                 key={c.id}
                 type="button"
                 className={activeId === c.id ? "messagesConvItem active" : "messagesConvItem"}
-                onClick={() => setActiveId(c.id)}
+                onClick={() => openConversation(c.id)}
               >
                 <div className="messagesConvTitle">{c.label || "Chat"}</div>
                 <div className="messagesConvPreview muted">{c.preview || "No messages yet"}</div>

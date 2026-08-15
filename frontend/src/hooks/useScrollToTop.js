@@ -11,8 +11,9 @@ export function scrollToTopNow() {
 }
 
 /** Scroll app content to top when route params or local form state changes. */
-export function useScrollToTop(deps = []) {
+export function useScrollToTop(deps = [], { skip = false } = {}) {
   useLayoutEffect(() => {
+    if (skip) return undefined;
     scrollToTopNow();
     const t = setTimeout(scrollToTopNow, 80);
     return () => clearTimeout(t);

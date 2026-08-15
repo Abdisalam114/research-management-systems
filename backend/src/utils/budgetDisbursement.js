@@ -22,20 +22,33 @@ async function deductFromBudget(budgetId, amount, { tierWhere } = {}) {
   }
 
   const filter = tierWhere ? tierWhere({ _id: budgetId }) : { _id: budgetId };
+  const updated = await Budget.findOneAndUpdate(
+    {
+      ...filter,
+      $expr: {
+        $gte: [
+          {
+            $subtract: [
+              { $ifNull: ["$totalAllocated", 0] },
+              { $ifNull: ["$totalDisbursed", 0] },
+            ],
+          },
+          amt,
+        ],
+      },
+    },
+    { $inc: { totalDisbursed: amt } },
+    { new: true }
+  );
+  if (updated) return updated;
+
   const budget = await Budget.findOne(filter);
   if (!budget) throw new AppError("Budget not found", 404);
-
   const remaining = remainingOf(budget);
-  if (amt > remaining + 1e-9) {
-    throw new AppError(
-      `Insufficient budget remaining. Remaining: ${remaining.toLocaleString()}, requested: ${amt.toLocaleString()}`,
-      400
-    );
-  }
-
-  budget.totalDisbursed = Number(budget.totalDisbursed || 0) + amt;
-  await budget.save();
-  return budget;
+  throw new AppError(
+    `Insufficient budget remaining. Remaining: ${remaining.toLocaleString()}, requested: ${amt.toLocaleString()}`,
+    400
+  );
 }
 
 function assertAffordable(budget, amount) {

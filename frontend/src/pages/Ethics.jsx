@@ -50,7 +50,7 @@ export function EthicsPage() {
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
   const proposalLoadedRef = useRef(false);
   const editorRef = useRef(null);
-  const autoOpenedRef = useRef(false);
+  const autoOpenedRef = useRef("");
   const applicationIdFromUrl = searchParams.get("applicationId");
 
   const load = useCallback(async () => {
@@ -303,10 +303,11 @@ export function EthicsPage() {
   }, [pendingEditorScroll, editing]);
 
   useEffect(() => {
-    if (!applicationIdFromUrl || !applications.length || autoOpenedRef.current) return;
+    if (!applicationIdFromUrl || !applications.length) return;
+    if (autoOpenedRef.current === String(applicationIdFromUrl)) return;
     const app = applications.find((a) => String(a.id) === String(applicationIdFromUrl));
     if (!app) return;
-    autoOpenedRef.current = true;
+    autoOpenedRef.current = String(applicationIdFromUrl);
     openViewApplication(app);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applicationIdFromUrl, applications]);

@@ -422,6 +422,27 @@ async function createGrant(req, res) {
   const linkedProjectId = explicitProjectId || linkedProjectFromProposal;
   const checklist = parseRequirementChecklist(req.body, call);
   assertCallRequirementsComplete(call, checklist);
+
+  const existing = await Grant.findOne({
+    researcherId: req.user.id,
+    callId: call._id,
+    proposalId: proposal._id,
+    status: { $ne: GRANT_STATUSES.REJECTED },
+  });
+  if (existing) {
+    if (existing.status !== GRANT_STATUSES.DRAFT) {
+      throw new AppError("You already applied to this funding call with this proposal", 409);
+    }
+    const populatedExisting = await Grant.findById(existing._id)
+      .populate("projectId", "title status")
+      .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId")
+      .populate("callId", "title status fundingSource requiredDocuments deadline");
+    return res.json({
+      grant: sanitizeGrant(populatedExisting),
+      message: "Opened your existing draft for this call.",
+    });
+  }
+
   const grant = await Grant.create(
     req.createWithTier(
       {

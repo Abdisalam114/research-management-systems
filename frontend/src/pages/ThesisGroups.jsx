@@ -12,6 +12,7 @@ import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } from "../constants/faculties";
 import { apiOrigin } from "../config/apiBase";
+import { todayIso } from "../utils/dateConstraints";
 import "./groups.css";
 
 const MANAGE_ROLES = ["faculty_coordinator", "research_director"];
@@ -1263,7 +1264,7 @@ export function ThesisGroupsPage() {
                             <label>Date</label>
                             <input
                               type="date"
-                              max={new Date().toISOString().slice(0, 10)}
+                              max={todayIso()}
                               value={meetingForm.date}
                               onChange={(e) => setMeetingForm({ ...meetingForm, date: e.target.value })}
                               required

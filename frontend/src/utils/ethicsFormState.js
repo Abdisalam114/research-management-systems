@@ -3,6 +3,7 @@
 import { PROGRAM_TIERS } from "../constants/programTier";
 import { normalizeProjectLevel } from "../constants/ethicsFormOptions";
 import { matchFacultyByName } from "../constants/faculties";
+import { dateIso } from "./dateConstraints";
 
 export function defaultProjectLevelFromTier(programTier) {
   if (programTier === PROGRAM_TIERS.UNDERGRADUATE) return "undergraduate";
@@ -58,7 +59,7 @@ function mergeSection(emptySection, raw) {
 
 export function ethicsApplicationToForm(a) {
   if (!a) return emptyEthicsForm();
-  const dt = (d) => (d ? new Date(d).toISOString().slice(0, 10) : "");
+  const dt = (d) => dateIso(d);
   const empty = emptyEthicsForm();
   const form = {
     ...empty,

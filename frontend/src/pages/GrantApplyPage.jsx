@@ -58,6 +58,7 @@ export function GrantApplyPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const budgetInitRef = useRef(false);
+  const creatingRef = useRef(false);
 
   const syncProposalsForCall = useCallback(
     async (c) => {
@@ -127,6 +128,7 @@ export function GrantApplyPage() {
     selectedProposal?.researcherName || user?.fullName || user?.email || "Current researcher";
 
   async function handleCreateGrant() {
+    if (creatingRef.current || busy) return;
     if (!call || !selectedProposalId) {
       setError("Select a research proposal before saving the grant application.");
       setStep(2);
@@ -162,6 +164,7 @@ export function GrantApplyPage() {
       return;
     }
 
+    creatingRef.current = true;
     setBusy(true);
     setError("");
     setMessage("");
@@ -189,6 +192,7 @@ const grantId = res.grant?.id;
     } catch (e) {
 setError(e?.response?.data?.message || "Could not save grant application.");
     } finally {
+      creatingRef.current = false;
       setBusy(false);
     }
   }

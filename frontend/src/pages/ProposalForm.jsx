@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import * as proposalApi from "../services/proposalApi";
@@ -53,6 +53,7 @@ export function ProposalFormPage() {
   const [ethicsForm, setEthicsForm] = useState(() => buildEthicsFromProposalAndUser({}, user, programTier));
   const [loaded, setLoaded] = useState(!isEdit);
   const [busy, setBusy] = useState(false);
+  const writeLockRef = useRef(false);
   const [error, setError] = useState("");
   const [validationIssues, setValidationIssues] = useState([]);
   const [draftSaved, setDraftSaved] = useState(false);
@@ -199,18 +200,28 @@ export function ProposalFormPage() {
     return base;
   }, [proposal, ethicsForm, complianceDocs, supportingDocs, fundingCallId, savedId, isGrantFundCall, isVoluntary]);
 
-  const saveDraft = async () => {
+  const saveDraft = async ({ holdLock } = {}) => {
+    if (!holdLock) {
+      if (writeLockRef.current) return null;
+      writeLockRef.current = true;
+    }
     setBusy(true);
     setError("");
     setValidationIssues([]);
     if (!String(proposal.department || "").trim()) {
       setError("Department is required — select your faculty and department.");
-      setBusy(false);
+      if (!holdLock) {
+        writeLockRef.current = false;
+        setBusy(false);
+      }
       return null;
     }
     if (!String(proposal.title || "").trim() || !String(proposal.abstract || "").trim() || !String(proposal.researchArea || "").trim()) {
       setError("Title, abstract, and research area are required to save a draft.");
-      setBusy(false);
+      if (!holdLock) {
+        writeLockRef.current = false;
+        setBusy(false);
+      }
       return null;
     }
     try {
@@ -228,37 +239,42 @@ export function ProposalFormPage() {
       }
       setStatus(res.proposal.status);
       setDraftSaved(true);
-return res.proposal;
+      return res.proposal;
     } catch (e) {
       setError(e?.response?.data?.message || "Save failed");
       return null;
     } finally {
-      setBusy(false);
+      if (!holdLock) {
+        writeLockRef.current = false;
+        setBusy(false);
+      }
     }
   };
 
   const submitToDirector = async () => {
+    if (writeLockRef.current) return;
+    writeLockRef.current = true;
+    setBusy(true);
     setValidationIssues([]);
     setError("");
     setDraftSaved(false);
 
-    const issues = collectSubmitValidationIssues(proposal, ethicsForm, proposal.requiresEthics);
-    if (issues.length > 0) {
-      setValidationIssues(issues);
-requestAnimationFrame(() => {
-        scrollElementIntoAppView(document.getElementById("validation-errors"), { behavior: "smooth", block: "start", offset: 88 });
-      });
-      return;
-    }
-
-    const p = await saveDraft();
-    if (!p) return;
-    const pid = p.id || savedId;
-    if (!pid) return;
-
-    setBusy(true);
-    setError("");
     try {
+      const issues = collectSubmitValidationIssues(proposal, ethicsForm, proposal.requiresEthics);
+      if (issues.length > 0) {
+        setValidationIssues(issues);
+        requestAnimationFrame(() => {
+          scrollElementIntoAppView(document.getElementById("validation-errors"), { behavior: "smooth", block: "start", offset: 88 });
+        });
+        return;
+      }
+
+      const p = await saveDraft({ holdLock: true });
+      if (!p) return;
+      const pid = p.id || savedId;
+      if (!pid) return;
+
+      setError("");
       await proposalApi.submitProposal(accessToken, pid);
       navigate(`/proposals/${pid}?submitted=1`, {
         replace: true,
@@ -271,6 +287,7 @@ requestAnimationFrame(() => {
         setValidationIssues(collectSubmitValidationIssues(proposal, ethicsForm, proposal.requiresEthics));
       }
     } finally {
+      writeLockRef.current = false;
       setBusy(false);
     }
   };
