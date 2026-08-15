@@ -6,6 +6,7 @@ import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
+import { WorkDoneBox } from "../components/WorkDoneBox";
 import { filterByStatKey, statFilterLabel, buildSentReceivedPendingStats } from "../utils/pageHeaderFilters";
 
 export function CommitteeAssignmentsPage() {
@@ -192,13 +193,21 @@ export function CommitteeAssignmentsPage() {
                           </span>
                         </div>
                       )}
-                      {isReceived && a.committeeScore != null ? (
-                        <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>
+                      {isReceived && a.committeeScore != null && !isCoordinator ? (
+                        <div className="muted" style={{ fontSize: 13, marginTop: 8 }}>
                           Score: <strong>{a.committeeScore}/5</strong>
                           {a.committeeDecision
                             ? ` · ${String(a.committeeDecision).replace(/_/g, " ")}`
                             : ""}
                         </div>
+                      ) : null}
+                      {isCoordinator && !needsAction ? (
+                        <WorkDoneBox
+                          stageLabel="Committee review"
+                          comment={a.committeeComment}
+                          score={a.committeeScore}
+                          decision={a.committeeDecision}
+                        />
                       ) : null}
                       <p
                         style={{

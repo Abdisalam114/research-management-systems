@@ -1205,6 +1205,12 @@ async function assignFinance(req, res) {
     assignedBy: req.user.id,
     assignedAt: new Date(),
   }));
+  const assignedTo = users.map((u) => ({
+    userId: u._id,
+    fullName: u.fullName || "",
+    email: u.email || "",
+    assignedAt: new Date(),
+  }));
   if (
     pipe.financeReview?.status === STAGE_STATUS.PENDING ||
     pipe.financeReview?.status === "pending"
@@ -1213,6 +1219,12 @@ async function assignFinance(req, res) {
       ...(pipe.financeReview || {}),
       status: STAGE_STATUS.IN_PROGRESS,
       startedAt: new Date(),
+      assignedTo,
+    };
+  } else {
+    pipe.financeReview = {
+      ...(pipe.financeReview || {}),
+      assignedTo,
     };
   }
   proposal.markModified("reviewPipeline");

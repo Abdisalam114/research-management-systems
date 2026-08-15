@@ -6,6 +6,8 @@ import * as userApi from "../services/userApi";
 import { StatusBadge } from "./StatusBadge";
 import { PeerReviewRoster } from "./PeerReviewRoster";
 import { buildPeerReviewRoster } from "../utils/peerReviewRoster";
+import { scrollToTopNow } from "../hooks/useScrollToTop";
+import { scrollElementIntoAppView } from "../utils/scrollContainer";
 
 const STAGE_LABELS = {
   admin_screening: "Admin screening",
@@ -93,8 +95,6 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
   const committeeStageOpen = stageOpen(pipe.committeeReview?.status);
   const committeePassed = pipe.committeeReview?.status === "passed";
   const committeeFailed = pipe.committeeReview?.status === "failed";
-  const committeeCompletedByMe =
-    String(pipe.committeeReview?.completedBy || "") === String(user?.id);
   const canDecideCommittee =
     pipe.peerReview?.status === "passed" &&
     committeeStageOpen &&
@@ -108,8 +108,6 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
   const financeStageOpen = stageOpen(pipe.financeReview?.status);
   const financePassed = pipe.financeReview?.status === "passed";
   const financeFailed = pipe.financeReview?.status === "failed";
-  const financeCompletedByMe =
-    String(pipe.financeReview?.completedBy || "") === String(user?.id);
   const directorReady = proposal.currentReviewStage === "ready_for_director";
   const canAssignFinance =
     isDirector &&
@@ -209,6 +207,12 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
       await fn();
       setComment("");
       await onReload();
+      scrollToTopNow();
+      setTimeout(() => {
+        const el = document.getElementById("review-work-done");
+        if (el) scrollElementIntoAppView(el, { behavior: "smooth", block: "start" });
+        else scrollToTopNow();
+      }, 80);
     } catch (e) {
       setErr(e?.response?.data?.message || "Action failed");
     } finally {
@@ -439,7 +443,7 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         </div>
       ) : null}
 
-      {isLeadershipReviewer && !assigned ? (
+      {isLeadershipReviewer && !assigned && !peerDone ? (
         <div className="muted" style={{ marginBottom: 12, fontSize: 13 }}>
           Ask the Research Director to assign you from the proposal review page.
         </div>
@@ -505,19 +509,6 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
           >
             Submit peer review
           </button>
-        </div>
-      ) : null}
-
-      {isLeadershipReviewer && peerDone ? (
-        <div
-          className="card"
-          style={{
-            borderColor: "rgba(34,197,94,0.4)",
-            background: "rgba(34,197,94,0.08)",
-            fontSize: 13,
-          }}
-        >
-          ✓ Your peer review was submitted. The Research Director can see your score and comments.
         </div>
       ) : null}
 
@@ -694,20 +685,21 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
           <div style={{ marginBottom: 12 }}>
           <label>
             Committee score (1–5)
-            <input
-              type="number"
-              min={1}
-              max={5}
-              value={score}
-              onChange={(e) => setScore(Number(e.target.value))}
-              style={{ marginLeft: 8, width: 64 }}
-            />
-          </label>
           <input
-            placeholder="Committee comment"
+            type="number"
+            min={1}
+            max={5}
+            value={score}
+            onChange={(e) => setScore(Number(e.target.value))}
+            style={{ marginLeft: 8, width: 64 }}
+          />
+          </label>
+          <textarea
+            placeholder="Committee comment (required)"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            style={{ marginTop: 8 }}
+            rows={4}
+            style={{ marginTop: 8, width: "100%", display: "block" }}
           />
           <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
             <button
@@ -766,22 +758,6 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
             </button>
           </div>
           </div>
-        </div>
-      ) : null}
-
-      {(isCoordinator || isDirector) && committeeCompletedByMe && !committeeStageOpen ? (
-        <div
-          className="card"
-          style={{
-            marginBottom: 12,
-            borderColor: "rgba(34,197,94,0.4)",
-            background: "rgba(34,197,94,0.08)",
-            fontSize: 13,
-          }}
-        >
-          {isDirector
-            ? "✓ Committee review submitted. Continue with finance assignment or final proposal approval below."
-            : "✓ Your committee review was submitted. The Research Director can continue the pipeline."}
         </div>
       ) : null}
 
@@ -925,10 +901,12 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
           <div style={{ fontWeight: 800, marginBottom: 8, color: "#fbbf24" }}>
             Your finance review — action required
           </div>
-          <input
-            placeholder="Finance review comment"
+          <textarea
+            placeholder="Finance review comment (required)"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
+            rows={4}
+            style={{ width: "100%", display: "block" }}
           />
           <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
             <button
@@ -966,20 +944,6 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
               Finance reject
             </button>
           </div>
-        </div>
-      ) : null}
-
-      {isFinance && financeCompletedByMe && !financeStageOpen ? (
-        <div
-          className="card"
-          style={{
-            marginBottom: 12,
-            borderColor: "rgba(34,197,94,0.4)",
-            background: "rgba(34,197,94,0.08)",
-            fontSize: 13,
-          }}
-        >
-          ✓ Your finance review was submitted. The Research Director can approve the proposal and create the project.
         </div>
       ) : null}
 

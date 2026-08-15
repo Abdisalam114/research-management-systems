@@ -278,6 +278,41 @@ function financeSentToOfficersFilter(extra = {}) {
   };
 }
 
+/** Director Finance page: still out plus reviews that already came back (active workflow). */
+function financeDirectorHistoryFilter(extra = {}) {
+  return {
+    status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+    "reviewPipeline.committeeReview.status": STAGE_STATUS.PASSED,
+    $or: [
+      {
+        "assignedFinance.0": { $exists: true },
+        "reviewPipeline.financeReview.status": { $in: [...ACTIVE_COMMITTEE_REVIEW_STATUSES] },
+      },
+      {
+        "reviewPipeline.financeReview.status": { $in: [STAGE_STATUS.PASSED, STAGE_STATUS.FAILED] },
+        "reviewPipeline.financeReview.completedBy": { $exists: true },
+      },
+    ],
+    ...extra,
+  };
+}
+
+/** Finance officer page: current assignments plus reviews they already submitted. */
+function financeOfficerHistoryFilter(userId, extra = {}) {
+  return {
+    $or: [
+      {
+        "assignedFinance.userId": userId,
+        status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+        "reviewPipeline.committeeReview.status": STAGE_STATUS.PASSED,
+        "reviewPipeline.financeReview.status": { $in: [...ACTIVE_COMMITTEE_REVIEW_STATUSES] },
+      },
+      { "reviewPipeline.financeReview.completedBy": userId },
+    ],
+    ...extra,
+  };
+}
+
 module.exports = {
   STAGE_KEYS,
   STAGE_STATUS,
@@ -297,6 +332,8 @@ module.exports = {
   committeeCoordinatorHistoryFilter,
   financeAssignedToUserFilter,
   financeSentToOfficersFilter,
+  financeDirectorHistoryFilter,
+  financeOfficerHistoryFilter,
   defaultReviewPipeline,
   ensureReviewPipeline,
   stagePassed,

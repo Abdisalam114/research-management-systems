@@ -10,14 +10,12 @@ const {
   getCurrentReviewStage,
   isVoluntaryProposal,
   ACTIVE_PEER_REVIEW_STATUSES,
-  peerReviewSentToReviewersFilter,
-  peerReviewAssignedToUserFilter,
   peerReviewDirectorHistoryFilter,
   peerReviewLeadershipHistoryFilter,
   committeeDirectorHistoryFilter,
   committeeCoordinatorHistoryFilter,
-  financeAssignedToUserFilter,
-  financeSentToOfficersFilter,
+  financeDirectorHistoryFilter,
+  financeOfficerHistoryFilter,
 } = require("../utils/proposalReviewPipeline");
 
 async function assertCoordinatorProposalFaculty(_req, _proposal) {}
@@ -450,6 +448,7 @@ async function financeProposalReview(req, res) {
     throw new AppError("Committee must pass before finance review", 400);
   }
   pipe.financeReview = {
+    ...(pipe.financeReview || {}),
     status: decision === "approve" ? STAGE_STATUS.PASSED : STAGE_STATUS.FAILED,
     completedAt: new Date(),
     completedBy: req.user.id,
@@ -515,8 +514,8 @@ async function listMyFinanceAssignments(req, res) {
   const isDirector = req.user.role === "research_director";
 
   const filter = isDirector
-    ? req.tierWhere(financeSentToOfficersFilter())
-    : req.tierWhere(financeAssignedToUserFilter(userId));
+    ? req.tierWhere(financeDirectorHistoryFilter())
+    : req.tierWhere(financeOfficerHistoryFilter(userId));
 
   const proposals = await Proposal.find(filter)
     .sort({ submittedAt: -1, updatedAt: -1 })
@@ -527,20 +526,31 @@ async function listMyFinanceAssignments(req, res) {
       "title status department submittedAt assignedFinance reviewPipeline researcherId updatedAt proposalKind fundingCallId budgetTotal budgetCurrency requestedAmount"
     );
 
-  let items = proposals
+  const items = proposals
     .filter((p) => !isVoluntaryProposal(p))
     .map((p) => {
-      const officers = (p.assignedFinance || []).map((r) => ({
+      const pipe = p.reviewPipeline || {};
+      const liveOfficers = (p.assignedFinance || []).map((r) => ({
         id: reviewerUserId(r.userId),
         fullName: r.userId?.fullName || null,
         email: r.userId?.email || null,
         assignedAt: r.assignedAt || null,
       }));
+      const snapshotOfficers = (pipe.financeReview?.assignedTo || []).map((r) => ({
+        id: reviewerUserId(r.userId),
+        fullName: r.fullName || null,
+        email: r.email || null,
+        assignedAt: r.assignedAt || null,
+      }));
+      const officers = liveOfficers.length ? liveOfficers : snapshotOfficers;
       const assignedToMe = officers.some((m) => m.id === String(userId));
-      const financeStage = p.reviewPipeline?.financeReview?.status || "pending";
+      const financeStage = pipe.financeReview?.status || "pending";
+      const completedBy = reviewerUserId(pipe.financeReview?.completedBy);
+      const financeSubmitted = completedBy === String(userId);
       const actionRequired =
         !isDirector &&
         assignedToMe &&
+        !financeSubmitted &&
         (financeStage === STAGE_STATUS.PENDING || financeStage === STAGE_STATUS.IN_PROGRESS);
       const amount =
         Number(p.requestedAmount) > 0
@@ -560,6 +570,10 @@ async function listMyFinanceAssignments(req, res) {
         researcherName: p.researcherId?.fullName || null,
         currentReviewStage: getCurrentReviewStage(p),
         financeStage,
+        financeDecision: pipe.financeReview?.decision || "",
+        financeComment: pipe.financeReview?.comment || "",
+        financeCompletedAt: pipe.financeReview?.completedAt || null,
+        financeSubmitted,
         assignedFinance: officers,
         assignedToMe,
         actionRequired,
@@ -572,23 +586,22 @@ async function listMyFinanceAssignments(req, res) {
       };
     });
 
-  if (isDirector) {
-    items = items.filter(
-      (i) => i.financeStage === STAGE_STATUS.PENDING || i.financeStage === STAGE_STATUS.IN_PROGRESS
-    );
-  } else {
-    items = items.filter((i) => i.actionRequired);
-  }
-
-  const pendingCount = items.length;
+  const pendingCount = items.filter((i) =>
+    isDirector
+      ? i.financeStage === STAGE_STATUS.PENDING || i.financeStage === STAGE_STATUS.IN_PROGRESS
+      : i.actionRequired
+  ).length;
+  const receivedCount = items.length - pendingCount;
 
   res.json({
     assignments: items,
     mode: isDirector ? "director_sent" : "finance_officer",
     summary: {
       total: items.length,
+      sent: items.length,
       pending: pendingCount,
-      done: 0,
+      received: receivedCount,
+      done: receivedCount,
     },
   });
 }

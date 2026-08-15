@@ -7,6 +7,7 @@ import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { PeerReviewRoster } from "../components/PeerReviewRoster";
+import { WorkDoneBox } from "../components/WorkDoneBox";
 import { filterByStatKey, statFilterLabel, buildSentReceivedPendingStats } from "../utils/pageHeaderFilters";
 
 export function ReviewAssignmentsPage() {
@@ -153,6 +154,21 @@ export function ReviewAssignmentsPage() {
                         showComments={isDirector}
                         showScores={isDirector}
                       />
+                      {!isDirector && a.peerReviewSubmitted ? (
+                        <WorkDoneBox
+                          stageLabel="Peer review"
+                          comment={
+                            (a.peerReviews || []).find(
+                              (r) => String(r.reviewerId) === String(user?.id)
+                            )?.comment
+                          }
+                          score={
+                            (a.peerReviews || []).find(
+                              (r) => String(r.reviewerId) === String(user?.id)
+                            )?.score
+                          }
+                        />
+                      ) : null}
                       <p
                         style={{
                           fontWeight: 600,

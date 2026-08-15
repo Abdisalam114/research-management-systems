@@ -8,6 +8,7 @@ import * as ethicsApi from "../services/ethicsApi";
 import { ProposalEthicsReviewPanel } from "../components/ProposalEthicsReviewPanel";
 import { EthicsDirectorDecisionModal } from "../components/EthicsDirectorDecisionModal";
 import { ProposalMultiStageReview } from "../components/ProposalMultiStageReview";
+import { WorkDoneBox, getMyCompletedReviewWork } from "../components/WorkDoneBox";
 import { StatusBadge } from "../components/StatusBadge";
 import { openProtectedUpload } from "../utils/protectedFile";
 
@@ -93,6 +94,7 @@ throw e;
   const showDirectorDecision =
     isDirector && multiStageReady && reviewableStatuses.includes(proposal.status);
   const showFinalDecision = showDirectorDecision;
+  const doneWork = getMyCompletedReviewWork(proposal, user);
 
   return (
     <div>
@@ -111,6 +113,16 @@ throw e;
           {isLeadershipReviewer ? "Back to assignments" : "Back to details"}
         </Link>
       </div>
+
+      {doneWork ? (
+        <WorkDoneBox
+          stageLabel={doneWork.stageLabel}
+          comment={doneWork.comment}
+          score={doneWork.score}
+          decision={doneWork.decision}
+          style={{ marginTop: 12, marginBottom: 12 }}
+        />
+      ) : null}
 
       {error ? <div className="card" style={{ borderColor: "rgba(255, 99, 132, 0.55)" }}>{error}</div> : null}
       {message ? (

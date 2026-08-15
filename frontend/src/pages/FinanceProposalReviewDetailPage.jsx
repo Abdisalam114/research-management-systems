@@ -5,11 +5,12 @@ import { useProgramTier } from "../hooks/useProgramTier";
 import { useScrollToTop } from "../hooks/useScrollToTop";
 import * as proposalApi from "../services/proposalApi";
 import { ProposalMultiStageReview } from "../components/ProposalMultiStageReview";
+import { WorkDoneBox, getMyCompletedReviewWork } from "../components/WorkDoneBox";
 
 /** Finance-only proposal review — funding/finance stage only, no full research dossier. */
 export function FinanceProposalReviewDetailPage() {
   const { id } = useParams();
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const { programTier } = useProgramTier();
   const [proposal, setProposal] = useState(null);
   const [error, setError] = useState("");
@@ -38,6 +39,7 @@ export function FinanceProposalReviewDetailPage() {
           ? Number(proposal.fundingCall.amountCap)
           : 0;
   const currency = proposal.budgetCurrency || proposal.fundingCall?.currency || "USD";
+  const doneWork = getMyCompletedReviewWork(proposal, user);
 
   return (
     <div>
@@ -47,6 +49,16 @@ export function FinanceProposalReviewDetailPage() {
           Back to finance review queue
         </Link>
       </div>
+
+      {doneWork ? (
+        <WorkDoneBox
+          stageLabel={doneWork.stageLabel}
+          comment={doneWork.comment}
+          score={doneWork.score}
+          decision={doneWork.decision}
+          style={{ marginTop: 12, marginBottom: 12 }}
+        />
+      ) : null}
 
       <p className="muted" style={{ fontSize: 13 }}>
         Limited finance view — research abstract, ethics, and full proposal dossier are hidden.

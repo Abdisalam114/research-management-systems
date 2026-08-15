@@ -124,6 +124,7 @@ const proposalSchema = new mongoose.Schema(
         decision: { type: String, default: "" },
         comment: { type: String, default: "" },
         score: { type: Number, default: null, min: 1, max: 5 },
+        assignedTo: { type: Array, default: [] },
       },
       financeReview: {
         status: { type: String, default: "pending" },
@@ -131,6 +132,7 @@ const proposalSchema = new mongoose.Schema(
         completedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
         decision: { type: String, default: "" },
         comment: { type: String, default: "" },
+        assignedTo: { type: Array, default: [] },
       },
     },
     submittedAt: { type: Date, default: null },
