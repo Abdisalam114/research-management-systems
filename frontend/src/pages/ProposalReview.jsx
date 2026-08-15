@@ -12,6 +12,22 @@ import { WorkDoneBox, getMyCompletedReviewWork } from "../components/WorkDoneBox
 import { StatusBadge } from "../components/StatusBadge";
 import { openProtectedUpload } from "../utils/protectedFile";
 
+/** Wait until the current click/Enter is finished so the new page is not hit by the same click (which was sending Open back). */
+function goAfterPointerSettles(navigate, to, state) {
+  let gone = false;
+  const go = () => {
+    if (gone) return;
+    gone = true;
+    window.removeEventListener("pointerup", onUp, true);
+    window.removeEventListener("pointercancel", onUp, true);
+    navigate(to, { state });
+  };
+  const onUp = () => window.setTimeout(go, 40);
+  window.addEventListener("pointerup", onUp, true);
+  window.addEventListener("pointercancel", onUp, true);
+  window.setTimeout(go, 400);
+}
+
 export function ProposalReviewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -240,20 +256,23 @@ throw e;
             setBusy(true);
             setError("");
             setMessage("");
+            let openingProject = false;
             try {
               if (isDirector) {
                 const res = await proposalApi.directorDecision(accessToken, id, selected, comment.trim());
                 const projectId = res?.project?.id ? String(res.project.id) : "";
                 if (selected === "approved") {
-                  navigate(projectId ? `/projects/${projectId}` : "/projects", {
-                    replace: true,
-                    state: {
+                  openingProject = true;
+                  goAfterPointerSettles(
+                    navigate,
+                    projectId ? `/projects/${projectId}` : "/projects",
+                    {
                       proposalAccepted: true,
                       message:
                         res?.message ||
                         "Congratulations — the proposal was accepted and the project is Open. Please continue your work.",
-                    },
-                  });
+                    }
+                  );
                   return;
                 }
                 setMessage(res?.message || "Decision saved");
@@ -263,7 +282,7 @@ throw e;
             } catch (err) {
               setError(err?.response?.data?.message || "Action failed");
             } finally {
-              setBusy(false);
+              if (!openingProject) setBusy(false);
             }
           }}
         >

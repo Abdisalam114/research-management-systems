@@ -27,6 +27,20 @@ export function AppLayout() {
   useAppFormBehavior(contentRef);
 
   useEffect(() => {
+    if (!location.state?.proposalAccepted) return undefined;
+    const el = contentRef.current;
+    if (!el) return undefined;
+    el.style.pointerEvents = "none";
+    const t = window.setTimeout(() => {
+      el.style.pointerEvents = "";
+    }, 450);
+    return () => {
+      window.clearTimeout(t);
+      el.style.pointerEvents = "";
+    };
+  }, [location.key, location.state?.proposalAccepted]);
+
+  useEffect(() => {
     requestAnimationFrame(() => {
       logScrollProbe(`${location.pathname}${location.search}`, "B");
     });

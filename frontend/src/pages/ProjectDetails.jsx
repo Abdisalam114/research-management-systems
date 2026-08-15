@@ -28,7 +28,12 @@ export function ProjectDetailsPage() {
   const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [acceptedBanner, setAcceptedBanner] = useState("");
+  const [acceptedBanner, setAcceptedBanner] = useState(() =>
+    location.state?.proposalAccepted
+      ? location.state.message ||
+        "Congratulations — the proposal was accepted and this project is Open. Please continue your work."
+      : ""
+  );
   const [closureForm, setClosureForm] = useState({
     finalReport: "",
     assetHandover: "",
@@ -73,17 +78,6 @@ export function ProjectDetailsPage() {
     setError("");
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load project"));
   }, [id, accessToken, programTier]);
-
-  useEffect(() => {
-    if (location.state?.proposalAccepted) {
-      setAcceptedBanner(
-        location.state.message ||
-          "Congratulations — the proposal was accepted and this project is Open. Please continue your work."
-      );
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state?.proposalAccepted]);
 
   useEffect(() => {
     if (location.state?.workflowHint === "publication_submitted") {
@@ -145,12 +139,19 @@ export function ProjectDetailsPage() {
     );
   }
 
+  const isDirector = user?.role === "research_director";
   const isOwner = String(project.researcherId) === String(user?.id);
-  const canEdit = isOwner || user?.role === "research_director";
+  const canEdit = isOwner || isDirector;
   const isVoluntary =
     typeof project.isVoluntary === "boolean"
       ? project.isVoluntary
       : project.proposalKind !== "grant_fund_call" && !project.fundingCallId;
+  const closureOpen =
+    !project.closure?.status || project.closure.status === "none";
+  const canSubmitClosure =
+    (isOwner || isDirector) &&
+    closureOpen &&
+    !["completed", "closed"].includes(project.status);
   // Finance clears money on Project closure (Finance) — PI never self-certifies financialCleared
   const closureItems = CLOSURE_CHECKLIST_ITEMS.filter((item) => item.key !== "financialCleared");
 
@@ -190,6 +191,17 @@ export function ProjectDetailsPage() {
               }}
             >
               Delete project
+            </button>
+          ) : null}
+          {canSubmitClosure || (isDirector && project.closure?.status === "submitted") ? (
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() =>
+                document.getElementById("closure")?.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+            >
+              Complete project
             </button>
           ) : null}
           <Link className="btn" to="/projects">
@@ -590,15 +602,14 @@ export function ProjectDetailsPage() {
             }}
           >
             <strong>Action needed:</strong> PI submitted project closure — use{" "}
-            <strong>Director approve closure</strong> below. It will then appear in Finance automatically
-            (grant-funded).
+            <strong>Director approve closure</strong> below to complete the project.
           </div>
         ) : null}
         <p className="muted" style={{ fontSize: 13 }}>
           Status: {project.closure?.status || "none"} · Project: {project.status}
           {["completed", "closed"].includes(project.status) ? " · Done" : ""}
         </p>
-        {isOwner && (!project.closure?.status || project.closure.status === "none") ? (
+        {canSubmitClosure ? (
           <>
             <div style={{ fontWeight: 700, marginBottom: 6 }}>Closure checklist (all required)</div>
             <div style={{ display: "grid", gap: 6, marginBottom: 10 }}>
@@ -655,14 +666,18 @@ export function ProjectDetailsPage() {
                 }
                 try {
                   await projectApi.submitClosure(accessToken, id, closureForm);
-                  setMessage("Closure submitted — Director will review. Project is now Closing.");
+                  setMessage(
+                    isDirector
+                      ? "Director approved — project closed."
+                      : "Closure submitted — Director will review. Project is now Closing."
+                  );
                   await load();
                 } catch (e) {
                   setError(e?.response?.data?.message || "Submit failed");
                 }
               }}
             >
-              Submit closure (complete project)
+              {isDirector ? "Complete project" : "Submit closure (complete project)"}
             </button>
           </>
         ) : null}
@@ -682,11 +697,7 @@ export function ProjectDetailsPage() {
               try {
                 setError("");
                 await projectApi.directorClosureApproval(accessToken, id, "Approved");
-                setMessage(
-                  isVoluntary
-                    ? "Director approved — project closed."
-                    : "Director approved — waiting for Finance clearance. After Finance approves, the project closes automatically."
-                );
+                setMessage("Director approved — project closed.");
                 await load();
               } catch (e) {
                 setError(e?.response?.data?.message || "Director approval failed");
@@ -695,13 +706,6 @@ export function ProjectDetailsPage() {
           >
             Director approve closure
           </button>
-        ) : null}
-        {user?.role === "research_director" &&
-        !isVoluntary &&
-        project.closure?.status === "director_approved" ? (
-          <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
-            Waiting for Finance clearance. When Finance approves, this project will close automatically.
-          </p>
         ) : null}
         {["completed", "closed"].includes(project.status) || project.closure?.status === "archived" ? (
           <div className="card" style={{ marginTop: 10, borderColor: "rgba(34,197,94,0.45)" }}>

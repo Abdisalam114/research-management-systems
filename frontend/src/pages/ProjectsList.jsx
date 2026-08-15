@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
@@ -184,11 +184,15 @@ export function ProjectsListPage({
   const { accessToken, user } = useAuth();
   const { programTier } = useProgramTier();
   const location = useLocation();
-  const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [acceptedBanner, setAcceptedBanner] = useState("");
+  const [acceptedBanner, setAcceptedBanner] = useState(() =>
+    location.state?.proposalAccepted
+      ? location.state.message ||
+        "Congratulations — the proposal was accepted and the project is Open. Please continue your work."
+      : ""
+  );
   const [busyId, setBusyId] = useState("");
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
   const isDirector = user?.role === "research_director";
@@ -211,17 +215,6 @@ export function ProjectsListPage({
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load projects"));
   }, [accessToken, programTier]);
 
-  useEffect(() => {
-    if (location.state?.proposalAccepted) {
-      setAcceptedBanner(
-        location.state.message ||
-          "Congratulations — the proposal was accepted and the project is Open. Please continue your work."
-      );
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.state?.proposalAccepted]);
-
   const pendingDirectorClosures = useMemo(() => {
     if (!isDirector) return [];
     const kind = kindFilterValue(statusFilter);
@@ -240,11 +233,7 @@ export function ProjectsListPage({
     setMessage("");
     try {
       await projectApi.directorClosureApproval(accessToken, p.id, "Director approved");
-      setMessage(
-        projectKind(p) === "voluntary"
-          ? `${p.title}: approved — project closed.`
-          : `${p.title}: Director approved — waiting for Finance. After Finance clears, the project closes automatically.`
-      );
+      setMessage(`${p.title}: approved — project closed.`);
       await load();
     } catch (e) {
       setError(e?.response?.data?.message || "Director approval failed");

@@ -96,8 +96,8 @@ function maskGrantStepsUntilComplete(steps, project) {
   });
 }
 
-function sanitizeLinkedGrantsForViewer(grants, canViewAwards, project) {
-  if (!isProjectCompleted(project)) return [];
+function sanitizeLinkedGrantsForViewer(grants, canViewAwards, _project) {
+  if (!Array.isArray(grants) || !grants.length) return [];
   if (canViewAwards) return grants;
   return grants.map((g) => ({
     ...g,
@@ -183,7 +183,7 @@ function buildProjectSteps(project, approved) {
   return steps;
 }
 
-function buildProjectCompletedStep(project, publication = null, repositoryItem = null, { isVoluntary = true } = {}) {
+function buildProjectCompletedStep(project, publication = null, repositoryItem = null) {
   if (!project) {
     return step("project_completed", "Project completed", "pending", { link: "/projects", section: "publish" });
   }
@@ -206,23 +206,17 @@ function buildProjectCompletedStep(project, publication = null, repositoryItem =
   else if (isClosing || closurePending) completeStatus = "current";
   else if (pubPublished && hasRepository) completeStatus = "current";
 
-  let detail = isVoluntary
-    ? "Final step — Research Director must approve closure"
-    : "Final step — Director and Finance must approve closure";
+  let detail = "Final step — Research Director must approve closure";
   if (isOnHold) detail = "On hold";
   else if (isCompleted) detail = "Completed / closed";
   else if (closureStatus === "submitted") {
-    detail = isVoluntary
-      ? "Awaiting Research Director closure approval"
-      : "Awaiting Research Director closure approval (then Finance)";
+    detail = "Awaiting Research Director closure approval";
   } else if (closureStatus === "director_approved") {
-    detail = "Director approved — awaiting Finance closure clearance";
+    detail = "Director approved — completing project";
   } else if (closureStatus === "finance_approved") {
     detail = "Awaiting final archive";
   } else if (pubPublished && hasRepository) {
-    detail = isVoluntary
-      ? "Publish pipeline done — submit closure for director approval"
-      : "Publish pipeline done — submit closure (director + finance)";
+    detail = "Publish pipeline done — submit closure for director approval";
   } else if (pubPublished) {
     detail = "Output published — archive in repository, then submit closure";
   }
@@ -465,7 +459,7 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
     })
   );
 
-  steps.push(buildProjectCompletedStep(project, pub, repo, { isVoluntary }));
+  steps.push(buildProjectCompletedStep(project, pub, repo));
 
   const gatedSteps = enforceSequentialWorkflow(steps);
   const current =

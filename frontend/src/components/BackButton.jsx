@@ -13,6 +13,12 @@ export function BackButton({ className = "topBarBackBtn", label = "Back" }) {
       return;
     }
 
+    // After proposal accept, stay in Projects — do not jump back to Review.
+    if (location.state?.proposalAccepted && location.pathname.startsWith("/projects")) {
+      navigate("/projects");
+      return;
+    }
+
     const historyIdx = window.history.state?.idx;
     if (typeof historyIdx === "number" && historyIdx > 0) {
       navigate(-1);
