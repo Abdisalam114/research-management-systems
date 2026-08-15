@@ -233,7 +233,11 @@ export function ProjectsListPage({
     setMessage("");
     try {
       await projectApi.directorClosureApproval(accessToken, p.id, "Director approved");
-      setMessage(`${p.title}: approved — project closed.`);
+      setMessage(
+        projectKind(p) === "voluntary"
+          ? `${p.title}: approved — project closed.`
+          : `${p.title}: Director approved — waiting for Finance. After Finance clears, the project closes automatically.`
+      );
       await load();
     } catch (e) {
       setError(e?.response?.data?.message || "Director approval failed");

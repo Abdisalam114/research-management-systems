@@ -183,7 +183,7 @@ function buildProjectSteps(project, approved) {
   return steps;
 }
 
-function buildProjectCompletedStep(project, publication = null, repositoryItem = null) {
+function buildProjectCompletedStep(project, publication = null, repositoryItem = null, { isVoluntary = true } = {}) {
   if (!project) {
     return step("project_completed", "Project completed", "pending", { link: "/projects", section: "publish" });
   }
@@ -206,17 +206,23 @@ function buildProjectCompletedStep(project, publication = null, repositoryItem =
   else if (isClosing || closurePending) completeStatus = "current";
   else if (pubPublished && hasRepository) completeStatus = "current";
 
-  let detail = "Final step — Research Director must approve closure";
+  let detail = isVoluntary
+    ? "Final step — Research Director must approve closure"
+    : "Final step — Director and Finance must approve closure";
   if (isOnHold) detail = "On hold";
   else if (isCompleted) detail = "Completed / closed";
   else if (closureStatus === "submitted") {
-    detail = "Awaiting Research Director closure approval";
+    detail = isVoluntary
+      ? "Awaiting Research Director closure approval"
+      : "Awaiting Research Director closure approval (then Finance)";
   } else if (closureStatus === "director_approved") {
-    detail = "Director approved — completing project";
+    detail = "Director approved — awaiting Finance closure clearance";
   } else if (closureStatus === "finance_approved") {
     detail = "Awaiting final archive";
   } else if (pubPublished && hasRepository) {
-    detail = "Publish pipeline done — submit closure for director approval";
+    detail = isVoluntary
+      ? "Publish pipeline done — submit closure for director approval"
+      : "Publish pipeline done — submit closure (director + finance)";
   } else if (pubPublished) {
     detail = "Output published — archive in repository, then submit closure";
   }
@@ -459,7 +465,7 @@ function buildStepsForTrack({ proposal, project, grants, budget, publication, re
     })
   );
 
-  steps.push(buildProjectCompletedStep(project, pub, repo));
+  steps.push(buildProjectCompletedStep(project, pub, repo, { isVoluntary }));
 
   const gatedSteps = enforceSequentialWorkflow(steps);
   const current =

@@ -465,12 +465,15 @@ async function submitClosure(req, res) {
     throw new AppError("Closure already in progress", 400);
   }
 
+  const isVoluntary = await resolveProjectIsVoluntary(req, project);
   const checklistData = checklist || {};
   const mergedChecklist = {
     publicationsArchived: Boolean(checklistData.publicationsArchived),
     assetsHandedOver: Boolean(checklistData.assetsHandedOver),
     dataArchived: Boolean(checklistData.dataArchived),
-    financialCleared: true,
+    // Grant-funded: Finance clears money on Project closure (Finance) queue.
+    // Voluntary: no grant funds — treat as cleared.
+    financialCleared: isVoluntary ? true : false,
     ethicsClosed: Boolean(checklistData.ethicsClosed),
   };
   const requiredKeys = ["publicationsArchived", "assetsHandedOver", "dataArchived", "ethicsClosed"];
@@ -490,28 +493,6 @@ async function submitClosure(req, res) {
   };
   project.status = PROJECT_STATUSES.CLOSING;
   await project.save();
-
-  if (isDirector) {
-    project.closure.directorApprovedAt = new Date();
-    project.closure.directorApprovedBy = req.user.id;
-    project.closure.status = CLOSURE_STATUSES.FINANCE_APPROVED;
-    project.closure.financeApprovedAt = new Date();
-    project.closure.financeApprovedBy = req.user.id;
-    await project.save();
-    await finalizeClosedProject(req, project);
-    await recordAudit({
-      entityType: "project",
-      entityId: project._id,
-      action: "closure_director_completed",
-      label: "Director completed project",
-      detail: project.title,
-      actorId: req.user.id,
-      actorRole: req.user.role,
-      programTier: req.programTier,
-    });
-    const updated = await Project.findById(project._id).populate(PROJECT_POPULATE);
-    return res.json({ message: "Director approved — project closed", project: sanitizeProject(updated) });
-  }
 
   try {
     const populated = await loadProjectForNotification(project);
@@ -552,23 +533,56 @@ async function directorClosureApproval(req, res) {
   project.closure.directorApprovedBy = req.user.id;
   if (comment) project.closure.auditNotes = `${project.closure.auditNotes || ""}\n[Director] ${comment}`.trim();
 
-  // Voluntary and Grant Fund Call: Director approval completes the project.
-  project.closure.status = CLOSURE_STATUSES.FINANCE_APPROVED;
-  project.closure.financeApprovedAt = new Date();
-  project.closure.financeApprovedBy = req.user.id;
-  project.closure.checklist = {
-    ...(project.closure.checklist || {}),
-    financialCleared: true,
-  };
+  // Only voluntary projects skip Finance. Grant-funded always enter the Finance closure queue.
+  if (isVoluntary) {
+    project.closure.status = CLOSURE_STATUSES.FINANCE_APPROVED;
+    project.closure.financeApprovedAt = new Date();
+    project.closure.financeApprovedBy = req.user.id;
+    project.closure.checklist = {
+      ...(project.closure.checklist || {}),
+      financialCleared: true,
+    };
+  } else {
+    project.closure.status = CLOSURE_STATUSES.DIRECTOR_APPROVED;
+    project.closure.checklist = {
+      ...(project.closure.checklist || {}),
+      financialCleared: false,
+    };
+  }
   await project.save();
 
-  await finalizeClosedProject(req, project);
+  // Voluntary: final approval is Director → close project immediately.
+  if (isVoluntary) {
+    await finalizeClosedProject(req, project);
+  }
+
+  if (!isVoluntary) {
+    try {
+      const populated = await loadProjectForNotification(project);
+      await notifyUsersByRole(
+        "finance_officer",
+        {
+          type: "project",
+          title: "Project closure pending finance",
+          body: buildProjectNotificationBody(populated, {
+            context: "closure_pending_finance",
+            comment: comment ? String(comment).trim() : "",
+          }),
+          link: `/finance/closures/${project._id}`,
+          programTier: req.notifyProgramTier?.(project) || project.programTier || req.programTier,
+        },
+        project.programTier || req.programTier
+      );
+    } catch { /* best-effort */ }
+  }
 
   await recordAudit({
     entityType: "project",
     entityId: project._id,
     action: isVoluntary ? "closure_director_approved_voluntary" : "closure_director_approved",
-    label: "Director approved closure — project closed",
+    label: isVoluntary
+      ? "Director approved voluntary closure — project closed"
+      : "Director approved closure — queued for Finance",
     detail: project.title,
     actorId: req.user.id,
     actorRole: req.user.role,
@@ -577,7 +591,9 @@ async function directorClosureApproval(req, res) {
 
   const updated = await Project.findById(project._id).populate(PROJECT_POPULATE);
   res.json({
-    message: "Director approved — project closed",
+    message: isVoluntary
+      ? "Director approved — project closed"
+      : "Director approved — waiting for Finance clearance",
     project: sanitizeProject(updated),
   });
 }
@@ -620,7 +636,7 @@ async function financeClosureApproval(req, res) {
 }
 
 /**
- * Mark project fully closed after Director closure approval.
+ * Mark project fully closed after final clearance (Director for voluntary, Finance for grant).
  */
 async function finalizeClosedProject(req, project) {
   project.closure.status = CLOSURE_STATUSES.ARCHIVED;

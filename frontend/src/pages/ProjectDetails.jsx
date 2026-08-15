@@ -149,7 +149,7 @@ export function ProjectDetailsPage() {
   const closureOpen =
     !project.closure?.status || project.closure.status === "none";
   const canSubmitClosure =
-    (isOwner || isDirector) &&
+    isOwner &&
     closureOpen &&
     !["completed", "closed"].includes(project.status);
   // Finance clears money on Project closure (Finance) — PI never self-certifies financialCleared
@@ -602,7 +602,8 @@ export function ProjectDetailsPage() {
             }}
           >
             <strong>Action needed:</strong> PI submitted project closure — use{" "}
-            <strong>Director approve closure</strong> below to complete the project.
+            <strong>Director approve closure</strong> below. It will then appear in Finance automatically
+            (grant-funded).
           </div>
         ) : null}
         <p className="muted" style={{ fontSize: 13 }}>
@@ -666,18 +667,14 @@ export function ProjectDetailsPage() {
                 }
                 try {
                   await projectApi.submitClosure(accessToken, id, closureForm);
-                  setMessage(
-                    isDirector
-                      ? "Director approved — project closed."
-                      : "Closure submitted — Director will review. Project is now Closing."
-                  );
+                  setMessage("Closure submitted — Director will review. Project is now Closing.");
                   await load();
                 } catch (e) {
                   setError(e?.response?.data?.message || "Submit failed");
                 }
               }}
             >
-              {isDirector ? "Complete project" : "Submit closure (complete project)"}
+              Submit closure (complete project)
             </button>
           </>
         ) : null}
@@ -697,7 +694,11 @@ export function ProjectDetailsPage() {
               try {
                 setError("");
                 await projectApi.directorClosureApproval(accessToken, id, "Approved");
-                setMessage("Director approved — project closed.");
+                setMessage(
+                  isVoluntary
+                    ? "Director approved — project closed."
+                    : "Director approved — waiting for Finance clearance. After Finance approves, the project closes automatically."
+                );
                 await load();
               } catch (e) {
                 setError(e?.response?.data?.message || "Director approval failed");
@@ -706,6 +707,13 @@ export function ProjectDetailsPage() {
           >
             Director approve closure
           </button>
+        ) : null}
+        {user?.role === "research_director" &&
+        !isVoluntary &&
+        project.closure?.status === "director_approved" ? (
+          <p className="muted" style={{ marginTop: 8, fontSize: 13 }}>
+            Waiting for Finance clearance. When Finance approves, this project will close automatically.
+          </p>
         ) : null}
         {["completed", "closed"].includes(project.status) || project.closure?.status === "archived" ? (
           <div className="card" style={{ marginTop: 10, borderColor: "rgba(34,197,94,0.45)" }}>

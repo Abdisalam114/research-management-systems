@@ -2,7 +2,7 @@ const { Project, PROJECT_STATUSES } = require("../models/Project");
 
 /**
  * Projects never auto-complete when publication/repository are done.
- * Closure must be submitted and approved by the Research Director.
+ * Closure must be submitted and approved (Director; Finance for grant-funded).
  */
 async function maybeCompleteFundedProject(projectId) {
   if (!projectId) return null;
