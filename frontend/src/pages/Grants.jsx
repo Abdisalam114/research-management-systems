@@ -75,7 +75,6 @@ export function GrantsPage() {
 
   const canCreate = user?.role === "researcher";
   const isDirector = user?.role === "research_director";
-  const isLeadership = user?.role === "leadership";
   const canViewAll = ["research_director", "finance_officer", "faculty_coordinator", "leadership"].includes(
     user?.role
   );
@@ -232,9 +231,13 @@ setGrants(withCall);
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                   {canViewAll || canCreate ? (
                     <Link
-                      className={(isDirector || isLeadership) && g.status === "submitted" ? "btn primary" : "btn"}
+                      className={isDirector && g.status === "submitted" ? "btn primary" : "btn"}
                       to={`/grants/${g.id}`}
-                      title="View full grant details before deciding"
+                      title={
+                        isDirector && g.status === "submitted"
+                          ? "View full grant details before deciding"
+                          : "View grant details"
+                      }
                     >
                       View details
                     </Link>

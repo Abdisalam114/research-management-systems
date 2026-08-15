@@ -49,7 +49,8 @@ export function GrantDetailsPage() {
   const isFinance = user?.role === "finance_officer";
   const isOwner = grant && String(grant.researcherId) === String(user?.id);
   const canEditLink = isOwner && ["draft", "rejected"].includes(grant?.status || "");
-  const canDecide = (isDirector || isLeadership) && grant?.status === "submitted";
+  const canDecide = isDirector && grant?.status === "submitted";
+  const canViewOnly = isLeadership && grant?.status === "submitted";
   const canFinanceDecide = isFinance && grant?.status === "pending_finance";
 
   const load = useCallback(async () => {
@@ -172,7 +173,9 @@ export function GrantDetailsPage() {
         title="Grant — Review details"
         subtitle={canDecide
             ? "Review all information below before approving or rejecting."
-            : "Full details for this grant / award request."
+            : canViewOnly
+              ? "View only — the Research Director accepts or rejects grants."
+              : "Full details for this grant / award request."
         }
         actions={
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -224,6 +227,22 @@ export function GrantDetailsPage() {
               <p className="muted" style={{ margin: "6px 0 0", fontSize: 13, lineHeight: 1.5 }}>
                 This grant is waiting for your decision. Review the researcher profile, funding request, and linked
                 project below, then choose Approve or Reject.
+              </p>
+            </div>
+          ) : null}
+
+          {canViewOnly ? (
+            <div
+              className="card"
+              style={{
+                marginTop: 12,
+                borderColor: "rgba(148,163,184,0.45)",
+                background: "rgba(148,163,184,0.08)",
+              }}
+            >
+              <div style={{ fontWeight: 800 }}>View only</div>
+              <p className="muted" style={{ margin: "6px 0 0", fontSize: 13, lineHeight: 1.5 }}>
+                Leadership can inspect this award request. Approve and Reject are for the Research Director only.
               </p>
             </div>
           ) : null}

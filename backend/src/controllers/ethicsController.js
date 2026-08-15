@@ -123,6 +123,21 @@ function applyPayload(target, payload) {
   }
 }
 
+function lockResearcherEthicsFaculty(req, application) {
+  if (req.user?.role !== "researcher") return;
+  const homeDept = String(req.user.department || "").trim();
+  if (!homeDept) return;
+  const { matchFacultyByName, coordinatorMatchesResearcherDept } = require("../utils/facultyMatcher");
+  const lockedFaculty = matchFacultyByName(homeDept);
+  const incomingDept = String(application.principal?.department || "").trim();
+  const deptOk = incomingDept && coordinatorMatchesResearcherDept(homeDept, incomingDept);
+  application.principal = {
+    ...(application.principal || {}),
+    faculty: lockedFaculty,
+    department: deptOk ? incomingDept : homeDept,
+  };
+}
+
 /** Active portal tier for staff; owner-first for researchers. */
 function ethicsScopeFilter(req, base = {}) {
   return req.ownedWhere(base);
@@ -215,6 +230,7 @@ async function createEthicsApplication(req, res) {
     req.createWithTier({ researcherId: req.user.id, status: ETHICS_STATUSES.DRAFT }, "ethics program tier")
   );
   applyPayload(a, req.body || {});
+  lockResearcherEthicsFaculty(req, a);
   await a.save();
   res.status(201).json({ application: sanitize(a) });
 }
@@ -227,6 +243,7 @@ async function updateEthicsApplication(req, res) {
     throw new AppError("Only draft / rejected applications can be edited", 400);
   }
   applyPayload(a, req.body || {});
+  lockResearcherEthicsFaculty(req, a);
   await a.save();
   res.json({ application: sanitize(a) });
 }
@@ -247,6 +264,7 @@ async function submitEthicsApplication(req, res) {
   }
   a.status = ETHICS_STATUSES.SUBMITTED;
   a.submittedAt = new Date();
+  lockResearcherEthicsFaculty(req, a);
   if (!a.applicantSignature?.signedAt) {
     a.applicantSignature = {
       name: a.applicantSignature?.name || `${a.principal?.firstName || ""} ${a.principal?.lastName || ""}`.trim(),
