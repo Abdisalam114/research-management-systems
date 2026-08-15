@@ -1,7 +1,7 @@
-# Start Jamhuriya RMS — backend + frontend (Windows)
-$Root = Split-Path -Parent $MyInvocation.MyCommand.Path
-$Backend = Join-Path $Root "backend"
-$Frontend = Join-Path $Root "frontend"
+# Start Jamhuriya RMS — backend + frontend (Windows PowerShell)
+$RepoRoot = Split-Path -Parent $PSScriptRoot
+$Backend = Join-Path $RepoRoot "backend"
+$Frontend = Join-Path $RepoRoot "frontend"
 
 Write-Host "Starting backend on http://localhost:5000 ..."
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$Backend'; npm run dev"

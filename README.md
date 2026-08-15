@@ -2,41 +2,67 @@
 
 MERN research management system for Jamhuriya University of Science & Technology (JUST): proposals, ethics, multi-stage review, projects, grants, budgets, publications, repository, groups, analytics, and notifications.
 
+## VS Code + CMD (Windows) — ugu fudud
+
+1. Install [Node.js 18+](https://nodejs.org/) iyo [MongoDB Community](https://www.mongodb.com/try/download/community). MongoDB ha shaqeyso (`net start MongoDB`).
+2. GitHub: **Code → Download ZIP** ama `git clone`, ka dib VS Code ku fur folder-ka `research-management-systems`.
+3. VS Code: **Terminal → New Terminal**. Shell-ka ha noqdo **Command Prompt** (CMD). Qor:
+
+```bat
+npm run setup
+npm run dev
+```
+
+Ama Explorer-ka ku labo-click `setup.bat` (marka hore), kadib `start.bat`.
+
+VS Code shortcut: **Terminal → Run Task…** → `1. Setup (first time)`, kadib **Ctrl+Shift+B** (`2. Start RMS`).
+
+4. Browser: [http://localhost:5173](http://localhost:5173)  
+   Login: `director@rms.edu` / `Director2024!`
+
+Haddii `setup` fashilmo: Node ma jiro, ama MongoDB ma shaqeyo. Kadib mar kale `npm run setup`.
+
 ## Stack
 
 - **Backend:** Node.js, Express, MongoDB (Mongoose), JWT
 - **Frontend:** React, Vite, Recharts
 
-## Quick start
+## Quick start (any OS)
 
 ### Prerequisites
 
 - Node.js 18+
 - MongoDB (`mongodb://localhost:27017/rms` or Atlas)
 
-### Backend
+From the **repo root** (not `backend/` or `frontend/`):
+
+```bash
+npm run setup
+npm run dev
+```
+
+- App: `http://localhost:5173`
+- API: `http://localhost:5000`
+
+`npm run setup` copies `backend/.env`, installs packages, and seeds demo users. `npm run dev` starts API + UI together (works in CMD and PowerShell).
+
+After login, all roles open **Dashboard**. Shared staff pick **Undergraduate (UG)** or **Postgraduate (PG)** portal.
+
+### Manual (two terminals)
 
 ```bash
 cd backend
-cp .env.example .env
+copy .env.example .env
 npm install
 npm run seed
 npm run dev
 ```
-
-API: `http://localhost:5000`
-
-### Frontend
 
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-
-App: `http://localhost:5173` (Vite proxies `/api` to the backend in dev)
-
-After login, all roles open **Dashboard**. Shared staff pick **Undergraduate (UG)** or **Postgraduate (PG)** portal.
 
 ## Users and passwords (demo)
 
@@ -102,6 +128,15 @@ Accounts and passwords are listed above under **Users and passwords (demo)**.
 | Research Director | Assign peer/committee/finance, ethics certificate, final approve |
 
 ## Scripts
+
+From the **repo root**:
+
+| Command | Description |
+|---------|-------------|
+| `npm run setup` | Copy `.env`, install backend + frontend, seed demo users |
+| `npm run dev` | Start API (`:5000`) and app (`:5173`) together |
+
+From `backend/`:
 
 | Command | Description |
 |---------|-------------|
