@@ -2,7 +2,7 @@ const { Payment, PAYMENT_CATEGORIES, PAYMENT_STATUSES, PAYMENT_METHODS } = requi
 const { Budget } = require("../models/Budget");
 const { AppError } = require("../utils/AppError");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
-const { deductFromBudget, assertAffordable, remainingOf } = require("../utils/budgetDisbursement");
+const { deductFromBudget, assertAffordableWithCommitments, remainingOf } = require("../utils/budgetDisbursement");
 
 function sanitizePayment(p) {
   const requestedByRef = p.requestedBy;
@@ -144,7 +144,7 @@ async function createPayment(req, res) {
   if (req.user.role === "researcher" && String(budget.ownerResearcherId) !== String(req.user.id)) {
     throw new AppError("Forbidden: budget does not belong to you", 403);
   }
-  assertAffordable(budget, amount);
+  await assertAffordableWithCommitments(budget, amount);
 
   const payment = await Payment.create(req.tierAssign({
     category,
@@ -229,37 +229,45 @@ async function financePay(req, res) {
     );
   }
 
-  const payment = await Payment.findOne(req.tierWhere({ _id: id }));
-  if (!payment) throw new AppError("Payment not found", 404);
-  if (payment.status !== PAYMENT_STATUSES.DIRECTOR_APPROVED) {
+  const claimed = await Payment.findOneAndUpdate(
+    req.tierWhere({ _id: id, status: PAYMENT_STATUSES.DIRECTOR_APPROVED }),
+    {
+      $set: {
+        status: PAYMENT_STATUSES.PAID,
+        paidBy: req.user.id,
+        paidAt: new Date(),
+        paymentMethod,
+        paymentMethodDetails: paymentMethodDetails ? String(paymentMethodDetails) : "",
+        ...(referenceNumber ? { referenceNumber: String(referenceNumber).trim() } : {}),
+      },
+    },
+    { new: true }
+  );
+  if (!claimed) {
+    const existing = await Payment.findOne(req.tierWhere({ _id: id }));
+    if (!existing) throw new AppError("Payment not found", 404);
     throw new AppError("Payment must be approved by the director before payment", 400);
   }
 
-  // Pre-check remaining before marking paid
-  const budgetCheck = await Budget.findOne(req.tierWhere({ _id: payment.budgetId }));
-  if (!budgetCheck) throw new AppError("Budget not found", 404);
-  assertAffordable(budgetCheck, payment.amount);
-
-  payment.status = PAYMENT_STATUSES.PAID;
-  payment.paidBy = req.user.id;
-  payment.paidAt = new Date();
-  payment.paymentMethod = paymentMethod;
-  payment.paymentMethodDetails = paymentMethodDetails ? String(paymentMethodDetails) : "";
-  if (referenceNumber) payment.referenceNumber = String(referenceNumber).trim();
-  await payment.save();
-
   let budgetAfter;
   try {
-    budgetAfter = await deductFromBudget(payment.budgetId, payment.amount, { tierWhere: req.tierWhere });
+    budgetAfter = await deductFromBudget(claimed.budgetId, claimed.amount, { tierWhere: req.tierWhere });
   } catch (err) {
-    payment.status = PAYMENT_STATUSES.DIRECTOR_APPROVED;
-    payment.paidBy = null;
-    payment.paidAt = null;
-    payment.paymentMethod = undefined;
-    payment.paymentMethodDetails = "";
-    await payment.save();
+    await Payment.updateOne(
+      { _id: claimed._id },
+      {
+        $set: {
+          status: PAYMENT_STATUSES.DIRECTOR_APPROVED,
+          paidBy: null,
+          paidAt: null,
+          paymentMethod: undefined,
+          paymentMethodDetails: "",
+        },
+      }
+    );
     throw err;
   }
+  const payment = claimed;
 try {
     await notifyUser(payment.requestedBy, {
       type: "budget",

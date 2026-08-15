@@ -261,6 +261,13 @@ function parseJsonField(raw, fallback = null) {
   }
 }
 
+function existingUploadPath(existingDocs, requested) {
+  const reqPath = String(requested || "").replace(/\\/g, "/").trim();
+  if (!reqPath.startsWith("/uploads/") || reqPath.includes("..")) return null;
+  const ok = (existingDocs || []).some((d) => String(d.filePath || "") === reqPath);
+  return ok ? reqPath : null;
+}
+
 function applyProposalDocuments(proposal, req) {
   const complianceMeta = parseJsonField(req.body?.complianceMeta, null);
   const supportingMeta = parseJsonField(req.body?.supportingMeta, null);
@@ -278,8 +285,12 @@ function applyProposalDocuments(proposal, req) {
     proposal.complianceDocuments = complianceMeta.map((m, idx) => ({
       docType: String(m.docType || "compliance").trim(),
       label: String(m.label || m.docType || "Compliance document").trim(),
-      filePath: complianceFiles[idx] ? `/uploads/${complianceFiles[idx].filename}` : m.filePath || null,
-      uploadedAt: complianceFiles[idx] || m.filePath ? new Date() : m.uploadedAt || null,
+      filePath: complianceFiles[idx]
+        ? `/uploads/${complianceFiles[idx].filename}`
+        : existingUploadPath(proposal.complianceDocuments, m.filePath),
+      uploadedAt: complianceFiles[idx] || existingUploadPath(proposal.complianceDocuments, m.filePath)
+        ? new Date()
+        : m.uploadedAt || null,
     }));
   }
 
@@ -287,8 +298,12 @@ function applyProposalDocuments(proposal, req) {
     proposal.supportingDocuments = supportingMeta.map((m, idx) => ({
       docType: String(m.docType || "other").trim(),
       label: String(m.label || "Supporting document").trim(),
-      filePath: supportingFiles[idx] ? `/uploads/${supportingFiles[idx].filename}` : m.filePath || null,
-      uploadedAt: supportingFiles[idx] || m.filePath ? new Date() : m.uploadedAt || null,
+      filePath: supportingFiles[idx]
+        ? `/uploads/${supportingFiles[idx].filename}`
+        : existingUploadPath(proposal.supportingDocuments, m.filePath),
+      uploadedAt: supportingFiles[idx] || existingUploadPath(proposal.supportingDocuments, m.filePath)
+        ? new Date()
+        : m.uploadedAt || null,
     }));
   }
 }

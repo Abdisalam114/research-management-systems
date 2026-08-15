@@ -8,8 +8,8 @@ import { SubmitValidationAlert, SubmitSuccessAlert } from "../components/SubmitV
 import { collectSubmitValidationIssues, SUBMIT_SUCCESS_MESSAGE } from "../utils/proposalSubmitValidation";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
 import { useScrollToTop } from "../hooks/useScrollToTop";
-import { apiOrigin } from "../config/apiBase";
 import { StatusBadge } from "../components/StatusBadge";
+import { openProtectedUpload } from "../utils/protectedFile";
 
 export function ProposalDetailsPage() {
   const { id } = useParams();
@@ -173,9 +173,17 @@ export function ProposalDetailsPage() {
             Document
           </div>
           {proposal.document ? (
-            <a className="btn" href={`${apiOrigin()}${proposal.document}`} target="_blank" rel="noreferrer">
+            <button
+              type="button"
+              className="btn"
+              onClick={() =>
+                openProtectedUpload(accessToken, proposal.document).catch((e) =>
+                  setError(e?.message || "Could not open document")
+                )
+              }
+            >
               View document
-            </a>
+            </button>
           ) : (
             <div className="muted">No document uploaded yet.</div>
           )}
@@ -261,7 +269,17 @@ export function ProposalDetailsPage() {
                   <td>{v.note || "—"}</td>
                   <td>
                     {v.document ? (
-                      <a href={`${apiOrigin()}${v.document}`} target="_blank" rel="noreferrer">Download</a>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() =>
+                          openProtectedUpload(accessToken, v.document).catch((e) =>
+                            setError(e?.message || "Could not open document")
+                          )
+                        }
+                      >
+                        Download
+                      </button>
                     ) : (
                       "—"
                     )}

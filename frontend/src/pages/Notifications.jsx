@@ -8,7 +8,7 @@ import { isCrossTierRole } from "../constants/programTier";
 import { SYSTEM_REFRESH_MS } from "../constants/systemRefresh";
 import * as notificationApi from "../services/notificationApi";
 import * as ethicsApi from "../services/ethicsApi";
-import { apiOrigin } from "../config/apiBase";
+import { downloadProtectedUpload } from "../utils/protectedFile";
 import { triggerBlobDownload } from "../utils/downloadBlob";
 
 function formatWhen(at) {
@@ -141,11 +141,11 @@ export function NotificationsPage() {
     if (n.downloadLink?.startsWith("/uploads/")) {
       setDownloadBusy(n.id);
       try {
-        const res = await fetch(`${apiOrigin()}${n.downloadLink}`);
-        if (!res.ok) throw new Error("File not found on server");
-        const blob = await res.blob();
-        const name = n.downloadLink.split("/").pop() || "download";
-        triggerBlobDownload(blob, name);
+        await downloadProtectedUpload(
+          accessToken,
+          n.downloadLink,
+          n.downloadLink.split("/").pop() || "download"
+        );
         if (!n.readAt) {
           await notificationApi.markNotificationRead(accessToken, n.id);
           await reload();

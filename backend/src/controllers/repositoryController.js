@@ -26,6 +26,7 @@ const {
   recordXml,
   paginateRecords,
 } = require("../utils/oaiPmh");
+const { resolveProtectedUpload } = require("../utils/uploadsPath");
 const {
   SET_REPO,
   SET_PUBLICATIONS,
@@ -215,7 +216,7 @@ async function downloadItemFile(req, res) {
   await assertCanAccessItem(req, item);
 
   const rel = normalizeStoredFilePath(item.filePath);
-  const abs = path.join(process.cwd(), rel.replace(/^\//, ""));
+  const abs = resolveProtectedUpload(rel.startsWith("/uploads/") ? rel : `/uploads/${rel.replace(/^\/+/, "")}`);
   if (!fs.existsSync(abs)) throw new AppError("File not found on server", 404);
 
   return res.download(abs, fileBasename(item.filePath));
@@ -237,7 +238,7 @@ async function deleteItem(req, res) {
   if (filePath) {
     try {
       const rel = normalizeStoredFilePath(filePath);
-      const abs = path.join(process.cwd(), rel.replace(/^\//, ""));
+      const abs = resolveProtectedUpload(rel.startsWith("/uploads/") ? rel : `/uploads/${rel.replace(/^\/+/, "")}`);
       if (fs.existsSync(abs)) fs.unlinkSync(abs);
     } catch {
       /* optional file cleanup */

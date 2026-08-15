@@ -421,7 +421,6 @@ async function createGroup(req, res) {
     faculty,
     facultyResearchArea,
     meetingSchedule,
-    status,
   } = req.body || {};
 
   let cleanStudents;
@@ -494,7 +493,7 @@ async function createGroup(req, res) {
     faculty: facultyValue,
     facultyResearchArea: facultyResearchArea ? String(facultyResearchArea).trim() : "",
     meetingSchedule: meetingSchedule ? String(meetingSchedule).trim() : "",
-    status: status && Object.values(THESIS_STATUSES).includes(status) ? status : THESIS_STATUSES.PROPOSED,
+    status: THESIS_STATUSES.PROPOSED,
     chapters: defaultChapters(),
     titleProposal: emptyTitleProposal(),
     createdBy: userId,
@@ -536,7 +535,6 @@ async function updateGroup(req, res) {
     faculty,
     facultyResearchArea,
     meetingSchedule,
-    status,
   } = req.body || {};
 
   const prevSupervisorId = group.supervisorId ? String(group.supervisorId) : null;
@@ -582,10 +580,6 @@ async function updateGroup(req, res) {
   }
   if (facultyResearchArea !== undefined) group.facultyResearchArea = String(facultyResearchArea).trim();
   if (meetingSchedule !== undefined) group.meetingSchedule = String(meetingSchedule).trim();
-  if (status !== undefined) {
-    if (!Object.values(THESIS_STATUSES).includes(status)) throw new AppError("Invalid status", 400);
-    group.status = status;
-  }
 
   const newSupervisorId = group.supervisorId ? String(group.supervisorId) : null;
   if (newSupervisorId && newSupervisorId !== prevSupervisorId) {
@@ -993,8 +987,13 @@ async function uploadFinalDocument(req, res) {
     uploadedBy: userId,
   };
 
-  if (markComplete && group.status !== THESIS_STATUSES.DEFENDED) {
-    group.status = THESIS_STATUSES.COMPLETED;
+  if (markComplete) {
+    if (!allChaptersFinished(group.chapters)) {
+      throw new AppError("All chapters must be finished before marking the thesis completed", 400);
+    }
+    if (group.status !== THESIS_STATUSES.DEFENDED && group.status !== THESIS_STATUSES.COMPLETED) {
+      group.status = THESIS_STATUSES.COMPLETED;
+    }
   } else if (
     group.status === THESIS_STATUSES.IN_PROGRESS ||
     group.status === THESIS_STATUSES.PROPOSED

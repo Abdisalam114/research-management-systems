@@ -9,7 +9,7 @@ import { ProposalEthicsReviewPanel } from "../components/ProposalEthicsReviewPan
 import { EthicsDirectorDecisionModal } from "../components/EthicsDirectorDecisionModal";
 import { ProposalMultiStageReview } from "../components/ProposalMultiStageReview";
 import { StatusBadge } from "../components/StatusBadge";
-import { apiOrigin } from "../config/apiBase";
+import { openProtectedUpload } from "../utils/protectedFile";
 
 export function ProposalReviewPage() {
   const { id } = useParams();
@@ -145,9 +145,17 @@ throw e;
           <div>
             <span className="muted">Document:</span>{" "}
             {proposal.document ? (
-              <a href={`${apiOrigin()}${proposal.document}`} target="_blank" rel="noreferrer">
+              <button
+                type="button"
+                className="btn"
+                onClick={() =>
+                  openProtectedUpload(accessToken, proposal.document).catch((e) =>
+                    setError(e?.message || "Could not open document")
+                  )
+                }
+              >
                 View proposal document
-              </a>
+              </button>
             ) : (
               "—"
             )}

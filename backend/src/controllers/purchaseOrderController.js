@@ -2,7 +2,7 @@ const { PurchaseOrder, PO_STATUSES, PO_PAYMENT_METHODS } = require("../models/Pu
 const { Budget } = require("../models/Budget");
 const { AppError } = require("../utils/AppError");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
-const { deductFromBudget, assertAffordable, remainingOf } = require("../utils/budgetDisbursement");
+const { deductFromBudget, assertAffordableWithCommitments, remainingOf } = require("../utils/budgetDisbursement");
 
 function sanitizePO(po) {
   return {
@@ -102,7 +102,7 @@ async function createPurchaseOrder(req, res) {
     (acc, it) => acc + Number(it.unitPrice || 0) * Number(it.quantity || 0),
     0
   );
-  assertAffordable(budget, estimatedTotal);
+  await assertAffordableWithCommitments(budget, estimatedTotal);
 
   const po = await PurchaseOrder.create(req.tierAssign({
     budgetId,
@@ -188,36 +188,45 @@ async function financePay(req, res) {
     );
   }
 
-  const po = await PurchaseOrder.findOne(req.tierWhere({ _id: id }));
-  if (!po) throw new AppError("Purchase order not found", 404);
-  if (po.status !== PO_STATUSES.DIRECTOR_APPROVED) {
+  const claimed = await PurchaseOrder.findOneAndUpdate(
+    req.tierWhere({ _id: id, status: PO_STATUSES.DIRECTOR_APPROVED }),
+    {
+      $set: {
+        status: PO_STATUSES.PAID,
+        paidBy: req.user.id,
+        paidAt: new Date(),
+        paymentMethod,
+        paymentMethodDetails: paymentMethodDetails ? String(paymentMethodDetails) : "",
+        ...(poNumber ? { poNumber: String(poNumber).trim() } : {}),
+      },
+    },
+    { new: true }
+  );
+  if (!claimed) {
+    const existing = await PurchaseOrder.findOne(req.tierWhere({ _id: id }));
+    if (!existing) throw new AppError("Purchase order not found", 404);
     throw new AppError("PO must be approved by the director before payment", 400);
   }
 
-  const budgetCheck = await Budget.findOne(req.tierWhere({ _id: po.budgetId }));
-  if (!budgetCheck) throw new AppError("Budget not found", 404);
-  assertAffordable(budgetCheck, po.totalAmount);
-
-  po.status = PO_STATUSES.PAID;
-  po.paidBy = req.user.id;
-  po.paidAt = new Date();
-  po.paymentMethod = paymentMethod;
-  po.paymentMethodDetails = paymentMethodDetails ? String(paymentMethodDetails) : "";
-  if (poNumber) po.poNumber = String(poNumber).trim();
-  await po.save();
-
   let budgetAfter;
   try {
-    budgetAfter = await deductFromBudget(po.budgetId, po.totalAmount, { tierWhere: req.tierWhere });
+    budgetAfter = await deductFromBudget(claimed.budgetId, claimed.totalAmount, { tierWhere: req.tierWhere });
   } catch (err) {
-    po.status = PO_STATUSES.DIRECTOR_APPROVED;
-    po.paidBy = null;
-    po.paidAt = null;
-    po.paymentMethod = undefined;
-    po.paymentMethodDetails = "";
-    await po.save();
+    await PurchaseOrder.updateOne(
+      { _id: claimed._id },
+      {
+        $set: {
+          status: PO_STATUSES.DIRECTOR_APPROVED,
+          paidBy: null,
+          paidAt: null,
+          paymentMethod: undefined,
+          paymentMethodDetails: "",
+        },
+      }
+    );
     throw err;
   }
+  const po = claimed;
 try {
     await notifyUser(po.requestedBy, {
       type: "budget",

@@ -3,7 +3,7 @@ const { Grant } = require("../models/Grant");
 const { Project } = require("../models/Project");
 const { AppError } = require("../utils/AppError");
 const { notifyUser, notifyUsersByRole } = require("../utils/notify");
-const { remainingOf } = require("../utils/budgetDisbursement");
+const { remainingOf, assertAffordableWithCommitments } = require("../utils/budgetDisbursement");
 
 function refId(ref) {
   if (!ref) return null;
@@ -182,6 +182,8 @@ async function addBudgetItem(req, res) {
       : await Budget.findOne(req.tierWhere({ _id: id }));
   if (!budget) throw new AppError("Budget not found", 404);
   if (String(budget.ownerResearcherId) !== String(req.user.id)) throw new AppError("Forbidden", 403);
+
+  await assertAffordableWithCommitments(budget, amount);
 
   budget.items.unshift({
     type,

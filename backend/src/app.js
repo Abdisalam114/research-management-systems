@@ -26,6 +26,7 @@ const { fundingCallRoutes } = require("./routes/fundingCallRoutes");
 const { policyRoutes } = require("./routes/policyRoutes");
 const { searchRoutes } = require("./routes/searchRoutes");
 const { auditRoutes } = require("./routes/auditRoutes");
+const { fileRoutes } = require("./routes/fileRoutes");
 
 function createApp() {
   const app = express();
@@ -86,8 +87,7 @@ function createApp() {
   app.use("/api/policies", policyRoutes);
   app.use("/api/search", searchRoutes);
   app.use("/api/audit", auditRoutes);
-
-  app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+  app.use("/api/files", fileRoutes);
 
   const serveFrontend = process.env.SERVE_FRONTEND === "true" || process.env.SERVE_FRONTEND === "1";
   if (serveFrontend) {

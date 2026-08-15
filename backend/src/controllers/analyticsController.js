@@ -1211,7 +1211,7 @@ async function getWorkflowOverview(req, res) {
         (e) => ({
           id: String(e._id),
           title: e.projectTitle || "Ethics application",
-          link: "/ethics",
+          link: `/ethics?applicationId=${e._id}`,
           status: e.status,
         })
       ),

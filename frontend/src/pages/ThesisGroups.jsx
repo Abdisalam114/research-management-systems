@@ -11,8 +11,8 @@ import { GroupsModuleNav } from "../components/GroupsModuleNav";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import { FACULTIES, DEFAULT_FACULTY, matchFacultyByName } from "../constants/faculties";
-import { apiOrigin } from "../config/apiBase";
 import { todayIso } from "../utils/dateConstraints";
+import { openProtectedUpload } from "../utils/protectedFile";
 import "./groups.css";
 
 const MANAGE_ROLES = ["faculty_coordinator", "research_director"];
@@ -220,7 +220,7 @@ export function ThesisGroupsPage() {
   const [meetingForm, setMeetingForm] = useState(EMPTY_MEETING);
   const [titleForm, setTitleForm] = useState({ title: "", reviewNote: "" });
   const [finalDocFile, setFinalDocFile] = useState(null);
-  const [markThesisCompleted, setMarkThesisCompleted] = useState(true);
+  const [markThesisCompleted, setMarkThesisCompleted] = useState(false);
   const [uploadingFinalDoc, setUploadingFinalDoc] = useState(false);
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
 
@@ -586,18 +586,20 @@ export function ThesisGroupsPage() {
       setError("");
       setMessage("");
       setUploadingFinalDoc(true);
+      const group = groups.find((x) => String(x.id) === String(groupId));
+      const canMarkComplete = markThesisCompleted && allChaptersFinished(group?.chapters);
       const res = await thesisApi.uploadFinalThesisDocument(accessToken, groupId, {
         file: finalDocFile,
-        markCompleted: markThesisCompleted,
+        markCompleted: canMarkComplete,
       });
       if (res?.group) {
         setGroups((prev) => prev.map((g) => (String(g.id) === String(groupId) ? res.group : g)));
       }
       setFinalDocFile(null);
-      setMarkThesisCompleted(true);
+      setMarkThesisCompleted(false);
       setExpandedId(groupId);
       setMessage(
-        markThesisCompleted
+        canMarkComplete
           ? "Final thesis uploaded and marked completed."
           : "Final thesis document uploaded."
       );
@@ -745,11 +747,20 @@ export function ThesisGroupsPage() {
           <div className="row">
             <div className="field">
               <label>Status</label>
-              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                {THESIS_STATUSES.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
-                ))}
-              </select>
+              <div
+                style={{
+                  fontWeight: 800,
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  background: "rgba(14,165,233,0.08)",
+                  border: "1px solid rgba(56,189,248,0.35)",
+                }}
+              >
+                {statusLabel(editingId ? form.status : "proposed")}
+              </div>
+              <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                Status follows chapter progress and defense — it cannot be jumped from this form.
+              </p>
             </div>
             <div className="field">
               <label>Program</label>
@@ -1333,14 +1344,17 @@ export function ThesisGroupsPage() {
                             </div>
                           ) : null}
                         </div>
-                        <a
+                        <button
+                          type="button"
                           className="btn"
-                          href={`${apiOrigin()}${finalDoc.path}`}
-                          target="_blank"
-                          rel="noreferrer"
+                          onClick={() =>
+                            openProtectedUpload(accessToken, finalDoc.path).catch((e) =>
+                              setError(e?.message || "Could not open thesis document")
+                            )
+                          }
                         >
                           View / Download
-                        </a>
+                        </button>
                       </div>
                     ) : (
                       <div className="muted" style={{ marginBottom: canUploadFinalDoc ? 12 : 0 }}>
@@ -1360,10 +1374,14 @@ export function ThesisGroupsPage() {
                         <label style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}>
                           <input
                             type="checkbox"
-                            checked={markThesisCompleted}
+                            checked={markThesisCompleted && allChaptersFinished(g.chapters)}
+                            disabled={!allChaptersFinished(g.chapters)}
                             onChange={(e) => setMarkThesisCompleted(e.target.checked)}
                           />
                           Mark thesis as completed
+                          {!allChaptersFinished(g.chapters) ? (
+                            <span className="muted"> (finish all chapters first)</span>
+                          ) : null}
                         </label>
                         <div>
                           <button type="submit" className="btn primary" disabled={uploadingFinalDoc || !finalDocFile}>

@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as groupApi from "../services/groupApi";
@@ -19,6 +19,7 @@ function isMember(group, userId) {
 export function GroupsPage() {
   const { accessToken, user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [groups, setGroups] = useState([]);
   const [stats, setStats] = useState({ total: 0, thesis: 0, collaboration: 0 });
   const [showForm, setShowForm] = useState(false);
@@ -44,6 +45,13 @@ export function GroupsPage() {
   }, [accessToken]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
+
+  useEffect(() => {
+    const hash = String(location.hash || "").replace(/^#/, "");
+    if (!hash.startsWith("group-") || !groups.length) return;
+    const el = document.getElementById(hash);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [location.hash, groups]);
 
   const headerStats = useMemo(() => {
     const mine = groups.filter((g) => isMember(g, user?.id)).length;
@@ -136,7 +144,15 @@ export function GroupsPage() {
           {filteredGroups.map((g) => {
             const member = isMember(g, user?.id);
             return (
-              <div key={g.id} className="card" style={{ background: "rgba(14,165,233,0.05)" }}>
+              <div
+                key={g.id}
+                id={`group-${g.id}`}
+                className="card"
+                style={{
+                  background: "rgba(14,165,233,0.05)",
+                  outline: location.hash === `#group-${g.id}` ? "2px solid rgba(56,189,248,0.8)" : undefined,
+                }}
+              >
                 <div className="groupsListItem">
                   <div className="groupsListItemMain">
                     <div style={{ fontWeight: 800 }}>{g.name}</div>
