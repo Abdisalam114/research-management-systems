@@ -6,7 +6,8 @@ import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
-import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
+import { PeerReviewRoster } from "../components/PeerReviewRoster";
+import { filterByStatKey, statFilterLabel, buildSentReceivedPendingStats } from "../utils/pageHeaderFilters";
 
 export function ReviewAssignmentsPage() {
   const { accessToken, user } = useAuth();
@@ -23,7 +24,7 @@ export function ReviewAssignmentsPage() {
 
   const { loading, error, reload } = useModuleLoad(accessToken, load, [location.pathname]);
 
-  const awaiting = useMemo(
+  const pending = useMemo(
     () =>
       assignments.filter((a) =>
         isDirector ? a.awaitingLeadership || (a.pendingReviewers || 0) > 0 : !a.peerReviewSubmitted
@@ -31,45 +32,21 @@ export function ReviewAssignmentsPage() {
     [assignments, isDirector]
   );
   const received = useMemo(
-    () =>
-      assignments.filter((a) =>
-        isDirector ? !(a.awaitingLeadership || (a.pendingReviewers || 0) > 0) : a.peerReviewSubmitted
-      ),
-    [assignments, isDirector]
+    () => assignments.filter((a) => !pending.includes(a)),
+    [assignments, pending]
   );
 
   const stats = useMemo(
-    () => [
-      {
-        label: isDirector ? "Awaiting Leadership" : "Assigned",
-        value: assignments.length,
-        filterKey: "all",
-      },
-      {
-        label: isDirector ? "Still pending" : "Pending review",
-        value: awaiting.length,
-        filterKey: "pending",
-        accent: "#fbbf24",
-      },
-      ...(received.length > 0
-        ? [
-            {
-              label: isDirector ? "Completed" : "Submitted",
-              value: received.length,
-              filterKey: "done",
-              accent: "#22c55e",
-            },
-          ]
-        : []),
-    ],
-    [assignments.length, awaiting.length, received.length, isDirector]
+    () => buildSentReceivedPendingStats(assignments.length, received.length, pending.length),
+    [assignments.length, received.length, pending.length]
   );
 
   const filtered = useMemo(() => {
-    if (statusFilter === "pending") return awaiting;
-    if (statusFilter === "done") return received;
+    if (statusFilter === "pending") return pending;
+    if (statusFilter === "received") return received;
+    if (statusFilter === "sent") return assignments;
     return filterByStatKey(assignments, statusFilter === "all" ? "all" : statusFilter);
-  }, [assignments, statusFilter, awaiting, received]);
+  }, [assignments, statusFilter, pending, received]);
 
   return (
     <div>
@@ -77,8 +54,8 @@ export function ReviewAssignmentsPage() {
         title="Peer Reviews"
         subtitle={
           isDirector
-            ? "Proposals awaiting Leadership peer review — completed ones move to committee on the Review page."
-            : "Proposals the Research Director sent to you — submit score (1–5) and comments."
+            ? "Proposals you sent to Leadership. Total = Received + Pending. Received = reviews that came back."
+            : "Proposals sent to you for peer review. Total = Received + Pending. Received = reviews you finished."
         }
         stats={stats}
         activeFilter={statusFilter}
@@ -115,12 +92,12 @@ export function ReviewAssignmentsPage() {
               {assignments.length === 0
                 ? isDirector
                   ? "No active proposals sent to reviewers"
-                  : "No peer review assignments"
+                  : "No peer reviews yet"
                 : "No items match this filter"}
             </div>
             <p className="muted" style={{ marginTop: 8, fontSize: 14 }}>
               {isDirector
-                ? "When Leadership finishes peer review, the proposal leaves this list. Open Proposals → Review to assign committee."
+                ? "When Leadership finishes, the proposal stays here as Received so you can assign committee."
                 : "When the Research Director sends a proposal to you, it appears here. Use the same portal (Undergraduate / Postgraduate)."}
             </p>
             {isDirector ? (
@@ -132,10 +109,6 @@ export function ReviewAssignmentsPage() {
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
             {filtered.map((a) => {
-              const reviewerNames = (a.assignedReviewers || [])
-                .map((r) => r.fullName || r.email)
-                .filter(Boolean)
-                .join(", ");
               const isAwaiting = isDirector
                 ? a.awaitingLeadership || (a.pendingReviewers || 0) > 0
                 : !a.peerReviewSubmitted;
@@ -157,45 +130,29 @@ export function ReviewAssignmentsPage() {
                         {a.researcherName ? ` · PI: ${a.researcherName}` : ""}
                         {a.currentReviewStage ? ` · Stage: ${a.currentReviewStage}` : ""}
                       </div>
-                      {reviewerNames ? (
-                        <div style={{ marginTop: 8, fontSize: 13 }}>
-                          <span
-                            style={{
-                              display: "inline-block",
-                              marginRight: 8,
-                              padding: "2px 8px",
-                              borderRadius: 6,
-                              fontSize: 12,
-                              fontWeight: 700,
-                              background: "rgba(56,189,248,0.18)",
-                              color: "#7dd3fc",
-                            }}
-                          >
-                            Sent to reviewer
-                          </span>
-                          {reviewerNames}
-                          {isDirector ? (
-                            <span className="muted">
-                              {" "}
-                              · {a.peerReviewCount || 0} review(s) in · {a.pendingReviewers || 0} pending
-                            </span>
-                          ) : null}
-                        </div>
-                      ) : null}
-                      {(a.peerReviews || []).length > 0 ? (
-                        <div style={{ marginTop: 8, fontSize: 13, display: "grid", gap: 6 }}>
-                          {(a.peerReviews || []).map((r, idx) => (
-                            <div key={`${r.reviewerId || idx}-${idx}`}>
-                              <strong>{r.reviewerName || r.reviewerEmail || "Reviewer"}</strong>
-                              {" · "}
-                              Score: <strong>{r.score}/5</strong>
-                              {r.comment?.trim() ? (
-                                <span className="muted"> — {r.comment.trim().slice(0, 120)}{r.comment.trim().length > 120 ? "…" : ""}</span>
-                              ) : null}
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
+                      <div style={{ marginTop: 8, fontSize: 13 }}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            marginRight: 8,
+                            padding: "2px 8px",
+                            borderRadius: 6,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            background: isAwaiting ? "rgba(56,189,248,0.18)" : "rgba(34,197,94,0.18)",
+                            color: isAwaiting ? "#7dd3fc" : "#86efac",
+                          }}
+                        >
+                          {isAwaiting ? "Sent to reviewer" : "Received"}
+                        </span>
+                      </div>
+                      <PeerReviewRoster
+                        assignedReviewers={a.assignedReviewers}
+                        peerReviews={a.peerReviews}
+                        compact
+                        showComments={isDirector}
+                        showScores={isDirector}
+                      />
                       <p
                         style={{
                           fontWeight: 600,
@@ -205,10 +162,12 @@ export function ReviewAssignmentsPage() {
                         }}
                       >
                         {isDirector
-                          ? "⏳ Awaiting Leadership peer review"
+                          ? isAwaiting
+                            ? "⏳ Pending — waiting for Leadership"
+                            : "✓ Received — assign committee"
                           : isAwaiting
-                            ? "⏳ Peer review pending — action required"
-                            : "✓ Peer review submitted"}
+                            ? "⏳ Pending — action required"
+                            : "✓ Received"}
                       </p>
                     </div>
                     <div
@@ -229,7 +188,7 @@ export function ReviewAssignmentsPage() {
                             ? "Open review"
                             : a.peerReviewSubmitted
                               ? "View review"
-                              : "Open & submit review"}
+                              : "Open review"}
                         </Link>
                       </div>
                     </div>

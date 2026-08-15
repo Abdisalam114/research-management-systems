@@ -48,7 +48,7 @@ export function SubmitValidationAlert({ issues, id = "validation-errors" }) {
   );
 }
 
-export function SubmitSuccessAlert({ message, onDismiss }) {
+export function SubmitSuccessAlert({ message, onDismiss, title = "✓ Submitted" }) {
   if (!message) return null;
   return (
     <div
@@ -60,7 +60,7 @@ export function SubmitSuccessAlert({ message, onDismiss }) {
         background: "rgba(34, 197, 94, 0.1)",
       }}
     >
-      <div style={{ fontWeight: 800, marginBottom: 6, color: "#86efac" }}>✓ Submitted</div>
+      <div style={{ fontWeight: 800, marginBottom: 6, color: "#86efac" }}>{title}</div>
       <p style={{ margin: 0, fontSize: 14 }}>{message}</p>
       {onDismiss ? (
         <button type="button" className="btn" style={{ marginTop: 10 }} onClick={onDismiss}>

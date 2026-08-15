@@ -7,15 +7,36 @@ const { notifyUsersByRole } = require("./notify");
  * After a fund-call proposal is accepted, create (or reuse) a Grant in pending_finance
  * so Finance can approve the money and activate a budget.
  */
+async function findExistingGrantForProposal(proposal) {
+  const notRejected = { status: { $ne: GRANT_STATUSES.REJECTED } };
+  if (proposal._id && proposal.fundingCallId) {
+    const exact = await Grant.findOne({
+      proposalId: proposal._id,
+      callId: proposal.fundingCallId,
+      ...notRejected,
+    }).sort({ createdAt: 1 });
+    if (exact) return exact;
+  }
+  if (proposal._id) {
+    const byProposal = await Grant.findOne({ proposalId: proposal._id, ...notRejected }).sort({ createdAt: 1 });
+    if (byProposal) return byProposal;
+  }
+  if (proposal.researcherId && proposal.fundingCallId) {
+    return Grant.findOne({
+      researcherId: proposal.researcherId,
+      callId: proposal.fundingCallId,
+      ...notRejected,
+    }).sort({ createdAt: 1 });
+  }
+  return null;
+}
+
 async function ensurePendingFinanceGrantFromProposal(proposal, { notify = true } = {}) {
   if (!proposal?._id || !proposal.fundingCallId) {
     return null;
   }
 
-  const existing = await Grant.findOne({
-    proposalId: proposal._id,
-    callId: proposal.fundingCallId,
-  });
+  const existing = await findExistingGrantForProposal(proposal);
   if (existing) {
     // If director already approved the proposal but grant is still draft/submitted, promote to pending_finance
     if (
@@ -35,6 +56,8 @@ async function ensurePendingFinanceGrantFromProposal(proposal, { notify = true }
       existing.amountRequested = amount || existing.amountRequested || 0;
       existing.amountAwarded = amount || existing.amountAwarded || 0;
       existing.decidedAt = existing.decidedAt || new Date();
+      if (!existing.proposalId) existing.proposalId = proposal._id;
+      if (!existing.callId) existing.callId = proposal.fundingCallId;
       if (!existing.projectId) {
         const project = await Project.findOne({ proposalId: proposal._id });
         if (project) existing.projectId = project._id;
@@ -78,24 +101,32 @@ async function ensurePendingFinanceGrantFromProposal(proposal, { notify = true }
         ? Number(call.amountCap)
         : 0;
 
-  const grant = await Grant.create({
-    title: call.title || proposal.title,
-    fundingSource: call.fundingSource || "Funding call",
-    donorRef: call.donorRef || "",
-    currency: proposal.budgetCurrency || call.currency || "USD",
-    amountRequested: amount,
-    amountAwarded: amount,
-    status: GRANT_STATUSES.PENDING_FINANCE,
-    complianceNotes: "Created from accepted funding-call proposal — awaiting finance approval.",
-    researcherId: proposal.researcherId,
-    projectId: project?._id || null,
-    proposalId: proposal._id,
-    callId: call._id,
-    decidedAt: new Date(),
-    programTier: proposal.programTier,
-    budgetBreakdown: proposal.budgetBreakdown || [],
-    budgetTotal: Number(proposal.budgetTotal) || amount,
-  });
+  let grant;
+  try {
+    grant = await Grant.create({
+      title: call.title || proposal.title,
+      fundingSource: call.fundingSource || "Funding call",
+      donorRef: call.donorRef || "",
+      currency: proposal.budgetCurrency || call.currency || "USD",
+      amountRequested: amount,
+      amountAwarded: amount,
+      status: GRANT_STATUSES.PENDING_FINANCE,
+      complianceNotes: "Created from accepted funding-call proposal — awaiting finance approval.",
+      researcherId: proposal.researcherId,
+      projectId: project?._id || null,
+      proposalId: proposal._id,
+      callId: call._id,
+      decidedAt: new Date(),
+      programTier: proposal.programTier,
+      budgetBreakdown: proposal.budgetBreakdown || [],
+      budgetTotal: Number(proposal.budgetTotal) || amount,
+    });
+  } catch (err) {
+    if (err?.code !== 11000) throw err;
+    grant = await findExistingGrantForProposal(proposal);
+    if (!grant) throw err;
+    return grant;
+  }
 
   if (notify) {
     try {

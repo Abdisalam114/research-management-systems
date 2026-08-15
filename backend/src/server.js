@@ -35,6 +35,30 @@ async function start() {
     console.warn("Grant↔FundingCall link on boot failed:", err?.message || err);
   }
 
+  try {
+    const { collapseDuplicateFundingCallGrants } = require("./utils/collapseDuplicateFundingCallGrants");
+    const { Grant } = require("./models/Grant");
+    await collapseDuplicateFundingCallGrants();
+    await Grant.syncIndexes();
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("Grant duplicate collapse on boot failed:", err?.message || err);
+  }
+
+  try {
+    const { ensureEthicsApplicationsForProposals } = require("./utils/ensureEthicsApplicationsForProposals");
+    const result = await ensureEthicsApplicationsForProposals();
+    if (result?.restored || result?.created) {
+      // eslint-disable-next-line no-console
+      console.log(
+        `Ethics restore: ${result.restored || 0} from snapshot, ${result.created || 0} recreated`
+      );
+    }
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("Ethics restore on boot failed:", err?.message || err);
+  }
+
   app.listen(port, host, () => {
     // eslint-disable-next-line no-console
     console.log(`API listening on http://${host}:${port}`);

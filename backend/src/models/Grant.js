@@ -56,6 +56,19 @@ const grantSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+grantSchema.index(
+  { researcherId: 1, callId: 1, proposalId: 1 },
+  {
+    unique: true,
+    name: "uniq_grant_researcher_call_proposal_open",
+    partialFilterExpression: {
+      callId: { $type: "objectId" },
+      proposalId: { $type: "objectId" },
+      status: { $in: ["draft", "submitted", "approved", "pending_finance", "active", "closed"] },
+    },
+  }
+);
+
 const Grant = mongoose.model("Grant", grantSchema);
 
 module.exports = { Grant, GRANT_STATUSES };

@@ -12,10 +12,10 @@ const {
   ACTIVE_PEER_REVIEW_STATUSES,
   peerReviewSentToReviewersFilter,
   peerReviewAssignedToUserFilter,
-  peerReviewDirectorQueueFilter,
-  peerReviewLeadershipQueueFilter,
-  committeeAssignedToUserFilter,
-  committeeSentToMembersFilter,
+  peerReviewDirectorHistoryFilter,
+  peerReviewLeadershipHistoryFilter,
+  committeeDirectorHistoryFilter,
+  committeeCoordinatorHistoryFilter,
   financeAssignedToUserFilter,
   financeSentToOfficersFilter,
 } = require("../utils/proposalReviewPipeline");
@@ -333,6 +333,7 @@ async function committeeReview(req, res) {
   else if (decision === "recommend_revision") committeeStatus = STAGE_STATUS.IN_PROGRESS;
 
   pipe.committeeReview = {
+    ...(pipe.committeeReview || {}),
     status: committeeStatus,
     completedAt: decision === "recommend_revision" ? null : new Date(),
     completedBy: req.user.id,
@@ -614,8 +615,8 @@ async function listMyReviewAssignments(req, res) {
   }
 
   const filter = isDirector
-    ? req.tierWhere(peerReviewDirectorQueueFilter())
-    : req.tierWhere(peerReviewLeadershipQueueFilter(userId));
+    ? req.tierWhere(peerReviewDirectorHistoryFilter())
+    : req.tierWhere(peerReviewLeadershipHistoryFilter(userId));
 
   const proposals = await Proposal.find(filter)
     .sort({ submittedAt: -1, updatedAt: -1 })
@@ -651,11 +652,13 @@ async function listMyReviewAssignments(req, res) {
     const peerStage = p.reviewPipeline?.peerReview?.status || "pending";
     const peerReviewCount = peerReviews.length;
     const awaitingLeadership =
-      reviewers.length > 0
-        ? pendingReviewers > 0
-        : peerReviewCount === 0 ||
-          peerStage === STAGE_STATUS.PENDING ||
-          peerStage === STAGE_STATUS.IN_PROGRESS;
+      peerStage === STAGE_STATUS.PASSED
+        ? false
+        : reviewers.length > 0
+          ? pendingReviewers > 0
+          : peerReviewCount === 0 ||
+            peerStage === STAGE_STATUS.PENDING ||
+            peerStage === STAGE_STATUS.IN_PROGRESS;
     return {
       id: p._id,
       title: p.title,
@@ -677,22 +680,19 @@ async function listMyReviewAssignments(req, res) {
     };
   });
 
-  if (isDirector) {
-    items = items.filter((i) => i.peerStage !== STAGE_STATUS.PASSED);
-  } else {
-    items = items.filter((i) => !i.peerReviewSubmitted);
-  }
-
   const awaitingCount = items.filter((i) =>
     isDirector ? i.awaitingLeadership : !i.peerReviewSubmitted
   ).length;
+  const receivedCount = items.length - awaitingCount;
   res.json({
     assignments: items,
     mode: isDirector ? "director_sent" : "reviewer",
     summary: {
       total: items.length,
+      sent: items.length,
       awaiting: awaitingCount,
-      received: items.length - awaitingCount,
+      pending: awaitingCount,
+      received: receivedCount,
     },
   });
 }
@@ -702,8 +702,8 @@ async function listMyCommitteeAssignments(req, res) {
   const isDirector = req.user.role === "research_director";
 
   const filter = isDirector
-    ? req.tierWhere(committeeSentToMembersFilter())
-    : req.tierWhere(committeeAssignedToUserFilter(userId));
+    ? req.tierWhere(committeeDirectorHistoryFilter())
+    : req.tierWhere(committeeCoordinatorHistoryFilter(userId));
 
   const proposals = await Proposal.find(filter)
     .sort({ submittedAt: -1, updatedAt: -1 })
@@ -714,17 +714,28 @@ async function listMyCommitteeAssignments(req, res) {
     );
 
   let items = proposals.map((p) => {
-    const members = (p.assignedCommittee || []).map((r) => ({
+    const pipe = p.reviewPipeline || {};
+    const liveMembers = (p.assignedCommittee || []).map((r) => ({
       id: reviewerUserId(r.userId),
       fullName: r.userId?.fullName || null,
       email: r.userId?.email || null,
       assignedAt: r.assignedAt || null,
     }));
+    const snapshotMembers = (pipe.committeeReview?.assignedTo || []).map((r) => ({
+      id: reviewerUserId(r.userId),
+      fullName: r.fullName || null,
+      email: r.email || null,
+      assignedAt: r.assignedAt || null,
+    }));
+    const members = liveMembers.length ? liveMembers : snapshotMembers;
     const assignedToMe = members.some((m) => m.id === String(userId));
-    const committeeStage = p.reviewPipeline?.committeeReview?.status || "pending";
+    const committeeStage = pipe.committeeReview?.status || "pending";
+    const completedBy = reviewerUserId(pipe.committeeReview?.completedBy);
+    const committeeSubmitted = completedBy === String(userId);
     const actionRequired =
       !isDirector &&
       assignedToMe &&
+      !committeeSubmitted &&
       (committeeStage === STAGE_STATUS.PENDING || committeeStage === STAGE_STATUS.IN_PROGRESS);
     return {
       id: p._id,
@@ -736,6 +747,11 @@ async function listMyCommitteeAssignments(req, res) {
       researcherName: p.researcherId?.fullName || null,
       currentReviewStage: getCurrentReviewStage(p),
       committeeStage,
+      committeeDecision: pipe.committeeReview?.decision || "",
+      committeeScore: pipe.committeeReview?.score ?? null,
+      committeeComment: pipe.committeeReview?.comment || "",
+      committeeCompletedAt: pipe.committeeReview?.completedAt || null,
+      committeeSubmitted,
       assignedCommittee: members,
       assignedToMe,
       actionRequired,
@@ -743,28 +759,22 @@ async function listMyCommitteeAssignments(req, res) {
     };
   });
 
-  if (isDirector) {
-    items = items.filter(
-      (i) =>
-        i.committeeStage === STAGE_STATUS.PENDING || i.committeeStage === STAGE_STATUS.IN_PROGRESS
-    );
-  } else {
-    items = items.filter((i) => i.actionRequired);
-  }
-
   const pendingCount = items.filter((i) =>
     isDirector
       ? i.committeeStage === STAGE_STATUS.PENDING || i.committeeStage === STAGE_STATUS.IN_PROGRESS
       : i.actionRequired
   ).length;
+  const receivedCount = items.length - pendingCount;
 
   res.json({
     assignments: items,
     mode: isDirector ? "director_sent" : "coordinator",
     summary: {
       total: items.length,
+      sent: items.length,
       pending: pendingCount,
-      done: items.length - pendingCount,
+      received: receivedCount,
+      done: receivedCount,
     },
   });
 }

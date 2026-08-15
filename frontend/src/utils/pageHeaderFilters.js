@@ -69,6 +69,16 @@ export function totalStatTile(label = "Total", count = 0) {
   return { label, value: count, filterKey: "all" };
 }
 
+/** Total = Sent = Received + Pending (dispatch queues: peer / committee). */
+export function buildSentReceivedPendingStats(total, received, pending) {
+  return [
+    { label: "Total", value: total, filterKey: "all" },
+    { label: "Sent", value: total, filterKey: "sent", accent: "#38bdf8" },
+    { label: "Received", value: received, filterKey: "received", accent: "#22c55e", alwaysShow: true },
+    { label: "Pending", value: pending, filterKey: "pending", accent: "#fbbf24", alwaysShow: true },
+  ];
+}
+
 export function fieldStatTile(label, count, field, value, accent) {
   return { label, value: count, filterKey: `field:${field}:${value}`, accent };
 }

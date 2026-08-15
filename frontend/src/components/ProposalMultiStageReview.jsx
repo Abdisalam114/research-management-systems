@@ -4,6 +4,8 @@ import { useProgramTier } from "../hooks/useProgramTier";
 import * as proposalApi from "../services/proposalApi";
 import * as userApi from "../services/userApi";
 import { StatusBadge } from "./StatusBadge";
+import { PeerReviewRoster } from "./PeerReviewRoster";
+import { buildPeerReviewRoster } from "../utils/peerReviewRoster";
 
 const STAGE_LABELS = {
   admin_screening: "Admin screening",
@@ -70,6 +72,11 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
   const peerReviewPassed = pipe.peerReview?.status === "passed";
   const hasPeerReviews = (proposal.peerReviews || []).length > 0;
   const hasAssignedReviewers = (proposal.assignedReviewers || []).length > 0;
+  const peerRoster = buildPeerReviewRoster(
+    proposal.assignedReviewers,
+    proposal.peerReviews
+  );
+  const showPeerRoster = hasAssignedReviewers || hasPeerReviews;
   const hasCommitteeAssignees = (proposal.assignedCommittee || []).length > 0;
   const canSubmitPeerReview =
     assigned && !peerDone && peerStageOpen && (isLeadershipReviewer || isDirector);
@@ -78,8 +85,6 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
   const showPeerSubmitForm = canSubmitPeerReview || canDirectorSubmitPeer;
   const canAssignReviewers =
     isDirector && !peerReviewPassed && !hasAssignedReviewers && !hasPeerReviews;
-  const showPeerAwaitingDirector =
-    isDirector && !peerReviewPassed && (hasAssignedReviewers || hasPeerReviews);
   const canAssignCommittee =
     isDirector &&
     pipe.peerReview?.status === "passed" &&
@@ -311,7 +316,10 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         <div style={{ display: "grid", gap: 6, fontSize: 13, marginBottom: 12 }}>
           <div>
             1. Peer review <StageBadge status={pipe.peerReview?.status} /> (
-            {(proposal.peerReviews || []).length} reviews)
+            {showPeerRoster
+              ? `${peerRoster.submittedCount}/${peerRoster.sentCount} reviewed`
+              : `${(proposal.peerReviews || []).length} reviews`}
+            )
           </div>
           {(!isDirector || showCommitteeStageForDirector) && (
             <div>
@@ -383,60 +391,51 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         </div>
       ) : null}
 
-      {showPeerAwaitingDirector ? (
+      {showPeerRoster && !isLeadershipReviewer ? (
         <div
           className="card"
           style={{
             marginBottom: 14,
             padding: 12,
-            borderColor: "rgba(251,191,36,0.45)",
-            background: "rgba(251,191,36,0.08)",
+            borderColor: peerReviewPassed
+              ? "rgba(34,197,94,0.45)"
+              : "rgba(251,191,36,0.45)",
+            background: peerReviewPassed
+              ? "rgba(34,197,94,0.08)"
+              : "rgba(251,191,36,0.08)",
             fontSize: 13,
           }}
         >
-          <strong>Sent to Leadership — awaiting peer review.</strong>
-          {(proposal.assignedReviewers || []).length > 0 ? (
-            <span>
-              {" "}
-              Reviewer(s):{" "}
-              {(proposal.assignedReviewers || [])
-                .map((r) => r.fullName || r.email || "Leadership")
-                .join(", ")}
-            </span>
-          ) : null}
-          {hasPeerReviews ? (
-            <span className="muted">
-              {" "}
-              · {(proposal.peerReviews || []).length} review(s) received — waiting for remaining
-              reviewer(s) or stage completion.
-            </span>
+          {peerReviewPassed ? (
+            <strong>✓ Leadership peer review complete.</strong>
           ) : (
-            <span className="muted"> · This proposal leaves Peer Reviews once Leadership submits.</span>
+            <strong>
+              {peerRoster.pendingCount > 0
+                ? "Sent to Leadership — awaiting remaining peer review."
+                : "Sent to Leadership — reviews received."}
+            </strong>
           )}
-        </div>
-      ) : null}
-
-      {isDirector && peerReviewPassed ? (
-        <div
-          className="card"
-          style={{
-            marginBottom: 14,
-            padding: 12,
-            borderColor: "rgba(34,197,94,0.45)",
-            background: "rgba(34,197,94,0.08)",
-            fontSize: 13,
-          }}
-        >
-          <strong>✓ Leadership peer review complete.</strong>
-          {(proposal.peerReviews || []).length > 0 ? (
-            <span>
-              {" "}
-              {(proposal.peerReviews || [])
-                .map((r) => `${r.reviewerName || r.reviewerEmail || "Reviewer"} (${r.score}/5)`)
-                .join(" · ")}
-            </span>
+          <PeerReviewRoster
+            assignedReviewers={proposal.assignedReviewers}
+            peerReviews={proposal.peerReviews}
+            showComments
+          />
+          {peerReviewPassed ? (
+            <p className="muted" style={{ marginBottom: 0, marginTop: 8 }}>
+              Continue with committee assignment below.
+            </p>
           ) : null}
-          <span className="muted"> Continue with committee assignment below.</span>
+          {isDirector && pipe.peerReview?.status !== "passed" && hasPeerReviews ? (
+            <button
+              type="button"
+              className="btn primary"
+              style={{ marginTop: 10 }}
+              disabled={busy || peerRoster.pendingCount > 0}
+              onClick={() => run(() => proposalApi.completePeerReview(accessToken, proposal.id))}
+            >
+              Complete peer review stage
+            </button>
+          ) : null}
         </div>
       ) : null}
 
@@ -446,54 +445,14 @@ export function ProposalMultiStageReview({ proposal, onReload }) {
         </div>
       ) : null}
 
-      {(isCoordinator || (isDirector && !peerReviewPassed)) && (proposal.peerReviews || []).length > 0 ? (
-        <div
-          style={{
-            marginBottom: 14,
-            padding: 12,
-            borderRadius: 8,
-            border: "1px solid rgba(34,197,94,0.35)",
-            background: "rgba(34,197,94,0.06)",
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: 8 }}>
-            Leadership peer reviews ({(proposal.peerReviews || []).length})
-          </div>
-          <div style={{ display: "grid", gap: 10 }}>
-            {(proposal.peerReviews || []).map((r, idx) => (
-              <div
-                key={`${r.userId}-${idx}`}
-                style={{
-                  fontSize: 13,
-                  paddingBottom: 8,
-                  borderBottom: "1px solid rgba(148,197,255,0.15)",
-                }}
-              >
-                <div>
-                  <strong>{r.reviewerName || r.reviewerEmail || "Reviewer"}</strong>
-                  {" · "}
-                  Score: <strong>{r.score}/5</strong>
-                  {r.at ? (
-                    <span className="muted"> · {new Date(r.at).toLocaleString()}</span>
-                  ) : null}
-                </div>
-                <div style={{ marginTop: 4, whiteSpace: "pre-wrap" }}>
-                  {r.comment?.trim() ? r.comment : <span className="muted">No comment</span>}
-                </div>
-              </div>
-            ))}
-          </div>
-          {isDirector && pipe.peerReview?.status !== "passed" && hasPeerReviews ? (
-            <button
-              type="button"
-              className="btn primary"
-              style={{ marginTop: 10 }}
-              disabled={busy}
-              onClick={() => run(() => proposalApi.completePeerReview(accessToken, proposal.id))}
-            >
-              Complete peer review stage
-            </button>
-          ) : null}
+      {isLeadershipReviewer && showPeerRoster ? (
+        <div style={{ marginBottom: 12 }}>
+          <PeerReviewRoster
+            assignedReviewers={proposal.assignedReviewers}
+            peerReviews={proposal.peerReviews}
+            compact
+            showScores={false}
+          />
         </div>
       ) : null}
 

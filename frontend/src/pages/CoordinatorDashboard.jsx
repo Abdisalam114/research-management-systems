@@ -122,26 +122,41 @@ export function CoordinatorDashboardPage() {
 
       <section className="dashboardSection">
         <div className="dashCard">
-          <div className="dashCardTitle">Committee review assignments</div>
-          <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>
-            Proposals the Research Director assigned to you for committee review.
-          </p>
-          {committeeQueue.filter((a) => a.actionRequired).length === 0 ? (
-            <p className="muted">No pending committee reviews.</p>
+          <div className="dashCardTitle">Committee Reviews</div>
+          {committeeQueue.length === 0 ? (
+            <p className="muted">No committee reviews yet. When the Research Director assigns you, they appear here.</p>
           ) : (
-            <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-              {committeeQueue
-                .filter((a) => a.actionRequired)
-                .map((a) => (
-                  <Link key={a.id} to={`/proposals/${a.id}/review`} className="card" style={{ textDecoration: "none" }}>
-                    <strong>{a.title}</strong>
-                    <div className="muted">
-                      {a.status} • {a.department || "—"}
-                      {a.researcherName ? ` • PI: ${a.researcherName}` : ""}
-                    </div>
-                  </Link>
-                ))}
-            </div>
+            <>
+              <p style={{ marginTop: 0, fontSize: 14 }}>
+                <strong>Total {committeeQueue.length}</strong>
+                {" · "}
+                <span style={{ color: "#38bdf8", fontWeight: 600 }}>
+                  Sent {committeeQueue.length}
+                </span>
+                {" · "}
+                <span style={{ color: "#22c55e", fontWeight: 600 }}>
+                  {committeeQueue.filter((a) => !a.actionRequired).length} received
+                </span>
+                {" · "}
+                <span style={{ color: "#fbbf24", fontWeight: 600 }}>
+                  {committeeQueue.filter((a) => a.actionRequired).length} pending
+                </span>
+              </p>
+              <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                {committeeQueue
+                  .filter((a) => a.actionRequired)
+                  .slice(0, 5)
+                  .map((a) => (
+                    <Link key={a.id} to={`/proposals/${a.id}/review`} className="card" style={{ textDecoration: "none" }}>
+                      <strong>{a.title}</strong>
+                      <div className="muted">
+                        {a.status} • {a.department || "—"}
+                        {a.researcherName ? ` • PI: ${a.researcherName}` : ""}
+                      </div>
+                    </Link>
+                  ))}
+              </div>
+            </>
           )}
           <Link className="btn" to="/committee-assignments" style={{ marginTop: 12, display: "inline-block" }}>
             Open Committee Reviews

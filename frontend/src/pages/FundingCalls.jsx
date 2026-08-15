@@ -9,6 +9,7 @@ import * as grantApi from "../services/grantApi";
 import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
 import { filterByStatKey, isAwardedItem, statFilterLabel } from "../utils/pageHeaderFilters";
+import { dedupeGrants, mergeFundingApplications } from "../utils/dedupeGrants";
 import { isDateInPast, minSelectableDate, pastDateMessage } from "../utils/dateConstraints";
 import "./fundingCalls.css";
 
@@ -155,7 +156,7 @@ export function FundingCallsPage() {
         grantApi.listGrants(accessToken).catch(() => ({ grants: [] })),
         proposalApi.listGrantFundCallProposals(accessToken).catch(() => ({ proposals: [] })),
       ]);
-      const apps = (gRes.grants || []).filter((g) => g.callId);
+      const apps = dedupeGrants((gRes.grants || []).filter((g) => g.callId));
       const props = (pRes.proposals || []).filter((p) => p.fundingCallId);
       setLinkedGrants(apps);
       setLinkedProposals(props);
@@ -234,7 +235,11 @@ export function FundingCallsPage() {
 
   const acceptedGrants = useMemo(() => linkedGrants.filter(isAcceptedGrant), [linkedGrants]);
   const acceptedProposals = useMemo(() => linkedProposals.filter(isAcceptedProposal), [linkedProposals]);
-  const acceptedTotal = acceptedGrants.length + acceptedProposals.length;
+  const acceptedApplications = useMemo(
+    () => mergeFundingApplications(acceptedGrants, acceptedProposals),
+    [acceptedGrants, acceptedProposals]
+  );
+  const acceptedTotal = acceptedApplications.length;
 
   const openCount = calls.filter((c) => c.status === "open").length;
   const draftCount = calls.filter((c) => c.status === "draft").length;
@@ -447,7 +452,7 @@ await fundingCallApi.publishFundingCall(accessToken, id);
             value: acceptedCalls.length,
             filterKey: "accepted",
             accent: "#38bdf8",
-            sub: acceptedTotal ? `${acceptedTotal} application${acceptedTotal === 1 ? "" : "s"}` : "Proposals + grants",
+            sub: acceptedTotal ? `${acceptedTotal} application${acceptedTotal === 1 ? "" : "s"}` : "Accepted applications",
           },
         ]}
         activeFilter={statusFilter}
@@ -455,8 +460,8 @@ await fundingCallApi.publishFundingCall(accessToken, id);
         actions={
           <>
             {(isResearcher || canSeeAllApps) && acceptedTotal ? (
-              <Link className="btn primary" to={acceptedProposals.length ? "/proposals" : "/grants?filter=awarded"}>
-                {acceptedProposals.length ? "View proposals" : "View accepted in Grants"}
+              <Link className="btn primary" to={acceptedGrants.length ? "/grants?filter=awarded" : "/proposals"}>
+                {acceptedGrants.length ? "View accepted in Grants" : "View proposals"}
               </Link>
             ) : null}
             {canCreate ? (
@@ -516,64 +521,55 @@ await fundingCallApi.publishFundingCall(accessToken, id);
         <div className="card" style={{ marginTop: 12, borderColor: "rgba(56,189,248,0.45)" }}>
           <div style={{ fontWeight: 800 }}>Accepted funding-call applications</div>
           <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-            Proposals accepted under a funding call appear here (and under Projects when a project was created).
-            Grant awards also appear under <Link to="/grants?filter=awarded">Grants → Awarded</Link>.
+            Each accepted application appears once. Grant awards also appear under{" "}
+            <Link to="/grants?filter=awarded">Grants → Awarded</Link>.
           </p>
           <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
-            {acceptedProposals.map((p) => (
-              <div
-                key={`p-${p.id}`}
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 10,
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700 }}>{p.title}</div>
-                  <div className="muted" style={{ fontSize: 13 }}>
-                    {proposalStatusLabel(p.status)}
-                    {p.fundingCall?.title ? ` · Call: ${p.fundingCall.title}` : ""}
-                    {p.researcherName ? ` · ${p.researcherName}` : ""}
+            {acceptedApplications.map((row) => {
+              const p = row.proposal;
+              const g = row.grant;
+              const title = p?.title || g?.title;
+              const statusText = g ? grantStatusLabel(g.status) : proposalStatusLabel(p?.status);
+              const callTitle = g?.fundingCall?.title || p?.fundingCall?.title || "";
+              return (
+                <div
+                  key={row.key}
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 10,
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{title}</div>
+                    <div className="muted" style={{ fontSize: 13 }}>
+                      {statusText}
+                      {callTitle ? ` · Call: ${callTitle}` : ""}
+                      {p?.researcherName ? ` · ${p.researcherName}` : ""}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {g?.status === "pending_finance" && isFinance ? (
+                      <Link className="btn primary" to="/finance/grant-approvals">
+                        Authorize budget
+                      </Link>
+                    ) : null}
+                    {p ? (
+                      <Link className={g ? "btn" : "btn primary"} to={`/proposals/${p.id}`}>
+                        Open proposal
+                      </Link>
+                    ) : null}
+                    {g ? (
+                      <Link className="btn primary" to={`/grants/${g.id}`}>
+                        Open grant
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
-                <Link className="btn primary" to={`/proposals/${p.id}`}>
-                  Open proposal
-                </Link>
-              </div>
-            ))}
-            {acceptedGrants.map((g) => (
-              <div
-                key={`g-${g.id}`}
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 10,
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                }}
-              >
-                <div>
-                  <div style={{ fontWeight: 700 }}>{g.title}</div>
-                  <div className="muted" style={{ fontSize: 13 }}>
-                    {grantStatusLabel(g.status)}
-                    {g.fundingCall?.title ? ` · Call: ${g.fundingCall.title}` : ""}
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {g.status === "pending_finance" && isFinance ? (
-                    <Link className="btn primary" to="/finance/grant-approvals">
-                      Authorize budget
-                    </Link>
-                  ) : null}
-                  <Link className="btn primary" to={`/grants/${g.id}`}>
-                    Open grant
-                  </Link>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ) : null}
@@ -902,52 +898,43 @@ await fundingCallApi.publishFundingCall(accessToken, id);
                 <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>
                   {isResearcher ? "My applications" : "Applications on this call"}
                 </div>
-                {(proposalsByCallId[String(c.id)] || []).map((p) => (
-                  <div
-                    key={`p-${p.id}`}
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 8,
-                      alignItems: "center",
-                      fontSize: 13,
-                      marginBottom: 4,
-                    }}
-                  >
-                    <span style={{ fontWeight: 600 }}>{p.title}</span>
-                    <span className={statusClass(isAcceptedProposal(p) ? "open" : p.status === "draft" ? "draft" : "closed")}>
-                      {proposalStatusLabel(p.status)}
-                    </span>
-                    <Link to={`/proposals/${p.id}`} style={{ fontWeight: 700 }}>
-                      View proposal →
-                    </Link>
-                  </div>
-                ))}
-                {(grantsByCallId[String(c.id)] || []).map((g) => (
-                  <div
-                    key={`g-${g.id}`}
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 8,
-                      alignItems: "center",
-                      fontSize: 13,
-                      marginBottom: 4,
-                    }}
-                  >
-                    <span style={{ fontWeight: 600 }}>{g.title}</span>
-                    <span
-                      className={statusClass(
-                        isAcceptedGrant(g) ? "open" : g.status === "draft" ? "draft" : g.status === "submitted" ? "open" : "closed"
-                      )}
+                {mergeFundingApplications(
+                  grantsByCallId[String(c.id)] || [],
+                  proposalsByCallId[String(c.id)] || []
+                ).map((row) => {
+                  const p = row.proposal;
+                  const g = row.grant;
+                  const accepted = (g && isAcceptedGrant(g)) || (p && isAcceptedProposal(p));
+                  const draft = g?.status === "draft" || p?.status === "draft";
+                  return (
+                    <div
+                      key={row.key}
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8,
+                        alignItems: "center",
+                        fontSize: 13,
+                        marginBottom: 4,
+                      }}
                     >
-                      {grantStatusLabel(g.status)}
-                    </span>
-                    <Link to={`/grants/${g.id}`} style={{ fontWeight: 700 }}>
-                      View in Grants →
-                    </Link>
-                  </div>
-                ))}
+                      <span style={{ fontWeight: 600 }}>{p?.title || g?.title}</span>
+                      <span className={statusClass(accepted ? "open" : draft ? "draft" : "closed")}>
+                        {g ? grantStatusLabel(g.status) : proposalStatusLabel(p?.status)}
+                      </span>
+                      {p ? (
+                        <Link to={`/proposals/${p.id}`} style={{ fontWeight: 700 }}>
+                          View proposal →
+                        </Link>
+                      ) : null}
+                      {g ? (
+                        <Link to={`/grants/${g.id}`} style={{ fontWeight: 700 }}>
+                          View in Grants →
+                        </Link>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
           </article>

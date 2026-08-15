@@ -7,7 +7,6 @@ import { useModuleLoad } from "../hooks/useModuleLoad";
 import * as budgetApi from "../services/budgetApi";
 import * as paymentApi from "../services/paymentApi";
 import * as procurementApi from "../services/procurementApi";
-import * as analyticsApi from "../services/analyticsApi";
 import * as projectApi from "../services/projectApi";
 import { PageHeader } from "../components/PageHeader";
 import { statFilterLabel } from "../utils/pageHeaderFilters";
@@ -135,7 +134,6 @@ export function BudgetsPage() {
   const [budgets, setBudgets] = useState([]);
   const [payments, setPayments] = useState([]);
   const [pos, setPOs] = useState([]);
-  const [financeReport, setFinanceReport] = useState(null);
   const [projects, setProjects] = useState([]);
   const [linkedProject, setLinkedProject] = useState(null);
   const [newBudget, setNewBudget] = useState({
@@ -153,7 +151,6 @@ export function BudgetsPage() {
   const isResearcher = user?.role === "researcher";
   const isDirector = user?.role === "research_director";
   const isFinance = user?.role === "finance_officer";
-  const canSeeFinanceReport = isDirector || isFinance;
 
   useEffect(() => {
     if (!projectIdFromUrl) return;
@@ -192,7 +189,6 @@ export function BudgetsPage() {
     let nextBudgets = [];
     let nextPayments = [];
     let nextPOs = [];
-    let nextReport = null;
     try {
       const b = await budgetApi.listBudgets(accessToken);
       nextBudgets = b.budgets || [];
@@ -211,18 +207,10 @@ export function BudgetsPage() {
     } catch {
       nextPOs = [];
     }
-    if (canSeeFinanceReport) {
-      try {
-        nextReport = await analyticsApi.financeReport(accessToken);
-      } catch {
-        nextReport = null;
-      }
-    }
     setBudgets(nextBudgets);
     setPayments(nextPayments);
     setPOs(nextPOs);
-    setFinanceReport(nextReport);
-}, [accessToken, canSeeFinanceReport, user?.role, programTier]);
+  }, [accessToken, user?.role, programTier]);
 
   const { loading, error, setError, reload } = useModuleLoad(accessToken, load);
 
@@ -276,18 +264,6 @@ export function BudgetsPage() {
     () => computeBudgetTotals(filteredBudgets, paymentsByBudget, posByBudget),
     [filteredBudgets, paymentsByBudget, posByBudget]
   );
-
-  const methodBreakdown = useMemo(() => {
-    const m = {};
-    [...payments, ...pos]
-      .filter((x) => x.status === "paid" && x.paymentMethod)
-      .forEach((x) => {
-        const k = x.paymentMethod;
-        const amt = Number(x.amount ?? x.totalAmount ?? 0);
-        m[k] = (m[k] || 0) + amt;
-      });
-    return m;
-  }, [payments, pos]);
 
   const directorQueuePayments = payments.filter((p) => p.status === "requested");
   const financePoReviewQueue = pos.filter((p) => p.status === "requested");
@@ -375,7 +351,7 @@ export function BudgetsPage() {
 
   const headerStats = [
     {
-      label: isResearcher ? "My total budget" : "Institutional total budget",
+      label: isResearcher ? "My budget" : "Total budget",
       value: formatMoney(totals.allocated, totals.currency),
       sub: isResearcher
         ? `${scopedBudgets.length} of your budget${scopedBudgets.length === 1 ? "" : "s"}`
@@ -384,7 +360,7 @@ export function BudgetsPage() {
       filterKey: "all",
     },
     {
-      label: "Disbursed (paid)",
+      label: "Paid",
       value: formatMoney(totals.disbursed, totals.currency),
       sub: `${disbursedBudgets.length} budget${disbursedBudgets.length === 1 ? "" : "s"} • Payments ${formatMoney(totals.disbursedPayments, totals.currency)} • POs ${formatMoney(totals.disbursedPOs, totals.currency)}`,
       accent: "#16a34a",
@@ -399,7 +375,7 @@ export function BudgetsPage() {
     {
       label: "Utilization",
       value: `${visibleTotals.utilizationPercent}%`,
-      sub: statusFilter === "all" ? "Disbursed ÷ allocated" : "Disbursed ÷ allocated (filtered list)",
+      sub: statusFilter === "all" ? "Paid ÷ allocated" : "Paid ÷ allocated (filtered list)",
       accent: "#7dd3fc",
     },
     {
@@ -412,7 +388,7 @@ export function BudgetsPage() {
     {
       label: "Total budgets",
       value: `${filteredBudgets.length} • ${formatMoney(visibleTotals.disbursed, visibleTotals.currency)} spent`,
-      sub: "Visible budgets & disbursed total",
+      sub: "Visible budgets & paid total",
       accent: "#38bdf8",
     },
   ];
@@ -629,80 +605,6 @@ export function BudgetsPage() {
               Open Budgets from a project to sync allocation if missing.
             </p>
           )}
-        </div>
-      ) : null}
-
-      {canSeeFinanceReport && financeReport ? (
-        <div className="card" style={{ marginTop: 12 }}>
-          <div style={{ fontWeight: 800 }}>📊 Financial reporting (institutional)</div>
-          <div className="overviewGrid" style={{ marginTop: 10 }}>
-            <div className="overviewTile">
-              <div className="label">Budgets</div>
-              <div className="value">{financeReport.summary.budgets}</div>
-            </div>
-            <div className="overviewTile">
-              <div className="label">Allocated</div>
-              <div className="value">${Number(financeReport.summary.totalAllocated || 0).toLocaleString()}</div>
-            </div>
-            <div className="overviewTile">
-              <div className="label">Paid</div>
-              <div className="value">${Number(financeReport.summary.totalPaid || 0).toLocaleString()}</div>
-            </div>
-            <div className="overviewTile">
-              <div className="label">Utilization</div>
-              <div className="value">{financeReport.summary.utilizationPercent}%</div>
-            </div>
-          </div>
-
-          {Object.keys(methodBreakdown).length ? (
-            <div style={{ marginTop: 14 }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Payments by method</div>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {Object.entries(methodBreakdown).map(([method, amount]) => (
-                  <div
-                    key={method}
-                    className="card"
-                    style={{
-                      padding: "8px 14px",
-                      background: "rgba(14,165,233,0.08)",
-                      borderColor: "rgba(56,189,248,0.25)",
-                    }}
-                  >
-                    <div className="muted" style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>
-                      {method.replace(/_/g, " ")}
-                    </div>
-                    <div style={{ fontWeight: 800, color: "#38bdf8" }}>{formatMoney(amount, totals.currency)}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {Array.isArray(financeReport.grantSummary) && financeReport.grantSummary.length ? (
-            <div style={{ marginTop: 14, overflowX: "auto" }}>
-              <div style={{ fontWeight: 700, marginBottom: 6 }}>Grant financial summary</div>
-              <table className="dashTable">
-                <thead>
-                  <tr>
-                    <th>Grant</th>
-                    <th>Source</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: "right" }}>Awarded</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {financeReport.grantSummary.map((g, idx) => (
-                    <tr key={String(g.id || `${g.title}-${g.status}-${idx}`)}>
-                      <td>{g.title}</td>
-                      <td>{g.fundingSource || "—"}</td>
-                      <td>{g.status}</td>
-                      <td style={{ textAlign: "right" }}>${Number(g.amountAwarded || 0).toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
         </div>
       ) : null}
 

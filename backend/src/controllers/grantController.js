@@ -24,6 +24,10 @@ const { closeExpiredOpenCalls, closeCallAfterGrantAccepted } = require("../utils
 const { isDeadlinePassed } = require("../utils/dateConstraints");
 const { ROLES } = require("../models/User");
 const { canViewProjectAwards } = require("../utils/researchJourney");
+const {
+  collapseDuplicateFundingCallGrants,
+  dedupeGrantList,
+} = require("../utils/collapseDuplicateFundingCallGrants");
 
 async function redactGrantAwardsIfNeeded(out, req) {
   if (!out?.amountAwarded) return out;
@@ -52,6 +56,13 @@ async function redactGrantAwardsIfNeeded(out, req) {
     out.awardsHidden = true;
   }
   return out;
+}
+
+async function populateGrantForResponse(grantId) {
+  return Grant.findById(grantId)
+    .populate("projectId", "title status")
+    .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId")
+    .populate("callId", "title status fundingSource requiredDocuments deadline");
 }
 
 function parseBudgetField(body) {
@@ -305,6 +316,12 @@ async function listGrants(req, res) {
     /* best-effort */
   }
 
+  try {
+    await collapseDuplicateFundingCallGrants();
+  } catch {
+    /* best-effort */
+  }
+
   // Finance / staff: ensure accepted fund-call proposals have a pending_finance grant to approve
   if (["finance_officer", "research_director", "leadership"].includes(role)) {
     try {
@@ -330,8 +347,9 @@ async function listGrants(req, res) {
     .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId")
     .populate("callId", "title status fundingSource requiredDocuments deadline amountCap currency callType eligibilityTier")
     .populate("researcherId", "fullName department");
+  grants = dedupeGrantList(grants);
   const sanitized = await Promise.all(grants.map(async (g) => redactGrantAwardsIfNeeded(sanitizeGrant(g), req)));
-res.json({ grants: sanitized });
+  res.json({ grants: sanitized });
 }
 
 async function getGrant(req, res) {
@@ -399,46 +417,83 @@ async function createGrant(req, res) {
   const checklist = parseRequirementChecklist(req.body, call);
   assertCallRequirementsComplete(call, checklist);
 
-  const existing = await Grant.findOne({
-    researcherId: req.user.id,
-    callId: call._id,
-    proposalId: proposal._id,
-    status: { $ne: GRANT_STATUSES.REJECTED },
-  });
+  const existing =
+    (await Grant.findOne({
+      researcherId: req.user.id,
+      callId: call._id,
+      proposalId: proposal._id,
+      status: { $ne: GRANT_STATUSES.REJECTED },
+    }).sort({ createdAt: 1 })) ||
+    (await Grant.findOne({
+      researcherId: req.user.id,
+      callId: call._id,
+      status: { $ne: GRANT_STATUSES.REJECTED },
+    }).sort({ createdAt: 1 }));
+
   if (existing) {
     if (existing.status !== GRANT_STATUSES.DRAFT) {
-      throw new AppError("You already applied to this funding call with this proposal", 409);
+      throw new AppError("You already applied to this funding call", 409);
     }
-    const populatedExisting = await Grant.findById(existing._id)
-      .populate("projectId", "title status")
-      .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId")
-      .populate("callId", "title status fundingSource requiredDocuments deadline");
+    existing.title = resolvedTitle;
+    existing.fundingSource = String(call.fundingSource).trim();
+    existing.amountRequested = requested;
+    existing.currency = currency
+      ? String(currency).trim().toUpperCase()
+      : budgetFields?.budgetCurrency || existing.currency || call.currency || "USD";
+    existing.donorRef = donorRef ? String(donorRef).trim() : call.donorRef || existing.donorRef || "";
+    if (complianceNotes !== undefined) existing.complianceNotes = String(complianceNotes);
+    existing.projectId = linkedProjectId || existing.projectId;
+    existing.proposalId = proposal._id;
+    existing.callId = call._id;
+    existing.requirementChecklist = checklist;
+    if (budgetFields) {
+      existing.budgetBreakdown = budgetFields.budgetBreakdown || existing.budgetBreakdown;
+      existing.budgetTotal = budgetFields.budgetTotal || existing.budgetTotal;
+    }
+    await existing.save();
+    const populatedExisting = await populateGrantForResponse(existing._id);
+    return res.json({
+      grant: sanitizeGrant(populatedExisting),
+      message: "Updated your existing draft for this call.",
+    });
+  }
+
+  let grant;
+  try {
+    grant = await Grant.create(
+      req.createWithTier(
+        {
+          title: resolvedTitle,
+          fundingSource: String(call.fundingSource).trim(),
+          amountRequested: requested,
+          currency: currency ? String(currency).trim().toUpperCase() : budgetFields?.budgetCurrency || call.currency || "USD",
+          donorRef: donorRef ? String(donorRef).trim() : call.donorRef || "",
+          complianceNotes: complianceNotes ? String(complianceNotes) : "",
+          projectId: linkedProjectId,
+          proposalId: proposal._id,
+          callId: call._id,
+          researcherId: req.user.id,
+          status: GRANT_STATUSES.DRAFT,
+          requirementChecklist: checklist,
+          ...(budgetFields || { budgetBreakdown: [], budgetTotal: 0 }),
+        },
+        "grant program tier"
+      )
+    );
+  } catch (err) {
+    if (err?.code !== 11000) throw err;
+    const raced = await Grant.findOne({
+      researcherId: req.user.id,
+      callId: call._id,
+      status: { $ne: GRANT_STATUSES.REJECTED },
+    }).sort({ createdAt: 1 });
+    if (!raced) throw err;
+    const populatedExisting = await populateGrantForResponse(raced._id);
     return res.json({
       grant: sanitizeGrant(populatedExisting),
       message: "Opened your existing draft for this call.",
     });
   }
-
-  const grant = await Grant.create(
-    req.createWithTier(
-      {
-        title: resolvedTitle,
-        fundingSource: String(call.fundingSource).trim(),
-        amountRequested: requested,
-        currency: currency ? String(currency).trim().toUpperCase() : budgetFields?.budgetCurrency || call.currency || "USD",
-        donorRef: donorRef ? String(donorRef).trim() : call.donorRef || "",
-        complianceNotes: complianceNotes ? String(complianceNotes) : "",
-        projectId: linkedProjectId,
-        proposalId: proposal._id,
-        callId: call._id,
-        researcherId: req.user.id,
-        status: GRANT_STATUSES.DRAFT,
-        requirementChecklist: checklist,
-        ...(budgetFields || { budgetBreakdown: [], budgetTotal: 0 }),
-      },
-      "grant program tier"
-    )
-  );
 
   await recordAudit({
     entityType: "grant",
@@ -451,10 +506,7 @@ async function createGrant(req, res) {
     programTier: req.programTier,
   });
 
-  const populated = await Grant.findById(grant._id)
-    .populate("projectId", "title status")
-    .populate("proposalId", "title status ethicsStatus requiresEthics fundingCallId")
-    .populate("callId", "title status fundingSource requiredDocuments deadline");
+  const populated = await populateGrantForResponse(grant._id);
   res.status(201).json({ grant: sanitizeGrant(populated) });
 }
 

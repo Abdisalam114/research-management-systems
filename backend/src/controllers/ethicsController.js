@@ -15,16 +15,28 @@ const {
 } = require("../utils/jurecCertificate");
 const { assertDateNotInPast, assertDateOnOrAfter } = require("../utils/dateConstraints");
 
+function idOf(value) {
+  if (!value) return null;
+  if (typeof value === "object") return value._id || value.id || null;
+  return value;
+}
+
 function sanitize(a) {
+  const linkedProposal =
+    a.proposalId && typeof a.proposalId === "object" && a.proposalId.title !== undefined
+      ? a.proposalId
+      : null;
   return {
     id: a._id,
-    proposalId: a.proposalId,
-    researcherId: a.researcherId,
+    proposalId: idOf(a.proposalId),
+    proposalKind: linkedProposal?.proposalKind || null,
+    fundingCallId: linkedProposal?.fundingCallId || null,
+    researcherId: idOf(a.researcherId),
     status: a.status,
     principal: a.principal,
     coResearcher: a.coResearcher,
     otherInvestigators: a.otherInvestigators,
-    projectTitle: a.projectTitle,
+    projectTitle: a.projectTitle || linkedProposal?.title || "",
     projectLevel: a.projectLevel,
     startDate: a.startDate,
     endDate: a.endDate,
@@ -170,11 +182,19 @@ async function syncLinkedProposalEthics(proposalId, ethicsStatus, ethicsAppId, p
 async function assertCoordinatorEthicsFaculty(_req, _application) {}
 
 async function listEthicsApplications(req, res) {
+  try {
+    const { ensureEthicsApplicationsForProposals } = require("../utils/ensureEthicsApplicationsForProposals");
+    await ensureEthicsApplicationsForProposals();
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn("Ethics restore on list failed:", err?.message || err);
+  }
   const { role, id } = req.user;
   const filter = role === "researcher" ? { researcherId: id } : req.tierWhere({});
-  let applications = await EthicsApplication.find(filter)
+  const applications = await EthicsApplication.find(filter)
     .sort({ createdAt: -1 })
-    .populate("researcherId", "department");
+    .populate("researcherId", "department")
+    .populate("proposalId", "title proposalKind fundingCallId");
   res.json({ applications: applications.map(sanitize) });
 }
 
@@ -188,6 +208,7 @@ async function getEthicsApplication(req, res) {
   const isStaff = ["research_director", "faculty_coordinator"].includes(req.user.role);
   if (!isOwner && !isStaff) throw new AppError("Forbidden", 403);
   await assertCoordinatorEthicsFaculty(req, a);
+  await a.populate("proposalId", "title proposalKind fundingCallId");
   res.json({ application: sanitize(a) });
 }
 

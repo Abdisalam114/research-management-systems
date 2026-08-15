@@ -233,7 +233,15 @@ throw e;
                 const res = await proposalApi.directorDecision(accessToken, id, selected, comment.trim());
                 const projectId = res?.project?.id ? String(res.project.id) : "";
                 if (selected === "approved") {
-                  navigate(projectId ? `/projects/${projectId}` : "/projects", { replace: true });
+                  navigate(projectId ? `/projects/${projectId}` : "/projects", {
+                    replace: true,
+                    state: {
+                      proposalAccepted: true,
+                      message:
+                        res?.message ||
+                        "Congratulations — the proposal was accepted and the project is Open. Please continue your work.",
+                    },
+                  });
                   return;
                 }
                 setMessage(res?.message || "Decision saved");

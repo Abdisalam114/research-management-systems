@@ -20,7 +20,7 @@ export function DonorReportsPage() {
   if (error) {
     return (
       <div>
-        <PageHeader title="Donor reports" subtitle="External funding accountability summary." />
+        <PageHeader title="Donor reports" subtitle="Internal and external funding-call summary." />
         <div className="card" style={{ borderColor: "rgba(239,68,68,0.55)", marginTop: 12 }}>{error}</div>
       </div>
     );
@@ -29,7 +29,7 @@ export function DonorReportsPage() {
   if (!report) {
     return (
       <div>
-        <PageHeader title="Donor reports" subtitle="External funding accountability summary." />
+        <PageHeader title="Donor reports" subtitle="Internal and external funding-call summary." />
         <p className="muted">Loading donor report…</p>
       </div>
     );
@@ -39,8 +39,7 @@ export function DonorReportsPage() {
     <div>
       <PageHeader
         title="Donor reports"
-        subtitle={`Generated ${new Date(report.generatedAt).toLocaleString()} · ${report.donors?.length || 0} donor references`
-        }
+        subtitle={`Internal and external funding calls · generated ${new Date(report.generatedAt).toLocaleString()}`}
       />
 
       <div className="overviewGrid" style={{ marginTop: 12 }}>
@@ -53,7 +52,7 @@ export function DonorReportsPage() {
           <div className="value">${(report.totals?.awarded || 0).toLocaleString()}</div>
         </div>
         <div className="overviewTile">
-          <div className="label">Total requested</div>
+          <div className="label">Amount requested</div>
           <div className="value">${(report.totals?.requested || 0).toLocaleString()}</div>
         </div>
         <div className="overviewTile">
@@ -63,7 +62,7 @@ export function DonorReportsPage() {
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
-        <div style={{ fontWeight: 800, marginBottom: 8 }}>Grants by donor reference</div>
+        <div style={{ fontWeight: 800, marginBottom: 8 }}>Applications by source</div>
         <table className="dashTable">
           <thead>
             <tr>
@@ -91,7 +90,7 @@ export function DonorReportsPage() {
             ) : (
               <tr>
                 <td colSpan={4} className="muted">
-                  No donor grant records in this portal.
+                  No funding-call grants in this portal.
                 </td>
               </tr>
             )}
@@ -105,6 +104,7 @@ export function DonorReportsPage() {
           <thead>
             <tr>
               <th>Title</th>
+              <th>Type</th>
               <th>Donor ref</th>
               <th>Source</th>
               <th>Cap</th>
@@ -115,12 +115,20 @@ export function DonorReportsPage() {
             {(report.fundingCalls || []).map((c) => (
               <tr key={c.id || c.title}>
                 <td>{c.title}</td>
+                <td>{c.callType === "external" ? "External" : "Internal"}</td>
                 <td>{c.donorRef || "—"}</td>
                 <td>{c.fundingSource || "—"}</td>
                 <td>${(c.amountCap || 0).toLocaleString()}</td>
                 <td>{c.status}</td>
               </tr>
             ))}
+            {(report.fundingCalls || []).length ? null : (
+              <tr>
+                <td colSpan={6} className="muted">
+                  No published funding calls in this portal.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

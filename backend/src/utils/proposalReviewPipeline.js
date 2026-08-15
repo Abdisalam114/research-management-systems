@@ -148,12 +148,48 @@ function peerReviewDirectorQueueFilter(extra = {}) {
   };
 }
 
+/** Director Peer Reviews page: still out plus reviews that already came back (active workflow). */
+function peerReviewDirectorHistoryFilter(extra = {}) {
+  return {
+    status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+    $or: [
+      {
+        "reviewPipeline.peerReview.status": { $in: [STAGE_STATUS.PENDING, STAGE_STATUS.IN_PROGRESS] },
+        $or: [
+          { "assignedReviewers.0": { $exists: true } },
+          { "peerReviews.0": { $exists: true } },
+        ],
+      },
+      {
+        "reviewPipeline.peerReview.status": STAGE_STATUS.PASSED,
+        "peerReviews.0": { $exists: true },
+      },
+    ],
+    ...extra,
+  };
+}
+
 /** Leadership queue: assigned and peer review stage still open (exits after they submit). */
 function peerReviewLeadershipQueueFilter(userId, extra = {}) {
   return {
     status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
     "assignedReviewers.userId": userId,
     "reviewPipeline.peerReview.status": { $in: [STAGE_STATUS.PENDING, STAGE_STATUS.IN_PROGRESS] },
+    ...extra,
+  };
+}
+
+/** Leadership Peer Reviews page: current assignments plus reviews they already submitted. */
+function peerReviewLeadershipHistoryFilter(userId, extra = {}) {
+  return {
+    $or: [
+      {
+        "assignedReviewers.userId": userId,
+        status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+        "reviewPipeline.peerReview.status": { $in: [STAGE_STATUS.PENDING, STAGE_STATUS.IN_PROGRESS] },
+      },
+      { "peerReviews.userId": userId },
+    ],
     ...extra,
   };
 }
@@ -181,6 +217,41 @@ function committeeSentToMembersFilter(extra = {}) {
     status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
     "reviewPipeline.peerReview.status": STAGE_STATUS.PASSED,
     "reviewPipeline.committeeReview.status": { $in: [...ACTIVE_COMMITTEE_REVIEW_STATUSES] },
+    ...extra,
+  };
+}
+
+/** Director Committee page: still out plus reviews that already came back (active workflow). */
+function committeeDirectorHistoryFilter(extra = {}) {
+  return {
+    status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+    "reviewPipeline.peerReview.status": STAGE_STATUS.PASSED,
+    $or: [
+      {
+        "assignedCommittee.0": { $exists: true },
+        "reviewPipeline.committeeReview.status": { $in: [...ACTIVE_COMMITTEE_REVIEW_STATUSES] },
+      },
+      {
+        "reviewPipeline.committeeReview.status": STAGE_STATUS.PASSED,
+        "reviewPipeline.committeeReview.completedBy": { $exists: true },
+      },
+    ],
+    ...extra,
+  };
+}
+
+/** Coordinator Committee page: current assignments plus reviews they already submitted. */
+function committeeCoordinatorHistoryFilter(userId, extra = {}) {
+  return {
+    $or: [
+      {
+        "assignedCommittee.userId": userId,
+        status: { $in: [...ACTIVE_PEER_REVIEW_STATUSES] },
+        "reviewPipeline.peerReview.status": STAGE_STATUS.PASSED,
+        "reviewPipeline.committeeReview.status": { $in: [...ACTIVE_COMMITTEE_REVIEW_STATUSES] },
+      },
+      { "reviewPipeline.committeeReview.completedBy": userId },
+    ],
     ...extra,
   };
 }
@@ -216,10 +287,14 @@ module.exports = {
   peerReviewSentToReviewersFilter,
   peerReviewAssignedToUserFilter,
   peerReviewDirectorQueueFilter,
+  peerReviewDirectorHistoryFilter,
   peerReviewLeadershipQueueFilter,
+  peerReviewLeadershipHistoryFilter,
   ACTIVE_COMMITTEE_REVIEW_STATUSES,
   committeeAssignedToUserFilter,
   committeeSentToMembersFilter,
+  committeeDirectorHistoryFilter,
+  committeeCoordinatorHistoryFilter,
   financeAssignedToUserFilter,
   financeSentToOfficersFilter,
   defaultReviewPipeline,

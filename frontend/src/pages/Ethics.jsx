@@ -25,6 +25,12 @@ function Badge({ status }) {
   return <StatusBadge status={status} />;
 }
 
+function hasEthicsCertificate(a) {
+  return Boolean(
+    a?.approval?.certificateNumber || a?.approval?.certificateId || a?.approval?.refNumber
+  );
+}
+
 const emptyForm = emptyEthicsForm;
 const toForm = ethicsApplicationToForm;
 
@@ -87,6 +93,7 @@ export function EthicsPage() {
             status: ethicsRes.application.status,
             proposalId: ethicsRes.application.proposalId || proposalIdFromUrl,
             proposalKind: kind,
+            fundingCallId: p?.fundingCallId || ethicsRes.application.fundingCallId || null,
           });
         }
       } catch (e) {
@@ -154,12 +161,17 @@ export function EthicsPage() {
       status: a.status,
       proposalId: a.proposalId,
       proposalKind: a.proposalKind || null,
+      fundingCallId: a.fundingCallId || null,
     });
     if (a.proposalId && accessToken) {
       proposalApi.getProposal(accessToken, a.proposalId).then((res) => {
         const p = res.proposal;
         const kind = p?.proposalKind || (p?.fundingCallId ? "grant_fund_call" : "voluntary");
-        setEditing((s) => (s?.id === a.id ? { ...s, proposalKind: kind } : s));
+        setEditing((s) =>
+          s?.id === a.id
+            ? { ...s, proposalKind: kind, fundingCallId: p?.fundingCallId || s.fundingCallId || null }
+            : s
+        );
       }).catch(() => {});
     }
     setPendingEditorScroll(true);
@@ -171,12 +183,8 @@ export function EthicsPage() {
     });
   }
 
-  /** Director: linked apps open on proposal review. Ethics committee stays on /ethics to decide. */
+  /** Director stays on /ethics to review REC; proposal review is a separate link. */
   function openViewApplication(a) {
-    if (isDirector && a.proposalId) {
-      navigate(`/proposals/${a.proposalId}/review`);
-      return;
-    }
     openEdit(a);
     setPendingEditorScroll(true);
   }
@@ -269,6 +277,8 @@ export function EthicsPage() {
             approval: res.application.approval,
             status: res.application.status,
             proposalId: res.application.proposalId,
+            proposalKind: res.application.proposalKind || editing.proposalKind,
+            fundingCallId: res.application.fundingCallId || editing.fundingCallId,
           });
         }
       }
@@ -385,6 +395,11 @@ export function EthicsPage() {
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <AppButton onClick={() => openViewApplication(a)}>View</AppButton>
+                  {a.proposalId ? (
+                    <Link className="btn" to={`/proposals/${a.proposalId}/review`}>
+                      Proposal
+                    </Link>
+                  ) : null}
                   <AppButton variant="primary" onClick={() => openDecideModal(a, "approve")}>
                     Approve & certificate
                   </AppButton>
@@ -425,9 +440,20 @@ export function EthicsPage() {
                   {a.status === "approved" ? (
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
                       <AppButton onClick={() => openViewApplication(a)}>View</AppButton>
-                      <AppButton variant="primary" onClick={() => downloadCert(a)}>
-                        Download certificate
-                      </AppButton>
+                      {a.proposalId && isDirector ? (
+                        <Link className="btn" to={`/proposals/${a.proposalId}/review`}>
+                          Proposal
+                        </Link>
+                      ) : null}
+                      {hasEthicsCertificate(a) ? (
+                        <AppButton variant="primary" onClick={() => downloadCert(a)}>
+                          Download certificate
+                        </AppButton>
+                      ) : canDecideEthics ? (
+                        <AppButton variant="primary" onClick={() => openDecideModal(a, "approve")}>
+                          Issue certificate
+                        </AppButton>
+                      ) : null}
                     </div>
                   ) : (
                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -541,8 +567,12 @@ function EthicsEditor({
   principalFaculty = "",
 }) {
   const { form } = editing;
-  const showDirectorActions = isDirector && editing.status === "submitted";
+  const showDirectorActions =
+    isDirector &&
+    (editing.status === "submitted" ||
+      (editing.status === "approved" && !hasEthicsCertificate(editing)));
   const isApproved = editing.status === "approved";
+  const canDownloadCert = isApproved && hasEthicsCertificate(editing);
 
   return (
     <div
@@ -575,7 +605,7 @@ function EthicsEditor({
         principalFaculty={principalFaculty}
       />
 
-      {isApproved ? (
+      {canDownloadCert ? (
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, marginTop: 12 }}>
           <Badge status="approved" />
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

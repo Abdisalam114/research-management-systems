@@ -41,6 +41,8 @@ function sameId(a, b) {
   return String(a?._id || a?.id || a || "") === String(b?._id || b?.id || b || "");
 }
 
+const inFlightGrantApply = new Set();
+
 export function GrantApplyPage() {
   const { accessToken, user } = useAuth();
   const navigate = useNavigate();
@@ -128,7 +130,8 @@ export function GrantApplyPage() {
     selectedProposal?.researcherName || user?.fullName || user?.email || "Current researcher";
 
   async function handleCreateGrant() {
-    if (creatingRef.current || busy) return;
+    const applyKey = `${callId}:${selectedProposalId}`;
+    if (creatingRef.current || busy || inFlightGrantApply.has(applyKey)) return;
     if (!call || !selectedProposalId) {
       setError("Select a research proposal before saving the grant application.");
       setStep(2);
@@ -164,6 +167,7 @@ export function GrantApplyPage() {
       return;
     }
 
+    inFlightGrantApply.add(applyKey);
     creatingRef.current = true;
     setBusy(true);
     setError("");
@@ -193,6 +197,7 @@ const grantId = res.grant?.id;
 setError(e?.response?.data?.message || "Could not save grant application.");
     } finally {
       creatingRef.current = false;
+      inFlightGrantApply.delete(applyKey);
       setBusy(false);
     }
   }

@@ -27,6 +27,7 @@ async function linkGrantsMissingCallId(programTier) {
   // Missing / null callId only (do not query "" — ObjectId cast fails)
   const unlinkedFilter = {
     $or: [{ callId: null }, { callId: { $exists: false } }],
+    proposalId: { $ne: null },
   };
   if (programTier) unlinkedFilter.programTier = programTier;
 

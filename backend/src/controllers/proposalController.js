@@ -163,7 +163,7 @@ function ethicsBlocksSubmission(proposal) {
 
 async function attachEthicsSummary(proposal) {
   const base = sanitizeProposal(proposal);
-  const ethics = await getEthicsForProposal(proposal._id, proposal.programTier);
+  const ethics = await getEthicsForProposal(proposal._id, proposal);
   if (!ethics) {
     return {
       ...base,
@@ -184,10 +184,18 @@ async function attachEthicsSummary(proposal) {
 }
 
 async function createLinkedEthicsApplication(proposal, user) {
+  const existing = await getEthicsForProposal(proposal._id, proposal);
+  if (existing) {
+    if (String(proposal.ethicsApplicationId || "") !== String(existing._id)) {
+      proposal.ethicsApplicationId = existing._id;
+      await proposal.save();
+    }
+    return existing;
+  }
   const parts = (user.fullName || "").trim().split(/\s+/);
   const { defaultEthicsProjectLevel } = require("../utils/ethicsDefaults");
   const defaultLevel = defaultEthicsProjectLevel(proposal.programTier);
-  const ethics = await EthicsApplication.create({
+  const payload = {
     proposalId: proposal._id,
     researcherId: proposal.researcherId,
     programTier: proposal.programTier,
@@ -202,15 +210,31 @@ async function createLinkedEthicsApplication(proposal, user) {
       department: user.department || proposal.department || "",
     },
     applicantSignature: { name: user.fullName || "" },
-  });
-  proposal.ethicsApplicationId = ethics._id;
-  await proposal.save();
-  return ethics;
+  };
+  if (proposal.ethicsApplicationId) payload._id = proposal.ethicsApplicationId;
+  try {
+    const ethics = await EthicsApplication.create(payload);
+    proposal.ethicsApplicationId = ethics._id;
+    await proposal.save();
+    return ethics;
+  } catch (err) {
+    if (err?.code === 11000) {
+      const again = await getEthicsForProposal(proposal._id, proposal);
+      if (again) {
+        if (String(proposal.ethicsApplicationId || "") !== String(again._id)) {
+          proposal.ethicsApplicationId = again._id;
+          await proposal.save();
+        }
+        return again;
+      }
+    }
+    throw err;
+  }
 }
 
 async function persistProposalEthics(proposal, user, reqBody) {
   if (!proposal.requiresEthics) return;
-  let ethics = await getEthicsForProposal(proposal._id, proposal.programTier);
+  let ethics = await getEthicsForProposal(proposal._id, proposal);
   if (!ethics) {
     ethics = await createLinkedEthicsApplication(proposal, user || {});
   }
@@ -461,7 +485,7 @@ async function getProposalEthicsApplication(req, res) {
   );
   if (!isOwner && !isStaff && !isAssignedReviewer) throw new AppError("Forbidden", 403);
 
-  let ethics = await getEthicsForProposal(proposal._id, proposal.programTier);
+  let ethics = await getEthicsForProposal(proposal._id, proposal);
   if (!ethics && isOwner && proposal.requiresEthics) {
     const user = await User.findById(req.user.id);
     ethics = await createLinkedEthicsApplication(proposal, user || {});
@@ -679,7 +703,7 @@ async function getProposal(req, res) {
 
   // Keep ethicsStatus in sync only — do NOT soft-pass committee (assign-first Phase 3).
   try {
-    const ethicsDoc = await getEthicsForProposal(proposal._id, proposal.programTier);
+    const ethicsDoc = await getEthicsForProposal(proposal._id, proposal);
     if (
       ethicsDoc?.status === "approved" &&
       proposal.ethicsStatus !== ETHICS_STATUSES.APPROVED
@@ -788,7 +812,7 @@ async function directorDecision(req, res) {
   clearPeerAssigneesIfInactive(proposal);
   // Keep proposal.ethicsStatus in sync if ethics app is approved
   if (decision === PROPOSAL_STATUSES.APPROVED && proposal.requiresEthics) {
-    const ethicsDoc = await getEthicsForProposal(proposal._id, proposal.programTier);
+    const ethicsDoc = await getEthicsForProposal(proposal._id, proposal);
     if (ethicsDoc?.status === "approved") {
       proposal.ethicsStatus = ETHICS_STATUSES.APPROVED;
     }
@@ -867,8 +891,8 @@ async function directorDecision(req, res) {
       const projectLink = projectId ? `/projects/${projectId}` : "/projects";
       await notifyUser(proposal.researcherId, {
         type: "proposal",
-        title: "Proposal accepted — project is Open",
-        body: `Your proposal "${proposal.title}" was accepted. An Open research project is now in Projects — continue your work there.`,
+        title: "Congratulations — your proposal was accepted",
+        body: `Your proposal "${proposal.title}" was accepted and the project is now Open. Please continue your work.`,
         link: projectLink,
         programTier: proposal.programTier,
       });
@@ -877,11 +901,13 @@ async function directorDecision(req, res) {
 
   const populated = await Proposal.findById(proposal._id).populate("fundingCallId", "title status deadline");
   const openProjectId = createdProject?._id || createdProject?.id || null;
+  const congrats =
+    "Congratulations — the proposal was accepted and the project is Open. Please continue your work.";
   const message =
     decision === PROPOSAL_STATUSES.APPROVED
       ? fundCallLinks?.message
-        ? `Proposal approved. An Open project was created for the researcher. ${fundCallLinks.message}`
-        : "Proposal approved. An Open project was created for the researcher and is listed under Projects."
+        ? `${congrats} ${fundCallLinks.message}`
+        : congrats
       : "Decision saved";
   res.json({
     message,
@@ -1088,6 +1114,12 @@ async function assignCommittee(req, res) {
     assignedBy: req.user.id,
     assignedAt: new Date(),
   }));
+  const assignedTo = users.map((u) => ({
+    userId: u._id,
+    fullName: u.fullName || "",
+    email: u.email || "",
+    assignedAt: new Date(),
+  }));
   if (
     pipe.committeeReview?.status === STAGE_STATUS.PENDING ||
     pipe.committeeReview?.status === "pending"
@@ -1096,6 +1128,12 @@ async function assignCommittee(req, res) {
       ...(pipe.committeeReview || {}),
       status: STAGE_STATUS.IN_PROGRESS,
       startedAt: new Date(),
+      assignedTo,
+    };
+  } else {
+    pipe.committeeReview = {
+      ...(pipe.committeeReview || {}),
+      assignedTo,
     };
   }
   proposal.markModified("reviewPipeline");

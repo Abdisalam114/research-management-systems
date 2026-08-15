@@ -63,7 +63,7 @@ function RoleDashboard({ role, user }) {
 
   const quickLinksByRole = {
     leadership: [
-      { to: "/review-assignments", label: "Peer review assignments", primary: true },
+      { to: "/review-assignments", label: "Peer Reviews", primary: true },
       { to: "/funding-calls", label: "View funding calls" },
       { to: "/policies", label: "Institutional policies" },
       { to: "/grants", label: "Grant awards" },
@@ -109,20 +109,28 @@ function RoleDashboard({ role, user }) {
 
       {role === "leadership" ? (
         <section className="dashboardSection">
-          <div className="dashboardSectionTitle">Peer reviews sent to you</div>
+          <div className="dashboardSectionTitle">Peer Reviews</div>
           <div className="card" style={{ marginTop: 8 }}>
-            {pendingPeer.length === 0 && peerAssignments.length === 0 ? (
+            {peerAssignments.length === 0 ? (
               <p className="muted" style={{ margin: 0, fontSize: 14 }}>
-                No assignments yet. When the Research Director sends a proposal to you as reviewer, it appears here and under Peer Reviews.
+                No peer reviews yet. When the Research Director sends a proposal to you, it appears here.
               </p>
             ) : (
               <>
                 <p style={{ marginTop: 0, fontSize: 14 }}>
-                  <strong>{pendingPeer.length}</strong> pending ·{" "}
-                  <strong>{peerAssignments.length - pendingPeer.length}</strong> submitted
-                  {metrics?.modules?.reviews != null ? (
-                    <span className="muted"> · Dashboard tile: {metrics.modules.reviews}</span>
-                  ) : null}
+                  <strong>Total {peerAssignments.length}</strong>
+                  {" · "}
+                  <span style={{ color: "#38bdf8", fontWeight: 600 }}>
+                    Sent {peerAssignments.length}
+                  </span>
+                  {" · "}
+                  <span style={{ color: "#22c55e", fontWeight: 600 }}>
+                    {peerAssignments.length - pendingPeer.length} received
+                  </span>
+                  {" · "}
+                  <span style={{ color: "#fbbf24", fontWeight: 600 }}>
+                    {pendingPeer.length} pending
+                  </span>
                 </p>
                 <div style={{ display: "grid", gap: 8 }}>
                   {pendingPeer.slice(0, 5).map((a) => (

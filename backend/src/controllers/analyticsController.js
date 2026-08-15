@@ -50,7 +50,7 @@ function reviewerRefId(ref) {
 }
 const { AppError } = require("../utils/AppError");
 const { userDisplayName } = require("../utils/userDisplay");
-const { ACTIVE_PEER_REVIEW_STATUSES, peerReviewDirectorQueueFilter, peerReviewLeadershipQueueFilter, STAGE_STATUS, committeeAssignedToUserFilter, committeeSentToMembersFilter } = require("../utils/proposalReviewPipeline");
+const { peerReviewDirectorHistoryFilter, peerReviewLeadershipHistoryFilter, STAGE_STATUS, committeeDirectorHistoryFilter, committeeCoordinatorHistoryFilter } = require("../utils/proposalReviewPipeline");
 const PDFDocument = require("pdfkit");
 
 function countByField(docs, field) {
@@ -269,21 +269,23 @@ async function getDashboardMetrics(req, res) {
   if (role === "leadership" || role === "research_director") {
     if (role === "leadership") {
       const assigned = await Proposal.find(
-        tw(peerReviewLeadershipQueueFilter(userId))
+        tw(peerReviewLeadershipHistoryFilter(userId))
       ).select("peerReviews assignedReviewers reviewPipeline");
-      const open = assigned.filter(
+      const pending = assigned.filter(
         (p) => !(p.peerReviews || []).some((r) => reviewerRefId(r.userId) === String(userId))
       );
-      reviewAssignments = open.length;
-      reviewAssignmentsPending = open.length;
+      reviewAssignments = assigned.length;
+      reviewAssignmentsPending = pending.length;
     } else {
-      // Director Peer Reviews tile = awaiting Leadership only (same filter as Peer Reviews page)
+      // Director Peer Reviews tile = same list as Peer Reviews page (sent + received)
       const sentActive = await Proposal.find(
-        tw(peerReviewDirectorQueueFilter())
+        tw(peerReviewDirectorHistoryFilter())
       ).select("assignedReviewers peerReviews reviewPipeline");
       proposalsSentToReviewers = sentActive.length;
       reviewAssignments = sentActive.length;
       reviewAssignmentsPending = sentActive.filter((p) => {
+        const peerStage = p.reviewPipeline?.peerReview?.status || "pending";
+        if (peerStage === STAGE_STATUS.PASSED) return false;
         const reviewers = p.assignedReviewers || [];
         const pending = reviewers.some(
           (r) =>
@@ -291,7 +293,6 @@ async function getDashboardMetrics(req, res) {
               (pr) => reviewerRefId(pr.userId) === reviewerRefId(r.userId)
             )
         );
-        const peerStage = p.reviewPipeline?.peerReview?.status || "pending";
         if (reviewers.length === 0) {
           return peerStage === STAGE_STATUS.PENDING || peerStage === STAGE_STATUS.IN_PROGRESS;
         }
@@ -305,9 +306,9 @@ async function getDashboardMetrics(req, res) {
 
   let committeeReviews = 0;
   if (role === "faculty_coordinator") {
-    committeeReviews = await Proposal.countDocuments(tw(committeeAssignedToUserFilter(userId)));
+    committeeReviews = await Proposal.countDocuments(tw(committeeCoordinatorHistoryFilter(userId)));
   } else if (role === "research_director") {
-    committeeReviews = await Proposal.countDocuments(tw(committeeSentToMembersFilter()));
+    committeeReviews = await Proposal.countDocuments(tw(committeeDirectorHistoryFilter()));
   }
   base.committeeReviews = committeeReviews;
 
@@ -329,8 +330,7 @@ async function getDashboardMetrics(req, res) {
     groups: collabGroupCount,
     thesis: facultyThesisCount,
     // Leadership tile prefers pending; Director tile = active sent queue (matches Peer Reviews page)
-    reviews:
-      role === "leadership" ? reviewAssignmentsPending || reviewAssignments : reviewAssignments,
+    reviews: reviewAssignments,
     committeeReviews,
     policies: policiesCount,
     fundingCalls: openFundingCallCount || fundingCallCount,
@@ -550,13 +550,8 @@ async function buildInstitutionalAnalytics(programTier) {
     ? Math.round((approvedProposals / allProposals.length) * 100)
     : 0;
 
-  // Proposals already sent to Leadership peer reviewers (active review queue only)
-  const proposalsSentToReviewers = allProposals.filter(
-    (p) =>
-      Array.isArray(p.assignedReviewers) &&
-      p.assignedReviewers.length > 0 &&
-      ACTIVE_PEER_REVIEW_STATUSES.includes(p.status)
-  ).length;
+  // Same set as Director Peer Reviews page (sent + received, active workflow)
+  const proposalsSentToReviewers = await Proposal.countDocuments(tf(peerReviewDirectorHistoryFilter()));
 
   const annualReport = {
     year: new Date().getFullYear(),
@@ -1438,28 +1433,118 @@ async function getSystemReport(req, res) {
   res.json(report);
 }
 
+function hasDonorRef(value) {
+  return Boolean(String(value || "").trim());
+}
+
+function callTypeOf(call) {
+  return call?.callType === "external" ? "external" : "internal";
+}
+
+const REQUESTED_GRANT_STATUSES = new Set([
+  GRANT_STATUSES.SUBMITTED,
+  GRANT_STATUSES.APPROVED,
+  GRANT_STATUSES.PENDING_FINANCE,
+  GRANT_STATUSES.ACTIVE,
+  GRANT_STATUSES.CLOSED,
+  GRANT_STATUSES.REJECTED,
+]);
+
+const AWARDED_GRANT_STATUSES = new Set([
+  GRANT_STATUSES.APPROVED,
+  GRANT_STATUSES.PENDING_FINANCE,
+  GRANT_STATUSES.ACTIVE,
+  GRANT_STATUSES.CLOSED,
+]);
+
+const REQUESTED_PROPOSAL_STATUSES = new Set([
+  PROPOSAL_STATUSES.SUBMITTED,
+  PROPOSAL_STATUSES.UNDER_REVIEW,
+  PROPOSAL_STATUSES.REVISION_REQUESTED,
+  PROPOSAL_STATUSES.APPROVED,
+  PROPOSAL_STATUSES.REJECTED,
+]);
+
+function applicationGroupKey(grant, call) {
+  if (hasDonorRef(grant?.donorRef)) return String(grant.donorRef).trim();
+  if (hasDonorRef(call?.donorRef)) return String(call.donorRef).trim();
+  const source = call?.fundingSource || grant?.fundingSource;
+  if (callTypeOf(call) === "internal") {
+    return hasDonorRef(source) ? String(source).trim() : "Internal";
+  }
+  return hasDonorRef(source) ? String(source).trim() : "Unspecified";
+}
+
+function requestedAmountOf({ grant, proposal, call }) {
+  const fromGrant = Number(grant?.amountRequested || 0) || Number(grant?.budgetTotal || 0);
+  if (fromGrant > 0) return fromGrant;
+  const fromProposal = Number(proposal?.budgetTotal || 0);
+  if (fromProposal > 0) return fromProposal;
+  return Number(call?.amountCap || 0) || 0;
+}
+
 async function getDonorReport(req, res) {
-  const [grants, calls] = await Promise.all([
-    Grant.find(req.tierWhere({ callId: { $ne: null, $exists: true } })).select(
-      "title donorRef fundingSource amountAwarded amountRequested status"
-    ),
-    FundingCall.find(req.tierWhere({})).select("title donorRef fundingSource amountCap status"),
-  ]);
+  const calls = await FundingCall.find(
+    req.tierWhere({
+      status: { $in: [CALL_STATUSES.OPEN, CALL_STATUSES.CLOSED] },
+    })
+  ).select("title donorRef fundingSource amountCap status callType");
+
+  const callIds = calls.map((c) => c._id);
+  const [grants, proposals] = callIds.length
+    ? await Promise.all([
+        Grant.find(req.tierWhere({ callId: { $in: callIds } })).select(
+          "title donorRef fundingSource amountAwarded amountRequested budgetTotal status callId proposalId"
+        ),
+        Proposal.find(req.tierWhere({ fundingCallId: { $in: callIds } })).select(
+          "title status budgetTotal fundingCallId"
+        ),
+      ])
+    : [[], []];
+
+  const callById = new Map(calls.map((c) => [String(c._id), c]));
+  const coveredProposalIds = new Set();
+  const applications = [];
+
+  for (const grant of grants) {
+    if (!REQUESTED_GRANT_STATUSES.has(grant.status)) continue;
+    if (grant.proposalId) coveredProposalIds.add(String(grant.proposalId));
+    applications.push({
+      grant,
+      proposal: null,
+      call: callById.get(String(grant.callId)),
+    });
+  }
+
+  for (const proposal of proposals) {
+    if (coveredProposalIds.has(String(proposal._id))) continue;
+    if (!REQUESTED_PROPOSAL_STATUSES.has(proposal.status)) continue;
+    applications.push({
+      grant: null,
+      proposal,
+      call: callById.get(String(proposal.fundingCallId)),
+    });
+  }
 
   const byDonor = {};
-  for (const g of grants) {
-    const key = (g.donorRef || g.fundingSource || "Unspecified").trim();
+  for (const app of applications) {
+    const key = applicationGroupKey(app.grant, app.call);
     if (!byDonor[key]) {
       byDonor[key] = { donorRef: key, grantCount: 0, totalAwarded: 0, totalRequested: 0, grants: [] };
     }
+    const requested = requestedAmountOf(app);
+    const awarded =
+      app.grant && AWARDED_GRANT_STATUSES.has(app.grant.status)
+        ? Number(app.grant.amountAwarded || 0)
+        : 0;
     byDonor[key].grantCount += 1;
-    byDonor[key].totalAwarded += g.amountAwarded || 0;
-    byDonor[key].totalRequested += g.amountRequested || 0;
+    byDonor[key].totalAwarded += awarded;
+    byDonor[key].totalRequested += requested;
     byDonor[key].grants.push({
-      title: g.title,
-      status: g.status,
-      amountAwarded: g.amountAwarded,
-      amountRequested: g.amountRequested,
+      title: app.grant?.title || app.proposal?.title,
+      status: app.grant?.status || app.proposal?.status,
+      amountAwarded: awarded,
+      amountRequested: requested,
     });
   }
 
@@ -1477,7 +1562,7 @@ async function getDonorReport(req, res) {
     fundingCalls: calls.map((c) => ({
       id: c._id,
       title: c.title,
-      callType: c.callType || "internal",
+      callType: callTypeOf(c),
       donorRef: c.donorRef,
       fundingSource: c.fundingSource,
       amountCap: c.amountCap,

@@ -11,6 +11,7 @@ import { ProjectOutputsHub } from "../components/ProjectOutputsHub";
 import { ProgramTierBadge } from "../components/ProgramTierBadge";
 import { triggerBlobDownload } from "../utils/downloadBlob";
 import { dateIso, isDateInPast, minSelectableDate, pastDateMessage } from "../utils/dateConstraints";
+import { SubmitSuccessAlert } from "../components/SubmitValidationAlert";
 
 const emptyMilestone = { title: "", dueDate: "", completed: false };
 const emptyMember = { name: "", role: "member" };
@@ -27,6 +28,7 @@ export function ProjectDetailsPage() {
   const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [acceptedBanner, setAcceptedBanner] = useState("");
   const [closureForm, setClosureForm] = useState({
     finalReport: "",
     assetHandover: "",
@@ -73,6 +75,17 @@ export function ProjectDetailsPage() {
   }, [id, accessToken, programTier]);
 
   useEffect(() => {
+    if (location.state?.proposalAccepted) {
+      setAcceptedBanner(
+        location.state.message ||
+          "Congratulations — the proposal was accepted and this project is Open. Please continue your work."
+      );
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state?.proposalAccepted]);
+
+  useEffect(() => {
     if (location.state?.workflowHint === "publication_submitted") {
       setMessage(
         "Publication submitted — workflow, awards visibility, notifications, audit & project activity updated."
@@ -101,26 +114,33 @@ export function ProjectDetailsPage() {
 
   if (!project) {
     return (
-      <div className="card" style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 800 }}>{error ? "Could not open project" : "Loading project…"}</div>
-        {error ? (
-          <>
-            <p className="muted" style={{ marginTop: 8 }}>{error}</p>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-              <button type="button" className="btn primary" onClick={() => load().catch((e) => setError(e?.response?.data?.message || "Failed to load project"))}>
-                Retry
-              </button>
-              <Link className="btn" to="/projects">
-                Back to projects
-              </Link>
-              <Link className="btn" to="/notifications">
-                Notifications
-              </Link>
-            </div>
-          </>
-        ) : (
-          <p className="muted" style={{ marginTop: 8 }}>Fetching project details and workflow…</p>
-        )}
+      <div>
+        <SubmitSuccessAlert
+          title="Congratulations"
+          message={acceptedBanner}
+          onDismiss={() => setAcceptedBanner("")}
+        />
+        <div className="card" style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 800 }}>{error ? "Could not open project" : "Loading project…"}</div>
+          {error ? (
+            <>
+              <p className="muted" style={{ marginTop: 8 }}>{error}</p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+                <button type="button" className="btn primary" onClick={() => load().catch((e) => setError(e?.response?.data?.message || "Failed to load project"))}>
+                  Retry
+                </button>
+                <Link className="btn" to="/projects">
+                  Back to projects
+                </Link>
+                <Link className="btn" to="/notifications">
+                  Notifications
+                </Link>
+              </div>
+            </>
+          ) : (
+            <p className="muted" style={{ marginTop: 8 }}>Fetching project details and workflow…</p>
+          )}
+        </div>
       </div>
     );
   }
@@ -179,6 +199,11 @@ export function ProjectDetailsPage() {
       </div>
 
       {error ? <div className="card" style={{ borderColor: "rgba(255, 99, 132, 0.55)", marginTop: 12 }}>{error}</div> : null}
+      <SubmitSuccessAlert
+        title="Congratulations"
+        message={acceptedBanner}
+        onDismiss={() => setAcceptedBanner("")}
+      />
       {message ? <div className="card" style={{ borderColor: "rgba(45, 212, 191, 0.35)", marginTop: 12 }}>{message}</div> : null}
 
       <div className="card" style={{ marginTop: 12 }}>

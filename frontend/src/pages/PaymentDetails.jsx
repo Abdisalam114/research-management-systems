@@ -283,7 +283,7 @@ await reload();
                   <div style={{ fontWeight: 700 }}>{formatMoney(budget.totalAllocated, budget.currency)}</div>
                 </div>
                 <div>
-                  <div className="muted" style={{ fontSize: 12, fontWeight: 800 }}>Paid (disbursed)</div>
+                  <div className="muted" style={{ fontSize: 12, fontWeight: 800 }}>Paid</div>
                   <div style={{ fontWeight: 700 }}>{formatMoney(budget.totalDisbursed || 0, budget.currency)}</div>
                 </div>
                 <div>

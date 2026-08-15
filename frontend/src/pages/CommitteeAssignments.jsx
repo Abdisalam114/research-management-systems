@@ -6,7 +6,7 @@ import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
 import * as proposalApi from "../services/proposalApi";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
-import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
+import { filterByStatKey, statFilterLabel, buildSentReceivedPendingStats } from "../utils/pageHeaderFilters";
 
 export function CommitteeAssignmentsPage() {
   const { accessToken, user } = useAuth();
@@ -24,50 +24,30 @@ export function CommitteeAssignmentsPage() {
   const { loading, error, reload } = useModuleLoad(accessToken, load, [location.pathname]);
 
   const pending = useMemo(
-    () => assignments.filter((a) => a.actionRequired),
-    [assignments]
+    () =>
+      assignments.filter((a) =>
+        isDirector
+          ? a.committeeStage === "pending" || a.committeeStage === "in_progress"
+          : a.actionRequired
+      ),
+    [assignments, isDirector]
   );
-  const done = useMemo(
-    () => assignments.filter((a) => !a.actionRequired),
-    [assignments]
+  const received = useMemo(
+    () => assignments.filter((a) => !pending.includes(a)),
+    [assignments, pending]
   );
 
   const stats = useMemo(
-    () => [
-      {
-        label: isDirector ? "Awaiting committee" : "Assigned to you",
-        value: assignments.length,
-        filterKey: "all",
-      },
-      ...(!isDirector
-        ? [
-            {
-              label: "Action required",
-              value: pending.length,
-              filterKey: "pending",
-              accent: "#fbbf24",
-            },
-            ...(done.length > 0
-              ? [
-                  {
-                    label: "Done",
-                    value: done.length,
-                    filterKey: "done",
-                    accent: "#22c55e",
-                  },
-                ]
-              : []),
-          ]
-        : []),
-    ],
-    [assignments.length, pending.length, done.length, isDirector]
+    () => buildSentReceivedPendingStats(assignments.length, received.length, pending.length),
+    [assignments.length, received.length, pending.length]
   );
 
   const filtered = useMemo(() => {
     if (statusFilter === "pending") return pending;
-    if (statusFilter === "done") return done;
+    if (statusFilter === "received") return received;
+    if (statusFilter === "sent") return assignments;
     return filterByStatKey(assignments, statusFilter === "all" ? "all" : statusFilter);
-  }, [assignments, statusFilter, pending, done]);
+  }, [assignments, statusFilter, pending, received]);
 
   return (
     <div>
@@ -75,8 +55,8 @@ export function CommitteeAssignmentsPage() {
         title="Committee Reviews"
         subtitle={
           isCoordinator
-            ? "Proposals assigned to you — submit committee review here. Completed ones leave this list."
-            : "Proposals awaiting Faculty Coordinator review — completed ones move to finance on the Review page."
+            ? "Proposals sent to you for committee review. Total = Received + Pending. Received = reviews you finished."
+            : "Proposals you sent to Faculty Coordinators. Total = Received + Pending. Received = reviews that came back."
         }
         stats={stats}
         activeFilter={statusFilter}
@@ -112,24 +92,26 @@ export function CommitteeAssignmentsPage() {
             <div style={{ fontWeight: 800 }}>
               {assignments.length === 0
                 ? isCoordinator
-                  ? "No committee assignments yet"
+                  ? "No committee reviews yet"
                   : "No active proposals sent to committee"
                 : "No items match this filter"}
             </div>
             <p className="muted" style={{ marginTop: 8, fontSize: 14 }}>
               {isCoordinator
-                ? "When the Research Director assigns you, the proposal appears here until you submit your committee review."
-                : "When the coordinator finishes committee review, the proposal leaves this list. Open Proposals → Review to assign finance."}
+                ? "When the Research Director assigns you, the proposal appears here. Use the same portal (Undergraduate / Postgraduate)."
+                : "When the coordinator finishes, the proposal stays here as Received so you can assign finance or approve."}
             </p>
           </div>
         ) : (
           <div style={{ display: "grid", gap: 10 }}>
             {filtered.map((a) => {
-              const memberNames = (a.assignedCommittee || [])
-                .map((m) => m.fullName || m.email)
-                .filter(Boolean)
-                .join(", ");
-              const needsAction = isCoordinator ? a.actionRequired : true;
+              const members = a.assignedCommittee || [];
+              const isReceived = isDirector
+                ? a.committeeStage === "passed"
+                : Boolean(a.committeeSubmitted || !a.actionRequired);
+              const needsAction = isDirector
+                ? a.committeeStage === "pending" || a.committeeStage === "in_progress"
+                : Boolean(a.actionRequired);
               return (
                 <div key={a.id} className="card">
                   <div
@@ -148,7 +130,51 @@ export function CommitteeAssignmentsPage() {
                         {a.researcherName ? ` · PI: ${a.researcherName}` : ""}
                         {a.currentReviewStage ? ` · Stage: ${a.currentReviewStage}` : ""}
                       </div>
-                      {memberNames ? (
+                      {members.length > 0 ? (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13 }}>Committee members</div>
+                          <p className="muted" style={{ fontSize: 12, margin: "4px 0 8px" }}>
+                            Sent to {members.length}
+                            {isReceived ? (
+                              <>
+                                {" · "}
+                                <span style={{ color: "#22c55e", fontWeight: 600 }}>received</span>
+                              </>
+                            ) : (
+                              <>
+                                {" · "}
+                                <span style={{ color: "#fbbf24", fontWeight: 600 }}>pending</span>
+                              </>
+                            )}
+                          </p>
+                          <div style={{ display: "grid", gap: 6 }}>
+                            {members.map((m) => (
+                              <div
+                                key={m.id || m.email}
+                                style={{
+                                  fontSize: 13,
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  gap: 8,
+                                  flexWrap: "wrap",
+                                }}
+                              >
+                                <span>
+                                  <strong>{m.fullName || m.email || "Coordinator"}</strong>
+                                  {m.email && m.fullName ? (
+                                    <span className="muted"> · {m.email}</span>
+                                  ) : null}
+                                </span>
+                                {isReceived ? (
+                                  <span style={{ color: "#22c55e", fontWeight: 700 }}>✓ Received</span>
+                                ) : (
+                                  <span style={{ color: "#fbbf24", fontWeight: 700 }}>⏳ Pending</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
                         <div style={{ marginTop: 8, fontSize: 13 }}>
                           <span
                             style={{
@@ -164,7 +190,14 @@ export function CommitteeAssignmentsPage() {
                           >
                             Committee
                           </span>
-                          {memberNames}
+                        </div>
+                      )}
+                      {isReceived && a.committeeScore != null ? (
+                        <div className="muted" style={{ marginTop: 8, fontSize: 13 }}>
+                          Score: <strong>{a.committeeScore}/5</strong>
+                          {a.committeeDecision
+                            ? ` · ${String(a.committeeDecision).replace(/_/g, " ")}`
+                            : ""}
                         </div>
                       ) : null}
                       <p
@@ -176,8 +209,12 @@ export function CommitteeAssignmentsPage() {
                         }}
                       >
                         {isCoordinator
-                          ? "⏳ Committee review required — submit score & comment"
-                          : "⏳ Awaiting Faculty Coordinator review"}
+                          ? needsAction
+                            ? "⏳ Pending — action required"
+                            : "✓ Received"
+                          : needsAction
+                            ? "⏳ Pending — waiting for committee"
+                            : "✓ Received — assign finance or approve"}
                       </p>
                     </div>
                     <div

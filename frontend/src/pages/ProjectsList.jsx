@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import { useUrlStatFilter } from "../hooks/useUrlStatFilter";
@@ -9,6 +9,7 @@ import { ProjectWorkflowSummary } from "../components/ProjectWorkflowPanel";
 import { StatusBadge } from "../components/StatusBadge";
 import { ProgramTierBadge } from "../components/ProgramTierBadge";
 import { filterByStatKey, statFilterLabel } from "../utils/pageHeaderFilters";
+import { SubmitSuccessAlert } from "../components/SubmitValidationAlert";
 
 function projectKind(p) {
   if (p?.isVoluntary === false) return "grant_fund_call";
@@ -182,9 +183,12 @@ export function ProjectsListPage({
 } = {}) {
   const { accessToken, user } = useAuth();
   const { programTier } = useProgramTier();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [acceptedBanner, setAcceptedBanner] = useState("");
   const [busyId, setBusyId] = useState("");
   const [statusFilter, setStatusFilter] = useUrlStatFilter("all");
   const isDirector = user?.role === "research_director";
@@ -206,6 +210,17 @@ export function ProjectsListPage({
   useEffect(() => {
     load().catch((e) => setError(e?.response?.data?.message || "Failed to load projects"));
   }, [accessToken, programTier]);
+
+  useEffect(() => {
+    if (location.state?.proposalAccepted) {
+      setAcceptedBanner(
+        location.state.message ||
+          "Congratulations — the proposal was accepted and the project is Open. Please continue your work."
+      );
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state?.proposalAccepted]);
 
   const pendingDirectorClosures = useMemo(() => {
     if (!isDirector) return [];
@@ -348,6 +363,11 @@ export function ProjectsListPage({
         </p>
       ) : null}
       {error ? <div className="card" style={{ borderColor: "rgba(255, 99, 132, 0.55)" }}>{error}</div> : null}
+      <SubmitSuccessAlert
+        title="Congratulations"
+        message={acceptedBanner}
+        onDismiss={() => setAcceptedBanner("")}
+      />
       {message ? (
         <div className="card" style={{ borderColor: "rgba(45,212,191,0.35)", marginTop: 12 }}>
           {message}

@@ -7,6 +7,7 @@ import * as grantApi from "../services/grantApi";
 import { PageHeader } from "../components/PageHeader";
 import { StatusBadge } from "../components/StatusBadge";
 import { filterByStatKey, isAwardedItem, statFilterLabel } from "../utils/pageHeaderFilters";
+import { dedupeGrants } from "../utils/dedupeGrants";
 
 function GrantAmounts({ grant }) {
   const requested = Number(grant.amountRequested || 0);
@@ -83,9 +84,9 @@ export function GrantsPage() {
     const grantParams = projectIdFromUrl ? { projectId: projectIdFromUrl } : {};
     const res = await grantApi.listGrants(accessToken, grantParams);
     const all = res.grants || [];
-    // Funding-call applications only
-    const withCall = all.filter((g) => Boolean(g.callId));
-setGrants(withCall);
+    // Funding-call applications only — one card per researcher + call + proposal
+    const withCall = dedupeGrants(all.filter((g) => Boolean(g.callId)));
+    setGrants(withCall);
   }, [accessToken, projectIdFromUrl]);
 
   useEffect(() => {

@@ -22,6 +22,7 @@ import { ActiveProjectsPanel } from "./ActiveProjectsPanel";
 import { MetricProvenanceBar } from "./MetricProvenanceBar";
 import { SystemModulesGrid } from "./SystemModulesGrid";
 import { StatusBadge } from "./StatusBadge";
+import { PeerReviewRoster } from "./PeerReviewRoster";
 import { DashChart } from "./DashChart";
 import { triggerBlobDownload } from "../utils/downloadBlob";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
@@ -83,10 +84,12 @@ export function DirectorDashboard() {
         ]);
         if (!cancelled) {
           const list = peer.assignments || [];
-          const summary = peer.summary || {
-            total: list.length,
-            awaiting: list.filter((a) => a.awaitingLeadership || (a.pendingReviewers || 0) > 0).length,
-            received: list.filter((a) => !(a.awaitingLeadership || (a.pendingReviewers || 0) > 0)).length,
+          const awaiting = list.filter((a) => a.awaitingLeadership || (a.pendingReviewers || 0) > 0).length;
+          const summary = {
+            total: peer.summary?.total ?? list.length,
+            sent: peer.summary?.sent ?? peer.summary?.total ?? list.length,
+            awaiting: peer.summary?.awaiting ?? peer.summary?.pending ?? awaiting,
+            received: peer.summary?.received ?? Math.max(0, list.length - awaiting),
           };
           // Single source of truth: Peer Reviews tile = listMyReviewAssignments count
           const aligned = {
@@ -193,32 +196,35 @@ export function DirectorDashboard() {
       </section>
 
       <section className="dashboardSection">
-        <div className="dashboardSectionTitle">Peer Reviews — awaiting Leadership</div>
+        <div className="dashboardSectionTitle">Peer Reviews</div>
         <div className="card" style={{ marginTop: 8 }}>
           <p style={{ marginTop: 0, fontSize: 14 }}>
-            <strong>{peerSummary.total}</strong> awaiting Leadership review
-            {peerSummary.awaiting !== peerSummary.total ? (
-              <>
-                {" "}
-                · <strong style={{ color: "#fbbf24" }}>{peerSummary.awaiting}</strong> still pending
-              </>
-            ) : null}
-            {data.overview?.modules?.reviews != null ? (
-              <span className="muted"> · Tile: {data.overview.modules.reviews}</span>
-            ) : null}
+            <strong>Total {peerSummary.total}</strong>
+            {" · "}
+            <span style={{ color: "#38bdf8", fontWeight: 600 }}>Sent {peerSummary.sent ?? peerSummary.total}</span>
+            {" · "}
+            <span style={{ color: "#22c55e", fontWeight: 600 }}>
+              {peerSummary.received} received
+            </span>
+            {" · "}
+            <span style={{ color: "#fbbf24", fontWeight: 600 }}>
+              {peerSummary.awaiting} pending
+            </span>
           </p>
           {peerQueue.length === 0 ? (
             <p className="muted" style={{ marginBottom: 0, fontSize: 14 }}>
-              No proposals awaiting Leadership. After peer review completes, continue on the proposal Review page (committee).
+              No proposals sent to Leadership yet. Send a proposal from the Review page.
             </p>
           ) : (
             <div style={{ display: "grid", gap: 10 }}>
-              {peerQueue.map((a) => {
+              {[...peerQueue]
+                .sort((a, b) => {
+                  const pendingA = a.awaitingLeadership || (a.pendingReviewers || 0) > 0 ? 1 : 0;
+                  const pendingB = b.awaitingLeadership || (b.pendingReviewers || 0) > 0 ? 1 : 0;
+                  return pendingB - pendingA;
+                })
+                .map((a) => {
                 const awaiting = a.awaitingLeadership || (a.pendingReviewers || 0) > 0;
-                const names = (a.assignedReviewers || [])
-                  .map((r) => r.fullName || r.email)
-                  .filter(Boolean)
-                  .join(", ");
                 return (
                   <div
                     key={a.id}
@@ -226,7 +232,7 @@ export function DirectorDashboard() {
                       display: "flex",
                       justifyContent: "space-between",
                       gap: 12,
-                      alignItems: "center",
+                      alignItems: "flex-start",
                       flexWrap: "wrap",
                       paddingBottom: 8,
                       borderBottom: "1px solid rgba(148,163,184,0.2)",
@@ -234,9 +240,15 @@ export function DirectorDashboard() {
                   >
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontWeight: 700 }}>{a.title}</div>
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        Sent to reviewer{names ? `: ${names}` : ""} ·{" "}
-                        <span style={{ color: "#fbbf24", fontWeight: 600 }}>Awaiting Leadership</span>
+                      <PeerReviewRoster
+                        assignedReviewers={a.assignedReviewers}
+                        peerReviews={a.peerReviews}
+                        compact
+                      />
+                      <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                        <span style={{ color: awaiting ? "#fbbf24" : "#22c55e", fontWeight: 600 }}>
+                          {awaiting ? "Pending — waiting for Leadership" : "Received"}
+                        </span>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
