@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
@@ -16,6 +15,7 @@ import { useProgramTier } from "../hooks/useProgramTier";
 import * as analyticsApi from "../services/analyticsApi";
 import * as grantApi from "../services/grantApi";
 import { SystemModulesGrid } from "./SystemModulesGrid";
+import { DashChart } from "./DashChart";
 import {
   DASH_AXIS_TICK,
   DASH_CHART_TOOLTIP,
@@ -190,7 +190,7 @@ export function FinanceDashboard() {
           <div className="dashCardTitle">Budget item status</div>
           <div className="dashChartBlock">
             <div className="dashChartPlot">
-              <ResponsiveContainer width="100%" height="100%">
+              <DashChart>
                 <PieChart>
                   <Pie data={utilizationPie} innerRadius={48} outerRadius={72} dataKey="value" paddingAngle={2}>
                     {utilizationPie.map((_, i) => (
@@ -199,7 +199,7 @@ export function FinanceDashboard() {
                   </Pie>
                   <Tooltip contentStyle={DASH_CHART_TOOLTIP} />
                 </PieChart>
-              </ResponsiveContainer>
+              </DashChart>
             </div>
             <div className="dashChartLegend">
               {utilizationPie.map((entry, i) => (
@@ -217,7 +217,7 @@ export function FinanceDashboard() {
           <div className="dashCardTitle">Grants by status</div>
           <div className="dashChartBlock">
             <div className="dashChartPlot dashChartPlotBars">
-              <ResponsiveContainer width="100%" height="100%">
+              <DashChart height={176}>
                 <BarChart layout="vertical" data={grantBars} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
                   <XAxis type="number" tick={DASH_AXIS_TICK} />
                   <YAxis
@@ -230,7 +230,7 @@ export function FinanceDashboard() {
                   <Tooltip contentStyle={DASH_CHART_TOOLTIP} />
                   <Bar dataKey="value" fill={DASH_COLORS.accent} radius={[0, 6, 6, 0]} />
                 </BarChart>
-              </ResponsiveContainer>
+              </DashChart>
             </div>
           </div>
         </div>

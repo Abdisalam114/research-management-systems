@@ -1,4 +1,5 @@
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
+import { DashChart } from "./DashChart";
 import { DASH_AXIS_TICK, DASH_CHART_TOOLTIP, DASH_COLORS } from "../constants/dashboardTheme";
 
 export function InstitutionalAnalyticsSections({ data }) {
@@ -53,14 +54,14 @@ export function InstitutionalAnalyticsSections({ data }) {
         <div className="dashCard dashSpan6">
           <div className="dashCardTitle">Budget workflow</div>
           <div className="dashChartPlot">
-            <ResponsiveContainer width="100%" height="100%">
+            <DashChart>
               <BarChart data={budgetChart} margin={{ top: 8, right: 8, left: 0, bottom: 4 }}>
                 <XAxis dataKey="name" tick={{ ...DASH_AXIS_TICK, fontSize: 11 }} />
                 <YAxis tick={{ ...DASH_AXIS_TICK, fontSize: 11 }} width={36} />
                 <Tooltip contentStyle={DASH_CHART_TOOLTIP} />
                 <Bar dataKey="value" fill={DASH_COLORS.accent} radius={[8, 8, 0, 0]} />
               </BarChart>
-            </ResponsiveContainer>
+            </DashChart>
           </div>
         </div>
 

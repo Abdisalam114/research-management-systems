@@ -834,8 +834,8 @@ await fundingCallApi.publishFundingCall(accessToken, id);
                 {c.requiredDocuments ? (
                   <div className="fundingCallDocs">
                     <div className="fundingCallDocsLabel">Required documents</div>
-                    {c.requiredDocuments.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => (
-                      <div key={line}>• {line}</div>
+                    {c.requiredDocuments.split("\n").map((line) => line.trim()).filter(Boolean).map((line, idx) => (
+                      <div key={`${c.id}-doc-${idx}`}>• {line}</div>
                     ))}
                   </div>
                 ) : null}

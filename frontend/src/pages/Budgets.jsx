@@ -691,8 +691,8 @@ export function BudgetsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {financeReport.grantSummary.map((g) => (
-                    <tr key={g.title + g.status}>
+                  {financeReport.grantSummary.map((g, idx) => (
+                    <tr key={String(g.id || `${g.title}-${g.status}-${idx}`)}>
                       <td>{g.title}</td>
                       <td>{g.fundingSource || "—"}</td>
                       <td>{g.status}</td>

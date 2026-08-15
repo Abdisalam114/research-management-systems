@@ -55,7 +55,7 @@ export function ActiveProjectsPanel({
             {list.map((p) => {
               const piName = projectPiName(p);
               return (
-              <tr key={p.projectId || p.id + p.title}>
+              <tr key={p.projectId || p.id || `project-${p.title}`}>
                 <td className="dashColId">{p.id}</td>
                 <td className="dashColTitle" title={p.title}>
                   {p.projectId ? (

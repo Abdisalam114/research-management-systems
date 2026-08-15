@@ -347,7 +347,7 @@ setError(e?.response?.data?.message || "Could not save grant application.");
           ) : (
             <div className="grantApplyReqList">
               {requirementChecklist.map((item, idx) => (
-                <label key={item.label} className="grantApplyReqItem">
+                <label key={`req-${idx}-${item.label}`} className="grantApplyReqItem">
                   <input
                     type="checkbox"
                     checked={item.met}

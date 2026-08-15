@@ -262,6 +262,11 @@ export function ThesisGroupsPage() {
       } catch (_) {
         setDepartments([]);
       }
+      if (!canManage) {
+        setResearchers([]);
+        setResearchersError("");
+        return;
+      }
       try {
         // All researchers on this portal (Director may see non-active too; coordinator API returns active only).
         const usersRes = await userApi.listUsers(accessToken, { role: "researcher" });
@@ -278,7 +283,7 @@ export function ThesisGroupsPage() {
         );
       }
     })();
-  }, [accessToken, user?.role, programTier]);
+  }, [accessToken, user?.role, programTier, canManage]);
 
   const filteredResearchers = useMemo(() => {
     const q = researcherQuery.trim().toLowerCase();

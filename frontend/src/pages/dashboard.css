@@ -247,6 +247,7 @@
 
 .dashChartPlot {
   width: 100%;
+  min-width: 0;
   height: 168px;
   flex-shrink: 0;
 }

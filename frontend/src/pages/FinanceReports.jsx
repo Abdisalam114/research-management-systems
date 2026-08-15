@@ -80,8 +80,8 @@ export function FinanceReportsPage() {
             </tr>
           </thead>
           <tbody>
-            {grantRows.map((g) => (
-              <tr key={g.title + g.status}>
+            {grantRows.map((g, idx) => (
+              <tr key={String(g.id || `${g.title}-${g.status}-${idx}`)}>
                 <td>{g.title}</td>
                 <td>{g.fundingSource}</td>
                 <td>{g.status}</td>

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
@@ -23,6 +22,7 @@ import { ActiveProjectsPanel } from "./ActiveProjectsPanel";
 import { MetricProvenanceBar } from "./MetricProvenanceBar";
 import { SystemModulesGrid } from "./SystemModulesGrid";
 import { StatusBadge } from "./StatusBadge";
+import { DashChart } from "./DashChart";
 import { triggerBlobDownload } from "../utils/downloadBlob";
 import { scrollElementIntoAppView } from "../utils/scrollContainer";
 import {
@@ -291,7 +291,7 @@ export function DirectorDashboard() {
           <div className="dashChartBlock">
             <div className="dashChartPlot">
               {pieData.length ? (
-                <ResponsiveContainer width="100%" height="100%">
+                <DashChart>
                   <PieChart>
                     <Pie data={pieData} innerRadius={48} outerRadius={72} dataKey="value" paddingAngle={2}>
                       {pieData.map((_, i) => (
@@ -299,7 +299,7 @@ export function DirectorDashboard() {
                       ))}
                     </Pie>
                   </PieChart>
-                </ResponsiveContainer>
+                </DashChart>
               ) : (
                 <div className="muted" style={{ padding: 24, textAlign: "center" }}>
                   No project status data yet.
@@ -346,14 +346,14 @@ export function DirectorDashboard() {
               <span className="dashChartMetaValue">{formatMoney(grantFunding.activeFunds || 0)}</span>
             </div>
             <div className="dashChartPlot">
-              <ResponsiveContainer width="100%" height="100%">
+              <DashChart>
                 <LineChart data={grantFunding.trends || []} margin={{ top: 8, right: 12, left: 0, bottom: 4 }}>
                   <XAxis dataKey="month" tick={DASH_AXIS_TICK} interval="preserveStartEnd" />
                   <YAxis tick={DASH_AXIS_TICK} width={44} />
                   <Tooltip contentStyle={DASH_CHART_TOOLTIP} />
                   <Line type="monotone" dataKey="amount" stroke={DASH_COLORS.accent} strokeWidth={2} dot={false} />
                 </LineChart>
-              </ResponsiveContainer>
+              </DashChart>
             </div>
           </div>
         </div>
@@ -362,7 +362,7 @@ export function DirectorDashboard() {
           <div className="dashCardTitle">Research Output</div>
           <div className="dashChartBlock">
             <div className="dashChartPlot dashChartPlotBars">
-              <ResponsiveContainer width="100%" height="100%">
+              <DashChart height={176}>
                 <BarChart layout="vertical" data={outputBars} margin={{ top: 8, right: 16, left: 4, bottom: 4 }}>
                   <XAxis type="number" tick={DASH_AXIS_TICK} />
                   <YAxis
@@ -375,7 +375,7 @@ export function DirectorDashboard() {
                   <Tooltip contentStyle={DASH_CHART_TOOLTIP} />
                   <Bar dataKey="value" fill={DASH_COLORS.accent} radius={[0, 6, 6, 0]} />
                 </BarChart>
-              </ResponsiveContainer>
+              </DashChart>
             </div>
             <div className="dashStatRow dashStatRowSplit">
               <span>

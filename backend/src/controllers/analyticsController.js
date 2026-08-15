@@ -909,6 +909,7 @@ res.json({
       ).length,
     },
     grantSummary: grants.map((g) => ({
+      id: g._id,
       title: g.title,
       fundingSource: g.fundingSource,
       status: g.status,
