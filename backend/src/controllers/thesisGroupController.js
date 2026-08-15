@@ -284,7 +284,15 @@ async function findSupervisorResearcher(supervisorId, req) {
     status: USER_STATUSES.ACTIVE,
   };
   const scoped = req?.userWhere ? req.userWhere(filter) : filter;
-  return User.findOne(scoped);
+  const sup = await User.findOne(scoped);
+  if (!sup) return null;
+  if (req.user?.role === ROLES.FACULTY_COORDINATOR) {
+    const dept = resolveCoordinatorDepartment(req);
+    if (dept && !recordInCoordinatorFaculty(dept, sup.department)) {
+      throw new AppError("Supervisor must be in your faculty", 403);
+    }
+  }
+  return sup;
 }
 
 /** Notify Faculty Coordinator + Research Director about thesis title / updates. */

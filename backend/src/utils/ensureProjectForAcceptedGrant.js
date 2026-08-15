@@ -8,8 +8,8 @@ function looksLikeFundingAwardTitle(title) {
 }
 
 /**
- * Link an accepted grant to a real research Project.
- * Never invent a Project from a funding-call / grant name alone.
+ * Link an accepted grant to a real research Project (Open / active).
+ * Prefer the linked proposal. Never invent a project from the funding-call name alone.
  */
 async function ensureProjectForAcceptedGrant(grant, { programTier } = {}) {
   if (!grant?._id) return null;
@@ -17,9 +17,8 @@ async function ensureProjectForAcceptedGrant(grant, { programTier } = {}) {
   if (grant.projectId) {
     const existing = await Project.findById(grant.projectId);
     if (existing) {
-      // Drop link if the "project" is only a fake funding-named shell
-      if (!existing.proposalId && looksLikeFundingAwardTitle(existing.title)) {
-      } else {
+      const fakeShell = !existing.proposalId && looksLikeFundingAwardTitle(existing.title);
+      if (!fakeShell || !grant.proposalId) {
         return { project: existing, created: false, linked: false };
       }
     }
@@ -33,16 +32,12 @@ async function ensureProjectForAcceptedGrant(grant, { programTier } = {}) {
       return { project: byProposal, created: false, linked: true };
     }
 
-    // Create project from the real proposal title (research work), not the call name
     const proposal = await Proposal.findById(grant.proposalId).select(
       "title ethicsStatus researcherId programTier"
     );
-    if (proposal?.title && !looksLikeFundingAwardTitle(proposal.title)) {
+    const tier = programTier || grant.programTier || proposal?.programTier;
+    if (proposal?.title && tier) {
       const ethicsApproved = proposal.ethicsStatus === ETHICS_STATUSES.APPROVED;
-      const tier = programTier || grant.programTier || proposal.programTier;
-      if (!tier) {
-        return null;
-      }
       const project = await Project.create({
         proposalId: proposal._id,
         title: proposal.title,
@@ -63,10 +58,44 @@ async function ensureProjectForAcceptedGrant(grant, { programTier } = {}) {
     }
   }
 
-  // No real research project available — leave grant without inventing a fake project
-  grant.projectId = null;
-  await grant.save();
   return null;
 }
 
-module.exports = { ensureProjectForAcceptedGrant, looksLikeFundingAwardTitle };
+/** Chain funding records, then always fall back to an Open project from the proposal. */
+async function attachOpenProjectOnGrantAccept(grant, req) {
+  let fundCallLinks = null;
+  let projectResult = null;
+  let budgetResult = null;
+  try {
+    if (grant.callId || grant.proposalId) {
+      const { linkFundCallAwardChain } = require("./linkFundCallAwardChain");
+      const chain = await linkFundCallAwardChain({
+        grant,
+        programTier: grant.programTier || req.programTier,
+      });
+      fundCallLinks = chain?.summary || null;
+      if (chain?.project) {
+        projectResult = { project: chain.project, created: chain.created?.project };
+      }
+      if (chain?.budget) {
+        budgetResult = { budget: chain.budget, created: chain.created?.budget };
+      }
+    }
+  } catch (err) {
+    fundCallLinks = {
+      message: err.message || "Funding-call link incomplete.",
+    };
+  }
+  if (!projectResult?.project) {
+    projectResult = await ensureProjectForAcceptedGrant(grant, {
+      programTier: grant.programTier || req.programTier,
+    });
+  }
+  return { fundCallLinks, projectResult, budgetResult };
+}
+
+module.exports = {
+  ensureProjectForAcceptedGrant,
+  attachOpenProjectOnGrantAccept,
+  looksLikeFundingAwardTitle,
+};

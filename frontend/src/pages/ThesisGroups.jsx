@@ -227,6 +227,8 @@ export function ThesisGroupsPage() {
 
 
   const canManage = MANAGE_ROLES.includes(user?.role);
+  const lockFaculty = user?.role === "faculty_coordinator";
+  const homeFaculty = defaultFacultyForUser(user);
 
   const load = useCallback(async () => {
     const res = await thesisApi.listThesisGroups(accessToken);
@@ -313,8 +315,8 @@ export function ThesisGroupsPage() {
   }, [departments]);
 
   const departmentsForFaculty = useMemo(
-    () => departmentsByFaculty[form.faculty] || [],
-    [departmentsByFaculty, form.faculty]
+    () => departmentsByFaculty[lockFaculty ? homeFaculty : form.faculty] || [],
+    [departmentsByFaculty, form.faculty, lockFaculty, homeFaculty]
   );
 
   const stats = useMemo(() => {
@@ -386,6 +388,7 @@ export function ThesisGroupsPage() {
   }
 
   function onFacultyChange(faculty) {
+    if (lockFaculty) return;
     setForm((prev) => ({
       ...prev,
       faculty,
@@ -437,7 +440,12 @@ export function ThesisGroupsPage() {
         setError("Select a department under the chosen faculty.");
         return;
       }
-      const body = { ...form, students: cleanStudents, programTier: programTier || form.programTier || "undergraduate" };
+      const body = {
+        ...form,
+        students: cleanStudents,
+        programTier: programTier || form.programTier || "undergraduate",
+        faculty: lockFaculty ? homeFaculty : form.faculty,
+      };
       if (editingId) {
         await thesisApi.updateThesisGroup(accessToken, editingId, body);
       } else {
@@ -692,11 +700,21 @@ export function ThesisGroupsPage() {
           <div className="row">
             <div className="field">
               <label>Faculty *</label>
-              <select value={form.faculty} onChange={(e) => onFacultyChange(e.target.value)} required>
+              <select
+                value={lockFaculty ? homeFaculty : form.faculty}
+                onChange={(e) => onFacultyChange(e.target.value)}
+                required
+                disabled={lockFaculty}
+              >
                 {FACULTIES.map((f) => (
                   <option key={f.value} value={f.value}>{f.icon} {f.value}</option>
                 ))}
               </select>
+              {lockFaculty ? (
+                <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+                  Faculty is locked to your profile. Groups can only be created in your faculty.
+                </p>
+              ) : null}
             </div>
             <div className="field">
               <label>Department *</label>
@@ -753,7 +771,11 @@ export function ThesisGroupsPage() {
 
           <div className="row">
             <div className="field" style={{ flex: 1 }}>
-              <label>Assign supervisor (choose from all researchers)</label>
+              <label>
+                {lockFaculty
+                  ? "Assign supervisor (researchers in your faculty)"
+                  : "Assign supervisor (choose from researchers)"}
+              </label>
               <input
                 type="search"
                 value={researcherQuery}
