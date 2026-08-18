@@ -13,6 +13,7 @@ export const FINANCE_MENU_PATHS = [
   "/search",
   "/policies",
   "/notifications",
+  "/messages",
   "/profile",
 ];
 

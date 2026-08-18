@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
 import * as searchApi from "../services/searchApi";
+import { MESSAGE_ROLES } from "../constants/systemRoles";
 
 const GROUP_LABELS = {
   proposals: "Proposal",
@@ -25,7 +26,7 @@ const GROUP_LABELS = {
   auditEvents: "Audit",
 };
 
-const MESSAGE_ROLES = new Set(["researcher", "faculty_coordinator", "research_director"]);
+const MESSAGE_ROLE_SET = new Set(MESSAGE_ROLES);
 
 export function GlobalSearchBar() {
   const { accessToken, user } = useAuth();
@@ -38,7 +39,7 @@ export function GlobalSearchBar() {
   const [error, setError] = useState("");
 
   const trimmed = q.trim();
-  const canOpenMessages = MESSAGE_ROLES.has(user?.role);
+  const canOpenMessages = MESSAGE_ROLE_SET.has(user?.role);
 
   useEffect(() => {
     setResults(null);

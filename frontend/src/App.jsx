@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
-import { SYSTEM_ROLES } from "./constants/systemRoles";
+import { MESSAGE_ROLES, SYSTEM_ROLES } from "./constants/systemRoles";
 import { AppLayout } from "./layout/AppLayout";
 import { LoginPage } from "./pages/Login";
 import { RegisterPage } from "./pages/Register";
@@ -60,7 +60,7 @@ export default function App() {
           <Route path="/analytics" element={<Navigate to="/dashboard#institutional-analytics" replace />} />
           <Route path="/profile" element={<ProfilePage />} />
 
-          <Route element={<ProtectedRoute roles={["researcher", "faculty_coordinator", "research_director"]} />}>
+          <Route element={<ProtectedRoute roles={[...MESSAGE_ROLES]} />}>
             <Route path="/messages" element={<MessagesPage />} />
           </Route>
 

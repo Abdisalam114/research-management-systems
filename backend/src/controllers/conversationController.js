@@ -5,17 +5,33 @@ const { NOTIFICATION_TYPES } = require("../models/Notification");
 const { AppError } = require("../utils/AppError");
 const { notifyUser } = require("../utils/notify");
 const { userDisplayName } = require("../utils/userDisplay");
-const { CROSS_TIER_ROLES } = require("../utils/programTierScope");
+const { isCrossTierRole } = require("../utils/programTierScope");
 
 function isDirectorReq(req) {
   return req.user?.role === ROLES.RESEARCH_DIRECTOR;
 }
 
-/** Director sees/messages across UG+PG; researchers: own threads only; other staff: portal-scoped. */
+/**
+ * Own threads stay visible on either UG/PG portal so Director can reach
+ * Finance, Leadership, and Coordinator (and they can reply) without a portal mismatch.
+ */
 function convWhere(req, base = {}) {
-  if (isDirectorReq(req)) return base;
-  if (req.user?.role === ROLES.RESEARCHER) return base;
-  return req.tierWhere(base);
+  if (isDirectorReq(req) || req.user?.role === ROLES.RESEARCHER || isCrossTierRole(req.user?.role)) {
+    return base;
+  }
+  return req.tierWhere ? req.tierWhere(base) : base;
+}
+
+async function findActiveMessagePeers(otherIds) {
+  const users = await User.find({
+    _id: { $in: otherIds },
+    status: USER_STATUSES.ACTIVE,
+  }).select("_id role programTier");
+
+  if (users.length !== otherIds.length) {
+    throw new AppError("One or more selected users are invalid or inactive", 400);
+  }
+  return users;
 }
 
 function sanitizeConversation(c) {
@@ -76,28 +92,13 @@ async function enrichConversation(c, currentUserId) {
 }
 
 async function listMessageableUsers(req, res) {
-  const tier = req.programTier;
-  const base = {
+  const users = await User.find({
     status: USER_STATUSES.ACTIVE,
     _id: { $ne: req.user.id },
-  };
-  const query =
-    isDirectorReq(req)
-      ? base
-      : tier
-        ? {
-            ...base,
-            $or: [
-              { role: { $in: CROSS_TIER_ROLES } },
-              { role: ROLES.RESEARCHER, programTier: tier },
-            ],
-          }
-        : base;
-
-  const users = await User.find(query)
+  })
     .select("fullName name email role department programTier")
     .sort({ fullName: 1, name: 1 })
-    .limit(300);
+    .limit(500);
 
   res.json({
     users: users.map((u) => ({
@@ -106,6 +107,7 @@ async function listMessageableUsers(req, res) {
       email: u.email,
       role: u.role,
       department: u.department,
+      programTier: u.programTier || null,
     })),
   });
 }
@@ -174,16 +176,7 @@ async function createConversation(req, res) {
   const others = participantIds.map(String).filter((id) => id && id !== String(req.user.id));
   if (!others.length) throw new AppError("Select at least one other user", 400);
 
-  const activeUsers = await User.find(
-    isDirectorReq(req)
-      ? { _id: { $in: others }, status: USER_STATUSES.ACTIVE }
-      : req.userWhere
-        ? req.userWhere({ _id: { $in: others }, status: USER_STATUSES.ACTIVE })
-        : { _id: { $in: others }, status: USER_STATUSES.ACTIVE }
-  ).select("_id");
-  if (activeUsers.length !== others.length) {
-    throw new AppError("One or more selected users are invalid or inactive", 400);
-  }
+  await findActiveMessagePeers(others);
 
   const ids = Array.from(new Set([String(req.user.id), ...others])).slice(0, 20);
 
@@ -244,7 +237,6 @@ async function sendMessage(req, res) {
       title: `New message from ${senderName}`,
       body: preview,
       link,
-      programTier: conversation.programTier || req.programTier,
     });
     notified += 1;
   }

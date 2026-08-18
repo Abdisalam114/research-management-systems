@@ -8,6 +8,7 @@ import * as notificationApi from "../services/notificationApi";
 import logo from "../assets/jamhuriya-logo.png";
 import { isCrossTierRole, PROGRAM_TIER_OPTIONS, programTierLabel } from "../constants/programTier";
 import { SYSTEM_REFRESH_MS } from "../constants/systemRefresh";
+import { MESSAGE_ROLES } from "../constants/systemRoles";
 
 export function TopBar({ title = "Dashboard" }) {
   const { user, accessToken } = useAuth();
@@ -89,7 +90,7 @@ export function TopBar({ title = "Dashboard" }) {
             {canSwitchTier ? " ▾" : ""}
           </button>
         ) : null}
-        {["researcher", "faculty_coordinator", "research_director"].includes(user?.role) ? (
+        {MESSAGE_ROLES.includes(user?.role) ? (
           <Link className="topBarIconBtn" to="/messages" title="Messages">
             💬
           </Link>

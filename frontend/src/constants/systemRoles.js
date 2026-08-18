@@ -6,3 +6,6 @@ export const SYSTEM_ROLES = Object.freeze([
   "researcher",
   "leadership",
 ]);
+
+/** Direct messaging — Director, Coordinator, Finance, Leadership, and researchers. */
+export const MESSAGE_ROLES = SYSTEM_ROLES;

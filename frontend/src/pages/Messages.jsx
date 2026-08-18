@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { useProgramTier } from "../hooks/useProgramTier";
+import { programTierLabel, programTierShortLabel } from "../constants/programTier";
 import * as conversationApi from "../services/conversationApi";
 import "./messages.css";
 
@@ -101,13 +102,20 @@ export function MessagesPage() {
   const filteredUsers = useMemo(() => {
     const q = userQuery.trim().toLowerCase();
     if (!q) return users;
-    return users.filter(
-      (u) =>
-        u.fullName?.toLowerCase().includes(q) ||
-        u.email?.toLowerCase().includes(q) ||
-        u.department?.toLowerCase().includes(q) ||
-        u.role?.toLowerCase().includes(q)
-    );
+    return users.filter((u) => {
+      const hay = [
+        u.fullName,
+        u.email,
+        u.department,
+        u.role,
+        programTierLabel(u.programTier),
+        programTierShortLabel(u.programTier),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
   }, [users, userQuery]);
 
   async function startChat() {
@@ -168,6 +176,7 @@ export function MessagesPage() {
             {filteredUsers.map((u) => (
               <option key={u.id} value={u.id}>
                 {u.fullName} — {u.role} ({u.department || "—"})
+                {u.programTier ? ` · ${programTierLabel(u.programTier)}` : ""}
               </option>
             ))}
           </select>

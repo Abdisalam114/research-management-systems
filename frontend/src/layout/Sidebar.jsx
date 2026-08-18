@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { SYSTEM_ROLES } from "../constants/systemRoles";
+import { MESSAGE_ROLES, SYSTEM_ROLES } from "../constants/systemRoles";
 import logo from "../assets/jamhuriya-logo.png";
 
 const MENU = [
@@ -30,7 +30,7 @@ const MENU = [
   { to: "/repository", label: "Repository", icon: "🗄️", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/collaboration", label: "Collaboration", icon: "🤝", roles: ["research_director", "faculty_coordinator", "researcher"] },
   { to: "/groups", label: "Groups", icon: "🧑‍🤝‍🧑", roles: ["research_director", "faculty_coordinator", "researcher"] },
-  { to: "/messages", label: "Messages", icon: "💬", roles: ["research_director", "faculty_coordinator", "researcher"] },
+  { to: "/messages", label: "Messages", icon: "💬", roles: [...MESSAGE_ROLES] },
   { to: "/notifications", label: "Notifications", icon: "🔔", roles: [...SYSTEM_ROLES] },
   { to: "/pending-users", label: "Users", icon: "👥", roles: ["research_director"] },
   { to: "/departments", label: "Departments", icon: "🏛️", roles: ["research_director"] },
